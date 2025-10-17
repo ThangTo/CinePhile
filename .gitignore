@@ -1,0 +1,8 @@
+# Node.js
+node_modules/
+npm-debug.log
+.env # Nếu bạn có file .env chứa biến môi trường nhạy cảm
+
+# React (Create React App specific)
+build/
+.DS_Store
