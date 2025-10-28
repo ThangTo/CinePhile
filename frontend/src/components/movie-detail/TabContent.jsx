@@ -15,7 +15,7 @@ const TabContent = ({ activeTab, movie, audioType, onAudioTypeChange }) => {
         );
 
       case "cast":
-        return <CastSection movie={movie} />;
+        return <CastSection movie={movie} title={false} layout="detail" />;
 
       case "gallery":
         return (
@@ -38,7 +38,7 @@ const TabContent = ({ activeTab, movie, audioType, onAudioTypeChange }) => {
     }
   };
 
-  return <section className="container mx-auto px-4 py-8">{renderTabContent()}</section>;
+  return <section className="container mx-auto px-4 py-2">{renderTabContent()}</section>;
 };
 
 export default TabContent;

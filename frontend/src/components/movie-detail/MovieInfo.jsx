@@ -1,5 +1,5 @@
-import React from 'react';
-import CastSection  from './CastSection'
+import React from "react";
+import CastSection from "./CastSection";
 
 const MovieInfo = ({ movie }) => {
   return (
@@ -26,7 +26,7 @@ const MovieInfo = ({ movie }) => {
         <div className="lg:col-span-2">
           <h1 className="text-4xl font-bold mb-2">{movie.title}</h1>
           <h2 className="text-xl text-gray-300 mb-6">{movie.englishTitle}</h2>
-          
+
           {/* Info Badges */}
           <div className="flex flex-wrap gap-2 mb-4">
             <span className="bg-yellow-500 text-black px-3 py-1 rounded text-sm font-semibold">
@@ -49,7 +49,10 @@ const MovieInfo = ({ movie }) => {
           {/* Genres */}
           <div className="flex flex-wrap gap-2 mb-6">
             {movie.genres.map((genre, index) => (
-              <span key={index} className="bg-gray-700 text-gray-200 px-3 py-1 rounded-full text-sm">
+              <span
+                key={index}
+                className="bg-gray-700 text-gray-200 px-3 py-1 rounded-full text-sm"
+              >
                 {genre}
               </span>
             ))}
@@ -84,7 +87,7 @@ const MovieInfo = ({ movie }) => {
               <span className="text-gray-300">{movie.director}</span>
             </div>
           </div>
-          <CastSection movie={movie}/>
+          <CastSection movie={movie} />
         </div>
       </div>
     </section>

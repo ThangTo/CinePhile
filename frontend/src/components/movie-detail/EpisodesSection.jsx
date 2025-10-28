@@ -19,15 +19,15 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
   }, []);
 
   return (
-    <div className="p-[6px] pt-[24px]">
+    <>
       <div className="flex items-center justify-between mb-6">
         {/* Bộ nút filter */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
           {/* Dropdown "Phần" */}
           <div className="relative" ref={partRef}>
             <button
               onClick={() => setOpenPart((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-transparent px-4 py-2 text-gray-200 hover:border-primaryColor transition-colors"
+              className="inline-flex items-center justify-start gap-2 rounded-md lg:border lg:border-white/15 bg-transparent lg:px-4 px-1 lg:py-2 py-1 text-gray-200 hover:border-primaryColor transition-colors"
             >
               <i className="fa-solid fa-bars text-primaryColor" />
               <span className="font-medium">{activePart}</span>
@@ -72,38 +72,39 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
           </div>
 
           {/* Nút "Phụ đề" */}
-          <button
-            onClick={() => onAudioTypeChange && onAudioTypeChange("subtitle")}
-            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-gray-200 text-sm transition-colors
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onAudioTypeChange && onAudioTypeChange("subtitle")}
+              className={`flex lg:inline-flex items-center gap-2 rounded-md px-2 py-1 sm:px-4 sm:py-2 text-gray-200 text-sm transition-colors
               ${
                 audioType === "subtitle"
                   ? "border border-primaryColor"
-                  : "border border-white/15 hover:border-primaryColor"
+                  : "lg:border lg:border-white/15 hover:border-primaryColor"
               }`}
-          >
-            <i className="fa-solid fa-file-alt" />
-            <span>Phụ đề</span>
-          </button>
-
-          {/* Nút "Lồng tiếng" — chỉ hiển thị nếu API có */}
-          {/* {movie.hasDub && ( */}
-          <button
-            onClick={() => onAudioTypeChange && onAudioTypeChange("dub")}
-            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-gray-200 text-sm transition-colors
+            >
+              <i className="fa-solid fa-file-alt" />
+              <span>Phụ đề</span>
+            </button>
+            {/* Nút "Lồng tiếng" — chỉ hiển thị nếu API có */}
+            {/* {movie.hasDub && ( */}
+            <button
+              onClick={() => onAudioTypeChange && onAudioTypeChange("dub")}
+              className={`flex lg:inline-flex items-center gap-2 rounded-md px-2 py-1 sm:px-4 sm:py-2 text-gray-200 text-sm transition-colors
                 ${
                   audioType === "dub"
                     ? "border border-primaryColor"
-                    : "border border-white/15 hover:border-primaryColor"
+                    : "lg:border lg:border-white/15 hover:border-primaryColor"
                 }`}
-          >
-            <i className="fa-solid fa-microphone" />
-            <span>Lồng tiếng</span>
-          </button>
-          {/* )} */}
+            >
+              <i className="fa-solid fa-microphone" />
+              <span>Lồng tiếng</span>
+            </button>
+            {/* )} */}
+          </div>
         </div>
 
         {/* Công tắc Rút gọn – dùng pseudo after để knob trượt */}
-        <label className="flex items-center gap-3 cursor-pointer select-none">
+        <label className="flex items-start -mt-10 lg:-mt-0 lg:items-center gap-3 cursor-pointer select-none">
           <span className="text-sm text-gray-200">Rút gọn</span>
           <input
             type="checkbox"
@@ -127,17 +128,17 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
       </div>
 
       {/* Lưới tập phim */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
         {(isCondensed ? movie.episodes.slice(0, 12) : movie.episodes).map((episode) => {
           const isActive = activeEpisode === episode.id;
           return (
             <button
               key={episode.id}
               onClick={() => onEpisodeClick && onEpisodeClick(episode.id)}
-              className={`group flex items-center justify-center gap-3 rounded-xl border px-6 py-5 transition-colors ${
+              className={`group flex items-center justify-center gap-3 lg:rounded-xl rounded-md font-normal text-sm md:text-base px-2 md:px-6 py-[11px] md:py-[15px] transition-colors ${
                 isActive
                   ? "border-primaryColor bg-primaryColor text-black"
-                  : "border-white/10 bg-[#1f2430]/80 text-gray-200 hover:bg-[#2a3140]"
+                  : "bg-bgColor2 text-white hover:bg-bgColor2/80"
               }`}
             >
               <i
@@ -148,7 +149,7 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
                 }`}
               />
               <span
-                className={`font-medium transition-colors ${
+                className={`font-normal text-sm md:font-medium transition-colors ${
                   isActive ? "text-black" : "group-hover:text-primaryColor"
                 }`}
               >
@@ -158,7 +159,7 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
           );
         })}
       </div>
-    </div>
+    </>
   );
 };
 
