@@ -1,37 +1,35 @@
-import React, { useRef } from 'react';
-import MovieCard from './MovieCard';
+import React from "react";
+import SectionHeader from "./common/SectionHeader";
+import ScrollContainer from "./common/ScrollContainer";
+import MovieCard from "./MovieCard";
+import { mockSectionMovies } from "../data/mockData";
 
-const SectionRow = ({ title, movies = [] }) => {
-  const scrollerRef = useRef(null);
-
-  const scrollBy = (delta) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollBy({ left: delta, behavior: 'smooth' });
-  };
+/**
+ * Movie section with horizontal scrolling for ALL screen sizes
+ * @param {Object} props
+ * @param {string} props.title - Section title
+ * @param {Array} props.movies - Array of movie objects (optional, uses mock data if not provided)
+ * @param {string} props.sectionType - Type of section for mock data: 'trending' | 'newReleases'
+ * @param {string} props.linkHref - Optional "View all" link
+ */
+const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" }) => {
+  // Use provided movies or fallback to mock data
+  const displayMovies = movies || mockSectionMovies[sectionType] || [];
 
   return (
-    <section className="container mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold">{title}</h3>
-        <a href="#" className="text-sm text-cyan-400 hover:text-cyan-300">Xem toàn bộ</a>
-      </div>
+    <section className="w-full py-2 pl-4 sm:px-4 sm:py-6 overflow-visible">
+      <SectionHeader title={title} linkHref={linkHref} />
 
-      <div className="relative">
-        <div ref={scrollerRef} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pr-10">
-          {movies.map((m) => (
-            <div key={m.id} className="shrink-0 w-[46%] sm:w-[30%] md:w-[22%] lg:w-[16%] snap-start">
-              <MovieCard movie={m} />
-            </div>
+      {/* Horizontal Scroll for ALL screen sizes - with extra space for hover card */}
+      <div className="lg:-mt-4">
+        <ScrollContainer gap="gap-1 sm:gap-3" showArrows={false}>
+          {displayMovies.map((movie) => (
+            <MovieCard key={movie.id} movie={movie} />
           ))}
-        </div>
-        <button onClick={() => scrollBy(-400)} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/15">‹</button>
-        <button onClick={() => scrollBy(400)} className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/15">›</button>
+        </ScrollContainer>
       </div>
     </section>
   );
 };
 
 export default SectionRow;
-
-

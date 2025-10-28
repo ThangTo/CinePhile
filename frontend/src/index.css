@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-[#0b1220] text-white;
+    @apply bg-[#191b24] text-white font-sans;
   }
 }
 
@@ -23,6 +23,49 @@
   }
   .action-label {
     @apply text-sm;
+  }
+}
+
+@layer utilities {
+  .pretty-scroll {
+    /* Firefox */
+    scrollbar-width: thin; /* thin | auto | none */
+    scrollbar-color: rgb(148 163 184) transparent; /* thumb | track */
+
+    /* Ngăn layout giật khi hiện thanh cuộn */
+    scrollbar-gutter: stable both-edges;
+  }
+
+  /* Chrome/Edge/Safari */
+  .pretty-scroll::-webkit-scrollbar {
+    width: 8px; /* dọc */
+    height: 8px; /* ngang (nếu có) */
+  }
+  .pretty-scroll::-webkit-scrollbar-track {
+    background: transparent; /* trong suốt */
+    margin: 6px 2px; /* rút ngắn track trên/dưới để không đụng viền */
+  }
+  .pretty-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, rgba(203, 213, 225, 0.35), rgba(148, 163, 184, 0.35));
+    border-radius: 9999px;
+    border: 2px solid transparent; /* tạo khoảng cách giữa thumb và track */
+    background-clip: content-box;
+    transition: background 150ms ease, opacity 150ms ease;
+    opacity: 0.7;
+  }
+  /* Khi hover vào panel cuộn, làm thumb rõ hơn */
+  .pretty-scroll:hover::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, rgba(203, 213, 225, 0.6), rgba(148, 163, 184, 0.6));
+    opacity: 1;
+  }
+  /* Khi đang kéo */
+  .pretty-scroll::-webkit-scrollbar-thumb:active {
+    background: rgba(94, 234, 212, 0.8); /* điểm nhấn màu primary nếu thích */
+  }
+
+  /* Tuỳ chọn: ẩn thanh cuộn ngang nếu lỡ xuất hiện */
+  .pretty-scroll::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 
