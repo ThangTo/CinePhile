@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 
 /**
  * Reusable horizontal scroll container with navigation arrows
@@ -10,18 +10,92 @@ import React, { useRef } from "react";
  */
 const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className = "" }) => {
   const scrollerRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
-  const scrollBy = (delta) => {
+  // Function to check scroll position
+  const checkScrollPosition = () => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: delta, behavior: "smooth" });
+
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const maxScroll = Math.max(0, scrollWidth - clientWidth);
+    // Tolerance to avoid float precision issues
+    const isAtStart = scrollLeft <= 1;
+    const isAtEnd = scrollLeft >= maxScroll - 1;
+
+    setCanScrollLeft(!isAtStart);
+    setCanScrollRight(!isAtEnd);
+  };
+
+  // Check scroll position on mount and when children change
+  useEffect(() => {
+    checkScrollPosition();
+    // Also check after a delay to ensure DOM is fully rendered
+    const timeout = setTimeout(checkScrollPosition, 100);
+    return () => clearTimeout(timeout);
+  }, [children]);
+
+  // Listen to scroll events
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    el.addEventListener("scroll", checkScrollPosition);
+    // Also check on resize
+    window.addEventListener("resize", checkScrollPosition);
+
+    return () => {
+      el.removeEventListener("scroll", checkScrollPosition);
+      window.removeEventListener("resize", checkScrollPosition);
+    };
+  }, []);
+
+  const scrollByCard = (direction) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    // Check if can scroll in this direction
+    if (direction === 'left' && !canScrollLeft) return;
+    if (direction === 'right' && !canScrollRight) return;
+
+    // Get all children elements (movie cards)
+    const children = Array.from(el.children);
+    if (children.length === 0) return;
+
+    // Get first child element to calculate card width
+    const firstChild = children[0];
+    if (!firstChild) return;
+
+    // Get computed width of first card using getBoundingClientRect for accurate measurement
+    const cardRect = firstChild.getBoundingClientRect();
+    const cardWidth = cardRect.width;
+    if (!cardWidth) return;
+    
+    // Get gap value from computed style (handles responsive gaps - 0)
+    const computedStyle = window.getComputedStyle(el);
+    // Try to get gap or columnGap (for flexbox, columnGap is used)
+    const gapString = computedStyle.columnGap || computedStyle.gap || '0';
+    const gapValue = parseFloat(gapString) || 0;
+    
+    // Scroll by card width + gap and CLAMP to bounds so no extra trailing space
+    const scrollAmount = cardWidth + gapValue;
+    const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+    const target = direction === 'left'
+      ? Math.max(0, el.scrollLeft - scrollAmount)
+      : Math.min(maxScroll, el.scrollLeft + scrollAmount);
+    
+    el.scrollTo({ left: target, behavior: "smooth" });
+    
+    // Check position after scroll (with delay to account for smooth scroll)
+    setTimeout(checkScrollPosition, 300);
   };
 
   return (
     <div className={`relative ${className}`}>
       <div
         ref={scrollerRef}
-        className={`flex ${gap} overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing select-none lg:py-6 pr-[50px] `}
+        className={`flex ${gap} overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing select-none lg:py-6`}
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
@@ -55,20 +129,24 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
 
       {showArrows && (
         <>
-          <button
-            onClick={() => scrollBy(-400)}
-            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/15 transition-colors"
-            aria-label="Scroll left"
-          >
-            ‹
-          </button>
-          <button
-            onClick={() => scrollBy(400)}
-            className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/15 transition-colors"
-            aria-label="Scroll right"
-          >
-            ›
-          </button>
+          {canScrollLeft && (
+            <button
+              onClick={() => scrollByCard('left')}
+              className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-lg hover:bg-gray-100 transition-colors z-20 cursor-pointer"
+              aria-label="Scroll left"
+            >
+              <i className="fa-solid fa-chevron-left text-lg"></i>
+            </button>
+          )}
+          {canScrollRight && (
+            <button
+              onClick={() => scrollByCard('right')}
+              className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-lg hover:bg-gray-100 transition-colors z-20 cursor-pointer"
+              aria-label="Scroll right"
+            >
+              <i className="fa-solid fa-chevron-right text-lg"></i>
+            </button>
+          )}
         </>
       )}
     </div>

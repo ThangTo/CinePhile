@@ -14,17 +14,21 @@ import { mockSectionMovies } from "../data/mockData";
  */
 const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" }) => {
   // Use provided movies or fallback to mock data
-  const displayMovies = movies || mockSectionMovies[sectionType] || [];
+  const allMovies = movies || mockSectionMovies[sectionType] || [];
+  // Render all movies; widths ensure ~6 visible at once while allowing scroll
+  const displayMovies = allMovies;
 
   return (
     <section className="w-full py-2 pl-4 sm:px-4 sm:py-6 overflow-visible">
       <SectionHeader title={title} linkHref={linkHref} />
 
       {/* Horizontal Scroll for ALL screen sizes - with extra space for hover card */}
-      <div className="lg:-mt-4">
-        <ScrollContainer gap="gap-1 sm:gap-3" showArrows={false}>
+      <div className="lg:-mt-4 relative">
+        <ScrollContainer gap="gap-1 sm:gap-3" showArrows={true}>
           {displayMovies.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} />
+            <div key={movie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[200px]">
+              <MovieCard movie={movie} />
+            </div>
           ))}
         </ScrollContainer>
       </div>

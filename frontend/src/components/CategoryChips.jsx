@@ -13,16 +13,6 @@ const colors = [
   "from-slate-600 to-slate-500",
 ];
 
-// tạo slug an toàn cho URL, loại dấu và ký tự đặc biệt
-const slugify = (str = "") =>
-  String(str)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9\s-]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-");
-
 const CategoryChips = () => {
   return (
     <section className="w-full py-6">
@@ -34,7 +24,7 @@ const CategoryChips = () => {
           {chips.map((c, idx) => (
             <Link
               key={c}
-              to={`/genre/${slugify(c)}`}
+              to={`/genre/${encodeURIComponent(c)}`}
               className={`relative flex flex-col items-center justify-center flex-shrink-0 w-[120px] rounded-xl p-3 text-white bg-gradient-to-br ${
                 colors[idx % colors.length]
               } overflow-hidden`}
@@ -51,7 +41,7 @@ const CategoryChips = () => {
           {chips.map((c, idx) => (
             <Link
               key={c}
-              to={`/genre/${slugify(c)}`}
+              to={`/genre/${encodeURIComponent(c)}`}
               className={`flex flex-col items-start justify-end rounded-xl p-6 text-white bg-gradient-to-br hover:translate-y-[-5px] transition-all duration-300 ${
                 colors[idx % colors.length]
               } overflow-hidden`}

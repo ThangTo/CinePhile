@@ -82,7 +82,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
   }, [allMovies, requestedKey, pageType]);
 
   const { page, totalPages, paginatedData: paginatedMovies, handlePrev, handleNext } =
-    usePagination(filtered, 24);
+    usePagination(filtered, 8);
 
   const emptyText = pageType === "genre" ? "Không tìm thấy phim cho thể loại này." : "Không tìm thấy phim cho quốc gia này.";
 
