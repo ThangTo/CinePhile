@@ -11,7 +11,7 @@ import HoverCardGenres from "./HoverCardGenres";
  * @param {Object} props
  * @param {Object} props.movie - Movie data
  */
-const MovieHoverCard = ({ movie }) => {
+const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) => {
   const navigate = useNavigate();
 
   // Handler functions
@@ -33,19 +33,20 @@ const MovieHoverCard = ({ movie }) => {
   };
 
   return (
-    <div className="w-[400px] h-full pb-2 rounded-xl overflow-hidden bg-gray-800 shadow-2xl">
+    <div className={`${hoverClass} h-full pb-2 rounded-xl overflow-hidden bg-gray-800 shadow-2xl`}>
       {/* Header with backdrop and title */}
       <HoverCardHeader
         backdropUrl={movie.backdropUrl || movie.posterUrl || movie.poster}
         title={movie.title}
         subtitle={movie.subtitle || movie.englishTitle}
+        compact={compact}
         onClick={handleHeaderClick}
       />
 
       {/* Content */}
-      <div className="p-4 space-y-3">
+      <div className={`${compact ? "p-3 space-y-2" : "p-4 space-y-3"}`}>
         {/* Action Buttons */}
-        <HoverCardActions onWatch={handleWatch} onLike={handleLike} onInfo={handleInfo} />
+        <HoverCardActions onWatch={handleWatch} onLike={handleLike} onInfo={handleInfo} compact={compact} />
 
         {/* Movie Info Badges */}
         <HoverCardInfo

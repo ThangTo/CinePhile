@@ -12,6 +12,13 @@ const WithHoverCard = ({
   viewportPaddingLeft = 16,
   viewportPaddingRight = 34,
   onClick,
+  // showHoverOn: Tailwind breakpoint name where hover popup becomes visible (e.g., 'md' or 'lg').
+  // If set to 'none' the popup will always be visible (no hidden class).
+  showHoverOn = "lg",
+  // hoverCardClass: class applied to the hover card container (controls width/size).
+  hoverCardClass = "w-[400px]",
+  // compact: render a denser/smaller hover content to fit small cards
+  compact = false,
 }) => {
   const { showHoverCard, isAnimating, handleMouseEnter, handleMouseLeave } = useMovieHover(
     showDelay,
@@ -124,7 +131,9 @@ const WithHoverCard = ({
       {showHoverCard && (
         <div
           ref={hoverShellRef}
-          className={`hidden lg:block absolute ${hoverPosition} pointer-events-auto`}
+          className={`absolute ${hoverPosition} pointer-events-auto ${
+            showHoverOn === "none" ? "block" : `hidden ${showHoverOn}:block`
+          }`}
           style={{
             zIndex: 9999,
             transform: `translate(${offset.x}px, ${offset.y}px)`,
@@ -133,9 +142,9 @@ const WithHoverCard = ({
           onMouseEnter={onEnter}
           onMouseLeave={onLeave}
         >
-          <div className={isAnimating ? "animate-pop-up" : "opacity-0"}>
-            <MovieHoverCard movie={movie} />
-          </div>
+            <div className={isAnimating ? "animate-pop-up" : "opacity-0"}>
+              <MovieHoverCard movie={movie} hoverClass={hoverCardClass} compact={compact} />
+            </div>
         </div>
       )}
     </div>
@@ -143,3 +152,6 @@ const WithHoverCard = ({
 };
 
 export default WithHoverCard;
+
+
+

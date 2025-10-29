@@ -27,6 +27,19 @@
 }
 
 @layer utilities {
+  /* Fluid typography utilities using clamp(min, vw-based, max) */
+  .text-fluid-xs { font-size: clamp(0.75rem, 0.67rem + 0.25vw, 0.875rem); }
+  .text-fluid-sm { font-size: clamp(0.875rem, 0.80rem + 0.35vw, 1rem); }
+  .text-fluid-base { font-size: clamp(1rem, 0.90rem + 0.50vw, 1.125rem); }
+  .text-fluid-lg { font-size: clamp(1.125rem, 1.00rem + 0.75vw, 1.5rem); }
+  .text-fluid-xl { font-size: clamp(1.25rem, 1.05rem + 1.10vw, 2rem); }
+  .text-fluid-2xl { font-size: clamp(1.5rem, 1.20rem + 1.60vw, 2.5rem); }
+  .text-fluid-3xl { font-size: clamp(1.875rem, 1.40rem + 2.00vw, 3rem); }
+
+  /* Optional: fluid leading for big headings */
+  .leading-fluid-tight { line-height: clamp(1.1, 1.05 + 0.2vw, 1.25); }
+  .leading-fluid-normal { line-height: clamp(1.3, 1.15 + 0.2vw, 1.5); }
+
   .pretty-scroll {
     /* Firefox */
     scrollbar-width: thin; /* thin | auto | none */

@@ -8,9 +8,9 @@ import React from "react";
  * @param {string} props.subtitle - Movie subtitle/English title
  * @param {Function} props.onClick - Click handler (optional)
  */
-const HoverCardHeader = ({ backdropUrl, title, subtitle, onClick }) => (
+const HoverCardHeader = ({ backdropUrl, title, subtitle, onClick, compact = false }) => (
   <div
-    className="relative h-[225px] w-full overflow-hidden cursor-pointer hover:brightness-110 transition-all"
+    className={`relative ${compact ? "h-[160px]" : "h-[225px]"} w-full overflow-hidden cursor-pointer hover:brightness-110 transition-all`}
     onClick={onClick}
   >
     <img src={backdropUrl} alt={title} className="h-full w-full object-cover" draggable="false" />
@@ -19,8 +19,8 @@ const HoverCardHeader = ({ backdropUrl, title, subtitle, onClick }) => (
 
     {/* Title overlay on image */}
     <div className="absolute inset-x-0 bottom-0 px-4 pb-3">
-      <h3 className="text-xl font-bold text-white mb-1 drop-shadow-lg line-clamp-2">{title}</h3>
-      {subtitle && <p className="text-sm text-yellow-400 font-semibold">{subtitle}</p>}
+      <h3 className={`${compact ? "text-lg" : "text-xl"} font-bold text-white mb-1 drop-shadow-lg line-clamp-2`}>{title}</h3>
+      {subtitle && <p className={`${compact ? "text-xs" : "text-sm"} text-yellow-400 font-semibold`}>{subtitle}</p>}
     </div>
   </div>
 );

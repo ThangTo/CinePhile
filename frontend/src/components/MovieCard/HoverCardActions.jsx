@@ -9,15 +9,15 @@ import ActionButton from "../BannerHome/ActionButton";
  * @param {Function} props.onLike - Like button click handler
  * @param {Function} props.onInfo - Info button click handler
  */
-const HoverCardActions = ({ onWatch, onLike, onInfo }) => (
+const HoverCardActions = ({ onWatch, onLike, onInfo, compact = false }) => (
   <div className="flex gap-2">
     {/* Watch Now Button - Custom gradient style */}
     <button
       onClick={onWatch}
-      className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-black font-semibold rounded-lg py-2.5 px-4 transition-all shadow-lg"
+      className={`flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-black font-semibold rounded-lg ${compact ? "py-2 px-3 text-xs" : "py-2.5 px-4"} transition-all shadow-lg`}
     >
-      <i className="fa-solid fa-play text-sm" />
-      <span className="text-sm">Xem ngay</span>
+      <i className={`fa-solid fa-play ${compact ? "text-xs" : "text-sm"}`} />
+      <span className={`${compact ? "text-xs" : "text-sm"}`}>Xem ngay</span>
     </button>
 
     {/* Like Button - Reuse ActionButton */}
@@ -26,7 +26,7 @@ const HoverCardActions = ({ onWatch, onLike, onInfo }) => (
         icon="fa-heart"
         onClick={onLike}
         variant="default"
-        size="sm"
+        size={compact ? "sm" : "md"}
         ariaLabel="Thích"
       />
     </div>
@@ -37,7 +37,7 @@ const HoverCardActions = ({ onWatch, onLike, onInfo }) => (
         icon="fa-info-circle"
         onClick={onInfo}
         variant="default"
-        size="sm"
+        size={compact ? "sm" : "md"}
         ariaLabel="Chi tiết"
       />
     </div>

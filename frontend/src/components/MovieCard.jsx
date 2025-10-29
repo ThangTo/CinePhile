@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import WithHoverCard from "./common/WithHoverCard";
 
-const MovieCard = ({ movie }) => {
+const MovieCard = ({ movie, hoverVisibleAt = "lg", hoverCardClass, hoverPosition = "-left-20 -top-4", compact = false }) => {
   const navigate = useNavigate();
 
   const handleClick = () => {
@@ -12,8 +12,12 @@ const MovieCard = ({ movie }) => {
   return (
     <WithHoverCard
       movie={movie}
-      hoverPosition="-left-20 -top-4"
-      className="relative flex-shrink-0 w-[45%] sm:w-[32%] md:w-[23%] lg:w-[16.5%] min-w-[150px] snap-start overflow-visible"
+      hoverPosition={hoverPosition}
+      // Let the parent grid control column sizing. Use full width inside grid cell.
+      className="relative w-full overflow-visible"
+      showHoverOn={hoverVisibleAt}
+      hoverCardClass={hoverCardClass}
+      compact={compact}
     >
       <div
         className="group relative rounded-lg overflow-visible bg-[#0f172a] border border-white/10 select-none cursor-pointer transition-all hover:border-primaryColor/50"
