@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GenreTag, BannerBackground, MovieInfo, useBannerConfig } from "../BannerHome/index";
+import RatingModal from "../watch/RatingModal";
 
 /**
  * Mobile Movie Hero Component - Hero section for mobile movie detail page
@@ -11,6 +12,7 @@ import { GenreTag, BannerBackground, MovieInfo, useBannerConfig } from "../Banne
 const MobileMovieHero = ({ movie }) => {
   const navigate = useNavigate();
   const [showInfo, setShowInfo] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Reuse BannerHome's config hook to generate infoBadges
   const { infoBadges } = useBannerConfig(movie);
@@ -186,7 +188,10 @@ const MobileMovieHero = ({ movie }) => {
           </button>
 
           {/* Rating Button - Star icon only */}
-          <button className="flex flex-col items-center gap-2 hover:text-yellow-400 transition-colors">
+          <button
+            onClick={() => setShowRatingModal(true)}
+            className="flex flex-col items-center gap-2 hover:text-yellow-400 transition-colors"
+          >
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-star text-xl text-yellow-400" />
             </div>
@@ -194,6 +199,9 @@ const MobileMovieHero = ({ movie }) => {
           </button>
         </div>
       </div>
+
+      {/* Rating Modal */}
+      <RatingModal isOpen={showRatingModal} onClose={() => setShowRatingModal(false)} movie={movie} />
     </div>
   );
 };

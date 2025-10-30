@@ -76,6 +76,7 @@ export const GENRE_CATEGORIES = [
   { label: "Đau Thương", href: "/genre/dau-thuong" },
   { label: "Đời Thường", href: "/genre/doi-thuong" },
   { label: "Âm Thực", href: "/genre/am-thuc" },
+  { label: "Lồng Tiếng", href: "/genre/long-tieng" },
 ];
 
 // Country categories (Quốc gia)

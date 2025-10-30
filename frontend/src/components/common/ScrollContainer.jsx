@@ -95,12 +95,11 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
     <div className={`relative ${className}`}>
       <div
         ref={scrollerRef}
-        className={`flex ${gap} overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing select-none lg:py-6`}
+        className={`flex ${gap} overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing select-none lg:py-6`}
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
           WebkitOverflowScrolling: "touch",
-          overflowY: "visible",
         }}
         onMouseDown={(e) => {
           const el = e.currentTarget;
@@ -138,7 +137,7 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
               <i className="fa-solid fa-chevron-left text-lg"></i>
             </button>
           )}
-          {canScrollRight && (
+          {canScrollRight ? (
             <button
               onClick={() => scrollByCard('right')}
               className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-lg hover:bg-gray-100 transition-colors z-20 cursor-pointer"
@@ -146,7 +145,7 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
             >
               <i className="fa-solid fa-chevron-right text-lg"></i>
             </button>
-          )}
+          ) : <div className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 h-10 w-14 items-center justify-center rounded-full bg-transparent text-black transition-colors z-20 cursor-pointer"></div>}
         </>
       )}
     </div>

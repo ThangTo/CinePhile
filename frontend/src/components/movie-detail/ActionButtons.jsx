@@ -1,14 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useToast from "../../hooks/useToast";
 import useAuth from "../../hooks/useAuth";
 import ToastContainer from "../common/ToastContainer";
 import AuthModal from "../auth/AuthModal";
+import RatingModal from "../watch/RatingModal";
 
 const ActionButtons = ({ movie }) => {
   const navigate = useNavigate();
   const { toasts, removeToast, success, info } = useToast();
   const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal } = useAuth();
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   const handleAddFavorite = () => {
     if (!isAuthenticated) {
@@ -42,7 +44,7 @@ const ActionButtons = ({ movie }) => {
       openAuthModal("login");
       return;
     }
-    info("Chức năng đánh giá sẽ được tích hợp!");
+    setShowRatingModal(true);
   };
 
   return (
@@ -104,6 +106,7 @@ const ActionButtons = ({ movie }) => {
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <AuthModal isOpen={showAuthModal} onClose={closeAuthModal} initialMode={authMode} />
+      <RatingModal isOpen={showRatingModal} onClose={() => setShowRatingModal(false)} movie={movie} />
     </>
   );
 };

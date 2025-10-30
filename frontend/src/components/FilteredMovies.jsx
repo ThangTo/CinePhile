@@ -89,7 +89,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
   return (
     <div className="min-h-screen bg-bgColor">
       <Header />
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-20">
         <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6">Phim {displayLabel}</h1>
 
         {filtered.length === 0 ? (
