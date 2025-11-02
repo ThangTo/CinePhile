@@ -7,6 +7,7 @@ import Pagination from "./common/Pagination";
 import usePagination from "../hooks/usePagination";
 import { mockTop10Movies, mockSectionMovies } from "../data/mockData";
 import { GENRE_CATEGORIES, COUNTRY_CATEGORIES } from "./Header/constants";
+import { slugify, buildSlugMap } from "../utils/slugify";
 
 const collectAllMovies = () => {
   const sections = [];
@@ -15,15 +16,6 @@ const collectAllMovies = () => {
   return [...mockTop10Movies, ...sections];
 };
 
-const slugify = (str = "") =>
-  String(str)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9\s-]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-");
-
 const FilteredMovies = ({ pageType = "genre" }) => {
   const { slug } = useParams();
   const raw = decodeURIComponent(slug || "");
@@ -31,15 +23,9 @@ const FilteredMovies = ({ pageType = "genre" }) => {
   const allMovies = React.useMemo(() => collectAllMovies(), []);
 
   const headerLabelMap = React.useMemo(() => {
-    const toPairs = (arr) =>
-      (arr || []).map((item) => {
-        const parts = (item.href || "").split("/");
-        const key = parts[parts.length - 1];
-        return [key, item.label];
-      });
     return {
-      genre: new Map(toPairs(GENRE_CATEGORIES)),
-      country: new Map(toPairs(COUNTRY_CATEGORIES)),
+      genre: buildSlugMap(GENRE_CATEGORIES),
+      country: buildSlugMap(COUNTRY_CATEGORIES),
     };
   }, []);
 

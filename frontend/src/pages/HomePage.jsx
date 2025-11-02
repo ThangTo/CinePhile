@@ -5,6 +5,7 @@ import CategoryChips from "../components/CategoryChips";
 import SectionRow from "../components/SectionRow";
 import Top10Movie from "../components/Top10Movie";
 import SiteFooter from "../components/SiteFooter";
+import QuickAdminLogin from "../components/QuickAdminLogin";
 
 /**
  * Home Page

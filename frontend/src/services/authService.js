@@ -1,10 +1,16 @@
-// Authentication service for API calls
-// Replace API_URL with your actual backend URL
+/**
+ * Authentication Service
+ * Handles login, register, logout, and session management
+ */
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-
-// Mock mode for development (set to false when backend is ready)
-const USE_MOCK = true;
+import { MOCK_USERS, DEFAULT_USER_TEMPLATE, getRandomAvatar } from "../data/mockUsers";
+import {
+  API_URL,
+  USE_MOCK_AUTH,
+  STORAGE_KEYS,
+  VALIDATION_RULES,
+  AUTH_ERRORS,
+} from "../constants/auth";
 
 /**
  * Login user with email and password
@@ -14,28 +20,29 @@ const USE_MOCK = true;
  */
 export const login = async (email, password) => {
   // Mock login for development
-  if (USE_MOCK) {
+  if (USE_MOCK_AUTH) {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
-        // Simple mock validation
-        if (email && password) {
+        // Find user in mock database
+        const foundUser = MOCK_USERS.find(
+          (u) => u.email === email && u.password === password
+        );
+
+        if (foundUser) {
+          // Don't send password to client
+          const { password: _, ...userWithoutPassword } = foundUser;
+          
+          const userData = {
+            ...DEFAULT_USER_TEMPLATE,
+            ...userWithoutPassword, // Override defaults with actual user data
+          };
+          
           resolve({
             token: "mock-jwt-token-" + Date.now(),
-            user: {
-              id: 1,
-              username: "ThangTo",
-              email: email,
-              avatar: "https://i.pravatar.cc/150?img=68",
-              premium: false,
-              coins: 1000,
-              watchlist: 0,
-              hasPassword: true,
-              loginMethod: "email",
-              gender: "other",
-            },
+            user: userData,
           });
         } else {
-          reject(new Error("Email hoặc mật khẩu không đúng"));
+          reject(new Error(AUTH_ERRORS.INVALID_CREDENTIALS));
         }
       }, 500);
     });
@@ -67,29 +74,54 @@ export const login = async (email, password) => {
  */
 export const register = async (username, email, password) => {
   // Mock register for development
-  if (USE_MOCK) {
+  if (USE_MOCK_AUTH) {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
-        // Simple mock validation
-        if (username && email && password) {
-          resolve({
-            token: "mock-jwt-token-" + Date.now(),
-            user: {
-              id: 1,
-              username: username,
-              email: email,
-              avatar: "https://i.pravatar.cc/150?img=68",
-              premium: false,
-              coins: 1000,
-              watchlist: 0,
-              hasPassword: true,
-              loginMethod: "email",
-              gender: "other",
-            },
-          });
-        } else {
-          reject(new Error("Vui lòng điền đầy đủ thông tin"));
+        // Check if email already exists
+        const existingUser = MOCK_USERS.find((u) => u.email === email);
+        if (existingUser) {
+          reject(new Error(AUTH_ERRORS.EMAIL_EXISTS));
+          return;
         }
+
+        // Validate input
+        if (!username || !email || !password) {
+          reject(new Error(AUTH_ERRORS.REQUIRED_FIELDS));
+          return;
+        }
+
+        if (password.length < VALIDATION_RULES.PASSWORD_MIN_LENGTH) {
+          reject(new Error(AUTH_ERRORS.WEAK_PASSWORD));
+          return;
+        }
+
+        if (!VALIDATION_RULES.EMAIL_REGEX.test(email)) {
+          reject(new Error(AUTH_ERRORS.INVALID_EMAIL));
+          return;
+        }
+
+        // Create new user (default role: user)
+        const newUser = {
+          id: MOCK_USERS.length + 1,
+          username: username,
+          email: email,
+          password: password, // In production, hash this
+          role: "user", // New users are always "user" role
+          avatar: getRandomAvatar(),
+          joinDate: new Date().toISOString().split("T")[0],
+          ...DEFAULT_USER_TEMPLATE,
+        };
+
+        // Add to mock database
+        MOCK_USERS.push(newUser);
+
+        // Return without password
+        const { password: _, ...userWithoutPassword } = newUser;
+        
+        resolve({
+          token: "mock-jwt-token-" + Date.now(),
+          user: userWithoutPassword,
+        });
       }, 500);
     });
   }
@@ -115,8 +147,9 @@ export const register = async (username, email, password) => {
  * Logout user (clear local storage and optionally call backend)
  */
 export const logout = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
+  localStorage.removeItem(STORAGE_KEYS.TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.USER);
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   // Optional: Call backend to invalidate token
   // await fetch(`${API_URL}/auth/logout`, { ... });
 };
@@ -126,11 +159,16 @@ export const logout = () => {
  * @returns {object|null}
  */
 export const getCurrentUser = () => {
-  const token = localStorage.getItem("token");
-  const user = localStorage.getItem("user");
+  const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+  const user = localStorage.getItem(STORAGE_KEYS.USER);
 
   if (token && user) {
-    return JSON.parse(user);
+    try {
+      return JSON.parse(user);
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      return null;
+    }
   }
 
   return null;
@@ -141,7 +179,16 @@ export const getCurrentUser = () => {
  * @returns {boolean}
  */
 export const isAuthenticated = () => {
-  return !!localStorage.getItem("token");
+  return !!localStorage.getItem(STORAGE_KEYS.TOKEN);
+};
+
+/**
+ * Check if user is admin
+ * @returns {boolean}
+ */
+export const isAdmin = () => {
+  const user = getCurrentUser();
+  return user?.role === "admin";
 };
 
 /**
@@ -149,7 +196,7 @@ export const isAuthenticated = () => {
  * @returns {string|null}
  */
 export const getToken = () => {
-  return localStorage.getItem("token");
+  return localStorage.getItem(STORAGE_KEYS.TOKEN);
 };
 
 /**
@@ -158,6 +205,6 @@ export const getToken = () => {
  * @param {object} user
  */
 export const setAuthData = (token, user) => {
-  localStorage.setItem("token", token);
-  localStorage.setItem("user", JSON.stringify(user));
+  localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
 };

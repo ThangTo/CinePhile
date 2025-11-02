@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { slugify } from "../utils/slugify";
 
 const chips = ["Marvel", "4K", "Sitcom", "Lồng Tiếng", "Xuyên Không", "Cổ Trang", "+4 chủ đề"];
 
@@ -24,7 +25,7 @@ const CategoryChips = () => {
           {chips.map((c, idx) => (
             <Link
               key={c}
-              to={`/genre/${encodeURIComponent(c)}`}
+              to={`/genre/${slugify(c)}`}
               className={`relative flex flex-col items-center justify-center flex-shrink-0 w-[120px] rounded-xl p-3 text-white bg-gradient-to-br ${
                 colors[idx % colors.length]
               } overflow-hidden`}
@@ -41,7 +42,7 @@ const CategoryChips = () => {
           {chips.map((c, idx) => (
             <Link
               key={c}
-              to={`/genre/${encodeURIComponent(c)}`}
+              to={`/genre/${slugify(c)}`}
               className={`flex flex-col items-start justify-end rounded-xl p-6 text-white bg-gradient-to-br hover:translate-y-[-5px] transition-all duration-300 ${
                 colors[idx % colors.length]
               } overflow-hidden`}

@@ -81,7 +81,14 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
     setIsLoading(true);
     try {
       const data = await authService.login(formData.email, formData.password);
+      console.log("Login response:", data);
+      console.log("User role:", data.user.role);
       authService.setAuthData(data.token, data.user);
+      
+      // Verify data was saved
+      const savedUser = JSON.parse(localStorage.getItem("user"));
+      console.log("Saved user role:", savedUser.role);
+      
       onClose();
       window.location.reload();
     } catch (error) {

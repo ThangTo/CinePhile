@@ -50,6 +50,18 @@ const MobileUserMenu = ({ user, onLogout, onOpenAuth, onClose }) => {
           <UserInfoCard user={user} />
           <UserStats coins={user.coins} />
 
+          {/* Admin Panel (Only for admin) */}
+          {user.role === "admin" && (
+            <a
+              href="/admin"
+              className="mb-3 flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-600/30 to-pink-600/30 border border-purple-500/30 rounded-lg text-purple-300 font-semibold transition-all hover:from-purple-600/40 hover:to-pink-600/40"
+            >
+              <i className="fa-solid fa-shield-halved text-lg" />
+              <span>Admin Panel</span>
+              <i className="fa-solid fa-arrow-up-right-from-square ml-auto text-xs" />
+            </a>
+          )}
+
           {/* Menu Items */}
           <div className="grid grid-cols-2 gap-2 mb-4 pb-4 border-b border-white/20">
             {USER_MENU_ITEMS.map((item) => (

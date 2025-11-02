@@ -6,6 +6,8 @@ import WatchPage from "./pages/WatchPage";
 import AccountPage from "./pages/AccountPage";
 import GenrePage from "./pages/GenrePage";
 import CountryPage from "./pages/CountryPage";
+import AdminDashboard from "./pages/AdminDashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
@@ -21,6 +23,14 @@ function App() {
         <Route path="/watchlist" element={<AccountPage />} />
         <Route path="/continue-watching" element={<AccountPage />} />
         <Route path="/notifications" element={<AccountPage />} />
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
       </Routes>
     </Router>
   );
