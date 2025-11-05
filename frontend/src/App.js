@@ -8,7 +8,7 @@ import GenrePage from "./pages/GenrePage";
 import CountryPage from "./pages/CountryPage";
 import APITestExample from "./components/examples/APITestExample";
 import AdminDashboard from "./pages/AdminDashboard";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute from "./components/general/ProtectedRoute";
 
 function App() {
   return (
@@ -25,13 +25,13 @@ function App() {
         <Route path="/continue-watching" element={<AccountPage />} />
         <Route path="/notifications" element={<AccountPage />} />
         <Route path="/api-test" element={<APITestExample />} />
-        <Route 
-          path="/admin" 
+        <Route
+          path="/admin"
           element={
             <ProtectedRoute requiredRole="admin">
               <AdminDashboard />
             </ProtectedRoute>
-          } 
+          }
         />
       </Routes>
     </Router>

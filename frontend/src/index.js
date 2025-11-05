@@ -16,6 +16,9 @@ async function enableMocking() {
 
   // Start MSW worker
   await worker.start({
+    serviceWorker: {
+      url: "/mockServiceWorker.js",
+    },
     onUnhandledRequest: "bypass", // Bypass unhandled requests to allow real API calls if needed
   });
 
@@ -32,7 +35,4 @@ enableMocking().then(() => {
   );
 });
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
