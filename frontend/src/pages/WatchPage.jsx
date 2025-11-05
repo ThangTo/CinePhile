@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import Header from "../components/Header";
-import SiteFooter from "../components/SiteFooter";
-import VideoPlayer from "../components/watch/VideoPlayer";
-import ActionBar from "../components/watch/ActionBar";
-import RatingSidebar from "../components/watch/RatingSidebar";
-import EpisodesSection from "../components/movie-detail/EpisodesSection";
-import CommentsSection from "../components/movie-detail/CommentsSection";
-import CastSection from "../components/movie-detail/CastSection";
-import MovieInfoBrief from "../components/watch/MovieInfoBrief";
-import { fetchMovieById, fetchEpisodes } from "../services/movie.service";
+import Header from "components/header";
+import SiteFooter from "components/home-page/SiteFooter";
+import VideoPlayer from "components/watch-page/VideoPlayer";
+import ActionBar from "components/watch-page/ActionBar";
+import RatingSidebar from "components/watch-page/RatingSidebar";
+import EpisodesSection from "components/movie-detail/EpisodesSection";
+import CommentsSection from "components/movie-detail/CommentsSection";
+import CastSection from "components/movie-detail/CastSection";
+import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
+import { fetchMovieById, fetchEpisodes } from "services/movie.service";
 
 const WatchPage = () => {
   const navigate = useNavigate();

@@ -1,11 +1,11 @@
 import React from "react";
-import Header from "../components/Header";
-import Banner from "../components/BannerHome";
-import CategoryChips from "../components/CategoryChips";
-import SectionRow from "../components/SectionRow";
-import Top10Movie from "../components/Top10Movie";
-import SiteFooter from "../components/SiteFooter";
-import QuickAdminLogin from "../components/QuickAdminLogin";
+import Header from "components/header";
+import Banner from "components/banner";
+import CategoryChips from "components/home-page/CategoryChips";
+import SectionRow from "components/home-page/SectionRow";
+import Top10Movie from "components/home-page/Top10Movie";
+import SiteFooter from "components/home-page/SiteFooter";
+import QuickAdminLogin from "components/general/QuickAdminLogin";
 
 /**
  * Home Page
@@ -33,6 +33,9 @@ const HomePage = () => {
       </div>
 
       <SiteFooter />
+
+      {/* Quick Admin Login - Development Tool */}
+      {process.env.NODE_ENV === "development" && <QuickAdminLogin />}
     </div>
   );
 };

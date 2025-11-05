@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import useToast from "../../hooks/useToast";
+import useToast from "hooks/useToast";
 import { modalStyles, buttonStyles, formStyles } from "./shared-styles";
 
 const PasswordChangeModal = ({ isGoogleLogin, onClose, onSuccess }) => {

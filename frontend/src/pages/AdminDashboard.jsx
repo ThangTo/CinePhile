@@ -1,27 +1,59 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import StatCard from "../components/admin/StatCard";
-import MovieTable from "../components/admin/MovieTable";
-import UserTable from "../components/admin/UserTable";
-import AdminSidebar from "../components/admin/AdminSidebar";
-import { MOCK_ADMIN_STATS } from "../data/adminMockData";
-import { ADMIN_TABS } from "../constants/admin";
+import StatCard from "components/admin/StatCard";
+import MovieTable from "components/admin/MovieTable";
+import UserTable from "components/admin/UserTable";
+import AdminSidebar from "components/admin/AdminSidebar";
+import { statsAPI } from "services/admin.service";
+import { ADMIN_TABS } from "constants/admin";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(ADMIN_TABS.OVERVIEW);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [stats, setStats] = useState(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
-  // Load stats from mock data
-  const stats = MOCK_ADMIN_STATS;
+  // Load stats from API
+  useEffect(() => {
+    const loadStats = async () => {
+      setIsLoadingStats(true);
+      try {
+        const statsData = await statsAPI.getStats();
+        setStats(statsData);
+      } catch (err) {
+        console.error("Không thể tải thống kê:", err);
+        // Fallback to default stats
+        setStats({
+          totalMovies: 0,
+          totalUsers: 0,
+          totalViews: 0,
+          activeUsers: 0,
+          trends: { movies: "0%", users: "0%", views: "0%", active: "0%" },
+        });
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+    loadStats();
+  }, []);
 
   const renderContent = () => {
+    // Show loading state for overview
+    if (activeTab === "overview" && (isLoadingStats || !stats)) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-white">Đang tải thống kê...</div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case "overview":
         return (
           <div>
             <h1 className="text-fluid-2xl font-bold text-white mb-6">Dashboard Overview</h1>
-            
+
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <StatCard
@@ -73,7 +105,7 @@ const AdminDashboard = () => {
             </div>
           </div>
         );
-      
+
       case "movies":
         return (
           <div>
@@ -81,7 +113,7 @@ const AdminDashboard = () => {
             <MovieTable />
           </div>
         );
-      
+
       case "users":
         return (
           <div>
@@ -89,7 +121,7 @@ const AdminDashboard = () => {
             <UserTable />
           </div>
         );
-      
+
       case "settings":
         return (
           <div>
@@ -99,7 +131,7 @@ const AdminDashboard = () => {
             </div>
           </div>
         );
-      
+
       default:
         return null;
     }
@@ -125,7 +157,7 @@ const AdminDashboard = () => {
           >
             <i className="fa-solid fa-bars text-xl"></i>
           </button>
-          
+
           <div className="flex items-center gap-4">
             <button className="text-white hover:text-primaryColor transition-colors relative">
               <i className="fa-solid fa-bell text-xl"></i>
@@ -143,13 +175,10 @@ const AdminDashboard = () => {
         </div>
 
         {/* Content Area */}
-        <div className="p-6">
-          {renderContent()}
-        </div>
+        <div className="p-6">{renderContent()}</div>
       </div>
     </div>
   );
 };
 
 export default AdminDashboard;
-

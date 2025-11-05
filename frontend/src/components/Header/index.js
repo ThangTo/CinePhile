@@ -4,7 +4,7 @@
  */
 
 // Main component
-export { default } from "../Header";
+export { default } from ".";
 
 // Sub-components
 export { default as DesktopUserMenu } from "./DesktopUserMenu";

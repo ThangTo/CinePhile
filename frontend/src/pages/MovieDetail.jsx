@@ -1,11 +1,11 @@
 import React from "react";
 import { useParams } from "react-router-dom";
-import Header from "../components/Header";
-import SiteFooter from "../components/SiteFooter";
-import { MobileLayout, DesktopLayout } from "../components/movie-detail/index";
-import LoadingState from "../components/common/LoadingState";
-import ErrorState from "../components/common/ErrorState";
-import useMovieDetail from "../hooks/useMovieDetail";
+import Header from "components/header";
+import SiteFooter from "components/home-page/SiteFooter";
+import { MobileLayout, DesktopLayout } from "components/movie-detail/index";
+import LoadingState from "components/common/LoadingState";
+import ErrorState from "components/common/ErrorState";
+import useMovieDetail from "hooks/useMovieDetail";
 
 const MovieDetail = () => {
   const { id } = useParams();

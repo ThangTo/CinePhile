@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import useToast from "../../hooks/useToast";
-import useAuth from "../../hooks/useAuth";
-import ToastContainer from "../common/ToastContainer";
-import AuthModal from "../auth/AuthModal";
-import RatingModal from "../watch/RatingModal";
-import userService from "../../services/user.service";
-import movieService from "../../services/movie.service";
+import useToast from "hooks/useToast";
+import useAuth from "hooks/useAuth";
+import ToastContainer from "components/common/ToastContainer";
+import AuthModal from "components/auth/AuthModal";
+import RatingModal from "components/watch-page/RatingModal";
+import userService from "services/user.service";
+import movieService from "services/movie.service";
 
 const ActionButtons = ({ movie }) => {
   const navigate = useNavigate();

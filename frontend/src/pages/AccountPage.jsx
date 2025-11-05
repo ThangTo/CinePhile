@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../components/Header";
-import SiteFooter from "../components/SiteFooter";
-import AccountSidebar from "../components/account/AccountSidebar";
-import ProfileCard from "../components/account/ProfileCard";
-import AccountInfoCard from "../components/account/AccountInfoCard";
-import SecurityCard from "../components/account/SecurityCard";
-import authService from "../services/auth.service";
-import userService from "../services/user.service";
+import Header from "components/header";
+import SiteFooter from "components/home-page/SiteFooter";
+import AccountSidebar from "components/account/AccountSidebar";
+import ProfileCard from "components/account/ProfileCard";
+import AccountInfoCard from "components/account/AccountInfoCard";
+import SecurityCard from "components/account/SecurityCard";
+import authService from "services/auth.service";
+import userService from "services/user.service";
 
 const AccountPage = () => {
   const navigate = useNavigate();

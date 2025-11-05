@@ -1,5 +1,5 @@
 import React from "react";
-import { ADMIN_MENU_ITEMS } from "../../constants/admin";
+import { ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   return (
@@ -47,4 +47,3 @@ const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
 };
 
 export default AdminSidebar;
-

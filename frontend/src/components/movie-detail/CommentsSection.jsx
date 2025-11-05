@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import CommentInput from "./comment/CommentInput";
-import CommentsList from "./comment/CommentsList";
-import useToast from "../../hooks/useToast";
-import useAuth from "../../hooks/useAuth";
-import ToastContainer from "../common/ToastContainer";
-import AuthModal from "../auth/AuthModal";
-import movieService from "../../services/movie.service";
+import CommentInput from "components/movie-detail/comment/CommentInput";
+import CommentsList from "components/movie-detail/comment/CommentsList";
+import useToast from "hooks/useToast";
+import useAuth from "hooks/useAuth";
+import ToastContainer from "components/common/ToastContainer";
+import AuthModal from "components/auth/AuthModal";
+import movieService from "services/movie.service";
 
 const CommentsSection = ({ movie, className = "" }) => {
   const [activeView, setActiveView] = useState("comments"); // "comments" or "ratings"
