@@ -41,7 +41,6 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:5000/api/v1",
   "devDependencies": {
     "autoprefixer": "^10.4.21",
     "msw": "^2.11.6",
