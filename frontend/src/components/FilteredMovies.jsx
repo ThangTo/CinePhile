@@ -1,26 +1,43 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Header from "./Header";
 import SiteFooter from "./SiteFooter";
 import MovieCard from "./MovieCard";
 import Pagination from "./common/Pagination";
 import usePagination from "../hooks/usePagination";
-import { mockTop10Movies, mockSectionMovies } from "../data/mockData";
+import movieService from "../services/movie.service";
 import { GENRE_CATEGORIES, COUNTRY_CATEGORIES } from "./Header/constants";
-import { slugify, buildSlugMap } from "../utils/slugify";
-
-const collectAllMovies = () => {
-  const sections = [];
-  if (mockSectionMovies.trending) sections.push(...mockSectionMovies.trending);
-  if (mockSectionMovies.newReleases) sections.push(...mockSectionMovies.newReleases);
-  return [...mockTop10Movies, ...sections];
-};
 
 const FilteredMovies = ({ pageType = "genre" }) => {
   const { slug } = useParams();
   const raw = decodeURIComponent(slug || "");
+  const [allMovies, setAllMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const allMovies = React.useMemo(() => collectAllMovies(), []);
+  useEffect(() => {
+    const fetchAllMovies = async () => {
+      try {
+        setLoading(true);
+        const [top10, trending, newReleases] = await Promise.all([
+          movieService.getTopRated(10),
+          movieService.getTrending(20),
+          movieService.getNewReleases(20),
+        ]);
+        const combined = [
+          ...(top10.data || []),
+          ...(trending.data || []),
+          ...(newReleases.data || []),
+        ];
+        setAllMovies(combined);
+      } catch (error) {
+        console.error("Error fetching movies:", error);
+        setAllMovies([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAllMovies();
+  }, []);
 
   const headerLabelMap = React.useMemo(() => {
     return {
@@ -67,16 +84,38 @@ const FilteredMovies = ({ pageType = "genre" }) => {
     return allMovies.filter((m) => slugify(m.country || "") === requestedKey);
   }, [allMovies, requestedKey, pageType]);
 
-  const { page, totalPages, paginatedData: paginatedMovies, handlePrev, handleNext } =
-    usePagination(filtered, 8);
+  const {
+    page,
+    totalPages,
+    paginatedData: paginatedMovies,
+    handlePrev,
+    handleNext,
+  } = usePagination(filtered, 8);
 
-  const emptyText = pageType === "genre" ? "Không tìm thấy phim cho thể loại này." : "Không tìm thấy phim cho quốc gia này.";
+  const emptyText =
+    pageType === "genre"
+      ? "Không tìm thấy phim cho thể loại này."
+      : "Không tìm thấy phim cho quốc gia này.";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bgColor">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 py-20">
+          <div className="text-white text-center">Đang tải...</div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bgColor">
       <Header />
       <main className="max-w-7xl mx-auto px-4 py-20">
-        <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6">Phim {displayLabel}</h1>
+        <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6">
+          Phim {displayLabel}
+        </h1>
 
         {filtered.length === 0 ? (
           <p className="text-gray-300">{emptyText}</p>
@@ -94,7 +133,12 @@ const FilteredMovies = ({ pageType = "genre" }) => {
               ))}
             </div>
 
-            <Pagination page={page} totalPages={totalPages} onPrev={handlePrev} onNext={handleNext} />
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPrev={handlePrev}
+              onNext={handleNext}
+            />
           </>
         )}
       </main>
@@ -104,5 +148,3 @@ const FilteredMovies = ({ pageType = "genre" }) => {
 };
 
 export default FilteredMovies;
-
-

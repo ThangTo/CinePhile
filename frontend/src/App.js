@@ -6,6 +6,7 @@ import WatchPage from "./pages/WatchPage";
 import AccountPage from "./pages/AccountPage";
 import GenrePage from "./pages/GenrePage";
 import CountryPage from "./pages/CountryPage";
+import APITestExample from "./components/examples/APITestExample";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -14,7 +15,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
-  <Route path="/genre/:slug" element={<GenrePage />} />
+        <Route path="/genre/:slug" element={<GenrePage />} />
         <Route path="/movie/:id" element={<MovieDetail />} />
         <Route path="/country/:slug" element={<CountryPage />} />
         <Route path="/watch/:id" element={<WatchPage />} />
@@ -23,6 +24,7 @@ function App() {
         <Route path="/watchlist" element={<AccountPage />} />
         <Route path="/continue-watching" element={<AccountPage />} />
         <Route path="/notifications" element={<AccountPage />} />
+        <Route path="/api-test" element={<APITestExample />} />
         <Route 
           path="/admin" 
           element={

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import authService from "../services/auth.service";
 
 /**
  * Custom hook to manage authentication state and modal
@@ -12,24 +13,43 @@ const useAuth = () => {
 
   // Check if user is logged in on mount
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userData = localStorage.getItem("user");
-    
-    console.log("🔍 useAuth mount - checking localStorage:", { token, userData });
-    
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        console.log("✅ User parsed successfully:", parsedUser);
-        console.log("👤 User role:", parsedUser.role);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error("Error parsing user data:", error);
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+    const loadUser = async () => {
+      const token = authService.getToken();
+      const cachedUserData = authService.getCurrentUserLocal();
+
+      if (token) {
+        try {
+          // Use cached data first for immediate UI update
+          if (cachedUserData) {
+            setUser(cachedUserData);
+          }
+
+          // Verify token and get current user from API
+          try {
+            const currentUser = await authService.getCurrentUser();
+            const userDataFromAPI = currentUser?.data || currentUser;
+            if (userDataFromAPI) {
+              setUser(userDataFromAPI);
+              // Update local storage
+              authService.setAuthData(token, userDataFromAPI, authService.getRefreshToken());
+            }
+          } catch (error) {
+            // If API call fails but we have cached data, keep using it
+            // This handles offline scenarios
+            console.warn("Failed to verify token, using cached user data:", error);
+          }
+        } catch (error) {
+          console.error("Error loading user:", error);
+          authService.clearAuthData();
+          setUser(null);
+        }
+      } else if (cachedUserData) {
+        // Clear legacy user data if no token
+        authService.clearAuthData();
       }
-    }
-    setIsLoading(false);
+    };
+
+    loadUser();
   }, []);
 
   /**
@@ -51,11 +71,16 @@ const useAuth = () => {
   /**
    * Handle logout
    */
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setUser(null);
-    window.location.reload();
+  const logout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      authService.clearAuthData();
+      setUser(null);
+      window.location.reload();
+    }
   };
 
   /**

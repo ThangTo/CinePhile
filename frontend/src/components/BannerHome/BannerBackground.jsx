@@ -11,7 +11,7 @@ const BannerBackground = ({
   title,
   classNameOverlay = "from-bgColor via-bgColor/10 to-transparent",
   overlayTop = false,
-  overlayLeft = false,
+  overlayLeft = true,
   className = "sm:absolute",
 }) => (
   <>

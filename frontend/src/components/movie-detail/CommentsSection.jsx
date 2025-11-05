@@ -1,20 +1,42 @@
-import React, { useState } from "react";
-import CommentInput from "./CommentInput";
-import CommentsList from "./CommentsList";
+import React, { useState, useEffect } from "react";
+import CommentInput from "./comment/CommentInput";
+import CommentsList from "./comment/CommentsList";
 import useToast from "../../hooks/useToast";
 import useAuth from "../../hooks/useAuth";
 import ToastContainer from "../common/ToastContainer";
 import AuthModal from "../auth/AuthModal";
+import movieService from "../../services/movie.service";
 
-const CommentsSection = ({ movie }) => {
+const CommentsSection = ({ movie, className = "" }) => {
   const [activeView, setActiveView] = useState("comments"); // "comments" or "ratings"
   const [commentText, setCommentText] = useState("");
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [showAllComments, setShowAllComments] = useState(false);
+  const [comments, setComments] = useState(movie?.comments || []);
+  const [loading, setLoading] = useState(!movie?.comments);
   const { toasts, removeToast, success, warning } = useToast();
-  const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal } = useAuth();
+  const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, user } =
+    useAuth();
 
-  const handleSubmitComment = () => {
+  // Fetch comments if not provided in movie prop
+  useEffect(() => {
+    const fetchComments = async () => {
+      if (!movie?.id || movie.comments) return;
+      try {
+        setLoading(true);
+        const response = await movieService.getComments(movie.id);
+        setComments(response.data || []);
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+        setComments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchComments();
+  }, [movie]);
+
+  const handleSubmitComment = async () => {
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
@@ -23,9 +45,20 @@ const CommentsSection = ({ movie }) => {
       warning("Vui lòng nhập nội dung bình luận!");
       return;
     }
-    // TODO: Integrate with backend
-    success("Bình luận của bạn đã được gửi!");
-    setCommentText("");
+    try {
+      const response = await movieService.postComment(movie.id, {
+        content: commentText,
+        isSpoiler,
+      });
+      const newComment = response.data || response;
+      setComments((prev) => [newComment, ...prev]);
+      success("Bình luận của bạn đã được gửi!");
+      setCommentText("");
+      setIsSpoiler(false);
+    } catch (error) {
+      warning(error.message || "Không thể gửi bình luận. Vui lòng thử lại!");
+      console.error("Error posting comment:", error);
+    }
   };
 
   const handleLike = (commentId) => {
@@ -61,13 +94,13 @@ const CommentsSection = ({ movie }) => {
   };
 
   // Limit comments to 10 initially
-  const displayedComments = showAllComments ? movie.comments : movie.comments.slice(0, 10);
+  const displayedComments = showAllComments ? comments : comments.slice(0, 10);
 
-  const hasMoreComments = movie.comments.length > 10;
+  const hasMoreComments = comments.length > 10;
 
   return (
     <>
-      <section className="px-4 py-16 lg:py-8 comments-section">
+      <section className={`px-4 py-16 lg:py-8 ${className}`}>
         {/* Header - Toggle Buttons */}
         <div className="mb-6">
           {/* Mobile: Full width buttons */}
@@ -81,7 +114,7 @@ const CommentsSection = ({ movie }) => {
               }`}
             >
               <i className="fa-solid fa-comment" />
-              <span>Bình luận ({movie.comments.length})</span>
+              <span>Bình luận ({comments.length})</span>
             </button>
 
             <button
@@ -102,7 +135,7 @@ const CommentsSection = ({ movie }) => {
             <div className="flex items-center gap-2">
               <i className="fa-solid fa-comment text-2xl text-white" />
               <span className="text-2xl font-semibold text-white">Bình luận</span>
-              <span className="text-2xl font-semibold text-white">({movie.comments.length})</span>
+              <span className="text-2xl font-semibold text-white">({comments.length})</span>
             </div>
             <div className="inline-flex items-center bg-bgColor rounded-lg p-1 border border-white/10">
               <button

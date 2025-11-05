@@ -9,7 +9,7 @@ const RATING_OPTIONS = [
   { id: 5, emoji: "😭", label: "Dở tệ", value: 2 },
 ];
 
-const RatingModal = ({ isOpen, onClose, movie }) => {
+const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
   const [selectedRating, setSelectedRating] = useState(null);
   const [comment, setComment] = useState("");
   const [isAnimating, setIsAnimating] = useState(false);
@@ -31,7 +31,11 @@ const RatingModal = ({ isOpen, onClose, movie }) => {
 
   const handleSubmit = () => {
     // Submit rating to backend only if rating is selected
-    if (selectedRating) {
+    if (selectedRating && onRate) {
+      // Call onRate callback with the rating value
+      const ratingValue = selectedRating.value;
+      onRate(ratingValue);
+    } else if (selectedRating) {
       console.log("Rating:", selectedRating);
       console.log("Comment:", comment);
       // TODO: Submit rating to backend
@@ -141,4 +145,3 @@ const RatingModal = ({ isOpen, onClose, movie }) => {
 };
 
 export default RatingModal;
-

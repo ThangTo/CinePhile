@@ -1,19 +1,41 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import SectionHeader from "./common/SectionHeader";
 import ScrollContainer from "./common/ScrollContainer";
 import Top10Card from "./Top10Movie/Top10Card";
-import { mockTop10Movies, formatEpisodeInfo } from "../data/mockData";
+import movieService from "../services/movie.service";
 
 /**
  * Top 10 Movies Section
  * Always displays in horizontal scroll layout for all screen sizes
  */
 const Top10Movie = () => {
-  // Transform mock data to include formatted episode info
-  const movies = mockTop10Movies.map((movie) => ({
-    ...movie,
-    episode: formatEpisodeInfo(movie),
-  }));
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTop10 = async () => {
+      try {
+        setLoading(true);
+        const response = await movieService.getTopRated(10);
+        setMovies(response.data || []);
+      } catch (error) {
+        console.error("Error fetching top 10 movies:", error);
+        setMovies([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTop10();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="w-full py-2 sm:py-6">
+        <SectionHeader title="Top 10 phim bộ hôm nay" linkHref="/top10" className="px-4" />
+        <div className="pl-4 sm:px-4 py-2 text-white text-center">Đang tải...</div>
+      </section>
+    );
+  }
 
   return (
     <section className="w-full py-2 sm:py-6">

@@ -9,7 +9,7 @@ import EpisodesSection from "../components/movie-detail/EpisodesSection";
 import CommentsSection from "../components/movie-detail/CommentsSection";
 import CastSection from "../components/movie-detail/CastSection";
 import MovieInfoBrief from "../components/watch/MovieInfoBrief";
-import { fetchMovieById, fetchEpisodes } from "../services/api";
+import { fetchMovieById, fetchEpisodes } from "../services/movie.service";
 
 const WatchPage = () => {
   const navigate = useNavigate();
@@ -28,8 +28,10 @@ const WatchPage = () => {
       setLoading(true);
       try {
         const [m, eps] = await Promise.all([fetchMovieById(id), fetchEpisodes(id)]);
-        setMovie(m);
-        setEpisodes(eps);
+        // Handle response format: could be direct object/array or wrapped in { data }
+        setMovie(m?.data || m);
+        const episodesData = eps?.data || eps || [];
+        setEpisodes(Array.isArray(episodesData) ? episodesData : []);
       } catch (error) {
         console.error("Error loading movie:", error);
       } finally {
