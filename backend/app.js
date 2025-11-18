@@ -20,4 +20,8 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/health', healthRoutes);
 
+app.get('/', (req, res) => {
+  res.status(200).send('Server is running');
+});
+
 module.exports = app;
