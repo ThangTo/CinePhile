@@ -91,7 +91,7 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
                   <i className="fa-solid fa-arrow-up-right-from-square ml-auto text-xs" />
                 </a>
               )}
-              
+
               {DESKTOP_MENU_ITEMS.map((item) => (
                 <a key={item.label} href={item.href} className={DESKTOP_MENU_ITEM_CLASS}>
                   <i className={`fa-solid ${item.icon} w-5 text-center`} />

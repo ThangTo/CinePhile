@@ -3,9 +3,6 @@
  * Central export point for all Header-related components
  */
 
-// Main component
-export { default } from ".";
-
 // Sub-components
 export { default as DesktopUserMenu } from "./DesktopUserMenu";
 export { default as MobileUserMenu } from "./MobileUserMenu";

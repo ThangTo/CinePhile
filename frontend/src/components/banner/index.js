@@ -3,9 +3,6 @@
  * Central export point for all BannerHome related components
  */
 
-// Main component
-export { default } from ".";
-
 // Sub-components (for advanced usage)
 export { default as BannerBackground } from "./BannerBackground";
 export { default as BannerContent } from "./BannerContent";

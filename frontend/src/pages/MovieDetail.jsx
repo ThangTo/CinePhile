@@ -1,7 +1,5 @@
 import React from "react";
 import { useParams } from "react-router-dom";
-import Header from "components/header";
-import SiteFooter from "components/home-page/SiteFooter";
 import { MobileLayout, DesktopLayout } from "components/movie-detail/index";
 import LoadingState from "components/common/LoadingState";
 import ErrorState from "components/common/ErrorState";
@@ -33,15 +31,11 @@ const MovieDetail = () => {
 
   return (
     <div className="min-h-screen bg-bgColor overflow-x-hidden">
-      <Header />
-
       {/* Mobile Layout */}
       <MobileLayout {...layoutProps} />
 
       {/* Desktop Layout */}
       <DesktopLayout {...layoutProps} />
-
-      <SiteFooter />
     </div>
   );
 };

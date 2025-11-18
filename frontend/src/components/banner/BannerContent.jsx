@@ -1,10 +1,12 @@
 import React from "react";
-import MovieTitle from "./MovieTitle";
-import MovieLogo from "./MovieLogo";
-import MovieInfo from "./MovieInfo";
-import GenreList from "./GenreList";
-import MovieDescription from "./MovieDescription";
-import ActionButtons from "./ActionButtons";
+import {
+  MovieTitle,
+  MovieLogo,
+  MovieInfo,
+  GenreList,
+  MovieDescription,
+  ActionButtons,
+} from "./index";
 
 /**
  * Banner Content Component - Main content container for banner

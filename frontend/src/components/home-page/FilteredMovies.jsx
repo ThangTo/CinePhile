@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import Header from "components/header";
-import SiteFooter from "./SiteFooter";
 import MovieCard from "components/home-page/MovieCard";
 import Pagination from "components/common/Pagination";
 import usePagination from "hooks/usePagination";
@@ -101,18 +99,15 @@ const FilteredMovies = ({ pageType = "genre" }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-bgColor">
-        <Header />
         <main className="max-w-7xl mx-auto px-4 py-20">
           <div className="text-white text-center">Đang tải...</div>
         </main>
-        <SiteFooter />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-bgColor">
-      <Header />
       <main className="max-w-7xl mx-auto px-4 py-20">
         <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6">
           Phim {displayLabel}
@@ -143,7 +138,6 @@ const FilteredMovies = ({ pageType = "genre" }) => {
           </>
         )}
       </main>
-      <SiteFooter />
     </div>
   );
 };

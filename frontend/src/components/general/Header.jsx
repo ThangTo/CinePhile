@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import AuthModal from "auth/AuthModal";
-import MobileUserMenu from "components/header/MobileUserMenu";
-import DesktopUserMenu from "components/header/DesktopUserMenu";
-import NavigationLinks from "components/header/NavigationLinks";
-import SearchBar from "components/header/SearchBar";
+import AuthModal from "components/auth/AuthModal";
+import {
+  MobileUserMenu,
+  DesktopUserMenu,
+  NavigationLinks,
+  SearchBar,
+} from "components/header/index";
 import useAuth from "hooks/useAuth";
 
 const Header = () => {

@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
-import BannerBackground from "components/banner/BannerBackground";
-import BannerContent from "components/banner/BannerContent";
-import { useBannerConfig } from "components/banner/useBannerConfig";
+import { BannerContent, BannerBackground, useBannerConfig } from "components/banner/index";
 import movieService from "services/movie.service";
 import { defaultBannerMovie } from "mocks/data/mockData";
 

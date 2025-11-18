@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import Header from "components/header";
-import SiteFooter from "components/home-page/SiteFooter";
 import VideoPlayer from "components/watch-page/VideoPlayer";
 import ActionBar from "components/watch-page/ActionBar";
 import RatingSidebar from "components/watch-page/RatingSidebar";
@@ -69,8 +67,6 @@ const WatchPage = () => {
 
   return (
     <div className="min-h-screen">
-      <Header />
-
       {/* Top Bar */}
       <div className="w-full pt-16 pl-6">
         <div className="container mx-auto flex items-center gap-3 px-4 text-white">
@@ -125,7 +121,6 @@ const WatchPage = () => {
         </div>
       </div>
       <CommentsSection movie={movie} />
-      <SiteFooter />
     </div>
   );
 };

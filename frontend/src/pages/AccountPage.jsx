@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "components/header";
-import SiteFooter from "components/home-page/SiteFooter";
 import AccountSidebar from "components/account/AccountSidebar";
 import ProfileCard from "components/account/ProfileCard";
 import AccountInfoCard from "components/account/AccountInfoCard";
@@ -95,7 +93,6 @@ const AccountPage = () => {
 
   return (
     <div className="min-h-screen">
-      <Header />
       <div className="flex flex-col py-[50px] md:flex-row min-h-screen bg-account-bg-primary text-account-text-primary">
         <AccountSidebar user={user} onLogout={handleLogout} />
 
@@ -109,7 +106,6 @@ const AccountPage = () => {
           <SecurityCard user={user} onUpdate={handleUpdateProfile} />
         </main>
       </div>
-      <SiteFooter />
     </div>
   );
 };
