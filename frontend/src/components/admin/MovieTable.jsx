@@ -1,15 +1,30 @@
 import React, { useState, useEffect } from "react";
-import { mockTop10Movies } from "../../data/mockData";
-import { movieAPI } from "../../services/adminService";
+import { movieAPI } from "services/admin.service";
 import MovieFormModal from "./MovieFormModal";
 
 const MovieTable = () => {
-  const [movies, setMovies] = useState(mockTop10Movies.slice(0, 10));
+  const [movies, setMovies] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Load movies from API on mount
+  useEffect(() => {
+    const loadMovies = async () => {
+      setIsLoading(true);
+      try {
+        const moviesData = await movieAPI.getAll();
+        setMovies(Array.isArray(moviesData) ? moviesData : []);
+      } catch (err) {
+        setError("Không thể tải danh sách phim: " + err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadMovies();
+  }, []);
 
   const filteredMovies = movies.filter((movie) =>
     movie.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -17,11 +32,13 @@ const MovieTable = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Bạn có chắc muốn xóa phim này?")) return;
-    
+
     setIsLoading(true);
     try {
       await movieAPI.delete(id);
-      setMovies(movies.filter((m) => m.id !== id));
+      // Reload movies to ensure consistency
+      const moviesData = await movieAPI.getAll();
+      setMovies(Array.isArray(moviesData) ? moviesData : []);
     } catch (err) {
       setError("Không thể xóa phim: " + err.message);
     } finally {
@@ -45,12 +62,16 @@ const MovieTable = () => {
     try {
       if (selectedMovie) {
         // Update
-        const updated = await movieAPI.update(selectedMovie.id, movieData);
-        setMovies(movies.map((m) => (m.id === selectedMovie.id ? updated : m)));
+        await movieAPI.update(selectedMovie.id, movieData);
+        // Reload movies to ensure consistency
+        const moviesData = await movieAPI.getAll();
+        setMovies(Array.isArray(moviesData) ? moviesData : []);
       } else {
         // Create
-        const newMovie = await movieAPI.create(movieData);
-        setMovies([newMovie, ...movies]);
+        await movieAPI.create(movieData);
+        // Reload movies to ensure consistency
+        const moviesData = await movieAPI.getAll();
+        setMovies(Array.isArray(moviesData) ? moviesData : []);
       }
     } catch (err) {
       setError(err.message);
@@ -62,6 +83,13 @@ const MovieTable = () => {
 
   return (
     <div className="bg-gray-800 rounded-xl border border-white/10 overflow-hidden">
+      {/* Loading state */}
+      {isLoading && movies.length === 0 && (
+        <div className="p-6 flex items-center justify-center">
+          <div className="text-white">Đang tải...</div>
+        </div>
+      )}
+
       {/* Header with search */}
       <div className="p-6 border-b border-white/10 flex items-center justify-between">
         <div className="relative flex-1 max-w-md">
@@ -88,13 +116,27 @@ const MovieTable = () => {
         <table className="w-full">
           <thead className="bg-gray-900 border-b border-white/10">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">ID</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Poster</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Tên Phim</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Năm</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Rating</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Lượt Xem</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Hành Động</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                ID
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Poster
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Tên Phim
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Năm
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Rating
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Lượt Xem
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Hành Động
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -192,4 +234,3 @@ const MovieTable = () => {
 };
 
 export default MovieTable;
-

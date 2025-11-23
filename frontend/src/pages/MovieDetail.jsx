@@ -1,132 +1,41 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useParams } from "react-router-dom";
-import Header from "../components/Header";
-import SiteFooter from "../components/SiteFooter";
-import BannerBackground from "../components/BannerHome/BannerBackground";
-import DetailTabs from "../components/movie-detail/DetailTabs";
-import TabContent from "../components/movie-detail/TabContent";
-import CommentsSection from "../components/movie-detail/CommentsSection";
-import MobileMovieHero from "../components/movie-detail/MobileMovieHero";
-import ActionButtons from "../components/movie-detail/ActionButtons";
-import SidebarInfo from "../components/movie-detail/SidebarInfo";
-import { getMovieDetail } from "../data/mockData";
+import { MobileLayout, DesktopLayout } from "components/movie-detail/index";
+import LoadingState from "components/common/LoadingState";
+import ErrorState from "components/common/ErrorState";
+import useMovieDetail from "hooks/useMovieDetail";
 
 const MovieDetail = () => {
   const { id } = useParams();
-  const [movie, setMovie] = useState(null);
-  const [activeTab, setActiveTab] = useState("episodes");
-  const [loading, setLoading] = useState(true);
-  const [audioType, setAudioType] = useState("subtitle");
+  const { movie, loading, error, activeTab, setActiveTab, audioType, setAudioType } =
+    useMovieDetail(id);
 
-  useEffect(() => {
-    // Fetch movie data from centralized mockData
-    const fetchMovie = async () => {
-      setLoading(true);
-      try {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // Get movie data from mockData.js
-        const movieData = getMovieDetail(id);
-
-        if (movieData) {
-          setMovie(movieData);
-        } else {
-          console.error(`Movie with ID ${id} not found`);
-        }
-      } catch (error) {
-        console.error("Error fetching movie:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMovie();
-  }, [id]);
-
+  // Loading state
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0b1220] text-white flex items-center justify-center">
-        <div className="text-xl">Đang tải...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
-  if (!movie) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Không tìm thấy phim</div>
-      </div>
-    );
+  // Error state
+  if (error || !movie) {
+    return <ErrorState message={error || "Không tìm thấy phim"} />;
   }
+
+  // Shared props for both layouts
+  const layoutProps = {
+    movie,
+    activeTab,
+    setActiveTab,
+    audioType,
+    onAudioTypeChange: setAudioType,
+  };
 
   return (
-    <div className="min-h-screen bg-bgColor">
-      <Header />
+    <div className="min-h-screen bg-bgColor overflow-x-hidden">
+      {/* Mobile Layout */}
+      <MobileLayout {...layoutProps} />
 
-      {/* Mobile View */}
-      <div className="lg:hidden">
-        <MobileMovieHero movie={movie} />
-        <DetailTabs activeTab={activeTab} setActiveTab={setActiveTab} />
-        <TabContent
-          activeTab={activeTab}
-          movie={movie}
-          audioType={audioType}
-          onAudioTypeChange={setAudioType}
-        />
-        <CommentsSection movie={movie} />
-      </div>
-
-      {/* Desktop View */}
-      <div className="hidden lg:block">
-        {/* Background Banner */}
-        <div className="h-[675px] relative overflow-hidden">
-          <BannerBackground
-            backgroundImage={movie.bgImage || movie.backdropUrl || movie.poster}
-            title={movie.title}
-            overlayTop={true}
-            overlayLeft={true}
-            classNameOverlay="from-bgColor/70 via-transparent to-transparent"
-            className="h-full"
-          />
-        </div>
-
-        {/* Main Content Layout */}
-        <div className="relative container mx-auto px-4 -mt-[200px] z-10 ">
-          <div className="grid grid-cols-12 gap-6">
-            {/* Left Sidebar - 4 columns */}
-            <div className="col-span-4">
-              <div className="top-24">
-                <SidebarInfo movie={movie} />
-              </div>
-            </div>
-
-            {/* Right Content - 8 columns */}
-            <div className="col-span-8 space-y-6 ">
-              {/* Action Buttons */}
-              <div className="bg-bgColor2/50 backdrop-blur-sm rounded-xl border border-white/10">
-                <ActionButtons movie={movie} />
-              </div>
-
-              {/* Tabs */}
-              <DetailTabs activeTab={activeTab} setActiveTab={setActiveTab} />
-
-              {/* Tab Content */}
-              <TabContent
-                activeTab={activeTab}
-                movie={movie}
-                audioType={audioType}
-                onAudioTypeChange={setAudioType}
-              />
-
-              {/* Comments */}
-              <CommentsSection movie={movie} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <SiteFooter />
+      {/* Desktop Layout */}
+      <DesktopLayout {...layoutProps} />
     </div>
   );
 };

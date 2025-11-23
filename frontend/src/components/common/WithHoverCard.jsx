@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useMovieHover } from "../../hooks/useMovieHover";
-import MovieHoverCard from "../MovieCard/MovieHoverCard";
+import { useMovieHover } from "hooks/useMovieHover";
+import MovieHoverCard from "components/movie-card/MovieHoverCard";
 
 const WithHoverCard = ({
   children,
@@ -142,9 +142,9 @@ const WithHoverCard = ({
           onMouseEnter={onEnter}
           onMouseLeave={onLeave}
         >
-            <div className={isAnimating ? "animate-pop-up" : "opacity-0"}>
-              <MovieHoverCard movie={movie} hoverClass={hoverCardClass} compact={compact} />
-            </div>
+          <div className={isAnimating ? "animate-pop-up" : "opacity-0"}>
+            <MovieHoverCard movie={movie} hoverClass={hoverCardClass} compact={compact} />
+          </div>
         </div>
       )}
     </div>
@@ -152,6 +152,3 @@ const WithHoverCard = ({
 };
 
 export default WithHoverCard;
-
-
-

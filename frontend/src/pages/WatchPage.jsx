@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import Header from "../components/Header";
-import SiteFooter from "../components/SiteFooter";
-import VideoPlayer from "../components/watch/VideoPlayer";
-import ActionBar from "../components/watch/ActionBar";
-import RatingSidebar from "../components/watch/RatingSidebar";
-import EpisodesSection from "../components/movie-detail/EpisodesSection";
-import CommentsSection from "../components/movie-detail/CommentsSection";
-import CastSection from "../components/movie-detail/CastSection";
-import MovieInfoBrief from "../components/watch/MovieInfoBrief";
-import { fetchMovieById, fetchEpisodes } from "../services/api";
+import VideoPlayer from "components/watch-page/VideoPlayer";
+import ActionBar from "components/watch-page/ActionBar";
+import RatingSidebar from "components/watch-page/RatingSidebar";
+import EpisodesSection from "components/movie-detail/EpisodesSection";
+import CommentsSection from "components/movie-detail/CommentsSection";
+import CastSection from "components/movie-detail/CastSection";
+import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
+import { fetchMovieById, fetchEpisodes } from "services/movie.service";
 
 const WatchPage = () => {
   const navigate = useNavigate();
@@ -28,8 +26,10 @@ const WatchPage = () => {
       setLoading(true);
       try {
         const [m, eps] = await Promise.all([fetchMovieById(id), fetchEpisodes(id)]);
-        setMovie(m);
-        setEpisodes(eps);
+        // Handle response format: could be direct object/array or wrapped in { data }
+        setMovie(m?.data || m);
+        const episodesData = eps?.data || eps || [];
+        setEpisodes(Array.isArray(episodesData) ? episodesData : []);
       } catch (error) {
         console.error("Error loading movie:", error);
       } finally {
@@ -67,8 +67,6 @@ const WatchPage = () => {
 
   return (
     <div className="min-h-screen">
-      <Header />
-
       {/* Top Bar */}
       <div className="w-full pt-16 pl-6">
         <div className="container mx-auto flex items-center gap-3 px-4 text-white">
@@ -123,7 +121,6 @@ const WatchPage = () => {
         </div>
       </div>
       <CommentsSection movie={movie} />
-      <SiteFooter />
     </div>
   );
 };

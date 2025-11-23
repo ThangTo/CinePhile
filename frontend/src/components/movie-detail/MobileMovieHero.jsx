@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GenreTag, BannerBackground, MovieInfo, useBannerConfig } from "../BannerHome/index";
-import RatingModal from "../watch/RatingModal";
+import { GenreTag, BannerBackground, MovieInfo, useBannerConfig } from "components/banner/index";
+import RatingModal from "components/watch-page/RatingModal";
 
 /**
  * Mobile Movie Hero Component - Hero section for mobile movie detail page
@@ -201,7 +201,11 @@ const MobileMovieHero = ({ movie }) => {
       </div>
 
       {/* Rating Modal */}
-      <RatingModal isOpen={showRatingModal} onClose={() => setShowRatingModal(false)} movie={movie} />
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        movie={movie}
+      />
     </div>
   );
 };

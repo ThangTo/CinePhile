@@ -1,23 +1,30 @@
 import React, { useState, useEffect } from "react";
-import { userAPI } from "../../services/adminService";
+import { userAPI } from "services/admin.service";
 import UserFormModal from "./UserFormModal";
 
-// Mock user data
-const MOCK_USERS = [
-  { id: 1, name: "Nguyễn Văn A", email: "nguyenvana@example.com", role: "user", status: "active", joinDate: "2024-01-15" },
-  { id: 2, name: "Trần Thị B", email: "tranthib@example.com", role: "user", status: "active", joinDate: "2024-02-20" },
-  { id: 3, name: "Lê Văn C", email: "levanc@example.com", role: "admin", status: "active", joinDate: "2023-12-10" },
-  { id: 4, name: "Phạm Thị D", email: "phamthid@example.com", role: "user", status: "inactive", joinDate: "2024-03-05" },
-  { id: 5, name: "Hoàng Văn E", email: "hoangvane@example.com", role: "user", status: "active", joinDate: "2024-01-28" },
-];
-
 const UserTable = () => {
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Load users from API on mount
+  useEffect(() => {
+    const loadUsers = async () => {
+      setIsLoading(true);
+      try {
+        const usersData = await userAPI.getAll();
+        setUsers(Array.isArray(usersData) ? usersData : []);
+      } catch (err) {
+        setError("Không thể tải danh sách người dùng: " + err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadUsers();
+  }, []);
 
   const filteredUsers = users.filter(
     (user) =>
@@ -27,11 +34,13 @@ const UserTable = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Bạn có chắc muốn xóa người dùng này?")) return;
-    
+
     setIsLoading(true);
     try {
       await userAPI.delete(id);
-      setUsers(users.filter((u) => u.id !== id));
+      // Reload users to ensure consistency
+      const usersData = await userAPI.getAll();
+      setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (err) {
       setError("Không thể xóa người dùng: " + err.message);
     } finally {
@@ -42,8 +51,10 @@ const UserTable = () => {
   const toggleStatus = async (id) => {
     setIsLoading(true);
     try {
-      const updated = await userAPI.toggleStatus(id);
-      setUsers(users.map((u) => (u.id === id ? updated : u)));
+      await userAPI.toggleStatus(id);
+      // Reload users to ensure consistency
+      const usersData = await userAPI.getAll();
+      setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (err) {
       setError("Không thể thay đổi trạng thái: " + err.message);
     } finally {
@@ -66,12 +77,13 @@ const UserTable = () => {
     setError(null);
     try {
       if (selectedUser) {
-        const updated = await userAPI.update(selectedUser.id, userData);
-        setUsers(users.map((u) => (u.id === selectedUser.id ? updated : u)));
+        await userAPI.update(selectedUser.id, userData);
       } else {
-        const newUser = await userAPI.create(userData);
-        setUsers([newUser, ...users]);
+        await userAPI.create(userData);
       }
+      // Reload users to ensure consistency
+      const usersData = await userAPI.getAll();
+      setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (err) {
       setError(err.message);
       throw err;
@@ -82,6 +94,13 @@ const UserTable = () => {
 
   return (
     <div className="bg-gray-800 rounded-xl border border-white/10 overflow-hidden">
+      {/* Loading state */}
+      {isLoading && users.length === 0 && (
+        <div className="p-6 flex items-center justify-center">
+          <div className="text-white">Đang tải...</div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-6 border-b border-white/10 flex items-center justify-between">
         <div className="relative flex-1 max-w-md">
@@ -108,13 +127,27 @@ const UserTable = () => {
         <table className="w-full">
           <thead className="bg-gray-900 border-b border-white/10">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">ID</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Họ Tên</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Email</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Vai Trò</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Trạng Thái</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Ngày Tham Gia</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Hành Động</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                ID
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Họ Tên
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Email
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Vai Trò
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Trạng Thái
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Ngày Tham Gia
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                Hành Động
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -127,7 +160,11 @@ const UserTable = () => {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                      {user.name.charAt(0)}
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="w-full h-full object-cover rounded-full"
+                      />
                     </div>
                     <span className="text-white font-medium">{user.name}</span>
                   </div>
@@ -184,7 +221,8 @@ const UserTable = () => {
       {/* Footer */}
       <div className="p-6 border-t border-white/10 flex items-center justify-between">
         <span className="text-sm text-gray-400">
-          Hiển thị <span className="text-white font-semibold">{filteredUsers.length}</span> người dùng
+          Hiển thị <span className="text-white font-semibold">{filteredUsers.length}</span> người
+          dùng
         </span>
       </div>
 
@@ -210,4 +248,3 @@ const UserTable = () => {
 };
 
 export default UserTable;
-

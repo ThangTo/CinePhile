@@ -1,11 +1,9 @@
 import React from "react";
-import Header from "../components/Header";
-import Banner from "../components/BannerHome";
-import CategoryChips from "../components/CategoryChips";
-import SectionRow from "../components/SectionRow";
-import Top10Movie from "../components/Top10Movie";
-import SiteFooter from "../components/SiteFooter";
-import QuickAdminLogin from "../components/QuickAdminLogin";
+import Banner from "components/home-page/BannerHome";
+import CategoryChips from "components/home-page/CategoryChips";
+import SectionRow from "components/home-page/SectionRow";
+import Top10Movie from "components/home-page/Top10Movie";
+import QuickAdminLogin from "components/general/QuickAdminLogin";
 
 /**
  * Home Page
@@ -14,7 +12,6 @@ import QuickAdminLogin from "../components/QuickAdminLogin";
 const HomePage = () => {
   return (
     <div className="min-h-screen bg-bgColor overflow-visible">
-      <Header />
       <Banner />
       <div className="py-8 sm:py-12 bg-bgColor overflow-visible">
         <CategoryChips />
@@ -32,7 +29,8 @@ const HomePage = () => {
         <SectionRow title="Mãn Nhãn Với Phim Chiếu Rạp" sectionType="trending" linkHref="/cinema" />
       </div>
 
-      <SiteFooter />
+      {/* Quick Admin Login - Development Tool */}
+      {process.env.NODE_ENV === "development" && <QuickAdminLogin />}
     </div>
   );
 };

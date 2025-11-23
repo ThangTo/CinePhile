@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import useToast from "../../hooks/useToast";
-import ToastContainer from "../common/ToastContainer";
+import useToast from "hooks/useToast";
+import ToastContainer from "components/common/ToastContainer";
 import { cardStyles, buttonStyles, formStyles } from "./shared-styles";
 
 const AccountInfoCard = ({ user, onUpdate }) => {

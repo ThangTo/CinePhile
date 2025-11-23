@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import useToast from "../../hooks/useToast";
-import ToastContainer from "../common/ToastContainer";
+import useToast from "hooks/useToast";
+import ToastContainer from "components/common/ToastContainer";
 import EmailChangeModal from "./EmailChangeModal";
 import PasswordChangeModal from "./PasswordChangeModal";
 import { cardStyles, buttonStyles } from "./shared-styles";

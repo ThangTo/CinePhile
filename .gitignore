@@ -6,3 +6,6 @@ npm-debug.log
 # React (Create React App specific)
 build/
 .DS_Store
+
+
+.vscode/

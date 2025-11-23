@@ -1,7 +1,7 @@
 import React from "react";
-import CastSection from "./CastSection";
-import { GenreTag, MovieInfo } from "../BannerHome/index";
-import { useBannerConfig } from "../BannerHome/useBannerConfig";
+import CastSection from "components/movie-detail/CastSection";
+import { GenreTag, MovieInfo } from "components/banner/index";
+import { useBannerConfig } from "components/banner/useBannerConfig";
 
 const SidebarInfo = ({ movie }) => {
   const { infoBadges } = useBannerConfig(movie);

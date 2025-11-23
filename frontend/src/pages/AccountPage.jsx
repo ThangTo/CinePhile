@@ -1,43 +1,89 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../components/Header";
-import SiteFooter from "../components/SiteFooter";
-import AccountSidebar from "../components/account/AccountSidebar";
-import ProfileCard from "../components/account/ProfileCard";
-import AccountInfoCard from "../components/account/AccountInfoCard";
-import SecurityCard from "../components/account/SecurityCard";
+import AccountSidebar from "components/account/AccountSidebar";
+import ProfileCard from "components/account/ProfileCard";
+import AccountInfoCard from "components/account/AccountInfoCard";
+import SecurityCard from "components/account/SecurityCard";
+import authService from "services/auth.service";
+import userService from "services/user.service";
 
 const AccountPage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load user from localStorage
-    const token = localStorage.getItem("token");
-    const userData = localStorage.getItem("user");
+    const loadUser = async () => {
+      try {
+        setLoading(true);
+        // Check if user is authenticated
+        if (!authService.isAuthenticated()) {
+          navigate("/");
+          return;
+        }
 
-    if (!token || !userData) {
-      // Redirect to home if not logged in
-      navigate("/");
-      return;
-    }
+        // Try to get user from API first
+        try {
+          const currentUser = await authService.getCurrentUser();
+          const userData = currentUser?.data || currentUser;
+          if (userData) {
+            setUser(userData);
+          } else {
+            // Fallback to local storage
+            const cachedUser = authService.getCurrentUserLocal();
+            if (cachedUser) {
+              setUser(cachedUser);
+            } else {
+              navigate("/");
+            }
+          }
+        } catch (error) {
+          // If API fails, use cached data
+          const cachedUser = authService.getCurrentUserLocal();
+          if (cachedUser) {
+            setUser(cachedUser);
+          } else {
+            navigate("/");
+          }
+        }
+      } catch (error) {
+        console.error("Error loading user:", error);
+        navigate("/");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    setUser(JSON.parse(userData));
+    loadUser();
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      authService.clearAuthData();
+      navigate("/");
+    }
   };
 
-  const handleUpdateProfile = (updatedData) => {
-    const updatedUser = { ...user, ...updatedData };
-    setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+  const handleUpdateProfile = async (updatedData) => {
+    if (!user?.id) return;
+
+    try {
+      // Update via API
+      const updatedUser = await userService.updateProfile(user.id, updatedData);
+      setUser(updatedUser);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      // Fallback: update local state only
+      const updatedUser = { ...user, ...updatedData };
+      setUser(updatedUser);
+    }
   };
 
-  if (!user) {
+  if (loading || !user) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-account-bg-primary">
         <div className="w-12 h-12 border-4 border-account-bg-tertiary border-t-account-accent rounded-full animate-spin"></div>
@@ -47,7 +93,6 @@ const AccountPage = () => {
 
   return (
     <div className="min-h-screen">
-      <Header />
       <div className="flex flex-col py-[50px] md:flex-row min-h-screen bg-account-bg-primary text-account-text-primary">
         <AccountSidebar user={user} onLogout={handleLogout} />
 
@@ -61,7 +106,6 @@ const AccountPage = () => {
           <SecurityCard user={user} onUpdate={handleUpdateProfile} />
         </main>
       </div>
-      <SiteFooter />
     </div>
   );
 };

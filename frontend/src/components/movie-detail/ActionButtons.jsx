@@ -1,23 +1,51 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import useToast from "../../hooks/useToast";
-import useAuth from "../../hooks/useAuth";
-import ToastContainer from "../common/ToastContainer";
-import AuthModal from "../auth/AuthModal";
-import RatingModal from "../watch/RatingModal";
+import useToast from "hooks/useToast";
+import useAuth from "hooks/useAuth";
+import ToastContainer from "components/common/ToastContainer";
+import AuthModal from "components/auth/AuthModal";
+import RatingModal from "components/watch-page/RatingModal";
+import userService from "services/user.service";
+import movieService from "services/movie.service";
 
 const ActionButtons = ({ movie }) => {
   const navigate = useNavigate();
-  const { toasts, removeToast, success, info } = useToast();
-  const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal } = useAuth();
+  const { toasts, removeToast, success, info, warning } = useToast();
+  const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, user } =
+    useAuth();
   const [showRatingModal, setShowRatingModal] = useState(false);
 
-  const handleAddFavorite = () => {
+  const handleAddFavorite = async () => {
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
     }
-    success("Đã thêm vào danh sách yêu thích!");
+    if (!user?.id) {
+      warning("Không tìm thấy thông tin người dùng!");
+      return;
+    }
+    try {
+      await userService.addToFavorites(user.id, movie.id);
+      success("Đã thêm vào danh sách yêu thích!");
+    } catch (error) {
+      warning(error.message || "Không thể thêm vào yêu thích. Vui lòng thử lại!");
+      console.error("Error adding to favorites:", error);
+    }
+  };
+
+  const handleRate = async (rating) => {
+    if (!isAuthenticated) {
+      openAuthModal("login");
+      return;
+    }
+    try {
+      await movieService.rateMovie(movie.id, rating);
+      success("Đánh giá của bạn đã được ghi nhận!");
+      setShowRatingModal(false);
+    } catch (error) {
+      warning(error.message || "Không thể gửi đánh giá. Vui lòng thử lại!");
+      console.error("Error rating movie:", error);
+    }
   };
 
   const handleAddToList = () => {
@@ -33,13 +61,29 @@ const ActionButtons = ({ movie }) => {
   };
 
   const handleComment = () => {
-    const commentsSection = document.querySelector(".comments-section");
-    if (commentsSection) {
-      commentsSection.scrollIntoView({ behavior: "smooth" });
+    // Check window size to determine which section to scroll to
+    const isDesktop = window.innerWidth >= 1024; // lg breakpoint
+    console.log(isDesktop);
+    const selector = isDesktop ? ".comments-section-desktop" : ".comments-section-mobile";
+    const commentsSection = document.querySelector(selector);
+
+    if (!commentsSection) {
+      console.warn(`Comments section (${selector}) not found`);
+      return;
     }
+
+    // Get absolute position
+    const elementPosition = commentsSection.getBoundingClientRect().top;
+    const offsetPosition = elementPosition + window.pageYOffset - 100;
+
+    // Scroll to position
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: "smooth",
+    });
   };
 
-  const handleRate = () => {
+  const handleOpenRateModal = () => {
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
@@ -95,7 +139,7 @@ const ActionButtons = ({ movie }) => {
         </div>
 
         <button
-          onClick={handleRate}
+          onClick={handleOpenRateModal}
           className="bg-blue-600 hover:bg-blue-700 text-white lg:px-4 px-2 py-2 rounded-full flex items-center gap-2 font-semibold shadow-lg transition-all"
         >
           <i className="fa-solid fa-smile text-lg" />
@@ -106,7 +150,12 @@ const ActionButtons = ({ movie }) => {
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <AuthModal isOpen={showAuthModal} onClose={closeAuthModal} initialMode={authMode} />
-      <RatingModal isOpen={showRatingModal} onClose={() => setShowRatingModal(false)} movie={movie} />
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        movie={movie}
+        onRate={handleRate}
+      />
     </>
   );
 };

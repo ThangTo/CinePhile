@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import * as authService from "../../services/authService";
+import authService from "services/auth.service";
 
 const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) => {
   const [mode, setMode] = useState(initialMode); // "login" or "register"
@@ -80,20 +80,26 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
 
     setIsLoading(true);
     try {
-      const data = await authService.login(formData.email, formData.password);
-      console.log("Login response:", data);
-      console.log("User role:", data.user.role);
-      authService.setAuthData(data.token, data.user);
-      
-      // Verify data was saved
-      const savedUser = JSON.parse(localStorage.getItem("user"));
-      console.log("Saved user role:", savedUser.role);
-      
+      // authService.login tự động handle cả hai cách: login({...}) hoặc login(email, password)
+      // và tự động lưu auth data vào localStorage
+      const data = await authService.login({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      // Call onLoginSuccess if provided
+      if (onLoginSuccess) {
+        onLoginSuccess({ user: data.user, token: data.token });
+      }
+
       onClose();
       window.location.reload();
     } catch (error) {
       console.error("Login error:", error);
-      setErrors({ general: error.message || "Có lỗi xảy ra. Vui lòng thử lại." });
+      setErrors({
+        general:
+          error.message || error.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -109,13 +115,27 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
 
     setIsLoading(true);
     try {
-      const data = await authService.register(formData.username, formData.email, formData.password);
-      authService.setAuthData(data.token, data.user);
+      // authService.register tự động handle cả hai cách: register({...}) hoặc register(username, email, password)
+      // và tự động lưu auth data vào localStorage
+      const data = await authService.register({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+      });
+
+      // Call onLoginSuccess if provided
+      if (onLoginSuccess) {
+        onLoginSuccess({ user: data.user, token: data.token });
+      }
+
       onClose();
       window.location.reload();
     } catch (error) {
       console.error("Register error:", error);
-      setErrors({ general: error.message || "Có lỗi xảy ra. Vui lòng thử lại." });
+      setErrors({
+        general:
+          error.message || error.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.",
+      });
     } finally {
       setIsLoading(false);
     }
