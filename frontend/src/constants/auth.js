@@ -5,8 +5,8 @@
 // API Configuration
 export const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
-// Mock mode (set to false when backend is ready)
-export const USE_MOCK_AUTH = true;
+// Mock mode - Now using real HTTP API (backend is ready)
+export const USE_MOCK_AUTH = false;
 
 // LocalStorage Keys
 export const STORAGE_KEYS = {
@@ -59,4 +59,3 @@ export const AUTH_SUCCESS = {
   PASSWORD_CHANGED: "Đổi mật khẩu thành công",
   EMAIL_CHANGED: "Đổi email thành công",
 };
-

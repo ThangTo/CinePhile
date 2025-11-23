@@ -32,9 +32,13 @@ const userSchema = new mongoose.Schema({
     enum: ['male', 'female', 'other'],
     default: 'other'
   },
-  premiumUntil: {
+  createdAt: {
     type: Date,
-    default: null
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
   },
   lastLogin: {
     type: Date,
@@ -43,6 +47,11 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+
+userSchema.index({ email: 1 });
+userSchema.index({ username: 1 });
+
 
 // Plugin configuration
 userSchema.plugin(passportLocalMongoose, {
