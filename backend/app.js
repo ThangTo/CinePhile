@@ -26,12 +26,12 @@ const adminRoutes = require('./routes/admin.routes');
 const crawlerRoutes = require('./routes/crawler.routes');
 
 // API endpoints
-// app.use('/api/v1/movies', movieRoutes);
+app.use('/api/v1/movies', movieRoutes);
 app.use('/api/v1/auth', authRoutes); 
-// app.use('/api/v1/users', userRoutes);
-// app.use('/api/v1/health', healthRoutes);
-// app.use('/api/v1/admin', adminRoutes);
-// app.use('/api/v1/crawl', crawlerRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/health', healthRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/crawl', crawlerRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).send('Server is running');
