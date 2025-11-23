@@ -1,19 +1,87 @@
+const jwt = require('jsonwebtoken');
+const User = require('../models/user.model');
+
+// Helper to generate tokens
+const generateTokens = (userId) => {
+  const token = jwt.sign({ userId }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE || '1h'
+  });
+  
+  const refreshToken = jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d'
+  });
+  
+  return { token, refreshToken };
+};
+
 /**
  * Register new user
  * @param {Object} userData - { username, email, password }
  * @returns {Promise<Object>} { user: Object, token: string, refreshToken: string }
  */
 const register = async (userData) => {
-  // TODO: Implement
+  const { username, email, password } = userData;
+  console.log('here');
+
+  // Check if user exists (passport-local-mongoose handles username uniqueness, but we check email too)
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    throw new Error('User with this email already exists');
+  }
+
+  // Register user with passport-local-mongoose
+  // User.register takes a user instance and a password
+  const user = new User({ username, email });
+  console.log('user')
+  User.register(user, password, async function (err, user) {
+    if (err) {
+      console.log(err);
+    }
+    console.log('registered', user);
+  });
+
+  // Generate tokens
+  const tokens = generateTokens(user._id);
+
+  return {
+    user,
+    ...tokens
+  };
 };
 
 /**
  * Login user
- * @param {Object} credentials - { email, password }
+ * @param {Object} credentials - { username, password } (Changed from email to username for passport-local default)
  * @returns {Promise<Object>} { user: Object, token: string, refreshToken: string }
  */
 const login = async (credentials) => {
-  // TODO: Implement
+  const { username, password } = credentials;
+
+  // Authenticate using passport-local-mongoose strategy
+  const { user, error } = await new Promise((resolve, reject) => {
+    const authenticate = User.authenticate();
+    authenticate(username, password, (err, user, info) => {
+      if (err) return reject(err);
+      if (!user) return resolve({ error: info });
+      resolve({ user });
+    });
+  });
+
+  if (error || !user) {
+    throw new Error(error ? error.message : 'Invalid credentials');
+  }
+
+  // // Update last login
+  // user.lastLogin = Date.now();
+  // await user.save();
+
+  // Generate tokens
+  const tokens = generateTokens(user._id);
+
+  return {
+    user,
+    ...tokens
+  };
 };
 
 /**
@@ -23,7 +91,9 @@ const login = async (credentials) => {
  * @returns {Promise<Object>} { message: string }
  */
 const logout = async (userId, token) => {
-  // TODO: Implement
+  // In a stateless JWT setup, we can't really "invalidate" tokens without a blacklist (Redis, etc.)
+  // For now, we'll just return success. Client should remove token.
+  return { message: 'Logged out successfully' };
 };
 
 /**
@@ -32,7 +102,23 @@ const logout = async (userId, token) => {
  * @returns {Promise<Object>} { token: string }
  */
 const refreshToken = async (refreshToken) => {
-  // TODO: Implement
+  if (!refreshToken) {
+    throw new Error('Refresh token is required');
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.userId);
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const tokens = generateTokens(user._id);
+    return { token: tokens.token, refreshToken: tokens.refreshToken };
+  } catch (error) {
+    throw new Error('Invalid refresh token');
+  }
 };
 
 /**
@@ -41,7 +127,14 @@ const refreshToken = async (refreshToken) => {
  * @returns {Promise<Object>} User object
  */
 const getCurrentUser = async (token) => {
-  // TODO: Implement
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+    if (!user) throw new Error('User not found');
+    return user;
+  } catch (error) {
+    throw new Error('Invalid token');
+  }
 };
 
 /**
@@ -51,7 +144,25 @@ const getCurrentUser = async (token) => {
  * @returns {Promise<Object>} Updated user object
  */
 const updateProfile = async (userId, updates) => {
-  // TODO: Implement
+  const allowedUpdates = ['username', 'email', 'avatar', 'gender'];
+  const actualUpdates = {};
+  
+  Object.keys(updates).forEach(key => {
+    if (allowedUpdates.includes(key)) {
+      actualUpdates[key] = updates[key];
+    }
+  });
+
+  const user = await User.findByIdAndUpdate(userId, actualUpdates, { 
+    new: true, 
+    runValidators: true 
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  return user;
 };
 
 /**
@@ -61,7 +172,17 @@ const updateProfile = async (userId, updates) => {
  * @returns {Promise<Object>} { message: string }
  */
 const changePassword = async (userId, passwords) => {
-  // TODO: Implement
+  const { oldPassword, newPassword } = passwords;
+  
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Use passport-local-mongoose changePassword method
+  await user.changePassword(oldPassword, newPassword);
+
+  return { message: 'Password changed successfully' };
 };
 
 /**
@@ -70,7 +191,18 @@ const changePassword = async (userId, passwords) => {
  * @returns {Promise<Object>} { message: string }
  */
 const forgotPassword = async (email) => {
-  // TODO: Implement
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Generate reset token (short lived)
+  const resetToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+  // In a real app, send email here
+  console.log(`Reset token for ${email}: ${resetToken}`);
+
+  return { message: 'Password reset email sent' };
 };
 
 /**
@@ -79,7 +211,24 @@ const forgotPassword = async (email) => {
  * @returns {Promise<Object>} { message: string }
  */
 const resetPassword = async (resetData) => {
-  // TODO: Implement
+  const { token, newPassword } = resetData;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Use passport-local-mongoose setPassword method
+    await user.setPassword(newPassword);
+    await user.save();
+
+    return { message: 'Password reset successfully' };
+  } catch (error) {
+    throw new Error('Invalid or expired reset token');
+  }
 };
 
 module.exports = {

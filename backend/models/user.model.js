@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const passportLocalMongoose = require('passport-local-mongoose');
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -17,11 +17,6 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
     match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please enter a valid email']
-  },
-  hashPassword: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: [8, 'Password must be at least 8 characters']
   },
   avatar: {
     type: String,
@@ -49,32 +44,18 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for better query performance
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
-
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('hashPassword')) return next();
-
-  try {
-    const salt = await bcrypt.genSalt(12);
-    this.hashPassword = await bcrypt.hash(this.hashPassword, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+// Plugin configuration
+userSchema.plugin(passportLocalMongoose, {
+  saltlen: 16,
+  keylen: 32,
+  usernameCaseInsensitive: true
 });
 
-// Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.hashPassword);
-};
-
-// Remove password from JSON output
+// Remove password from JSON output (passport-local-mongoose adds salt and hash)
 userSchema.methods.toJSON = function() {
   const userObject = this.toObject();
-  delete userObject.hashPassword;
+  delete userObject.hash;
+  delete userObject.salt;
   return userObject;
 };
 

@@ -3,10 +3,13 @@ const cors = require('cors');
 const morgan = require('morgan');
 const app = express();
 
+const passport = require('passport');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
+app.use(passport.initialize());
 
 // Routes
 const movieRoutes = require('./routes/movie.routes');
@@ -20,7 +23,6 @@ app.use('/api/v1/movies', movieRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/health', healthRoutes);
-
 app.use("/api/v1/crawl", crawlerRoutes);
 
 app.get('/', (req, res) => {

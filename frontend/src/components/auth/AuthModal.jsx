@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import authService from "services/auth.service";
+import http from "lib/axios";
 
 const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) => {
   const [mode, setMode] = useState(initialMode); // "login" or "register"
@@ -51,7 +52,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
 
   const validateLogin = () => {
     const newErrors = {};
-    if (!formData.email) newErrors.email = "Vui lòng nhập email";
+    if (!formData.username) newErrors.username = "Vui lòng nhập tên đăng nhập";
     if (!formData.password) newErrors.password = "Vui lòng nhập mật khẩu";
     return newErrors;
   };
@@ -80,10 +81,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
 
     setIsLoading(true);
     try {
-      // authService.login tự động handle cả hai cách: login({...}) hoặc login(email, password)
-      // và tự động lưu auth data vào localStorage
-      const data = await authService.login({
-        email: formData.email,
+      const data = await http.post("/auth/login", {
+        username: formData.username,
         password: formData.password,
       });
 
@@ -117,7 +116,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
     try {
       // authService.register tự động handle cả hai cách: register({...}) hoặc register(username, email, password)
       // và tự động lưu auth data vào localStorage
-      const data = await authService.register({
+      const data = await http.post("/auth/register", {
         username: formData.username,
         email: formData.email,
         password: formData.password,
@@ -222,35 +221,35 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
             )}
 
             <form onSubmit={mode === "login" ? handleLogin : handleRegister} className="space-y-4">
+              <div>
+                <input
+                  required
+                  type="text"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  placeholder={mode === "login" ? "Tên đăng nhập" : "Tên hiển thị"}
+                  className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
+                />
+                {errors.username && (
+                  <p className="mt-1 text-red-500 text-sm">{errors.username}</p>
+                )}
+              </div>
+
               {mode === "register" && (
                 <div>
                   <input
                     required
-                    type="text"
-                    name="username"
-                    value={formData.username}
+                    type="email"
+                    name="email"
+                    value={formData.email}
                     onChange={handleChange}
-                    placeholder="Tên hiển thị"
+                    placeholder="Email"
                     className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
                   />
-                  {errors.username && (
-                    <p className="mt-1 text-red-500 text-sm">{errors.username}</p>
-                  )}
+                  {errors.email && <p className="mt-1 text-red-500 text-sm">{errors.email}</p>}
                 </div>
               )}
-
-              <div>
-                <input
-                  required
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="Email"
-                  className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
-                />
-                {errors.email && <p className="mt-1 text-red-500 text-sm">{errors.email}</p>}
-              </div>
 
               <div>
                 <input
