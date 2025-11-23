@@ -4,7 +4,6 @@ import CommentsList from "components/movie-detail/comment/CommentsList";
 import useToast from "hooks/useToast";
 import useAuth from "hooks/useAuth";
 import ToastContainer from "components/common/ToastContainer";
-import AuthModal from "components/auth/AuthModal";
 import movieService from "services/movie.service";
 
 const CommentsSection = ({ movie, className = "" }) => {
@@ -200,9 +199,6 @@ const CommentsSection = ({ movie, className = "" }) => {
       </section>
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-
-      {/* Auth Modal */}
-      <AuthModal isOpen={showAuthModal} onClose={closeAuthModal} initialMode={authMode} />
     </>
   );
 };

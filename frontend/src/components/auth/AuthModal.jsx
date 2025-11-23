@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import authService from "services/auth.service";
-import http from "lib/axios";
+import { useAuth } from "contexts/AuthContext";
 
-const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) => {
+const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
+  const { login, register } = useAuth();
   const [mode, setMode] = useState(initialMode); // "login" or "register"
   const [formData, setFormData] = useState({
     username: "",
@@ -81,23 +81,16 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
 
     setIsLoading(true);
     try {
-      const data = await http.post("/auth/login", {
-        username: formData.username,
+      // Use email for login (backend expects email)
+      await login({
+        email: formData.username, // Use username field as email
         password: formData.password,
       });
-
-      // Call onLoginSuccess if provided
-      if (onLoginSuccess) {
-        onLoginSuccess({ user: data.user, token: data.token });
-      }
-
       onClose();
-      window.location.reload();
     } catch (error) {
       console.error("Login error:", error);
       setErrors({
-        general:
-          error.message || error.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.",
+        general: error.message || "Có lỗi xảy ra. Vui lòng thử lại.",
       });
     } finally {
       setIsLoading(false);
@@ -114,26 +107,16 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
 
     setIsLoading(true);
     try {
-      // authService.register tự động handle cả hai cách: register({...}) hoặc register(username, email, password)
-      // và tự động lưu auth data vào localStorage
-      const data = await http.post("/auth/register", {
+      await register({
         username: formData.username,
         email: formData.email,
         password: formData.password,
       });
-
-      // Call onLoginSuccess if provided
-      if (onLoginSuccess) {
-        onLoginSuccess({ user: data.user, token: data.token });
-      }
-
       onClose();
-      window.location.reload();
     } catch (error) {
       console.error("Register error:", error);
       setErrors({
-        general:
-          error.message || error.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.",
+        general: error.message || "Có lỗi xảy ra. Vui lòng thử lại.",
       });
     } finally {
       setIsLoading(false);
@@ -231,9 +214,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onLoginSuccess }) =
                   placeholder={mode === "login" ? "Tên đăng nhập" : "Tên hiển thị"}
                   className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
-                {errors.username && (
-                  <p className="mt-1 text-red-500 text-sm">{errors.username}</p>
-                )}
+                {errors.username && <p className="mt-1 text-red-500 text-sm">{errors.username}</p>}
               </div>
 
               {mode === "register" && (

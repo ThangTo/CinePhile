@@ -1,71 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AccountSidebar from "components/account/AccountSidebar";
 import ProfileCard from "components/account/ProfileCard";
 import AccountInfoCard from "components/account/AccountInfoCard";
 import SecurityCard from "components/account/SecurityCard";
-import authService from "services/auth.service";
+import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
 
 const AccountPage = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading, updateUser, logout } = useAuth();
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        setLoading(true);
-        // Check if user is authenticated
-        if (!authService.isAuthenticated()) {
-          navigate("/");
-          return;
-        }
-
-        // Try to get user from API first
-        try {
-          const currentUser = await authService.getCurrentUser();
-          const userData = currentUser?.data || currentUser;
-          if (userData) {
-            setUser(userData);
-          } else {
-            // Fallback to local storage
-            const cachedUser = authService.getCurrentUserLocal();
-            if (cachedUser) {
-              setUser(cachedUser);
-            } else {
-              navigate("/");
-            }
-          }
-        } catch (error) {
-          // If API fails, use cached data
-          const cachedUser = authService.getCurrentUserLocal();
-          if (cachedUser) {
-            setUser(cachedUser);
-          } else {
-            navigate("/");
-          }
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-        navigate("/");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadUser();
-  }, [navigate]);
-
-  const handleLogout = async () => {
-    try {
-      await authService.logout();
-    } catch (error) {
-      console.error("Logout error:", error);
-    } finally {
-      authService.clearAuthData();
+    // Redirect if not authenticated
+    if (!isLoading && !user) {
       navigate("/");
     }
+  }, [user, isLoading, navigate]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
   };
 
   const handleUpdateProfile = async (updatedData) => {
@@ -74,16 +29,16 @@ const AccountPage = () => {
     try {
       // Update via API
       const updatedUser = await userService.updateProfile(user.id, updatedData);
-      setUser(updatedUser);
+      updateUser(updatedUser);
     } catch (error) {
       console.error("Error updating profile:", error);
       // Fallback: update local state only
       const updatedUser = { ...user, ...updatedData };
-      setUser(updatedUser);
+      updateUser(updatedUser);
     }
   };
 
-  if (loading || !user) {
+  if (isLoading || !user) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-account-bg-primary">
         <div className="w-12 h-12 border-4 border-account-bg-tertiary border-t-account-accent rounded-full animate-spin"></div>

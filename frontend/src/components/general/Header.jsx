@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import AuthModal from "components/auth/AuthModal";
 import {
   MobileUserMenu,
   DesktopUserMenu,
@@ -149,9 +148,6 @@ const Header = () => {
           </div>
         </div>
       )}
-
-      {/* Auth Modal */}
-      <AuthModal isOpen={showAuthModal} onClose={closeAuthModal} initialMode={authMode} />
     </>
   );
 };

@@ -1,30 +1,24 @@
 import React, { useState } from "react";
 import useAuth from "hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import authService from "services/auth.service";
 
 /**
  * Quick Admin Login Button (For Development/Testing Only)
  * Đặt component này ở trang chủ hoặc header để test admin access
- * Uses authService.login() to match real API flow
+ * Uses login from AuthContext
  */
 const QuickAdminLogin = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, login } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAdminLogin = async () => {
     setIsLoading(true);
     try {
-      // Use authService.login() to call real backend API
-      // Backend will return admin user for these credentials
-      await authService.login({
+      await login({
         email: "admin@cinephile.com",
         password: "admin123",
       });
-
-      // Reload to trigger useAuth to load the new user
-      window.location.reload();
     } catch (error) {
       console.error("Login error:", error);
       alert("Có lỗi khi login: " + (error.message || "Unknown error"));
@@ -36,14 +30,10 @@ const QuickAdminLogin = () => {
   const handleUserLogin = async () => {
     setIsLoading(true);
     try {
-      // Use authService.login() to match real API flow
-      await authService.login({
+      await login({
         email: "user@cinephile.com",
         password: "user123",
       });
-
-      // Reload to trigger useAuth to load the new user
-      window.location.reload();
     } catch (error) {
       console.error("Login error:", error);
       alert("Có lỗi khi login: " + (error.message || "Unknown error"));
