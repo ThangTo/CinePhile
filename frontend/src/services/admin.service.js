@@ -2,7 +2,7 @@ import apiRequest from "./utils/apiRequest";
 
 // ============================================================================
 // Admin Service - API calls for admin dashboard
-// Compatible with both MSW (mock) and real API
+// Uses real HTTP API requests to backend
 // ============================================================================
 
 /**

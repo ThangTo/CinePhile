@@ -16,8 +16,8 @@ const QuickAdminLogin = () => {
   const handleAdminLogin = async () => {
     setIsLoading(true);
     try {
-      // Use authService.login() to match real API flow
-      // MSW handler will return admin user for these credentials
+      // Use authService.login() to call real backend API
+      // Backend will return admin user for these credentials
       await authService.login({
         email: "admin@cinephile.com",
         password: "admin123",
