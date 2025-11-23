@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
-const authMiddleware = require('../middleware/auth.middleware');
+const passport = require('passport');
 
-// All admin routes require authentication
-// TODO: Add role-based authorization when auth middleware is implemented
-router.use(authMiddleware);
+// const authMiddleware = require('../middleware/auth.middleware');
+
+// // All admin routes require authentication
+// // TODO: Add role-based authorization when auth middleware is implemented
+// router.use(authMiddleware);
 
 // ===== ADMIN MOVIES =====
 // GET /api/v1/admin/movies - Get all movies
@@ -51,5 +53,13 @@ router.get('/stats', adminController.getStats);
 
 // GET /api/v1/admin/stats/charts/:type - Get chart data
 router.get('/stats/charts/:type', adminController.getChartData);
+
+
+function isAdmin(req, res, next) {
+  if (req.isAuthenticated() && (req.user.role === 'admin')) {
+    return next();
+  }
+  return res.redirect('/');
+}
 
 module.exports = router;

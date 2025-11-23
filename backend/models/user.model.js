@@ -49,9 +49,6 @@ const userSchema = new mongoose.Schema({
 });
 
 
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
-
 
 // Plugin configuration
 userSchema.plugin(passportLocalMongoose, {
