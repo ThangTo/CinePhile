@@ -49,7 +49,7 @@ const WatchPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b1220] text-white flex items-center justify-center">
+      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
         <div className="text-xl">Đang tải...</div>
       </div>
     );
@@ -57,7 +57,7 @@ const WatchPage = () => {
 
   if (!movie) {
     return (
-      <div className="min-h-screen bg-[#0b1220] text-white flex items-center justify-center">
+      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
         <div className="text-xl">Không tìm thấy phim</div>
       </div>
     );
@@ -66,27 +66,27 @@ const WatchPage = () => {
   const currentEpisode = episodes.find((ep) => ep.id === activeEp) || episodes[0];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-bgColor">
       {/* Top Bar */}
-      <div className="w-full pt-16 pl-6">
-        <div className="container mx-auto flex items-center gap-3 px-4 text-white">
+      <div className="w-full pt-16 md:pt-20 px-4">
+        <div className="container mx-auto flex items-center gap-3 text-white">
           <button
             onClick={() => navigate(-1)}
             className="p-2 hover:bg-white/10 rounded-full transition-colors"
           >
             <i className="fa-solid fa-chevron-left text-lg" />
           </button>
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-base md:text-lg font-semibold truncate">
             Xem phim <span className="text-primaryColor">{movie.title}</span>
           </h1>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-3">
-        <div className="grid lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-12">
-            {/* Video Player */}
+      <div className="container mx-auto px-4 py-3 md:py-6">
+        <div className="grid lg:grid-cols-12 gap-4 md:gap-6">
+          {/* Video Player - Full width on all screens */}
+          <div className="lg:col-span-12 w-full">
             <VideoPlayer
               movie={movie}
               episode={currentEpisode}
@@ -96,12 +96,18 @@ const WatchPage = () => {
               onAudioTypeChange={setAudioType}
             />
 
-            {/* Action Bar */}
-            <ActionBar />
+            {/* Action Bar - Only favorite and add buttons */}
+            <ActionBar movie={movie} />
           </div>
 
+          {/* Desktop Layout: Left column (Movie Info + Episodes + Comments) */}
           <div className="lg:col-span-8 flex flex-col">
-            <MovieInfoBrief movie={movie} activeEp={activeEp} />
+            {/* Movie Info Brief - Hidden on md and below */}
+            <div className="hidden lg:block">
+              <MovieInfoBrief movie={movie} activeEp={activeEp} />
+            </div>
+
+            {/* Episodes Section */}
             <EpisodesSection
               movie={{ ...movie, episodes }}
               activeEpisode={activeEp}
@@ -109,18 +115,33 @@ const WatchPage = () => {
               audioType={audioType}
               onAudioTypeChange={setAudioType}
             />
+
+            {/* Comments - constrained to left grid column on desktop */}
+            <div className="hidden lg:block mt-6">
+              <CommentsSection movie={movie} />
+            </div>
           </div>
 
-          {/* Right Sidebar */}
-          <div className="lg:col-span-4 pl-[24px] border-l-2 border-borderColor">
+          {/* Desktop Layout: Right Sidebar (Rating + Cast) */}
+          <div className="hidden lg:block lg:col-span-4 pl-6 border-l-2 border-borderColor">
             <div className="gap-8 flex flex-col">
               <RatingSidebar movie={movie} />
               <CastSection movie={movie} layout="vertical" />
             </div>
           </div>
+
+          {/* Mobile/Tablet Layout: Rating + Cast below Episodes (sm and below) */}
+          <div className="lg:hidden w-full space-y-6 mt-6">
+            <RatingSidebar movie={movie} />
+            <CastSection movie={movie} layout="vertical" />
+          </div>
+
+          {/* Mobile/Tablet Comments below rating & cast */}
+          <div className="lg:hidden w-full mt-6">
+            <CommentsSection movie={movie} />
+          </div>
         </div>
       </div>
-      <CommentsSection movie={movie} />
     </div>
   );
 };

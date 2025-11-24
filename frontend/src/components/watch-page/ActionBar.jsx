@@ -1,92 +1,76 @@
-import React, { useState } from "react";
+import React from "react";
+import useAuth from "hooks/useAuth";
+import userService from "services/user.service";
+import useToast from "hooks/useToast";
+import ToastContainer from "components/common/ToastContainer";
 
-const ActionBar = () => {
-  const [autoPlay, setAutoPlay] = useState(true);
-  const [skipIntro, setSkipIntro] = useState(false);
-  const [cinemaMode, setCinemaMode] = useState(false);
+const ActionBar = ({ movie }) => {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
+  const { toasts, removeToast, success, warning } = useToast();
+
+  const handleAddFavorite = async () => {
+    if (!isAuthenticated) {
+      openAuthModal("login");
+      return;
+    }
+    if (!user?.id) {
+      warning("Không tìm thấy thông tin người dùng!");
+      return;
+    }
+    try {
+      await userService.addToFavorites(user.id, movie.id);
+      success("Đã thêm vào danh sách yêu thích!");
+    } catch (error) {
+      warning(error.message || "Không thể thêm vào yêu thích. Vui lòng thử lại!");
+      console.error("Error adding to favorites:", error);
+    }
+  };
+
+  const handleAddToList = async () => {
+    if (!isAuthenticated) {
+      openAuthModal("login");
+      return;
+    }
+    if (!user?.id) {
+      warning("Không tìm thấy thông tin người dùng!");
+      return;
+    }
+    try {
+      await userService.addToWatchlist(user.id, movie.id);
+      success("Đã thêm vào danh sách!");
+    } catch (error) {
+      warning(error.message || "Không thể thêm vào danh sách. Vui lòng thử lại!");
+      console.error("Error adding to watchlist:", error);
+    }
+  };
 
   return (
-    <div className="bg-gray-800/90 backdrop-blur-sm border-b border-white/10">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Left Actions */}
-          <div className="flex items-center gap-6">
-            <button className="action-btn">
-              <i className="fa-solid fa-heart" />
-              <span className="text-sm">Yêu thích</span>
+    <>
+      <div className="bg-bgColor2/50 backdrop-blur-sm rounded-lg">
+        <div className="container mx-auto px-4 py-3 md:py-4">
+          <div className="flex items-center justify-center gap-3 md:gap-4">
+            {/* Yêu thích */}
+            <button
+              onClick={handleAddFavorite}
+              className="flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primaryColor/50 rounded-lg text-white transition-all duration-200 hover:scale-105"
+            >
+              <i className="fa-solid fa-heart text-sm md:text-base" />
+              <span className="text-xs md:text-sm font-medium">Yêu thích</span>
             </button>
 
-            <button className="action-btn">
-              <i className="fa-solid fa-plus" />
-              <span className="text-sm">Thêm vào</span>
-            </button>
-
-            {/* Auto Play Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-300">Chuyển tập</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={autoPlay}
-                  onChange={(e) => setAutoPlay(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
-                <span className="ml-2 text-sm text-gray-300">{autoPlay ? "ON" : "OFF"}</span>
-              </label>
-            </div>
-
-            {/* Skip Intro Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-300">Bỏ qua giới thiệu</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={skipIntro}
-                  onChange={(e) => setSkipIntro(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
-                <span className="ml-2 text-sm text-gray-300">{skipIntro ? "ON" : "OFF"}</span>
-              </label>
-            </div>
-
-            {/* Cinema Mode Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-300">Rạp phim</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={cinemaMode}
-                  onChange={(e) => setCinemaMode(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
-                <span className="ml-2 text-sm text-gray-300">{cinemaMode ? "ON" : "OFF"}</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Right Actions */}
-          <div className="flex items-center gap-6">
-            <button className="action-btn">
-              <i className="fa-solid fa-broadcast-tower" />
-              <span className="text-sm">Xem chung</span>
-            </button>
-
-            <button className="action-btn">
-              <i className="fa-solid fa-paper-plane" />
-              <span className="text-sm">Chia sẻ</span>
-            </button>
-
-            <button className="action-btn">
-              <i className="fa-solid fa-flag" />
-              <span className="text-sm">Báo lỗi</span>
+            {/* Thêm vào */}
+            <button
+              onClick={handleAddToList}
+              className="flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primaryColor/50 rounded-lg text-white transition-all duration-200 hover:scale-105"
+            >
+              <i className="fa-solid fa-plus text-sm md:text-base" />
+              <span className="text-xs md:text-sm font-medium">Thêm vào</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+    </>
   );
 };
 

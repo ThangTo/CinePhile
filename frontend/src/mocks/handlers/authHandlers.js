@@ -99,20 +99,9 @@ export const authHandlers = [
     const authError = requireAuth(request);
     if (authError) return authError;
 
-    // Try to get user from localStorage first (for QuickAdminLogin)
-    // This allows admin login to work properly
-    try {
-      const userFromStorage = localStorage.getItem("user");
-      if (userFromStorage) {
-        const parsedUser = JSON.parse(userFromStorage);
-        // Update mockStorage to keep it in sync
-        mockStorage.user = parsedUser;
-        // Return user with preserved role
-        return HttpResponse.json(parsedUser);
-      }
-    } catch (error) {
-      console.warn("Failed to parse user from localStorage:", error);
-    }
+    // Note: We cannot access localStorage in Service Worker
+    // So we rely on in-memory mockStorage.
+    // If you reload the page, you will need to login again in mock mode.
 
     // Fallback to mockStorage (which should have the user from login)
     // or create new user (should not happen if login was successful)
