@@ -11,6 +11,7 @@ import APITestExample from "./components/examples/APITestExample";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/general/ProtectedRoute";
 import MainLayout from "layouts/MainLayout";
+import NotFoundPage from "./pages/NotFound";
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </Router>
