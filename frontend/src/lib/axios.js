@@ -8,23 +8,7 @@ console.log(API_BASE_URL);
 const http = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000, // timeout 15s
-  withCredentials: false, // true nếu backend dùng cookie
-});
-
-// Interceptors request
-http.interceptors.request.use((config) => {
-  const requiresAuth = config?.meta?.requiresAuth;
-  if (requiresAuth) {
-    // Use auth-storage helper to get token
-    // Dynamic import to avoid circular dependency
-    const authStorage = require("./auth-storage");
-    const token = authStorage.getToken();
-    if (token) {
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
+  withCredentials: true,
 });
 
 // Interceptors response

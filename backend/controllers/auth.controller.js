@@ -1,4 +1,39 @@
-const authService = require("../services/auth.service");
+const authService = require('../services/auth.service');
+
+const isProduction = process.env.NODE_ENV === 'production';
+const baseCookieOptions = {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
+  domain: process.env.COOKIE_DOMAIN || undefined,
+  path: '/',
+};
+const ACCESS_TOKEN_MAX_AGE = parseInt(process.env.ACCESS_TOKEN_MAX_AGE_MS, 10) || 60 * 60 * 1000; // 1 hour
+const REFRESH_TOKEN_MAX_AGE =
+  parseInt(process.env.REFRESH_TOKEN_MAX_AGE_MS, 10) || 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const attachAuthCookies = (res, tokens = {}) => {
+  if (!tokens) return;
+
+  if (tokens.token) {
+    res.cookie('accessToken', tokens.token, {
+      ...baseCookieOptions,
+      maxAge: ACCESS_TOKEN_MAX_AGE,
+    });
+  }
+
+  if (tokens.refreshToken) {
+    res.cookie('refreshToken', tokens.refreshToken, {
+      ...baseCookieOptions,
+      maxAge: REFRESH_TOKEN_MAX_AGE,
+    });
+  }
+};
+
+const clearAuthCookies = (res) => {
+  res.clearCookie('accessToken', baseCookieOptions);
+  res.clearCookie('refreshToken', baseCookieOptions);
+};
 
 /**
  * POST /auth/register
@@ -9,7 +44,8 @@ const authService = require("../services/auth.service");
 const register = async (req, res) => {
   try {
     const result = await authService.register(req.body);
-    res.status(201).json(result);
+    attachAuthCookies(res, result);
+    res.status(201).json({ user: result.user });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -24,7 +60,8 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const result = await authService.login(req.body);
-    res.json(result);
+    attachAuthCookies(res, result);
+    res.json({ user: result.user });
   } catch (error) {
     res.status(401).json({ message: error.message });
   }
@@ -38,9 +75,8 @@ const login = async (req, res) => {
  */
 const logout = async (req, res) => {
   try {
-    // We might want to pass the token to blacklist it if we had that mechanism
-    const token = req.headers.authorization?.split(' ')[1];
-    const result = await authService.logout(req.user._id, token);
+    const result = await authService.logout(req.user?._id);
+    clearAuthCookies(res);
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -55,8 +91,15 @@ const logout = async (req, res) => {
  */
 const refreshToken = async (req, res) => {
   try {
-    const result = await authService.refreshToken(req.body.refreshToken);
-    res.json(result);
+    const incomingRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+
+    if (!incomingRefreshToken) {
+      return res.status(401).json({ message: 'Refresh token is required' });
+    }
+
+    const tokens = await authService.refreshToken(incomingRefreshToken);
+    attachAuthCookies(res, tokens);
+    res.json({ message: 'Token refreshed' });
   } catch (error) {
     res.status(401).json({ message: error.message });
   }
@@ -70,12 +113,9 @@ const refreshToken = async (req, res) => {
  */
 const getCurrentUser = async (req, res) => {
   try {
-    // req.user is already attached by middleware, but we can fetch fresh data if needed
-    // or just return req.user. Let's fetch fresh to be safe/consistent.
-    // However, the service expects a token. 
-    // Let's just return req.user for now as it's efficient, 
-    // OR call service if we want to reuse logic (but service takes token).
-    // Actually, let's just return req.user since middleware did the work.
+    if (!req.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
     res.json(req.user);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -126,7 +166,7 @@ const forgotPassword = async (req, res) => {
     res.json(result);
   } catch (error) {
     // Don't reveal if user exists or not for security, but for now we might
-    // or just return success always. 
+    // or just return success always.
     // If service throws "User not found", we might want to mask it.
     // For this implementation, I'll pass the error message (dev mode style).
     res.status(404).json({ message: error.message });

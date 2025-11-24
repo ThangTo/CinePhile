@@ -21,72 +21,27 @@ export const AuthProvider = ({ children }) => {
     const loadUser = async () => {
       setIsLoading(true);
       try {
-        const token = authService.getToken();
         const cachedUserData = authService.getCurrentUserLocal();
+        if (cachedUserData) {
+          setUser(cachedUserData);
+        }
 
-        if (token) {
-          // Use cached data first for immediate UI update
-          if (cachedUserData) {
-            const userWithRole = {
-              id: cachedUserData.id,
-              name: cachedUserData.name || cachedUserData.username,
-              email: cachedUserData.email,
-              role: cachedUserData.role || "user",
-              ...cachedUserData,
-            };
+        const currentUser = await authService.getCurrentUser();
+        const userDataFromAPI = currentUser?.data || currentUser;
 
-            if (!userWithRole.role) {
-              userWithRole.role = cachedUserData.role || "user";
-            }
-
-            authService.setAuthData(token, userWithRole, authService.getRefreshToken());
-            setUser(userWithRole);
-            setIsLoading(false);
-
-            // Verify with API in background
-            try {
-              const currentUser = await authService.getCurrentUser();
-              const userDataFromAPI = currentUser?.data || currentUser;
-              if (userDataFromAPI) {
-                const finalUser = {
-                  ...userDataFromAPI,
-                  role: userDataFromAPI.role || cachedUserData?.role || "user",
-                };
-                setUser(finalUser);
-                authService.setAuthData(token, finalUser, authService.getRefreshToken());
-              }
-            } catch (error) {
-              console.warn("Failed to verify token, using cached user data:", error);
-              if (!cachedUserData) {
-                authService.clearAuthData();
-                setUser(null);
-              }
-            }
-          } else {
-            // No cached data, fetch from API
-            try {
-              const currentUser = await authService.getCurrentUser();
-              const userDataFromAPI = currentUser?.data || currentUser;
-              if (userDataFromAPI) {
-                setUser(userDataFromAPI);
-                authService.setAuthData(token, userDataFromAPI, authService.getRefreshToken());
-              }
-            } catch (error) {
-              console.warn("Failed to verify token:", error);
-              authService.clearAuthData();
-              setUser(null);
-            }
-          }
+        if (userDataFromAPI) {
+          setUser(userDataFromAPI);
+          authService.setAuthData(null, userDataFromAPI);
         } else {
-          // No token - clear any legacy cached data
-          if (cachedUserData) {
-            authService.clearAuthData();
-          }
+          authService.clearAuthData();
           setUser(null);
         }
       } catch (error) {
-        console.error("Unexpected error in loadUser:", error);
+        authService.clearAuthData();
         setUser(null);
+        if (error?.status && error.status !== 401) {
+          console.error("Unexpected error in loadUser:", error);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -166,11 +121,7 @@ export const AuthProvider = ({ children }) => {
    */
   const updateUser = (userData) => {
     setUser(userData);
-    const token = authService.getToken();
-    const refreshToken = authService.getRefreshToken();
-    if (token) {
-      authService.setAuthData(token, userData, refreshToken);
-    }
+    authService.setAuthData(null, userData);
   };
 
   /**

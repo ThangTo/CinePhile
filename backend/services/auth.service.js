@@ -51,35 +51,22 @@ const register = async (userData) => {
 
 /**
  * Login user
- * @param {Object} credentials - { username, password } (Changed from email to username for passport-local default)
+ * @param {Object} credentials - { email, password }
  * @returns {Promise<Object>} { user: Object, token: string, refreshToken: string }
  */
 const login = async (credentials) => {
-  const { username, email, password } = credentials;
+  const { email, password } = credentials;
 
-  if (!password) {
-    throw new Error('Password is required');
+  if (!email || !password) {
+    throw new Error('Email and password are required');
   }
 
-  let identifier = username;
+  const normalizedEmail = email.toLowerCase().trim();
 
-  // Support login with email by resolving to the stored username
-  if (!identifier && email) {
-    const userByEmail = await User.findOne({ email: email.toLowerCase().trim() });
-    if (!userByEmail) {
-      throw new Error('Invalid credentials');
-    }
-    identifier = userByEmail.username;
-  }
-
-  if (!identifier) {
-    throw new Error('Username or email is required');
-  }
-
-  // Authenticate using passport-local-mongoose strategy
+  // Authenticate using passport-local-mongoose (configured to use email)
   const { user, error } = await new Promise((resolve, reject) => {
     const authenticate = User.authenticate();
-    authenticate(identifier, password, (err, user, info) => {
+    authenticate(normalizedEmail, password, (err, user, info) => {
       if (err) return reject(err);
       if (!user) return resolve({ error: info });
       resolve({ user });
@@ -109,7 +96,7 @@ const login = async (credentials) => {
  * @param {string} token - Access token
  * @returns {Promise<Object>} { message: string }
  */
-const logout = async (userId, token) => {
+const logout = async (userId) => {
   // In a stateless JWT setup, we can't really "invalidate" tokens without a blacklist (Redis, etc.)
   // For now, we'll just return success. Client should remove token.
   return { message: 'Logged out successfully' };

@@ -1,18 +1,18 @@
 // src/lib/auth-storage.js
-const TOKEN_KEY = "token";
 const USER_KEY = "user";
-const REFRESH_KEY = "refresh_token"; // nếu backend có refresh
+const TOKEN_KEY = "token"; // legacy key
+const REFRESH_KEY = "refresh_token"; // legacy key
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY) || null;
-export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY) || null;
+export const getToken = () => null;
+export const getRefreshToken = () => null;
 
-export const setAuthData = ({ token, refreshToken, user }) => {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
-  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+export const setAuthData = ({ user }) => {
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
 };
 
-export const isAuthenticated = () => Boolean(getToken());
+export const isAuthenticated = () => Boolean(getCurrentUserLocal());
 
 export const getCurrentUserLocal = () => {
   const raw = localStorage.getItem(USER_KEY);
@@ -20,7 +20,7 @@ export const getCurrentUserLocal = () => {
 };
 
 export const clearAuthData = () => {
+  localStorage.removeItem(USER_KEY);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
-  localStorage.removeItem(USER_KEY);
 };

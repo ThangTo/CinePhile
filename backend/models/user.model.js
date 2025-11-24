@@ -55,6 +55,8 @@ userSchema.plugin(passportLocalMongoose, {
   saltlen: 16,
   keylen: 32,
   usernameCaseInsensitive: true,
+  usernameField: 'email',
+  usernameLowerCase: true,
 });
 
 // Remove password from JSON output (passport-local-mongoose adds salt and hash)

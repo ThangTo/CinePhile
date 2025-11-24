@@ -1,12 +1,5 @@
 import apiRequest from "./utils/apiRequest";
-import {
-  setAuthData,
-  clearAuthData,
-  getCurrentUserLocal,
-  isAuthenticated,
-  getToken,
-  getRefreshToken,
-} from "lib/auth-storage";
+import { setAuthData, clearAuthData, getCurrentUserLocal, isAuthenticated } from "lib/auth-storage";
 
 // ============================================================================
 // Authentication Service
@@ -36,34 +29,30 @@ const authService = {
       data: userData,
     });
 
-    // Save auth data to localStorage
-    setAuthData({
-      token: data.token,
-      refreshToken: data.refreshToken,
-      user: data.user,
-    });
+    const user = data?.user || data;
+    if (user) {
+      setAuthData({ user });
+    }
 
     return data;
   },
 
   /**
    * Đăng nhập
-   * @param {Object} credentials - { email, username, password }
+   * @param {Object} credentials - { email, password }
    * @returns {Promise<Object>} { user, token, refreshToken }
    */
-  login: async ({ email, username, password }) => {
-    const payload = { email, username, password };
-    console.log("payload", payload);
+  login: async ({ email, password }) => {
+    const payload = { email, password };
     try {
       const data = await apiRequest("/auth/login", {
         method: "POST",
         data: payload,
       });
-      setAuthData({
-        token: data.token,
-        refreshToken: data.refreshToken,
-        user: data.user,
-      });
+      const user = data?.user || data;
+      if (user) {
+        setAuthData({ user });
+      }
       return data;
     } catch (error) {
       console.error("Login error:", error);
@@ -93,21 +82,11 @@ const authService = {
    * @param {string} refreshToken - Refresh token
    * @returns {Promise<Object>} { token }
    */
-  refreshToken: async (refreshToken) => {
-    const data = await apiRequest("/auth/refresh-token", {
+  refreshToken: async () => {
+    return apiRequest("/auth/refresh-token", {
       method: "POST",
-      data: { refreshToken },
+      requiresAuth: true,
     });
-
-    // Update token in storage if response includes new token
-    if (data.token) {
-      const currentUser = getCurrentUserLocal();
-      if (currentUser) {
-        setAuthData({ token: data.token, user: currentUser, refreshToken: getRefreshToken() });
-      }
-    }
-
-    return data;
   },
 
   /**
@@ -122,11 +101,7 @@ const authService = {
     // Update localStorage with fresh user data from API
     const userData = data?.data || data;
     if (userData) {
-      setAuthData({
-        token: getToken(),
-        refreshToken: getRefreshToken(),
-        user: userData,
-      });
+      setAuthData({ user: userData });
     }
 
     return userData || data;
@@ -147,11 +122,7 @@ const authService = {
     // Update localStorage with new user data
     const userData = data?.user || data;
     if (userData) {
-      setAuthData({
-        token: getToken(),
-        refreshToken: getRefreshToken(),
-        user: userData,
-      });
+      setAuthData({ user: userData });
     }
 
     return userData || data;
@@ -205,18 +176,6 @@ const authService = {
   isAuthenticated,
 
   /**
-   * Get current auth token
-   * @returns {string|null}
-   */
-  getToken,
-
-  /**
-   * Get refresh token
-   * @returns {string|null}
-   */
-  getRefreshToken,
-
-  /**
    * Get current user from localStorage (synchronous)
    * @returns {Object|null}
    */
@@ -228,8 +187,8 @@ const authService = {
    * @param {Object} user - User object
    * @param {string} refreshToken - Refresh token (optional)
    */
-  setAuthData: (token, user, refreshToken) => {
-    setAuthData({ token, user, refreshToken });
+  setAuthData: (_token, user) => {
+    setAuthData({ user });
   },
 
   /**

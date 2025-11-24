@@ -52,7 +52,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
 
   const validateLogin = () => {
     const newErrors = {};
-    if (!formData.username) newErrors.username = "Vui lòng nhập tên đăng nhập";
+    if (!formData.email) newErrors.email = "Vui lòng nhập email";
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email không hợp lệ";
     if (!formData.password) newErrors.password = "Vui lòng nhập mật khẩu";
     return newErrors;
   };
@@ -82,11 +83,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
     setIsLoading(true);
     try {
       // Use email for login (backend expects email)
-      if (formData.username.includes("@")) {
-        await login({ email: formData.username, password: formData.password });
-      } else {
-        await login({ username: formData.username, password: formData.password });
-      }
+
+      await login({ email: formData.email, password: formData.password });
       onClose();
     } catch (error) {
       console.error("Login error:", error);
@@ -208,14 +206,19 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
               <div>
                 <input
                   required
-                  type="text"
-                  name="username"
-                  value={formData.username}
+                  type={mode === "login" ? "email" : "text"}
+                  name={mode === "login" ? "email" : "username"}
+                  value={mode === "login" ? formData.email : formData.username}
                   onChange={handleChange}
-                  placeholder={mode === "login" ? "Tên đăng nhập" : "Tên hiển thị"}
+                  placeholder={mode === "login" ? "Email" : "Tên hiển thị"}
                   className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
-                {errors.username && <p className="mt-1 text-red-500 text-sm">{errors.username}</p>}
+                {mode === "login" && errors.email && (
+                  <p className="mt-1 text-red-500 text-sm">{errors.email}</p>
+                )}
+                {mode === "register" && errors.username && (
+                  <p className="mt-1 text-red-500 text-sm">{errors.username}</p>
+                )}
               </div>
 
               {mode === "register" && (
