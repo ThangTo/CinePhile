@@ -4,13 +4,13 @@ const User = require('../models/user.model');
 // Helper to generate tokens
 const generateTokens = (userId) => {
   const token = jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '1h'
+    expiresIn: process.env.JWT_EXPIRE || '1h',
   });
-  
+
   const refreshToken = jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d'
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
   });
-  
+
   return { token, refreshToken };
 };
 
@@ -32,7 +32,7 @@ const register = async (userData) => {
   // Register user with passport-local-mongoose
   // User.register takes a user instance and a password
   const user = new User({ username, email });
-  console.log('user')
+  console.log('user');
   User.register(user, password, async function (err, user) {
     if (err) {
       console.log(err);
@@ -45,7 +45,7 @@ const register = async (userData) => {
 
   return {
     user,
-    ...tokens
+    ...tokens,
   };
 };
 
@@ -55,12 +55,31 @@ const register = async (userData) => {
  * @returns {Promise<Object>} { user: Object, token: string, refreshToken: string }
  */
 const login = async (credentials) => {
-  const { username, password } = credentials;
+  const { username, email, password } = credentials;
+
+  if (!password) {
+    throw new Error('Password is required');
+  }
+
+  let identifier = username;
+
+  // Support login with email by resolving to the stored username
+  if (!identifier && email) {
+    const userByEmail = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!userByEmail) {
+      throw new Error('Invalid credentials');
+    }
+    identifier = userByEmail.username;
+  }
+
+  if (!identifier) {
+    throw new Error('Username or email is required');
+  }
 
   // Authenticate using passport-local-mongoose strategy
   const { user, error } = await new Promise((resolve, reject) => {
     const authenticate = User.authenticate();
-    authenticate(username, password, (err, user, info) => {
+    authenticate(identifier, password, (err, user, info) => {
       if (err) return reject(err);
       if (!user) return resolve({ error: info });
       resolve({ user });
@@ -80,7 +99,7 @@ const login = async (credentials) => {
 
   return {
     user,
-    ...tokens
+    ...tokens,
   };
 };
 
@@ -109,7 +128,7 @@ const refreshToken = async (refreshToken) => {
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.userId);
-    
+
     if (!user) {
       throw new Error('User not found');
     }
@@ -146,16 +165,16 @@ const getCurrentUser = async (token) => {
 const updateProfile = async (userId, updates) => {
   const allowedUpdates = ['username', 'email', 'avatar', 'gender'];
   const actualUpdates = {};
-  
-  Object.keys(updates).forEach(key => {
+
+  Object.keys(updates).forEach((key) => {
     if (allowedUpdates.includes(key)) {
       actualUpdates[key] = updates[key];
     }
   });
 
-  const user = await User.findByIdAndUpdate(userId, actualUpdates, { 
-    new: true, 
-    runValidators: true 
+  const user = await User.findByIdAndUpdate(userId, actualUpdates, {
+    new: true,
+    runValidators: true,
   });
 
   if (!user) {
@@ -173,7 +192,7 @@ const updateProfile = async (userId, updates) => {
  */
 const changePassword = async (userId, passwords) => {
   const { oldPassword, newPassword } = passwords;
-  
+
   const user = await User.findById(userId);
   if (!user) {
     throw new Error('User not found');
@@ -216,7 +235,7 @@ const resetPassword = async (resetData) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId);
-    
+
     if (!user) {
       throw new Error('User not found');
     }

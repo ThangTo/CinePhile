@@ -48,34 +48,27 @@ const authService = {
 
   /**
    * Đăng nhập
-   * Hỗ trợ 2 cách gọi:
-   * - login({ email, password })
-   * - login(email, password)
-   *
-   * @param {string|Object} emailOrCredentials - Email string hoặc credentials object
-   * @param {string} password - Password (nếu emailOrCredentials là string)
+   * @param {Object} credentials - { email, username, password }
    * @returns {Promise<Object>} { user, token, refreshToken }
    */
-  login: async (emailOrCredentials, password) => {
-    // Normalize input - hỗ trợ cả hai cách gọi
-    const credentials =
-      typeof emailOrCredentials === "string"
-        ? { email: emailOrCredentials, password }
-        : emailOrCredentials;
-
-    const data = await apiRequest("/auth/login", {
-      method: "POST",
-      data: credentials,
-    });
-
-    // Save auth data to localStorage
-    setAuthData({
-      token: data.token,
-      refreshToken: data.refreshToken,
-      user: data.user,
-    });
-
-    return data;
+  login: async ({ email, username, password }) => {
+    const payload = { email, username, password };
+    console.log("payload", payload);
+    try {
+      const data = await apiRequest("/auth/login", {
+        method: "POST",
+        data: payload,
+      });
+      setAuthData({
+        token: data.token,
+        refreshToken: data.refreshToken,
+        user: data.user,
+      });
+      return data;
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
+    }
   },
 
   /**

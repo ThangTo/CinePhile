@@ -82,10 +82,11 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
     setIsLoading(true);
     try {
       // Use email for login (backend expects email)
-      await login({
-        email: formData.username, // Use username field as email
-        password: formData.password,
-      });
+      if (formData.username.includes("@")) {
+        await login({ email: formData.username, password: formData.password });
+      } else {
+        await login({ username: formData.username, password: formData.password });
+      }
       onClose();
     } catch (error) {
       console.error("Login error:", error);
