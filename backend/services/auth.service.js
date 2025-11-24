@@ -14,6 +14,11 @@ const generateTokens = (userId) => {
   return { token, refreshToken };
 };
 
+const generateAuthPayload = (user) => ({
+  user,
+  ...generateTokens(user._id),
+});
+
 /**
  * Register new user
  * @param {Object} userData - { username, email, password }
@@ -40,13 +45,7 @@ const register = async (userData) => {
     console.log('registered', user);
   });
 
-  // Generate tokens
-  const tokens = generateTokens(user._id);
-
-  return {
-    user,
-    ...tokens,
-  };
+  return generateAuthPayload(user);
 };
 
 /**
@@ -81,13 +80,7 @@ const login = async (credentials) => {
   // user.lastLogin = Date.now();
   // await user.save();
 
-  // Generate tokens
-  const tokens = generateTokens(user._id);
-
-  return {
-    user,
-    ...tokens,
-  };
+  return generateAuthPayload(user);
 };
 
 /**
@@ -120,8 +113,7 @@ const refreshToken = async (refreshToken) => {
       throw new Error('User not found');
     }
 
-    const tokens = generateTokens(user._id);
-    return { token: tokens.token, refreshToken: tokens.refreshToken };
+    return generateTokens(user._id);
   } catch (error) {
     throw new Error('Invalid refresh token');
   }
@@ -141,6 +133,61 @@ const getCurrentUser = async (token) => {
   } catch (error) {
     throw new Error('Invalid token');
   }
+};
+
+const normalizeDisplayName = (name = '') => {
+  const cleaned = name.trim();
+  if (!cleaned) return null;
+  return cleaned
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const generateUniqueUsername = async (base) => {
+  let username = base;
+  let counter = 1;
+  while (await User.findOne({ username })) {
+    username = `${base}${counter}`;
+    counter += 1;
+  }
+  return username;
+};
+
+const loginWithGoogleProfile = async (profile) => {
+  const email = profile?.emails?.[0]?.value?.toLowerCase();
+  if (!email) {
+    throw new Error('Google account does not provide an email address');
+  }
+
+  const googleId = profile.id;
+  let user = await User.findOne({ $or: [{ googleId }, { email }] });
+  const avatar = profile?.photos?.[0]?.value;
+
+  if (!user) {
+    const displayName =
+      normalizeDisplayName(profile.displayName) || email.split('@')[0] || `user${Date.now()}`;
+    const baseUsername = displayName.toLowerCase().replace(/\s+/g, '');
+    const username = await generateUniqueUsername(baseUsername || `user${Date.now()}`);
+
+    user = new User({
+      username,
+      email,
+      googleId,
+      avatar: avatar || undefined,
+      role: 'user',
+    });
+  } else {
+    if (!user.googleId) {
+      user.googleId = googleId;
+    }
+    if (!user.avatar && avatar) {
+      user.avatar = avatar;
+    }
+  }
+
+  await user.save();
+  return generateAuthPayload(user);
 };
 
 /**
@@ -243,6 +290,7 @@ module.exports = {
   logout,
   refreshToken,
   getCurrentUser,
+  loginWithGoogleProfile,
   updateProfile,
   changePassword,
   forgotPassword,

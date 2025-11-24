@@ -1,7 +1,27 @@
 const express = require('express');
 const router = express.Router();
+const passport = require('passport');
 const authController = require('../controllers/auth.controller');
 const authMiddleware = require('../middleware/auth.middleware');
+
+// GET /api/v1/auth/google - Start Google OAuth
+router.get(
+  '/google',
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: false,
+  }),
+);
+
+// GET /api/v1/auth/google/callback - Google OAuth callback
+router.get(
+  '/google/callback',
+  passport.authenticate('google', {
+    session: false,
+    failureRedirect: authController.GOOGLE_FAILURE_REDIRECT,
+  }),
+  authController.googleCallback,
+);
 
 // POST /api/v1/auth/register - Register new user
 router.post('/register', authController.register);

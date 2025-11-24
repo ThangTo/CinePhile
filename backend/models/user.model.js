@@ -32,6 +32,11 @@ const userSchema = new mongoose.Schema(
       enum: ['male', 'female', 'other'],
       default: 'other',
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     createdAt: {
       type: Date,
       default: Date.now,

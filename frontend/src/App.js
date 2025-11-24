@@ -12,12 +12,14 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/general/ProtectedRoute";
 import MainLayout from "layouts/MainLayout";
 import NotFoundPage from "./pages/NotFound";
+import GoogleAuthHandler from "pages/GoogleAuthHandler";
 
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/auth/google/callback" element={<GoogleAuthHandler />} />
           {/* All routes use MainLayout (includes Header and Footer) */}
           <Route path="/" element={<MainLayout />}>
             <Route index element={<HomePage />} />

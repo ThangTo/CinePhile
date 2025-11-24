@@ -1,6 +1,12 @@
 const authService = require('../services/auth.service');
 
 const isProduction = process.env.NODE_ENV === 'production';
+const clientBaseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+const GOOGLE_SUCCESS_REDIRECT =
+  process.env.GOOGLE_SUCCESS_REDIRECT || `${clientBaseUrl}/?auth=google_success`;
+const GOOGLE_FAILURE_REDIRECT =
+  process.env.GOOGLE_FAILURE_REDIRECT || `${clientBaseUrl}/auth/google/callback?auth=google_failed`;
+
 const baseCookieOptions = {
   httpOnly: true,
   secure: isProduction,
@@ -188,6 +194,20 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const googleCallback = (req, res) => {
+  try {
+    if (!req.user) {
+      return res.redirect(GOOGLE_FAILURE_REDIRECT);
+    }
+
+    const { token, refreshToken } = req.user;
+    attachAuthCookies(res, { token, refreshToken });
+    return res.redirect(GOOGLE_SUCCESS_REDIRECT);
+  } catch (error) {
+    return res.redirect(GOOGLE_FAILURE_REDIRECT);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -198,4 +218,6 @@ module.exports = {
   changePassword,
   forgotPassword,
   resetPassword,
+  googleCallback,
+  GOOGLE_FAILURE_REDIRECT,
 };

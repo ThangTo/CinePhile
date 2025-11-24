@@ -125,6 +125,20 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
+   * Force refresh user from API
+   */
+  const refetchCurrentUser = async () => {
+    const data = await authService.getCurrentUser();
+    const userData = data?.data || data;
+    if (userData) {
+      setUser(userData);
+      authService.setAuthData(null, userData);
+      return userData;
+    }
+    throw new Error("Unable to fetch user");
+  };
+
+  /**
    * Check if user is authenticated
    */
   const isAuthenticated = !!user;
@@ -141,6 +155,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
+    getCurrentUser: refetchCurrentUser,
     setUser,
   };
 

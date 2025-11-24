@@ -5,8 +5,10 @@ const app = express();
 
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('./models/user.model');
 const cookieParser = require('cookie-parser');
+const authService = require('./services/auth.service');
 
 // Middleware
 const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
@@ -23,6 +25,30 @@ app.use(passport.initialize());
 passport.use(new LocalStrategy({ usernameField: 'email' }, User.authenticate()));
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
+const apiBaseUrl =
+  process.env.GOOGLE_CALLBACK_BASE_URL ||
+  process.env.API_BASE_URL ||
+  `http://localhost:${process.env.PORT || 5000}`;
+
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL || `${apiBaseUrl}/api/v1/auth/google/callback`,
+      },
+      async (_accessToken, _refreshToken, profile, done) => {
+        try {
+          const authResult = await authService.loginWithGoogleProfile(profile);
+          return done(null, authResult);
+        } catch (error) {
+          return done(error, null);
+        }
+      },
+    ),
+  );
+}
 // require('./config/passport')(passport);
 
 // Routes

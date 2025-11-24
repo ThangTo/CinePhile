@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "contexts/AuthContext";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+const GOOGLE_AUTH_URL = `${API_BASE_URL}/auth/google`;
+
 const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
   const { login, register } = useAuth();
   const [mode, setMode] = useState(initialMode); // "login" or "register"
@@ -123,8 +126,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
   };
 
   const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth
-    window.location.href = "/api/auth/google";
+    window.location.href = GOOGLE_AUTH_URL;
   };
 
   const switchMode = (newMode) => {
