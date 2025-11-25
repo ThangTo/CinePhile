@@ -1,47 +1,45 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const userHistorySchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true
-  },
-  movieId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Movie',
-    required: true,
-    index: true
-  },
-  episodeId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Episode', // Assuming there is an Episode model, or it can be optional
-    default: null
-  },
-  watchTime: {
-    type: Number, // in seconds
-    default: 0
-  },
-  duration: {
-    type: Number, // total seconds
-    default: 0
-  },
-  progress: {
-    type: Number, // percentage 0-100
-    default: 0
-  },
-  lastWatchedAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+    // Tham chiếu đến User (required, indexed)
+    userId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        required: true, 
+        index: true 
+    },
+    // Tham chiếu đến Movie (required, indexed)
+    movieId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Movie', 
+        required: true, 
+        index: true 
+    },
+    // Tham chiếu đến Episode (optional)
+    episodeId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Episode' 
+    },
+    watchTime: { 
+        type: Number // seconds
+    }, 
+    duration: { 
+        type: Number // total seconds
+    }, 
+    progress: { 
+        type: Number, // percentage 0-100
+        min: 0, 
+        max: 100 
+    }, 
+    lastWatchedAt: { 
+        type: Date, 
+        index: true 
+    },
+}, { 
+    timestamps: true // Tự động thêm createdAt và updatedAt
 });
 
-// Index for retrieving history sorted by last watched
+// Compound Index: Sắp xếp lịch sử theo người dùng và thời gian xem gần nhất (-1)
 userHistorySchema.index({ userId: 1, lastWatchedAt: -1 });
 
-module.exports = mongoose.model('UserHistory', userHistorySchema);
+module.exports = mongoose.model("UserHistory", userHistorySchema);

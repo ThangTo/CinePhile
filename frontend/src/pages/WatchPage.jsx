@@ -1,50 +1,94 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import VideoPlayer from "components/watch-page/VideoPlayer";
-import ActionBar from "components/watch-page/ActionBar";
-import RatingSidebar from "components/watch-page/RatingSidebar";
-import EpisodesSection from "components/movie-detail/EpisodesSection";
-import CommentsSection from "components/movie-detail/CommentsSection";
-import CastSection from "components/movie-detail/CastSection";
-import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
-import { fetchMovieById, fetchEpisodes } from "services/movie.service";
+import { ChevronLeft } from "lucide-react";
+
+// --- CÁC IMPORT COMPONENT (Đã sửa lại đường dẫn chuẩn) ---
+import VideoPlayer from "../components/watch-page/VideoPlayer";
+import ActionBar from "../components/watch-page/ActionBar";
+import RatingSidebar from "../components/watch-page/RatingSidebar";
+import MovieInfoBrief from "../components/watch-page/MovieInfoBrief";
+
+import EpisodesSection from "../components/movie-detail/EpisodesSection";
+import CommentsSection from "../components/movie-detail/CommentsSection";
+import CastSection from "../components/movie-detail/CastSection";
+
+// Service
+import movieService from "../services/movie.service";
 
 const WatchPage = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams(); // Slug phim
   const [searchParams] = useSearchParams();
-  const episodeParam = parseInt(searchParams.get("ep") || "1", 10);
+  
+  // Lấy tập từ URL (?ep=tap-01). Nếu không có thì mặc định null
+  const episodeParam = searchParams.get("ep");
 
+  // State
   const [movie, setMovie] = useState(null);
   const [episodes, setEpisodes] = useState([]);
-  const [activeEp, setActiveEp] = useState(episodeParam);
+  const [cast, setCast] = useState([]);
+  
+  // Lưu ID của tập đang xem để active
+  const [activeEpId, setActiveEpId] = useState(null);
+  
   const [loading, setLoading] = useState(true);
   const [audioType, setAudioType] = useState("subtitle");
 
   useEffect(() => {
-    const load = async () => {
+    const loadData = async () => {
+      if (!id) return;
       setLoading(true);
       try {
-        const [m, eps] = await Promise.all([fetchMovieById(id), fetchEpisodes(id)]);
-        // Handle response format: could be direct object/array or wrapped in { data }
-        setMovie(m?.data || m);
-        const episodesData = eps?.data || eps || [];
-        setEpisodes(Array.isArray(episodesData) ? episodesData : []);
+        // GỌI 3 API SONG SONG (Chuẩn database mới)
+        const [movieRes, epRes, castRes] = await Promise.all([
+          movieService.getById(id),
+          movieService.getEpisodes(id),
+          movieService.getCast(id)
+        ]);
+
+        // 1. Xử lý dữ liệu Phim
+        // Backend trả về { status: "success", data: ... } hoặc trực tiếp data tùy config axios
+        const movieData = movieRes.data?.data || movieRes.data || movieRes;
+        setMovie(movieData);
+
+        // 2. Xử lý dữ liệu Tập phim
+        const epList = epRes.data?.data || epRes.data || [];
+        const safeEpList = Array.isArray(epList) ? epList : [];
+        setEpisodes(safeEpList);
+
+        // 3. Xử lý dữ liệu Diễn viên
+        const castList = castRes.data?.data || castRes.data || [];
+        setCast(Array.isArray(castList) ? castList : []);
+
+        // 4. Xác định tập đang xem
+        if (safeEpList.length > 0) {
+            // Tìm tập trùng với param trên URL (so sánh slug hoặc tên tập)
+            const foundEp = episodeParam 
+                ? safeEpList.find(e => e.slug === episodeParam || e.episode === episodeParam)
+                : safeEpList[0];
+            
+            // Set ID để active
+            setActiveEpId(foundEp?._id || safeEpList[0]._id);
+        }
+
       } catch (error) {
-        console.error("Error loading movie:", error);
+        console.error("Error loading movie data:", error);
       } finally {
         setLoading(false);
       }
     };
-    load();
-  }, [id]);
 
-  useEffect(() => {
-    setActiveEp(episodeParam);
-  }, [episodeParam]);
+    loadData();
+  }, [id, episodeParam]);
 
-  const handleEpisodeChange = (episodeId) => {
-    navigate(`/watch/${id}?ep=${episodeId}`);
+  const handleEpisodeChange = (episode) => {
+    // Xử lý khi bấm vào tập phim
+    // episode có thể là object hoặc id tùy component con trả về, ta xử lý an toàn:
+    const epSlug = episode.slug || episode.episode;
+    const epId = episode._id || episode.id;
+
+    navigate(`/watch/${id}?ep=${epSlug}`);
+    setActiveEpId(epId);
   };
 
   if (loading) {
@@ -63,7 +107,8 @@ const WatchPage = () => {
     );
   }
 
-  const currentEpisode = episodes.find((ep) => ep.id === activeEp) || episodes[0];
+  // Tìm object tập phim hiện tại để đưa vào Player
+  const currentEpisode = episodes.find((ep) => ep._id === activeEpId) || episodes[0];
 
   return (
     <div className="min-h-screen bg-bgColor">
@@ -72,9 +117,9 @@ const WatchPage = () => {
         <div className="container mx-auto flex items-center gap-3 text-white">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            className="p-2 hover:bg-white/10 rounded-full transition-colors flex items-center justify-center"
           >
-            <i className="fa-solid fa-chevron-left text-lg" />
+            <ChevronLeft className="w-6 h-6" />
           </button>
           <h1 className="text-base md:text-lg font-semibold truncate">
             Xem phim <span className="text-primaryColor">{movie.title}</span>
@@ -88,12 +133,12 @@ const WatchPage = () => {
           {/* Video Player - Full width on all screens */}
           <div className="lg:col-span-12 w-full">
             <VideoPlayer
+              src={currentEpisode?.videoUrl} 
+              poster={movie.backgroundImage || movie.poster}
+              
+              // Giữ lại props cũ phòng khi bạn muốn dùng lại logic cũ
               movie={movie}
               episode={currentEpisode}
-              onEpisodeChange={handleEpisodeChange}
-              totalEpisodes={episodes.length}
-              audioType={audioType}
-              onAudioTypeChange={setAudioType}
             />
 
             {/* Action Bar - Only favorite and add buttons */}
@@ -109,8 +154,10 @@ const WatchPage = () => {
 
             {/* Episodes Section */}
             <EpisodesSection
-              movie={{ ...movie, episodes }}
-              activeEpisode={activeEp}
+              movie={{ ...movie, episodes }} // Fallback cho code cũ
+              episodes={episodes}            // Prop mới: danh sách tập
+              activeEpisode={activeEpId}     // Prop mới: ID tập đang xem
+              activeEpisodeId={activeEpId}   // Prop dự phòng (tùy tên prop bên trong component con)
               onEpisodeClick={handleEpisodeChange}
               audioType={audioType}
               onAudioTypeChange={setAudioType}
@@ -126,7 +173,13 @@ const WatchPage = () => {
           <div className="hidden lg:block lg:col-span-4 pl-6 border-l-2 border-borderColor">
             <div className="gap-8 flex flex-col">
               <RatingSidebar movie={movie} />
-              <CastSection movie={movie} layout="vertical" />
+              
+              {/* Truyền cast xuống CastSection */}
+              <CastSection 
+                movie={movie} 
+                cast={cast} 
+                layout="vertical" 
+              />
             </div>
           </div>
 

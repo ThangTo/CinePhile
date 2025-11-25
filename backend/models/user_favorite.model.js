@@ -1,25 +1,25 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const userFavoriteSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true
-  },
-  movieId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Movie',
-    required: true,
-    index: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+    // Tham chiếu đến User (required, indexed)
+    userId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        required: true, 
+        index: true 
+    },
+    // Tham chiếu đến Movie (required, indexed)
+    movieId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Movie', 
+        required: true, 
+        index: true 
+    },
+}, { 
+    timestamps: true // Tự động thêm createdAt và updatedAt
 });
 
-// Compound index to ensure a user can only favorite a movie once
+// Unique Compound Index: Đảm bảo { userId, movieId } là duy nhất
 userFavoriteSchema.index({ userId: 1, movieId: 1 }, { unique: true });
 
-module.exports = mongoose.model('UserFavorite', userFavoriteSchema);
+module.exports = mongoose.model("UserFavorite", userFavoriteSchema);

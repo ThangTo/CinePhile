@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Tooltip from "./Tooltip";
 
@@ -24,36 +25,23 @@ const VideoPlayer = ({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [quality, setQuality] = useState("Auto");
   const [isBuffering, setIsBuffering] = useState(false);
+=======
+import React, { useEffect, useRef } from "react";
+import Hls from "hls.js";
+>>>>>>> Stashed changes
 
+const VideoPlayer = ({ src, poster }) => {
   const videoRef = useRef(null);
-  const containerRef = useRef(null);
-  const controlsTimeoutRef = useRef(null);
+  const hlsRef = useRef(null);
 
-  // Mock video URL - replace with actual API
-  const currentVideoUrl =
-    videoUrl ||
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-
-  const formatTime = (seconds) => {
-    if (!seconds || isNaN(seconds)) return "00:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  // Update video time
   useEffect(() => {
     const video = videoRef.current;
-    // video.focus();
     if (!video) return;
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
-    const handleDurationChange = () => setDuration(video.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleWaiting = () => setIsBuffering(true);
-    const handleCanPlay = () => setIsBuffering(false);
+    // Nếu src rỗng thì không làm gì
+    if (!src) return;
 
+<<<<<<< Updated upstream
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("durationchange", handleDurationChange);
     video.addEventListener("play", handlePlay);
@@ -196,9 +184,29 @@ const VideoPlayer = ({
             console.error("Error attempting to exit fullscreen:", err);
           });
       }
+=======
+    // Hủy HLS instance cũ nếu có
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
     }
-  }, []);
 
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+      });
+      
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hlsRef.current = hls;
+
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Hỗ trợ Safari
+      video.src = src;
+>>>>>>> Stashed changes
+    }
+
+<<<<<<< Updated upstream
   const handleSpeedChange = (speed) => {
     const video = videoRef.current;
     if (!video) return;
@@ -360,10 +368,15 @@ const VideoPlayer = ({
     };
 
     document.addEventListener("keydown", handleKeyDown);
+=======
+    // Cleanup khi component unmount
+>>>>>>> Stashed changes
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+      }
     };
-  }, [duration, toggleFullscreen, toggleMute]);
+  }, [src]);
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -394,6 +407,7 @@ const VideoPlayer = ({
   }, [showMoreMenu]);
 
   return (
+<<<<<<< Updated upstream
     <div
       ref={containerRef}
       className="relative w-full bg-black rounded-lg"
@@ -896,6 +910,22 @@ const VideoPlayer = ({
           </div>
         </div>
       </div>
+=======
+    <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-800 group">
+      {src ? (
+        <video
+          ref={videoRef}
+          controls
+          className="w-full h-full object-contain"
+          poster={poster}
+          playsInline
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center w-full h-full text-gray-500 bg-[#0f0f0f]">
+            <p className="text-lg font-medium">Chọn tập phim để bắt đầu xem</p>
+        </div>
+      )}
+>>>>>>> Stashed changes
     </div>
   );
 };
