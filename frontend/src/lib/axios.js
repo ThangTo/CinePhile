@@ -6,18 +6,11 @@ const API_BASE_URL =
   "http://localhost:5001/api/v1"; 
 
 console.log(API_BASE_URL);
+
 const http = axios.create({
   baseURL: API_BASE_URL,
-<<<<<<< Updated upstream
-  timeout: 10000, // timeout 15s
-<<<<<<< Updated upstream
+  timeout: 10000, // timeout 10s
   withCredentials: true,
-=======
-  withCredentials: false, // true nếu backend dùng cookie
-=======
-  timeout: 15000, 
-  withCredentials: false,
->>>>>>> Stashed changes
 });
 
 // Interceptors request
@@ -38,7 +31,6 @@ http.interceptors.request.use((config) => {
     }
   }
   return config;
->>>>>>> Stashed changes
 });
 
 // Interceptors response
