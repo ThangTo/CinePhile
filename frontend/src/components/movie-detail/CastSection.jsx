@@ -16,7 +16,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
         {title && <h3 className="text-xl font-bold mb-5 text-gray-100">Diễn viên</h3>}
 
         <div className={`grid ${gridClass} gap-4`}>
-          {movie.cast.map((actor, index) => (
+          {movie?.cast?.map((actor, index) => (
             <div
               key={index}
               className="bg-bgColor rounded-xl overflow-hidden transition-colors cursor-pointer"

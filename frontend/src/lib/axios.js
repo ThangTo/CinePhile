@@ -1,9 +1,6 @@
 import axios from "axios";
 
-// SỬA LẠI CỔNG 5000 -> 5001 CHO KHỚP VỚI BACKEND
-const API_BASE_URL =
-  process.env.REACT_APP_API_URL || 
-  "http://localhost:5001/api/v1"; 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
 
 console.log(API_BASE_URL);
 
@@ -18,16 +15,16 @@ http.interceptors.request.use((config) => {
   const requiresAuth = config?.meta?.requiresAuth;
   if (requiresAuth) {
     try {
-        // Dynamic import để tránh lỗi vòng lặp dependency nếu có
-        const authStorage = require("./auth-storage");
-        const token = authStorage.getToken();
-        if (token) {
-            config.headers = config.headers || {};
-            config.headers.Authorization = `Bearer ${token}`;
-        }
+      // Dynamic import để tránh lỗi vòng lặp dependency nếu có
+      const authStorage = require("./auth-storage");
+      const token = authStorage.getToken();
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     } catch (e) {
-        // Bỏ qua nếu không tìm thấy file auth-storage
-        console.warn("Auth storage not found or error loading token");
+      // Bỏ qua nếu không tìm thấy file auth-storage
+      console.warn("Auth storage not found or error loading token");
     }
   }
   return config;
