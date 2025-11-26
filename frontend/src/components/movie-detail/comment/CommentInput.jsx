@@ -42,7 +42,7 @@ const CommentInput = ({
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-white">{user.username || "Người dùng"}</span>
                 {user.isPremium && (
-                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-2 py-0.5 rounded text-xs font-bold">
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded text-xs font-bold">
                     <i className="fa-solid fa-infinity text-xs" />
                   </span>
                 )}

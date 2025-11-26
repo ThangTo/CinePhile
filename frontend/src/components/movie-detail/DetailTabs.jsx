@@ -20,7 +20,7 @@ const DetailTabs = ({ activeTab, setActiveTab }) => {
                 onClick={() => setActiveTab(tab.id)}
                 className={[
                   "relative py-4 text-sm font-medium transition-colors",
-                  active ? "text-amber-400" : "text-gray-300 hover:text-gray-100",
+                  active ? "text-primaryColor" : "text-gray-300 hover:text-gray-100",
                 ].join(" ")}
               >
                 {tab.label}
@@ -28,7 +28,7 @@ const DetailTabs = ({ activeTab, setActiveTab }) => {
                 <span
                   className={[
                     "absolute left-0 -bottom-[1px] h-[2px] w-full transition-opacity",
-                    active ? "bg-amber-400 opacity-100" : "opacity-0",
+                    active ? "bg-primaryColor opacity-100" : "opacity-0",
                   ].join(" ")}
                 />
               </button>

@@ -460,7 +460,7 @@ const VideoPlayer = ({
             onClick={handleSeek}
           >
             <div
-              className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full transition-all duration-100 relative"
+              className="h-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor rounded-full transition-all duration-100 relative"
               style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
             >
               <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 md:w-2.5 md:h-2.5 lg:w-3 lg:h-3 bg-white rounded-full opacity-0 group-hover/seek:opacity-100 shadow-lg" />
@@ -607,7 +607,7 @@ const VideoPlayer = ({
                 >
                   <span className="text-right">Tiếng gốc</span>
                   {audioType === "subtitle" && (
-                    <i className="fa-solid fa-check text-yellow-400 text-xs" />
+                    <i className="fa-solid fa-check text-primaryColor text-xs" />
                   )}
                 </button>
                 <button
@@ -618,7 +618,7 @@ const VideoPlayer = ({
                 >
                   <span className="text-right">Lồng tiếng</span>
                   {audioType === "dub" && (
-                    <i className="fa-solid fa-check text-yellow-400 text-xs" />
+                    <i className="fa-solid fa-check text-primaryColor text-xs" />
                   )}
                 </button>
               </div>
@@ -672,7 +672,7 @@ const VideoPlayer = ({
                   >
                     <span className="text-right">{speed}x</span>
                     {playbackRate === speed && (
-                      <i className="fa-solid fa-check text-yellow-400 text-xs" />
+                      <i className="fa-solid fa-check text-primaryColor text-xs" />
                     )}
                   </button>
                 ))}
@@ -710,7 +710,7 @@ const VideoPlayer = ({
                     }`}
                   >
                     <span className="text-right">{q}</span>
-                    {quality === q && <i className="fa-solid fa-check text-yellow-400 text-xs" />}
+                    {quality === q && <i className="fa-solid fa-check text-primaryColor text-xs" />}
                   </button>
                 ))}
               </div>
@@ -773,7 +773,7 @@ const VideoPlayer = ({
                       >
                         <span>Tiếng gốc</span>
                         {audioType === "subtitle" && (
-                          <i className="fa-solid fa-check text-yellow-400 text-[10px]" />
+                          <i className="fa-solid fa-check text-primaryColor text-[10px]" />
                         )}
                       </button>
                       <button
@@ -784,7 +784,7 @@ const VideoPlayer = ({
                       >
                         <span>Lồng tiếng</span>
                         {audioType === "dub" && (
-                          <i className="fa-solid fa-check text-yellow-400 text-[10px]" />
+                          <i className="fa-solid fa-check text-primaryColor text-[10px]" />
                         )}
                       </button>
                     </div>
@@ -844,7 +844,7 @@ const VideoPlayer = ({
                         >
                           <span>{speed}x</span>
                           {playbackRate === speed && (
-                            <i className="fa-solid fa-check text-yellow-400 text-[10px]" />
+                            <i className="fa-solid fa-check text-primaryColor text-[10px]" />
                           )}
                         </button>
                       ))}
@@ -888,7 +888,7 @@ const VideoPlayer = ({
                         >
                           <span>{q}</span>
                           {quality === q && (
-                            <i className="fa-solid fa-check text-yellow-400 text-[10px]" />
+                            <i className="fa-solid fa-check text-primaryColor text-[10px]" />
                           )}
                         </button>
                       ))}

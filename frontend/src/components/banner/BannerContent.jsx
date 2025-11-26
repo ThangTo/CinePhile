@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  MovieTitle,
-  MovieLogo,
-  MovieInfo,
-  GenreList,
-  MovieDescription,
-  ActionButtons,
-} from "./index";
+import { MovieTitle, MovieInfo, GenreList, MovieDescription, ActionButtons } from "./index";
 
 /**
  * Banner Content Component - Main content container for banner
@@ -18,11 +11,8 @@ import {
 const BannerContent = ({ movieData, infoBadges, actionButtons }) => (
   <div className="absolute inset-0 sm:relative flex justify-center items-center mt-16 sm:block z-10 w-full mx-auto px-4 py-8 sm:mt-28 md:mt-16">
     <div className="max-w-3xl flex flex-col justify-center items-center sm:items-start py-12 pb-4 px-4 lg:px-8 lg:py-12">
-      {/* Movie Title - Mobile/Tablet */}
-      <MovieTitle title={movieData.title} shortTitle={movieData.shortTitle} />
-
-      {/* Movie Logo - Desktop */}
-      <MovieLogo logoImage={movieData.logoImage} title={movieData.title} movieId={movieData.id} />
+      {/* Movie Title */}
+      <MovieTitle title={movieData.title} englishTitle={movieData.englishTitle} />
 
       {/* Info Badges */}
       <MovieInfo badges={infoBadges} />

@@ -180,7 +180,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                   Nếu bạn chưa có tài khoản,{" "}
                   <button
                     onClick={() => switchMode("register")}
-                    className="text-yellow-500 hover:underline"
+                    className="text-primaryColor hover:underline"
                   >
                     đăng ký ngay
                   </button>
@@ -190,7 +190,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                   Nếu bạn đã có tài khoản,{" "}
                   <button
                     onClick={() => switchMode("login")}
-                    className="text-yellow-500 hover:underline"
+                    className="text-primaryColor hover:underline"
                   >
                     đăng nhập
                   </button>
@@ -213,7 +213,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                   value={mode === "login" ? formData.email : formData.username}
                   onChange={handleChange}
                   placeholder={mode === "login" ? "Email" : "Tên hiển thị"}
-                  className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
+                  className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
                 />
                 {mode === "login" && errors.email && (
                   <p className="mt-1 text-red-500 text-sm">{errors.email}</p>
@@ -232,7 +232,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Email"
-                    className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
+                    className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
                   />
                   {errors.email && <p className="mt-1 text-red-500 text-sm">{errors.email}</p>}
                 </div>
@@ -246,7 +246,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Mật khẩu"
-                  className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
+                  className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
                 />
                 {errors.password && <p className="mt-1 text-red-500 text-sm">{errors.password}</p>}
               </div>
@@ -260,7 +260,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="Nhập lại mật khẩu"
-                    className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
+                    className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
                   />
                   {errors.confirmPassword && (
                     <p className="mt-1 text-red-500 text-sm">{errors.confirmPassword}</p>
@@ -271,7 +271,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? "Đang xử lý..." : mode === "login" ? "Đăng nhập" : "Đăng ký"}
               </button>
@@ -279,13 +279,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
 
             {mode === "login" && (
               <>
-                <div className="mt-4 text-center">
-                  <button className="text-sm text-gray-400 hover:text-yellow-500">
-                    Quên mật khẩu?
-                  </button>
-                </div>
+                <div className="mt-4 text-center text-gray-400 text-sm">OR</div>
 
-                <div className="mt-6">
+                <div className="mt-4">
                   <button
                     onClick={handleGoogleLogin}
                     className="w-full py-3 bg-white hover:bg-gray-100 text-gray-800 font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"

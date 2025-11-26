@@ -3,6 +3,7 @@ import SectionHeader from "components/common/SectionHeader";
 import ScrollContainer from "components/common/ScrollContainer";
 import MovieCard from "components/home-page/MovieCard";
 import movieService from "services/movie.service";
+import { InlineSpinner } from "components/common/LoadingState";
 
 /**
  * Movie section with horizontal scrolling for ALL screen sizes
@@ -59,7 +60,7 @@ const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" })
         <div className="px-4">
           <SectionHeader title={title} linkHref={linkHref} />
         </div>
-        <div className="px-4 text-white text-center py-4">Đang tải...</div>
+        <InlineSpinner className="py-4" />
       </section>
     );
   }
@@ -109,3 +110,4 @@ const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" })
 };
 
 export default SectionRow;
+

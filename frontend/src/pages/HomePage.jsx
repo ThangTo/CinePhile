@@ -3,7 +3,7 @@ import Banner from "components/home-page/BannerHome";
 import CategoryChips from "components/home-page/CategoryChips";
 import SectionRow from "components/home-page/SectionRow";
 import Top10Movie from "components/home-page/Top10Movie";
-import QuickAdminLogin from "components/general/QuickAdminLogin";
+// import QuickAdminLogin from "components/general/QuickAdminLogin";
 
 /**
  * Home Page
@@ -30,7 +30,7 @@ const HomePage = () => {
       </div>
 
       {/* Quick Admin Login - Development Tool */}
-      {process.env.NODE_ENV === "development" && <QuickAdminLogin />}
+      {/* {process.env.NODE_ENV === "development" && <QuickAdminLogin />} */}
     </div>
   );
 };

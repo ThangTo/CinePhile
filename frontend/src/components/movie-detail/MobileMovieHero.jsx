@@ -51,7 +51,7 @@ const MobileMovieHero = ({ movie }) => {
           {/* Rating Badge - Top Right of Poster */}
           {movie.rating && (
             <div className="absolute -top-2 -right-2 bg-blue-600 text-white px-3 py-2 rounded-full flex items-center gap-1 shadow-lg z-10">
-              <i className="fa-solid fa-star text-yellow-400 text-sm" />
+              <i className="fa-solid fa-star text-primaryColor text-sm" />
               <span className="font-bold text-base">{movie.rating.toFixed(1)}</span>
             </div>
           )}
@@ -66,7 +66,7 @@ const MobileMovieHero = ({ movie }) => {
         {/* Info Dropdown Trigger */}
         <button
           onClick={() => setShowInfo(!showInfo)}
-          className="flex items-center gap-2 text-primaryColor mb-6 hover:text-yellow-300 transition-colors"
+          className="flex items-center gap-2 text-primaryColor mb-6 hover:text-hoverPrimaryColor transition-colors"
         >
           <span className="font-medium">Thông tin phim</span>
           <i
@@ -148,7 +148,7 @@ const MobileMovieHero = ({ movie }) => {
         {/* Watch Now Button */}
         <button
           onClick={handleWatch}
-          className="w-[85%] max-w-xs bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black font-bold py-4 rounded-full flex items-center justify-center gap-3 shadow-lg shadow-yellow-500/30 transition-all hover:scale-105 mb-6"
+          className="w-[85%] max-w-xs bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-bold py-4 rounded-full flex items-center justify-center gap-3 shadow-lg transition-all hover:scale-105 mb-6"
         >
           <i className="fa-solid fa-play text-lg" />
           <span className="text-lg">Xem Ngay</span>
@@ -156,21 +156,21 @@ const MobileMovieHero = ({ movie }) => {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-center gap-6 text-white">
-          <button className="flex flex-col items-center gap-2 hover:text-yellow-400 transition-colors">
+          <button className="flex flex-col items-center gap-2 hover:text-primaryColor transition-colors">
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-heart text-xl" />
             </div>
             <span className="text-xs text-gray-400">Yêu thích</span>
           </button>
 
-          <button className="flex flex-col items-center gap-2 hover:text-yellow-400 transition-colors">
+          <button className="flex flex-col items-center gap-2 hover:text-primaryColor transition-colors">
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-plus text-xl" />
             </div>
             <span className="text-xs text-gray-400">Thêm vào</span>
           </button>
 
-          <button className="flex flex-col items-center gap-2 hover:text-yellow-400 transition-colors">
+          <button className="flex flex-col items-center gap-2 hover:text-primaryColor transition-colors">
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-share-nodes text-xl" />
             </div>
@@ -179,7 +179,7 @@ const MobileMovieHero = ({ movie }) => {
 
           <button
             onClick={handleComment}
-            className="hidden sm:flex flex-col items-center gap-2 hover:text-yellow-400 transition-colors"
+            className="hidden sm:flex flex-col items-center gap-2 hover:text-primaryColor transition-colors"
           >
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-comment text-xl" />
@@ -190,10 +190,10 @@ const MobileMovieHero = ({ movie }) => {
           {/* Rating Button - Star icon only */}
           <button
             onClick={() => setShowRatingModal(true)}
-            className="flex flex-col items-center gap-2 hover:text-yellow-400 transition-colors"
+            className="flex flex-col items-center gap-2 hover:text-primaryColor transition-colors"
           >
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-              <i className="fa-solid fa-star text-xl text-yellow-400" />
+              <i className="fa-solid fa-star text-xl text-primaryColor" />
             </div>
             <span className="text-xs text-gray-400">Đánh giá</span>
           </button>

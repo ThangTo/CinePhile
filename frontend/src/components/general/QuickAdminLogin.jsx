@@ -70,7 +70,7 @@ const QuickAdminLogin = () => {
           <div className="text-xs text-gray-300 mb-2">
             Logged in as: <span className="text-primaryColor font-semibold">{user.name}</span>
             <br />
-            Role: <span className="text-yellow-400">{user.role}</span>
+            Role: <span className="text-primaryColor">{user.role}</span>
           </div>
           <button
             onClick={goToAdmin}

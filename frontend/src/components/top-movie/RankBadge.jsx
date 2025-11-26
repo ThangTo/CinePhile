@@ -19,7 +19,7 @@ const RankBadge = ({ rank, size = "md" }) => {
         WebkitBackgroundClip: "text",
         WebkitTextFillColor: "transparent",
       }}
-      className={`lg:py-4 px-2 text-primaryColor bg-gradient-to-r from-yellow-400 to-yellow-200 font-extrabold flex lg:items-center justify-center ${sizeClasses[size]} italic`}
+      className={`lg:py-4 px-2 text-primaryColor bg-gradient-to-r from-primaryColor to-hoverPrimaryColor font-extrabold flex lg:items-center justify-center ${sizeClasses[size]} italic`}
     >
       {rank}
     </div>

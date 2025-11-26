@@ -34,7 +34,7 @@ const HoverCardHeader = ({ backgroundImage, title, subtitle, onClick, compact = 
         {title}
       </h3>
       {subtitle && (
-        <p className={`${compact ? "text-xs" : "text-sm"} text-yellow-400 font-semibold`}>
+        <p className={`${compact ? "text-xs" : "text-sm"} text-primaryColor font-semibold`}>
           {subtitle}
         </p>
       )}

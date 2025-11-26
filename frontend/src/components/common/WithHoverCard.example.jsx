@@ -174,7 +174,7 @@ export const StyledMovieCard = ({ movie }) => {
 
           <div className="flex items-center gap-2 mt-2">
             {movie.rating && (
-              <span className="bg-yellow-500/20 text-yellow-400 text-xs px-2 py-1 rounded">
+              <span className="bg-primaryColor/20 text-primaryColor text-xs px-2 py-1 rounded">
                 ⭐ {movie.rating}
               </span>
             )}

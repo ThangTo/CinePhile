@@ -14,7 +14,7 @@ const HoverCardActions = ({ onWatch, onLike, onInfo, compact = false }) => (
     {/* Watch Now Button - Custom gradient style */}
     <button
       onClick={onWatch}
-      className={`flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-black font-semibold rounded-lg ${
+      className={`flex-1 flex items-center justify-center gap-2 bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-semibold rounded-lg ${
         compact ? "py-2 px-3 text-xs" : "py-2.5 px-4"
       } transition-all shadow-lg`}
     >

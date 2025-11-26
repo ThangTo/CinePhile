@@ -10,7 +10,6 @@ export { default as InfoBadge } from "./InfoBadge";
 export { default as GenreTag } from "./GenreTag";
 export { default as ActionButton } from "./ActionButton";
 export { default as MovieTitle } from "./MovieTitle";
-export { default as MovieLogo } from "./MovieLogo";
 export { default as MovieInfo } from "./MovieInfo";
 export { default as GenreList } from "./GenreList";
 export { default as MovieDescription } from "./MovieDescription";

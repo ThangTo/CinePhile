@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { movieAPI } from "services/admin.service";
 import MovieFormModal from "./MovieFormModal";
+import { InlineSpinner } from "components/common/LoadingState";
 
 const MovieTable = () => {
   const [movies, setMovies] = useState([]);
@@ -84,11 +85,7 @@ const MovieTable = () => {
   return (
     <div className="bg-gray-800 rounded-xl border border-white/10 overflow-hidden">
       {/* Loading state */}
-      {isLoading && movies.length === 0 && (
-        <div className="p-6 flex items-center justify-center">
-          <div className="text-white">Đang tải...</div>
-        </div>
-      )}
+      {isLoading && movies.length === 0 && <InlineSpinner className="p-6" />}
 
       {/* Header with search */}
       <div className="p-6 border-b border-white/10 flex items-center justify-between">
@@ -159,7 +156,7 @@ const MovieTable = () => {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-300">{movie.year}</td>
                 <td className="px-6 py-4">
-                  <span className="inline-flex items-center gap-1 text-yellow-400 font-semibold">
+                  <span className="inline-flex items-center gap-1 text-primaryColor font-semibold">
                     <i className="fa-solid fa-star text-xs"></i>
                     {movie.rating}
                   </span>

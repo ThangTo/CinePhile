@@ -53,7 +53,7 @@ const Top10Card = ({ movie, rank }) => {
           {/* Rating & Quality Badges */}
           <div className="hidden sm:flex mt-1.5 items-center gap-1.5 flex-wrap">
             {movie.rating && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-[10px] font-semibold">
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-primaryColor/20 text-primaryColor rounded text-[10px] font-semibold">
                 <i className="fa-solid fa-star text-[8px]" />
                 {movie.rating}
               </span>

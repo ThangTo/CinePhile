@@ -20,6 +20,7 @@ export const useBannerConfig = (movieData) => {
       { label: movieData.year },
       { label: movieData.duration },
       { label: movieData.quality },
+      { label: movieData.country },
     ],
     [movieData]
   );

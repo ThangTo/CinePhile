@@ -2,9 +2,9 @@ import React from "react";
 import { DESKTOP_MENU_ITEMS, DESKTOP_MENU_ITEM_CLASS } from "./constants";
 
 const PremiumBanner = ({ username }) => (
-  <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-lg p-2.5">
+  <div className="bg-gradient-to-r from-primaryColor/20 to-hoverPrimaryColor/20 border border-primaryColor/30 rounded-lg p-2.5">
     <div className="flex items-center justify-between mb-1.5">
-      <span className="text-yellow-400 font-semibold text-sm flex items-center gap-1">
+      <span className="text-primaryColor font-semibold text-sm flex items-center gap-1">
         <i className="fa-solid fa-infinity" />
         {username}
       </span>
@@ -12,21 +12,8 @@ const PremiumBanner = ({ username }) => (
     <p className="text-gray-300 text-xs mb-2">
       Nâng cấp tài khoản Cinx để có trải nghiệm đẳng cấp hơn.
     </p>
-    <button className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold text-sm py-1.5 rounded-md transition-all">
+    <button className="w-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor hover:from-hoverPrimaryColor hover:to-primaryColor text-primaryColorButtonText font-semibold text-sm py-1.5 rounded-md transition-all">
       Nâng cấp ngay <i className="fa-solid fa-arrow-up" />
-    </button>
-  </div>
-);
-
-const UserStats = ({ coins }) => (
-  <div className="flex items-center gap-4 mt-3 text-sm">
-    <div className="flex items-center gap-2">
-      <i className="fa-solid fa-bookmark text-gray-400" />
-      <span className="text-white font-semibold">{coins}</span>
-      <i className="fa-solid fa-coins text-yellow-400" />
-    </div>
-    <button className="ml-auto bg-white/5 hover:bg-white/10 text-gray-200 px-3 py-1 rounded-md text-xs transition-colors">
-      + Nạp
     </button>
   </div>
 );
@@ -75,7 +62,6 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
               </div>
 
               <PremiumBanner username={user.username} />
-              <UserStats coins={user.coins} />
             </div>
 
             {/* Menu Items */}

@@ -12,14 +12,14 @@ const UserInfoCard = ({ user }) => (
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-white font-semibold">{user.username}</span>
-          <i className="fa-solid fa-infinity text-yellow-400 text-sm" />
+          <i className="fa-solid fa-infinity text-primaryColor text-sm" />
         </div>
         <p className="text-gray-300 text-xs">
           Nâng cấp tài khoản Cinx để có trải nghiệm đẳng cấp hơn.
         </p>
       </div>
     </div>
-    <button className="w-full bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-black font-semibold text-sm py-2 rounded-lg transition-all flex items-center justify-center gap-2">
+    <button className="w-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor hover:from-hoverPrimaryColor hover:to-primaryColor text-primaryColorButtonText font-semibold text-sm py-2 rounded-lg transition-all flex items-center justify-center gap-2">
       Nâng cấp ngay
       <i className="fa-solid fa-arrow-up rotate-45" />
     </button>
@@ -34,7 +34,7 @@ const UserStats = ({ coins }) => (
     </div>
     <div className="flex items-center gap-2">
       <span className="text-white font-bold">{coins || 0}</span>
-      <i className="fa-solid fa-coins text-yellow-400" />
+      <i className="fa-solid fa-coins text-primaryColor" />
       <button className="ml-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-full text-xs font-semibold transition-colors">
         + Nạp
       </button>

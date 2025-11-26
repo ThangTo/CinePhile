@@ -16,7 +16,7 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore }) => {
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="font-semibold text-white">{comment.user}</span>
             {comment.badge === "vip" && (
-              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-2 py-0.5 rounded text-xs font-bold">
+              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded text-xs font-bold">
                 <i className="fa-solid fa-infinity text-xs" />
               </span>
             )}
@@ -31,7 +31,7 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore }) => {
           {/* Rating (if exists) */}
           {comment.rating && (
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-yellow-400 text-lg font-bold">{comment.rating}/10</span>
+              <span className="text-primaryColor text-lg font-bold">{comment.rating}/10</span>
               <i className="fa-solid fa-fire text-orange-500 text-base" />
             </div>
           )}

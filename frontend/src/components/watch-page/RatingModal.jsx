@@ -81,7 +81,7 @@ const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
         <div className="px-6 pt-6 pb-4 text-center">
           <h2 className="text-xl font-bold text-white mb-2">{movie?.title || "Đánh giá phim"}</h2>
           <div className="flex items-center justify-center gap-2">
-            <i className="fa-solid fa-star text-yellow-400"></i>
+            <i className="fa-solid fa-star text-primaryColor"></i>
             <span className="text-white font-semibold text-lg">
               {parseFloat(movie?.rating || 0).toFixed(1)}
             </span>
@@ -126,7 +126,7 @@ const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
         <div className="px-6 pb-6 flex gap-3">
           <button
             onClick={handleSubmit}
-            className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-6 py-3 rounded-xl transition-colors"
+            className="flex-1 bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-semibold px-6 py-3 rounded-xl transition-colors"
           >
             Gửi đánh giá
           </button>

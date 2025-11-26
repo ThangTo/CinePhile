@@ -21,7 +21,7 @@ const MovieInfoBrief = ({ movie, activeEp }) => {
 
           {/* Dòng badge */}
           <div className="flex flex-wrap gap-2 mb-4">
-            <span className="bg-yellow-500 text-black px-3 py-1 rounded text-xs font-semibold">
+            <span className="bg-primaryColor text-primaryColorButtonText px-3 py-1 rounded text-xs font-semibold">
               IMDb {movie.imdb}
             </span>
             <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">

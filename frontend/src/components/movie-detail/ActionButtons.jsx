@@ -97,7 +97,7 @@ const ActionButtons = ({ movie }) => {
         <div className="flex items-center justify-start gap-6">
           <button
             onClick={() => navigate(`/watch/${movie.id}?ep=1`)}
-            className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black px-8 py-3 rounded-full font-semibold flex items-center gap-2 hover:from-yellow-300 hover:to-orange-400 transition-all shadow-lg"
+            className="bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText px-8 py-3 rounded-full font-semibold flex items-center gap-2 transition-all shadow-lg"
           >
             <i className="fa-solid fa-play text-lg" />
             Xem Ngay
@@ -106,7 +106,7 @@ const ActionButtons = ({ movie }) => {
           {/* Action Buttons */}
           <button
             onClick={handleAddFavorite}
-            className="flex flex-col items-center gap-1 hover:text-yellow-400 transition-colors text-white"
+            className="flex flex-col items-center gap-1 hover:text-primaryColor transition-colors text-white"
           >
             <i className="fa-solid fa-heart text-2xl" />
             <span className="text-xs">Yêu thích</span>
@@ -114,7 +114,7 @@ const ActionButtons = ({ movie }) => {
 
           <button
             onClick={handleAddToList}
-            className="flex flex-col items-center gap-1 hover:text-yellow-400 transition-colors text-white"
+            className="flex flex-col items-center gap-1 hover:text-primaryColor transition-colors text-white"
           >
             <i className="fa-solid fa-plus text-2xl" />
             <span className="text-xs">Thêm vào</span>
@@ -122,7 +122,7 @@ const ActionButtons = ({ movie }) => {
 
           <button
             onClick={handleShare}
-            className="flex flex-col items-center gap-1 hover:text-yellow-400 transition-colors text-white"
+            className="flex flex-col items-center gap-1 hover:text-primaryColor transition-colors text-white"
           >
             <i className="fa-solid fa-paper-plane text-2xl" />
             <span className="text-xs">Chia sẻ</span>
@@ -130,7 +130,7 @@ const ActionButtons = ({ movie }) => {
 
           <button
             onClick={handleComment}
-            className="flex flex-col items-center gap-1 hover:text-yellow-400 transition-colors text-white"
+            className="flex flex-col items-center gap-1 hover:text-primaryColor transition-colors text-white"
           >
             <i className="fa-solid fa-comment text-2xl" />
             <span className="text-xs">Bình luận</span>

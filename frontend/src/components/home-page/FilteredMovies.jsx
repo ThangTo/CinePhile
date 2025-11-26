@@ -6,6 +6,7 @@ import usePagination from "hooks/usePagination";
 import movieService from "services/movie.service";
 import { buildSlugMap, slugify } from "utils/slugify";
 import { GENRE_CATEGORIES, COUNTRY_CATEGORIES } from "components/header/constants";
+import LoadingState from "components/common/LoadingState";
 
 const FilteredMovies = ({ pageType = "genre" }) => {
   const { slug } = useParams();
@@ -97,13 +98,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
       : "Không tìm thấy phim cho quốc gia này.";
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-bgColor">
-        <main className="max-w-7xl mx-auto px-4 py-20">
-          <div className="text-white text-center">Đang tải...</div>
-        </main>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   return (

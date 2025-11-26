@@ -8,6 +8,7 @@ import CommentsSection from "components/movie-detail/CommentsSection";
 import CastSection from "components/movie-detail/CastSection";
 import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
 import { fetchMovieById, fetchEpisodes } from "services/movie.service";
+import LoadingState from "components/common/LoadingState";
 
 const WatchPage = () => {
   const navigate = useNavigate();
@@ -48,11 +49,7 @@ const WatchPage = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
-        <div className="text-xl">Đang tải...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (!movie) {

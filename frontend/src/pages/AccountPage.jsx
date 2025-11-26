@@ -6,6 +6,7 @@ import AccountInfoCard from "components/account/AccountInfoCard";
 import SecurityCard from "components/account/SecurityCard";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
+import LoadingState from "components/common/LoadingState";
 
 const AccountPage = () => {
   const navigate = useNavigate();
@@ -39,20 +40,16 @@ const AccountPage = () => {
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-account-bg-primary">
-        <div className="w-12 h-12 border-4 border-account-bg-tertiary border-t-account-accent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="flex flex-col py-[50px] md:flex-row min-h-screen bg-account-bg-primary text-account-text-primary">
+    <div className="min-h-screen bg-account-bg-primary text-account-text-primary">
+      <div className="flex flex-col py-[50px] md:flex-row min-h-screen">
         <AccountSidebar user={user} onLogout={handleLogout} />
 
-        <main className="flex-1 p-5 md:mt-[40px] md:p-10 md:pt-2 overflow-y-auto md:max-h-screen box-border">
-          <h1 className="text-3xl font-bold mb-8 text-account-text-primary">Quản lý Tài khoản</h1>
+        <main className="flex-1 p-5 md:mt-[40px] md:p-10 md:pt-2 box-border">
+          <h1 className="text-3xl font-bold mb-8">Quản lý Tài khoản</h1>
 
           <ProfileCard user={user} onUpdate={handleUpdateProfile} />
 

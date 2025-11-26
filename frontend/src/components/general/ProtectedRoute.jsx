@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
+import LoadingState from "components/common/LoadingState";
 
 /**
  * Protected Route Wrapper
@@ -15,14 +16,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   // Đang load thông tin user
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-bgColor flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primaryColor mb-4"></div>
-          <p className="text-white">Đang kiểm tra quyền truy cập...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Đang kiểm tra quyền truy cập..." />;
   }
 
   // Chưa đăng nhập -> redirect về trang chủ

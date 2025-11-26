@@ -154,11 +154,11 @@ const SiteFooter = () => {
           {/* Footer Icon - Large Logo on Right */}
           <div className="hidden lg:flex footer-icon flex-1 flex-shrink-0">
             <div className="relative group">
-              <div className="h-32 w-32 rounded-full bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 flex items-center justify-center shadow-2xl transition-all duration-300 hover:shadow-yellow-500/50 hover:scale-105">
+              <div className="h-32 w-32 rounded-full bg-gradient-to-br from-primaryColor via-hoverPrimaryColor to-red-500 flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-105">
                 <i className="fa-solid fa-play text-black text-5xl"></i>
               </div>
               {/* Glow effect */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-300 -z-10"></div>
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primaryColor to-hoverPrimaryColor blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-300 -z-10"></div>
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import SectionHeader from "components/common/SectionHeader";
 import ScrollContainer from "components/common/ScrollContainer";
 import Top10Card from "components/top-movie/Top10Card";
 import movieService from "services/movie.service";
+import { InlineSpinner } from "components/common/LoadingState";
 
 /**
  * Top 10 Movies Section
@@ -32,7 +33,7 @@ const Top10Movie = () => {
     return (
       <section className="w-full py-2 sm:py-6">
         <SectionHeader title="Top 10 phim bộ hôm nay" linkHref="/top10" className="px-4" />
-        <div className="pl-4 sm:px-4 py-2 text-white text-center">Đang tải...</div>
+        <InlineSpinner className="pl-4 sm:px-4 py-2" />
       </section>
     );
   }
@@ -54,3 +55,4 @@ const Top10Movie = () => {
 };
 
 export default Top10Movie;
+

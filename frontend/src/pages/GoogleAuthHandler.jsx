@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "contexts/AuthContext";
+import LoadingState from "components/common/LoadingState";
 
 const GoogleAuthHandler = () => {
   const navigate = useNavigate();
@@ -28,14 +29,7 @@ const GoogleAuthHandler = () => {
     handleCallback();
   }, [location.search, navigate, getCurrentUser]);
 
-  return (
-    <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-white border-t-transparent mx-auto" />
-        <p>Đang xử lý đăng nhập Google...</p>
-      </div>
-    </div>
-  );
+  return <LoadingState message="Đang xử lý đăng nhập Google..." />;
 };
 
 export default GoogleAuthHandler;
