@@ -19,7 +19,7 @@ const WatchPage = () => {
   const navigate = useNavigate();
   const { id } = useParams(); // Slug phim
   const [searchParams] = useSearchParams();
-  
+
   // Lấy tập từ URL (?ep=tap-01). Nếu không có thì mặc định null
   const episodeParam = searchParams.get("ep");
 
@@ -27,10 +27,10 @@ const WatchPage = () => {
   const [movie, setMovie] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [cast, setCast] = useState([]);
-  
+
   // Lưu ID của tập đang xem để active
   const [activeEpId, setActiveEpId] = useState(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [audioType, setAudioType] = useState("subtitle");
 
@@ -43,7 +43,7 @@ const WatchPage = () => {
         const [movieRes, epRes, castRes] = await Promise.all([
           movieService.getById(id),
           movieService.getEpisodes(id),
-          movieService.getCast(id)
+          movieService.getCast(id),
         ]);
 
         // 1. Xử lý dữ liệu Phim
@@ -62,15 +62,14 @@ const WatchPage = () => {
 
         // 4. Xác định tập đang xem
         if (safeEpList.length > 0) {
-            // Tìm tập trùng với param trên URL (so sánh slug hoặc tên tập)
-            const foundEp = episodeParam 
-                ? safeEpList.find(e => e.slug === episodeParam || e.episode === episodeParam)
-                : safeEpList[0];
-            
-            // Set ID để active
-            setActiveEpId(foundEp?._id || safeEpList[0]._id);
-        }
+          // Tìm tập trùng với param trên URL (so sánh slug hoặc tên tập)
+          const foundEp = episodeParam
+            ? safeEpList.find((e) => e.slug === episodeParam || e.episode === episodeParam)
+            : safeEpList[0];
 
+          // Set ID để active
+          setActiveEpId(foundEp?._id || safeEpList[0]._id);
+        }
       } catch (error) {
         console.error("Error loading movie data:", error);
       } finally {
@@ -133,9 +132,8 @@ const WatchPage = () => {
           {/* Video Player - Full width on all screens */}
           <div className="lg:col-span-12 w-full">
             <VideoPlayer
-              src={currentEpisode?.videoUrl} 
+              src={currentEpisode?.videoUrl}
               poster={movie.backgroundImage || movie.poster}
-              
               // Giữ lại props cũ phòng khi bạn muốn dùng lại logic cũ
               movie={movie}
               episode={currentEpisode}
@@ -149,15 +147,15 @@ const WatchPage = () => {
           <div className="lg:col-span-8 flex flex-col">
             {/* Movie Info Brief - Hidden on md and below */}
             <div className="hidden lg:block">
-              <MovieInfoBrief movie={movie} activeEp={activeEp} />
+              <MovieInfoBrief movie={movie} activeEp={currentEpisode} />
             </div>
 
             {/* Episodes Section */}
             <EpisodesSection
               movie={{ ...movie, episodes }} // Fallback cho code cũ
-              episodes={episodes}            // Prop mới: danh sách tập
-              activeEpisode={activeEpId}     // Prop mới: ID tập đang xem
-              activeEpisodeId={activeEpId}   // Prop dự phòng (tùy tên prop bên trong component con)
+              episodes={episodes} // Prop mới: danh sách tập
+              activeEpisode={activeEpId} // Prop mới: ID tập đang xem
+              activeEpisodeId={activeEpId} // Prop dự phòng (tùy tên prop bên trong component con)
               onEpisodeClick={handleEpisodeChange}
               audioType={audioType}
               onAudioTypeChange={setAudioType}
@@ -173,13 +171,9 @@ const WatchPage = () => {
           <div className="hidden lg:block lg:col-span-4 pl-6 border-l-2 border-borderColor">
             <div className="gap-8 flex flex-col">
               <RatingSidebar movie={movie} />
-              
+
               {/* Truyền cast xuống CastSection */}
-              <CastSection 
-                movie={movie} 
-                cast={cast} 
-                layout="vertical" 
-              />
+              <CastSection movie={movie} cast={cast} layout="vertical" />
             </div>
           </div>
 

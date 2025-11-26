@@ -9,6 +9,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('./models/user.model');
 const cookieParser = require('cookie-parser');
 const authService = require('./services/auth.service');
+const { getGoogleCallbackUrl } = require('./utils/authUtils');
 
 // Middleware
 const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
@@ -36,7 +37,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: process.env.GOOGLE_CALLBACK_URL || `${apiBaseUrl}/api/v1/auth/google/callback`,
+        callbackURL: getGoogleCallbackUrl(apiBaseUrl),
       },
       async (_accessToken, _refreshToken, profile, done) => {
         try {

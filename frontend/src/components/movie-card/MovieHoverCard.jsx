@@ -36,7 +36,7 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
     <div className={`${hoverClass} h-full pb-2 rounded-xl overflow-hidden bg-gray-800 shadow-2xl`}>
       {/* Header with backdrop and title */}
       <HoverCardHeader
-        backdropUrl={movie.backdropUrl || movie.posterUrl || movie.poster}
+        backgroundImage={movie.backgroundImage || movie.posterUrl || movie.poster}
         title={movie.title}
         subtitle={movie.subtitle || movie.englishTitle}
         compact={compact}
@@ -46,7 +46,12 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
       {/* Content */}
       <div className={`${compact ? "p-3 space-y-2" : "p-4 space-y-3"}`}>
         {/* Action Buttons */}
-        <HoverCardActions onWatch={handleWatch} onLike={handleLike} onInfo={handleInfo} compact={compact} />
+        <HoverCardActions
+          onWatch={handleWatch}
+          onLike={handleLike}
+          onInfo={handleInfo}
+          compact={compact}
+        />
 
         {/* Movie Info Badges */}
         <HoverCardInfo

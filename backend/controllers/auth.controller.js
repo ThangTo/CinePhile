@@ -1,45 +1,8 @@
 const authService = require('../services/auth.service');
+const { attachAuthCookies, clearAuthCookies, getGoogleRedirects } = require('../utils/authUtils');
 
-const isProduction = process.env.NODE_ENV === 'production';
 const clientBaseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-const GOOGLE_SUCCESS_REDIRECT =
-  process.env.GOOGLE_SUCCESS_REDIRECT || `${clientBaseUrl}/?auth=google_success`;
-const GOOGLE_FAILURE_REDIRECT =
-  process.env.GOOGLE_FAILURE_REDIRECT || `${clientBaseUrl}/auth/google/callback?auth=google_failed`;
-
-const baseCookieOptions = {
-  httpOnly: true,
-  secure: isProduction,
-  sameSite: isProduction ? 'none' : 'lax',
-  domain: process.env.COOKIE_DOMAIN || undefined,
-  path: '/',
-};
-const ACCESS_TOKEN_MAX_AGE = parseInt(process.env.ACCESS_TOKEN_MAX_AGE_MS, 10) || 60 * 60 * 1000; // 1 hour
-const REFRESH_TOKEN_MAX_AGE =
-  parseInt(process.env.REFRESH_TOKEN_MAX_AGE_MS, 10) || 7 * 24 * 60 * 60 * 1000; // 7 days
-
-const attachAuthCookies = (res, tokens = {}) => {
-  if (!tokens) return;
-
-  if (tokens.token) {
-    res.cookie('accessToken', tokens.token, {
-      ...baseCookieOptions,
-      maxAge: ACCESS_TOKEN_MAX_AGE,
-    });
-  }
-
-  if (tokens.refreshToken) {
-    res.cookie('refreshToken', tokens.refreshToken, {
-      ...baseCookieOptions,
-      maxAge: REFRESH_TOKEN_MAX_AGE,
-    });
-  }
-};
-
-const clearAuthCookies = (res) => {
-  res.clearCookie('accessToken', baseCookieOptions);
-  res.clearCookie('refreshToken', baseCookieOptions);
-};
+const { successRedirect, failureRedirect } = getGoogleRedirects(clientBaseUrl);
 
 /**
  * POST /auth/register
@@ -197,14 +160,14 @@ const resetPassword = async (req, res) => {
 const googleCallback = (req, res) => {
   try {
     if (!req.user) {
-      return res.redirect(GOOGLE_FAILURE_REDIRECT);
+      return res.redirect(failureRedirect);
     }
 
     const { token, refreshToken } = req.user;
     attachAuthCookies(res, { token, refreshToken });
-    return res.redirect(GOOGLE_SUCCESS_REDIRECT);
+    return res.redirect(successRedirect);
   } catch (error) {
-    return res.redirect(GOOGLE_FAILURE_REDIRECT);
+    return res.redirect(failureRedirect);
   }
 };
 
@@ -219,5 +182,5 @@ module.exports = {
   forgotPassword,
   resetPassword,
   googleCallback,
-  GOOGLE_FAILURE_REDIRECT,
+  GOOGLE_FAILURE_REDIRECT: failureRedirect,
 };

@@ -14,7 +14,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     quality: "HD",
     synopsis: "",
     poster: "",
-    backdropUrl: "",
+    backgroundImage: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -36,7 +36,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         quality: movie.quality || "HD",
         synopsis: movie.synopsis || movie.description || "",
         poster: movie.poster || "",
-        backdropUrl: movie.backdropUrl || "",
+        backgroundImage: movie.backgroundImage || "",
       });
     } else {
       // Reset form khi tạo mới
@@ -53,7 +53,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         quality: "HD",
         synopsis: "",
         poster: "",
-        backdropUrl: "",
+        backgroundImage: "",
       });
     }
     setErrors({});
@@ -93,7 +93,10 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
       // Chuyển genres từ string sang array
       const movieData = {
         ...formData,
-        genres: formData.genres.split(",").map((g) => g.trim()).filter(Boolean),
+        genres: formData.genres
+          .split(",")
+          .map((g) => g.trim())
+          .filter(Boolean),
         rating: parseFloat(formData.rating),
         imdb: parseFloat(formData.imdb),
         year: parseInt(formData.year),
@@ -119,10 +122,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
           <h2 className="text-2xl font-bold text-white">
             {movie ? "Chỉnh Sửa Phim" : "Thêm Phim Mới"}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <i className="fa-solid fa-times text-2xl"></i>
           </button>
         </div>
@@ -149,9 +149,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Tên Tiếng Anh
-              </label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Tên Tiếng Anh</label>
               <input
                 type="text"
                 name="englishTitle"
@@ -298,8 +296,8 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
               <label className="block text-sm font-medium text-gray-300 mb-2">URL Backdrop</label>
               <input
                 type="url"
-                name="backdropUrl"
-                value={formData.backdropUrl}
+                name="backgroundImage"
+                value={formData.backgroundImage}
                 onChange={handleChange}
                 className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
                 placeholder="https://..."
@@ -361,4 +359,3 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
 };
 
 export default MovieFormModal;
-

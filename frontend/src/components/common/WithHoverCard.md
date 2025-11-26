@@ -177,7 +177,7 @@ hoverPosition = "-right-20 -top-4";
 ### Hover card không hiện
 
 1. Check `overflow-visible` ở parent containers
-2. Verify mock data có đầy đủ fields (posterUrl, backdropUrl, genres)
+2. Verify mock data có đầy đủ fields (posterUrl, backgroundImage, genres)
 3. Check responsive breakpoint (chỉ hiện ở `lg` trở lên)
 
 ### Hover card bị cắt

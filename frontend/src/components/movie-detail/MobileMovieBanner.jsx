@@ -31,7 +31,7 @@ const MobileMovieBanner = ({ movie }) => {
     <div className="relative min-h-screen mt-[60px]">
       {/* Background Image */}
       <BannerBackground
-        backgroundImage={movie.bgImage || movie.backdropUrl || movie.poster}
+        backgroundImage={movie.bgImage || movie.backgroundImage || movie.poster}
         title={movie.title}
         classNameOverlay="from-bgColor via-bgColor/50 to-transparent"
         overlTop={true}

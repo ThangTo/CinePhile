@@ -1,4 +1,4 @@
-const movieService = require("../services/movie.service");
+const movieService = require('../services/movie.service');
 
 /**
  * GET /movies
@@ -7,27 +7,45 @@ const movieService = require("../services/movie.service");
  * @returns {Object} { data: Array, pagination: Object }
  */
 const getAll = async (req, res) => {
-  // TODO: Implement
+  try {
+    const result = await movieService.getAll(req.query, {
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 /**
  * GET /movies/:id
- * Get movie by ID
- * @param {string} req.params.id - Movie ID
+ * Get movie by ID (supports slug or ObjectId)
+ * @param {string} req.params.id - Movie ID or slug
  * @returns {Object} Movie object
  */
 const getById = async (req, res) => {
-  // TODO: Implement
+  try {
+    const movie = await movieService.getById(req.params.id);
+    res.json(movie);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
 };
 
 /**
  * GET /movies/trending/now
- * Get trending movies
+ * Get trending movies ordered by view count
  * @param {number} req.query.limit - Limit number of results (default: 10)
  * @returns {Object} { data: Array }
  */
 const getTrending = async (req, res) => {
-  // TODO: Implement
+  try {
+    const result = await movieService.getTrending(Number(req.query.limit) || 10);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 /**
@@ -37,28 +55,45 @@ const getTrending = async (req, res) => {
  * @returns {Object} { data: Array }
  */
 const getTopRated = async (req, res) => {
-  // TODO: Implement
+  try {
+    const result = await movieService.getTopRated(Number(req.query.limit) || 10);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 /**
  * GET /movies/new/releases
- * Get new releases
+ * Get latest movies
  * @param {number} req.query.limit - Limit number of results (default: 10)
  * @returns {Object} { data: Array }
  */
 const getNewReleases = async (req, res) => {
-  // TODO: Implement
+  try {
+    const result = await movieService.getNewReleases(Number(req.query.limit) || 10);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 /**
  * GET /movies/genre/:genre
- * Get movies by genre
- * @param {string} req.params.genre - Genre name
+ * Get movies filtered by genre
+ * @param {string} req.params.genre - Genre
  * @param {Object} req.query - { page?, limit? }
- * @returns {Object} { data: Array, pagination: Object }
  */
 const getByGenre = async (req, res) => {
-  // TODO: Implement
+  try {
+    const result = await movieService.getByGenre(req.params.genre, {
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 /**
@@ -66,66 +101,102 @@ const getByGenre = async (req, res) => {
  * Search movies
  * @param {string} req.query.q - Search query
  * @param {Object} req.query - { page?, limit? }
- * @returns {Object} { data: Array, pagination: Object }
  */
 const search = async (req, res) => {
-  // TODO: Implement
+  try {
+    const result = await movieService.search(req.query.q || '', {
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 /**
  * GET /movies/:id/episodes
- * Get movie episodes
- * @param {string} req.params.id - Movie ID
- * @param {number} req.query.season - Season number (optional)
- * @returns {Object} { data: Array }
+ * Get all episodes of a movie
+ * @param {string} req.params.id - Movie ID or slug
  */
 const getEpisodes = async (req, res) => {
-  // TODO: Implement
+  try {
+    const episodes = await movieService.getEpisodes(req.params.id, req.query.season);
+    res.json({ data: episodes });
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
 };
 
 /**
  * GET /movies/:id/cast
- * Get movie cast
- * @param {string} req.params.id - Movie ID
- * @returns {Object} { data: Array }
+ * Get cast list
+ * @param {string} req.params.id - Movie ID or slug
  */
 const getCast = async (req, res) => {
-  // TODO: Implement
+  try {
+    const cast = await movieService.getCast(req.params.id);
+    res.json({ data: cast });
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
 };
 
 /**
  * GET /movies/:id/comments
- * Get movie comments
- * @param {string} req.params.id - Movie ID
- * @param {Object} req.query - { page?, limit?, sort? }
- * @returns {Object} { data: Array, pagination: Object }
+ * Get comments with pagination
+ * @param {string} req.params.id - Movie ID or slug
+ * @param {Object} req.query - { page?, limit? }
  */
 const getComments = async (req, res) => {
-  // TODO: Implement
+  try {
+    const comments = await movieService.getComments(req.params.id, {
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    res.json(comments);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
 };
 
 /**
  * POST /movies/:id/comments
  * Post comment (requires authentication)
- * @param {string} req.params.id - Movie ID
- * @param {Object} req.body - { content, isSpoiler?, rating?, episode? }
- * @param {Object} req.user - User object from auth middleware
- * @returns {Object} Comment object (status: 201)
+ * @param {string} req.params.id - Movie ID or slug
+ * @param {Object} req.body - { content, episodeId? }
+ * @param {Object} req.user - Authed user
  */
 const postComment = async (req, res) => {
-  // TODO: Implement
+  try {
+    const newComment = await movieService.postComment(
+      req.params.id,
+      req.user?._id || null,
+      req.body,
+    );
+    res.status(201).json(newComment);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
 };
 
 /**
  * POST /movies/:id/rate
  * Rate movie (requires authentication)
- * @param {string} req.params.id - Movie ID
- * @param {number} req.body.rating - Rating from 1-10
- * @param {Object} req.user - User object from auth middleware
- * @returns {Object} { message, rating, movieId }
+ * @param {string} req.params.id - Movie ID or slug
+ * @param {number} req.body.rating - 1-10
  */
 const rateMovie = async (req, res) => {
-  // TODO: Implement
+  try {
+    const result = await movieService.rateMovie(
+      req.params.id,
+      req.user?._id || null,
+      req.body.rating,
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
 };
 
 module.exports = {

@@ -14,7 +14,7 @@ const DesktopLayout = ({ movie, activeTab, setActiveTab, audioType, onAudioTypeC
       {/* Background Banner */}
       <div className="h-[675px] relative overflow-hidden">
         <BannerBackground
-          backgroundImage={movie.bgImage || movie.backdropUrl || movie.poster}
+          backgroundImage={movie.bgImage || movie.backgroundImage || movie.poster}
           title={movie.title}
           overlayTop={true}
           classNameOverlay="from-bgColor/70 via-transparent to-transparent"

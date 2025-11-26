@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const movieController = require('../controllers/movie.controller');
+const authMiddleware = require('../middleware/auth.middleware');
 
 // IMPORTANT: Routes with specific paths must be defined BEFORE routes with parameters
 // Otherwise Express will match /:id first and treat "trending", "top", etc. as IDs
@@ -33,10 +34,10 @@ router.get('/:id/cast', movieController.getCast);
 router.get('/:id/comments', movieController.getComments);
 
 // POST /api/v1/movies/:id/comments - Post comment
-router.post('/:id/comments', movieController.postComment);
+router.post('/:id/comments', authMiddleware, movieController.postComment);
 
 // POST /api/v1/movies/:id/rate - Rate movie
-router.post('/:id/rate', movieController.rateMovie);
+router.post('/:id/rate', authMiddleware, movieController.rateMovie);
 
 // GET /api/v1/movies/:id - Get movie by ID (must be LAST to avoid conflicts)
 router.get('/:id', movieController.getById);

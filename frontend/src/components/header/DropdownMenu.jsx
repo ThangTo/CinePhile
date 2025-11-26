@@ -34,10 +34,11 @@ const DropdownMenu = ({ label, items, isMobile = false, className = "" }) => {
       <div className="relative group">
         <a
           href="/"
-          className={`text-white hover:text-primaryColor transition-colors dropdown-link ${className}`}
+          className={`text-white hover:text-primaryColor transition-colors flex items-center gap-1 ${className}`}
           onClick={(e) => e.preventDefault()}
         >
-          {label}
+          <span>{label}</span>
+          <i className="fa-solid fa-chevron-down text-[10px] transition-transform duration-200 group-hover:rotate-180" />
         </a>
 
         {/* Desktop Dropdown */}
@@ -46,25 +47,6 @@ const DropdownMenu = ({ label, items, isMobile = false, className = "" }) => {
             <DropdownGrid items={items} columns={4} />
           </div>
         </div>
-
-        {/* Desktop ::after arrow */}
-        <style jsx>{`
-          .dropdown-link::after {
-            content: "";
-            display: inline-block;
-            width: 0;
-            height: 0;
-            margin-left: 6px;
-            vertical-align: middle;
-            border-left: 4px solid transparent;
-            border-right: 4px solid transparent;
-            border-top: 4px solid currentColor;
-            transition: transform 0.2s;
-          }
-          .group:hover .dropdown-link::after {
-            transform: rotate(180deg);
-          }
-        `}</style>
       </div>
     );
   }

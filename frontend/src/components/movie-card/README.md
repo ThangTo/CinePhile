@@ -40,7 +40,7 @@ import MovieHoverCard from "./components/MovieCard/MovieHoverCard";
   title: string,
   subtitle?: string,           // Optional subtitle
   englishTitle?: string,       // Fallback for subtitle
-  backdropUrl?: string,        // Backdrop image
+  backgroundImage?: string,        // Backdrop image
   posterUrl?: string,          // Fallback for backdrop
   poster?: string,             // Second fallback
   rating?: string,             // IMDb rating (e.g. "8.5")
@@ -64,12 +64,12 @@ Displays backdrop image with title overlay.
 ```jsx
 import HoverCardHeader from "./components/MovieCard/HoverCardHeader";
 
-<HoverCardHeader backdropUrl="https://..." title="Movie Title" subtitle="English Title" />;
+<HoverCardHeader backgroundImage="https://..." title="Movie Title" subtitle="English Title" />;
 ```
 
 **Props:**
 
-- `backdropUrl` (string, required): Backdrop image URL
+- `backgroundImage` (string, required): Backdrop image URL
 - `title` (string, required): Movie title
 - `subtitle` (string, optional): Movie subtitle/English title
 
@@ -356,7 +356,7 @@ import MovieHoverCard from "./components/MovieCard/MovieHoverCard";
 const movie = {
   id: 1,
   title: "Movie Title",
-  backdropUrl: "https://...",
+  backgroundImage: "https://...",
   rating: "8.5",
   genres: ["Action", "Thriller"],
 };
