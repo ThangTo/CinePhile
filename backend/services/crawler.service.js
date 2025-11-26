@@ -74,7 +74,7 @@ const crawlMovies = async (page = 1) => {
     return {
       status: "success",
       message: `Đã quét xong trang ${page}`,
-      updated_count: count,
+      movies_count: count,
     };
 
   } catch (error) {
@@ -83,6 +83,49 @@ const crawlMovies = async (page = 1) => {
   }
 };
 
+
+/**
+ * HÀM MỚI: Quản lý vòng lặp crawl từ trang startPage đến endPage.
+ * @param {number} startPage - Trang bắt đầu
+ * @param {number} endPage - Trang kết thúc
+ */
+const runPageRange = async (startPage, endPage) => {
+    let totalMovies = 0;
+    // Thêm biến tổng tập phim nếu bạn sửa crawlMovies để trả về episode count
+    // let totalEpisodes = 0; 
+
+    for (let page = startPage; page <= endPage; page++) {
+        try {
+            console.log(`\n\n================================`);
+            console.log(`➡️ BẮT ĐẦU XỬ LÝ PHẠM VI TRANG ${page} / ${endPage}`);
+            console.log(`================================`);
+            
+            // Gọi hàm crawlMovies để xử lý 1 trang
+            const result = await crawlMovies(page); 
+            
+            // CỘNG DỒN KẾT QUẢ TỪ TỪNG TRANG
+            totalMovies += result.movies_count || 0;
+            // totalEpisodes += result.episodes_count || 0;
+            
+            // Tùy chọn: Đợi một chút để tránh quá tải API
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+
+        } catch (error) {
+            console.error(`❌ Lỗi nghiêm trọng khi crawl trang ${page}. Tiêp tục trang kế:`, error.message);
+            // Tiếp tục vòng lặp sang trang kế tiếp dù có lỗi
+        }
+    }
+
+    // TRẢ VỀ KẾT QUẢ TỔNG HỢP VÀ THÔNG BÁO CHÍNH XÁC
+    return {
+        status: "success",
+        message: `✅ Hoàn thành quét từ trang ${startPage} đến ${endPage}.`,
+        movies_count: totalMovies,
+        // episodes_count: totalEpisodes,
+    };
+};
+
 module.exports = {
   crawlMovies,
+  runPageRange
 };
