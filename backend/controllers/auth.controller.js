@@ -85,7 +85,9 @@ const getCurrentUser = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
-    res.json(req.user);
+    // Convert Mongoose document to plain object to ensure all fields (including avatar) are included
+    const userObj = req.user.toObject ? req.user.toObject() : req.user;
+    res.json(userObj);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

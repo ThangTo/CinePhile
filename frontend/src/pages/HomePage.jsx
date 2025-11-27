@@ -3,6 +3,7 @@ import Banner from "components/home-page/BannerHome";
 import CategoryChips from "components/home-page/CategoryChips";
 import SectionRow from "components/home-page/SectionRow";
 import Top10Movie from "components/home-page/Top10Movie";
+import ContinueWatching from "components/home-page/ContinueWatching";
 // import QuickAdminLogin from "components/general/QuickAdminLogin";
 
 /**
@@ -15,6 +16,9 @@ const HomePage = () => {
       <Banner />
       <div className="py-8 sm:py-12 bg-bgColor overflow-visible">
         <CategoryChips />
+
+        {/* Continue Watching Section - Only shows when user is authenticated */}
+        <ContinueWatching />
 
         {/* Trending Section - Uses mock data */}
         <SectionRow title="Phim Đang Thịnh Hành" sectionType="trending" linkHref="/trending" />

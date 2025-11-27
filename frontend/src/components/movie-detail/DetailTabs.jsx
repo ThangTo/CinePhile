@@ -3,7 +3,7 @@ import React from "react";
 const DetailTabs = ({ activeTab, setActiveTab }) => {
   const tabs = [
     { id: "episodes", label: "Tập phim" },
-    { id: "gallery", label: "Gallery" },
+    // { id: "gallery", label: "Gallery" },
     { id: "cast", label: "Diễn viên" },
     { id: "recommendations", label: "Đề xuất" },
   ];

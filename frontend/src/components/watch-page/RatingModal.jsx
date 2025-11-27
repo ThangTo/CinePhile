@@ -2,16 +2,16 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 
 const RATING_OPTIONS = [
-  { id: 1, emoji: "🤩", label: "Tuyệt vời", value: 10 },
-  { id: 2, emoji: "😙", label: "Phim hay", value: 8 },
-  { id: 3, emoji: "😊", label: "Khá ổn", value: 6 },
-  { id: 4, emoji: "😕", label: "Phim chán", value: 4 },
   { id: 5, emoji: "😭", label: "Dở tệ", value: 2 },
+  { id: 4, emoji: "😕", label: "Phim chán", value: 4 },
+  { id: 3, emoji: "😊", label: "Khá ổn", value: 6 },
+  { id: 2, emoji: "😙", label: "Phim hay", value: 8 },
+  { id: 1, emoji: "🤩", label: "Tuyệt vời", value: 10 },
 ];
 
 const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
   const [selectedRating, setSelectedRating] = useState(null);
-  const [comment, setComment] = useState("");
+  // const [comment, setComment] = useState("");
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
@@ -37,7 +37,7 @@ const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
       onRate(ratingValue);
     } else if (selectedRating) {
       console.log("Rating:", selectedRating);
-      console.log("Comment:", comment);
+      // console.log("Comment:", comment);
       // TODO: Submit rating to backend
     }
 
@@ -45,15 +45,16 @@ const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
     handleClose();
     setTimeout(() => {
       setSelectedRating(null);
-      setComment("");
-    }, 300);
+      setIsAnimating(false);
+      window.location.reload();
+    }, 1000);
   };
 
-  const handleViewRatings = () => {
-    // TODO: Navigate to ratings section or show ratings list
-    console.log("View all ratings");
-    handleClose();
-  };
+  // const handleViewRatings = () => {
+  //   // TODO: Navigate to ratings section or show ratings list
+  //   console.log("View all ratings");
+  //   handleClose();
+  // };
 
   const modalContent = (
     <div
@@ -85,7 +86,9 @@ const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
             <span className="text-white font-semibold text-lg">
               {parseFloat(movie?.rating || 0).toFixed(1)}
             </span>
-            <span className="text-gray-400 text-sm">/ 7 lượt đánh giá</span>
+            <span className="text-gray-400 text-sm">
+              / {movie?.totalRatings || 0} lượt đánh giá
+            </span>
           </div>
         </div>
 
@@ -112,7 +115,7 @@ const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
         </div>
 
         {/* Comment Input */}
-        <div className="px-6 py-4">
+        {/* <div className="px-6 py-4">
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
@@ -120,7 +123,7 @@ const RatingModal = ({ isOpen, onClose, movie, onRate }) => {
             className="w-full bg-[#1a1f2e]/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none transition-colors"
             rows="3"
           />
-        </div>
+        </div> */}
 
         {/* Action Buttons */}
         <div className="px-6 pb-6 flex gap-3">

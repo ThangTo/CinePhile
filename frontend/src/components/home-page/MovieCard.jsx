@@ -26,29 +26,31 @@ const MovieCard = ({
       compact={compact}
     >
       <div
-        className="group relative rounded-lg overflow-visible bg-[#0f172a] border border-white/10 select-none cursor-pointer transition-all hover:border-primaryColor/50"
+        className="group bg-bgColor4 rounded-2xl p-4 shadow-lg border border-white/5 cursor-pointer transition-all duration-300 hover:border-primaryColor/60"
         onClick={handleClick}
       >
-        <div className="aspect-[2/3] w-full overflow-hidden rounded-lg">
+        <div className="relative rounded-2xl overflow-hidden">
           <img
             src={movie.posterUrl || movie.poster}
             alt={movie.title}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 pointer-events-none"
+            className="w-full aspect-[2/3] object-cover transition-transform duration-300 group-hover:scale-105 pointer-events-none"
             draggable="false"
           />
+          <div className="absolute left-2 top-1 z-10">
+            <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+              {movie.quality || "HD"}
+            </span>
+          </div>
         </div>
 
-        {/* Overlay bottom with title */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 rounded-b-lg">
-          <h3 className="text-sm font-semibold text-white line-clamp-2">{movie.title}</h3>
-          <p className="text-xs text-gray-300 mt-0.5">{movie.year}</p>
-        </div>
-
-        {/* Top-left badge */}
-        <div className="absolute left-2 top-2 z-10">
-          <span className="rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
-            {movie.quality || "HD"}
-          </span>
+        <div className="mt-4 text-center">
+          <p className="text-[11px] text-gray-400 mb-1">
+            {movie.year || movie.releaseYear || "N/A"}
+          </p>
+          <h3 className="text-base font-semibold text-white line-clamp-2">{movie.title}</h3>
+          {movie.englishTitle && (
+            <p className="text-sm text-gray-400 mt-1 line-clamp-1">{movie.englishTitle}</p>
+          )}
         </div>
       </div>
     </WithHoverCard>

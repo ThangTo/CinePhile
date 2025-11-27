@@ -24,6 +24,7 @@ module.exports = {
         bgColor: "#191b24",
         bgColor2: "#282B3A",
         bgColor3: "#ffffff10",
+        bgColor4: "#10121b",
         primaryColor: "#ffd875",
         hoverPrimaryColor: "#fde68a",
         hoverLinkColor: "#22d3ee",

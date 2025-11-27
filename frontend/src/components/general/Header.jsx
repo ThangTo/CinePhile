@@ -116,7 +116,7 @@ const Header = () => {
             ) : (
               <button
                 onClick={() => openAuthModal("login")}
-                className="hidden sm:hidden md:hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold px-5 py-2 text-sm transition-all shadow-lg shadow-cyan-500/30"
+                className="hidden sm:hidden md:hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor hover:from-hoverPrimaryColor hover:to-primaryColor text-primaryColorButtonText font-semibold px-5 py-2 text-sm transition-all shadow-lg shadow-primaryColor/30"
               >
                 <i className="fa-solid fa-user" />
                 <span>Đăng nhập</span>

@@ -1,14 +1,7 @@
-/**
- * EXAMPLES: Using WithHoverCard in different scenarios
- * This file demonstrates various use cases for the WithHoverCard component
- */
-
 import React from "react";
 import WithHoverCard from "./WithHoverCard";
 
-// ============================================
 // EXAMPLE 1: Simple Movie Card
-// ============================================
 export const SimpleMovieCard = ({ movie }) => {
   return (
     <WithHoverCard movie={movie}>
@@ -19,9 +12,7 @@ export const SimpleMovieCard = ({ movie }) => {
   );
 };
 
-// ============================================
 // EXAMPLE 2: Card with Custom Position
-// ============================================
 export const CustomPositionCard = ({ movie }) => {
   return (
     <WithHoverCard movie={movie} hoverPosition="left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -35,9 +26,7 @@ export const CustomPositionCard = ({ movie }) => {
   );
 };
 
-// ============================================
 // EXAMPLE 3: Card with Fast Hover Response
-// ============================================
 export const FastHoverCard = ({ movie }) => {
   return (
     <WithHoverCard
@@ -52,9 +41,7 @@ export const FastHoverCard = ({ movie }) => {
   );
 };
 
-// ============================================
 // EXAMPLE 4: Grid Layout with Multiple Cards
-// ============================================
 export const MovieGrid = ({ movies }) => {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 overflow-visible">
@@ -71,9 +58,7 @@ export const MovieGrid = ({ movies }) => {
   );
 };
 
-// ============================================
 // EXAMPLE 5: Horizontal Scroll Container
-// ============================================
 export const HorizontalScrollCards = ({ movies }) => {
   return (
     <div className="overflow-x-auto scrollbar-hide pb-80 overflow-visible">
@@ -90,9 +75,7 @@ export const HorizontalScrollCards = ({ movies }) => {
   );
 };
 
-// ============================================
 // EXAMPLE 6: Card with Additional Content
-// ============================================
 export const DetailedMovieCard = ({ movie }) => {
   return (
     <WithHoverCard movie={movie}>
@@ -118,9 +101,7 @@ export const DetailedMovieCard = ({ movie }) => {
   );
 };
 
-// ============================================
 // EXAMPLE 7: Position Based on Index
-// ============================================
 export const DynamicPositionCards = ({ movies }) => {
   const getPosition = (index, total) => {
     // First card: position right
@@ -150,16 +131,14 @@ export const DynamicPositionCards = ({ movies }) => {
   );
 };
 
-// ============================================
 // EXAMPLE 8: With Custom Styling
-// ============================================
 export const StyledMovieCard = ({ movie }) => {
   return (
     <WithHoverCard movie={movie} showDelay={300} hideDelay={100}>
       <div className="group relative rounded-xl overflow-hidden bg-gradient-to-br from-gray-900 to-gray-950 border border-white/20 shadow-lg hover:shadow-2xl transition-shadow">
         <div className="aspect-[2/3] relative">
           <img
-            src={movie.posterUrl}
+            src={movie.poster}
             alt={movie.title}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />

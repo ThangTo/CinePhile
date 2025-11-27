@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const { getRandomAvatar } = require('../utils/avatarUtils');
 
 // Helper to generate tokens
 const generateTokens = (userId) => {
@@ -14,10 +15,14 @@ const generateTokens = (userId) => {
   return { token, refreshToken };
 };
 
-const generateAuthPayload = (user) => ({
-  user,
-  ...generateTokens(user._id),
-});
+const generateAuthPayload = (user) => {
+  // Convert Mongoose document to plain object to ensure all fields are included
+  const userObj = user.toObject ? user.toObject() : user;
+  return {
+    user: userObj,
+    ...generateTokens(user._id || userObj._id),
+  };
+};
 
 /**
  * Register new user
@@ -36,16 +41,25 @@ const register = async (userData) => {
 
   // Register user with passport-local-mongoose
   // User.register takes a user instance and a password
-  const user = new User({ username, email });
-  console.log('user');
-  User.register(user, password, async function (err, user) {
-    if (err) {
-      console.log(err);
-    }
-    console.log('registered', user);
-  });
+  // Assign random default avatar
+  const randomAvatar = getRandomAvatar();
+  const user = new User({ username, email, avatar: randomAvatar });
 
-  return generateAuthPayload(user);
+  return new Promise((resolve, reject) => {
+    User.register(user, password, async function (err, registeredUser) {
+      if (err) {
+        console.log('Registration error:', err);
+        return reject(err);
+      }
+      console.log('User registered:', registeredUser);
+      // Ensure avatar is set (in case it wasn't saved)
+      if (!registeredUser.avatar) {
+        registeredUser.avatar = randomAvatar;
+        await registeredUser.save();
+      }
+      resolve(generateAuthPayload(registeredUser));
+    });
+  });
 };
 
 /**
@@ -162,32 +176,37 @@ const loginWithGoogleProfile = async (profile) => {
 
   const googleId = profile.id;
   let user = await User.findOne({ $or: [{ googleId }, { email }] });
-  const avatar = profile?.photos?.[0]?.value;
 
   if (!user) {
+    // New user - assign random default avatar
     const displayName =
       normalizeDisplayName(profile.displayName) || email.split('@')[0] || `user${Date.now()}`;
     const baseUsername = displayName.toLowerCase().replace(/\s+/g, '');
     const username = await generateUniqueUsername(baseUsername || `user${Date.now()}`);
+    const randomAvatar = getRandomAvatar();
 
     user = new User({
       username,
       email,
       googleId,
-      avatar: avatar || undefined,
+      avatar: randomAvatar,
       role: 'user',
     });
   } else {
+    // Existing user - update googleId if not set, but keep existing avatar
     if (!user.googleId) {
       user.googleId = googleId;
     }
-    if (!user.avatar && avatar) {
-      user.avatar = avatar;
+    // If user doesn't have an avatar, assign a random one
+    if (!user.avatar) {
+      user.avatar = getRandomAvatar();
     }
   }
 
   await user.save();
-  return generateAuthPayload(user);
+  // Ensure avatar is included in the returned user object
+  const userObj = user.toObject ? user.toObject() : user;
+  return generateAuthPayload(userObj);
 };
 
 /**

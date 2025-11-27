@@ -18,7 +18,7 @@ const ActionButton = ({ icon, onClick, variant = "default", size = "md", ariaLab
 
   const variantClasses = {
     primary:
-      "bg-amber-400 text-black opacity-80 shadow-md transition-all duration-300 hover:shadow-[0_0_25px_5px_rgba(250,204,21,0.8)] hover:scale-105",
+      "bg-primaryColor text-primaryColorButtonText shadow-md transition-all duration-300 hover:shadow-[0_0_25px_5px_rgba(250,204,21,0.8)] hover:scale-105",
     default:
       "bg-white/10 text-white hover:bg-white/20 hover:text-primaryColor border border-white/15 transition-all duration-300",
   };

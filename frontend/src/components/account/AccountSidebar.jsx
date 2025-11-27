@@ -18,7 +18,7 @@ const AccountSidebar = ({ user, onLogout }) => {
         {navItems.map((item) => (
           <Link
             key={item.path}
-            to={item.path}
+            to={"/account" + item.path}
             className={`flex items-center px-4 py-3 rounded-lg mb-2 font-medium no-underline transition-all ${
               location.pathname === item.path
                 ? "bg-account-bg-tertiary text-account-accent"

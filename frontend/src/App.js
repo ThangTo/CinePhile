@@ -7,7 +7,6 @@ import WatchPage from "./pages/WatchPage";
 import AccountPage from "./pages/AccountPage";
 import GenrePage from "./pages/GenrePage";
 import CountryPage from "./pages/CountryPage";
-import APITestExample from "./components/examples/APITestExample";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/general/ProtectedRoute";
 import MainLayout from "layouts/MainLayout";
@@ -30,9 +29,8 @@ function App() {
             <Route path="/account" element={<AccountPage />} />
             <Route path="/favorites" element={<AccountPage />} />
             <Route path="/watchlist" element={<AccountPage />} />
-            <Route path="/continue-watching" element={<AccountPage />} />
+            <Route path="/account/continue-watching" element={<AccountPage />} />
             <Route path="/notifications" element={<AccountPage />} />
-            <Route path="/api-test" element={<APITestExample />} />
             <Route
               path="/admin"
               element={

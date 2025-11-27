@@ -110,6 +110,31 @@ const userService = {
       params,
       requiresAuth: true,
     }),
+
+  /**
+   * Lấy danh sách phim đang xem tiếp (continue watching)
+   * @param {string|number} userId - User ID
+   * @param {Object} params - { page?, limit? }
+   * @returns {Promise<Object>} { data: [], pagination: {} }
+   */
+  getContinueWatching: (userId, params = {}) =>
+    apiRequest(`/users/${userId}/continue-watching`, {
+      params,
+      requiresAuth: true,
+    }),
+
+  /**
+   * Cập nhật tiến độ xem phim
+   * @param {string|number} userId - User ID
+   * @param {Object} progressData - { movieId, episodeId, progress, watchTime }
+   * @returns {Promise<Object>} { message }
+   */
+  updateWatchProgress: (userId, progressData) =>
+    apiRequest(`/users/${userId}/watch-progress`, {
+      method: "POST",
+      data: progressData,
+      requiresAuth: true,
+    }),
 };
 
 export default userService;

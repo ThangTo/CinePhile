@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 // import CastSection  from './CastSection'
 
 const MovieInfoBrief = ({ movie, activeEp }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   return (
     <div className="lg:col-span-8 m-[6px] pb-[30px] border-b-2 border-borderColor">
       <div className="mt-6 grid gap-6 lg:grid-cols-8">
@@ -63,10 +64,20 @@ const MovieInfoBrief = ({ movie, activeEp }) => {
 
         {/* Tóm tắt + link “Thông tin phim >” */}
         <div className="lg:col-span-3">
-          <p className="text-gray-300 leading-relaxed text-sm">{movie.description}</p>
+          <div>
+            <p className={`text-gray-300 ${isExpanded ? "" : "line-clamp-3"}`}>
+              {movie.description}
+            </p>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-sm text-primaryColor hover:text-hoverPrimaryColor mt-1 underline cursor-pointer"
+            >
+              {isExpanded ? "Thu gọn" : "Xem thêm"}
+            </button>
+          </div>
           <a
             href={`/movie/${movie.id}`}
-            className="text-primaryColor hover:text-hoverPrimaryColor text-sm mt-2 inline-block mt-6"
+            className="text-primaryColor hover:text-hoverPrimaryColor text-sm inline-block mt-2"
           >
             Thông tin phim &gt;
           </a>

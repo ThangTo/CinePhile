@@ -26,29 +26,12 @@ const UserInfoCard = ({ user }) => (
   </div>
 );
 
-const UserStats = ({ coins }) => (
-  <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/20">
-    <div className="flex items-center gap-2">
-      <i className="fa-solid fa-film text-gray-300 text-sm" />
-      <span className="text-white font-semibold">Số dư</span>
-    </div>
-    <div className="flex items-center gap-2">
-      <span className="text-white font-bold">{coins || 0}</span>
-      <i className="fa-solid fa-coins text-primaryColor" />
-      <button className="ml-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-full text-xs font-semibold transition-colors">
-        + Nạp
-      </button>
-    </div>
-  </div>
-);
-
 const MobileUserMenu = ({ user, onLogout, onOpenAuth, onClose }) => {
   return (
     <>
       {user ? (
         <div className="mb-4">
           <UserInfoCard user={user} />
-          <UserStats coins={user.coins} />
 
           {/* Admin Panel (Only for admin) */}
           {user.role === "admin" && (

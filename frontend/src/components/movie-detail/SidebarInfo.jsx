@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import CastSection from "components/movie-detail/CastSection";
 import { GenreTag, MovieInfo } from "components/banner/index";
 import { useBannerConfig } from "components/banner/useBannerConfig";
 
 const SidebarInfo = ({ movie }) => {
   const { infoBadges } = useBannerConfig(movie);
-
+  const [isExpanded, setIsExpanded] = useState(false);
   return (
     <div className="space-y-6 px-16 pb-16">
       {/* Poster */}
@@ -86,6 +86,22 @@ const SidebarInfo = ({ movie }) => {
           <div className="flex">
             <span className="font-semibold text-gray-400 w-28">Trạng thái:</span>
             <span className="text-green-400">{movie.status}</span>
+          </div>
+        )}
+        {movie.description && (
+          <div className="flex items-start">
+            <span className="font-semibold text-gray-400 w-28 flex-none">Giới thiệu:</span>
+            <div className="flex-1">
+              <p className={`text-gray-300 ${isExpanded ? "" : "line-clamp-3"}`}>
+                {movie.description}
+              </p>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-sm text-primaryColor hover:text-hoverPrimaryColor mt-1 underline cursor-pointer"
+              >
+                {isExpanded ? "Thu gọn" : "Xem thêm"}
+              </button>
+            </div>
           </div>
         )}
       </div>

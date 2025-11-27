@@ -4,8 +4,8 @@ import useAuth from "hooks/useAuth";
 const CommentInput = ({
   commentText,
   setCommentText,
-  isSpoiler,
-  setIsSpoiler,
+  // isSpoiler,
+  // setIsSpoiler,
   onSubmit,
   isAuthenticated,
   onOpenAuth,
@@ -66,8 +66,8 @@ const CommentInput = ({
           </span>
         </div>
 
-        <div className="flex items-center justify-between mt-3">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+        <div className="flex items-center justify-end mt-3">
+          {/* <label className="flex items-center gap-2 cursor-pointer select-none">
             <span className="text-sm text-gray-400">Tiết lộ?</span>
             <input
               type="checkbox"
@@ -76,7 +76,7 @@ const CommentInput = ({
               onChange={(e) => setIsSpoiler(e.target.checked)}
             />
             <span className="relative inline-block h-5 w-9 rounded-full transition-colors duration-300 peer-checked:bg-primaryColor/70 after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-md after:transition-transform after:duration-300 after:ease-in-out peer-checked:after:translate-x-4 bg-white/20" />
-          </label>
+          </label> */}
 
           <div className="flex items-center gap-3">
             <button

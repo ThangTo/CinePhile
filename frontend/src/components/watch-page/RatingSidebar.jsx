@@ -35,7 +35,11 @@ const RatingSidebar = ({ movie }) => {
       </div>
 
       {/* Rating Modal */}
-      <RatingModal isOpen={showRatingModal} onClose={() => setShowRatingModal(false)} movie={movie} />
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        movie={movie}
+      />
     </>
   );
 };
