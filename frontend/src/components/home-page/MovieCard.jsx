@@ -26,12 +26,14 @@ const MovieCard = ({
       compact={compact}
     >
       <div
-        className="group bg-bgColor4 rounded-2xl p-4 shadow-lg border border-white/5 cursor-pointer transition-all duration-300 hover:border-primaryColor/60"
+        className={`group bg-bgColor4 rounded-2xl ${
+          compact ? "p-2" : "p-4"
+        } shadow-lg border border-white/5 cursor-pointer transition-all duration-300 hover:border-primaryColor/60`}
         onClick={handleClick}
       >
         <div className="relative rounded-2xl overflow-hidden">
           <img
-            src={movie.posterUrl || movie.poster}
+            src={movie.poster}
             alt={movie.title}
             className="w-full aspect-[2/3] object-cover transition-transform duration-300 group-hover:scale-105 pointer-events-none"
             draggable="false"
@@ -43,13 +45,19 @@ const MovieCard = ({
           </div>
         </div>
 
-        <div className="mt-4 text-center">
-          <p className="text-[11px] text-gray-400 mb-1">
-            {movie.year || movie.releaseYear || "N/A"}
-          </p>
-          <h3 className="text-base font-semibold text-white line-clamp-2">{movie.title}</h3>
+        <div className={`${compact ? "mt-2" : "mt-4"} text-center`}>
+          {!compact && <p className="text-[10px] text-gray-400 mb-1">{movie.year || "N/A"}</p>}
+          <h3
+            className={`${
+              compact ? "text-sm line-clamp-1" : "text-base line-clamp-2"
+            } font-semibold text-white `}
+          >
+            {movie.title}
+          </h3>
           {movie.englishTitle && (
-            <p className="text-sm text-gray-400 mt-1 line-clamp-1">{movie.englishTitle}</p>
+            <p className={`${compact ? "text-xs" : "text-sm"} text-gray-400 mt-1 line-clamp-1`}>
+              {movie.englishTitle}
+            </p>
           )}
         </div>
       </div>

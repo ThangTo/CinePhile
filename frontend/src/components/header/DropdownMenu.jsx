@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import DropdownGrid from "./DropdownGrid";
+import { Link } from "react-router-dom";
 
 /**
  * Reusable Dropdown Menu Component
@@ -14,36 +15,22 @@ const DropdownMenu = ({ label, items, isMobile = false, className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside (mobile only)
-  useEffect(() => {
-    if (!isMobile || !isOpen) return;
-
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, isMobile]);
-
   // Desktop: Hover-based dropdown with ::after arrow
   if (!isMobile) {
     return (
       <div className="relative group">
-        <a
-          href="/"
+        <Link
+          to="/"
           className={`text-white hover:text-primaryColor transition-colors flex items-center gap-1 ${className}`}
           onClick={(e) => e.preventDefault()}
         >
           <span>{label}</span>
           <i className="fa-solid fa-chevron-down text-[10px] transition-transform duration-200 group-hover:rotate-180" />
-        </a>
+        </Link>
 
         {/* Desktop Dropdown */}
         <div className="absolute left-0 top-full pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-          <div className="bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-2xl border border-white/10 p-4 w-[min(90vw,48rem)] max-h-[60vh] overflow-y-auto overflow-x-hidden overscroll-contain pretty-scroll">
+          <div className="bg-bgColor4 backdrop-blur-sm rounded-xl shadow-2xl border border-white/10 p-4 w-[min(90vw,48rem)] max-h-[60vh] overflow-y-auto overflow-x-hidden overscroll-contain pretty-scroll">
             <DropdownGrid items={items} columns={4} />
           </div>
         </div>
@@ -75,7 +62,7 @@ const DropdownMenu = ({ label, items, isMobile = false, className = "" }) => {
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="fixed top-[60px] left-0 right-0 mx-2 sm:mx-4 bg-gray-900/98 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 p-4 max-h-[calc(100vh-80px)] overflow-y-auto pretty-scroll animate-slideDown"
+            className="fixed top-[60px] left-0 right-0 mx-2 sm:mx-4 bg-bgColor4 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 p-4 max-h-[calc(100vh-80px)] overflow-y-auto pretty-scroll animate-slideDown"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/10">

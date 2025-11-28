@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   MobileUserMenu,
   DesktopUserMenu,
@@ -70,10 +70,10 @@ const Header = () => {
           </button>
 
           {/* Left: Logo */}
-          <a href="/" className="shrink-0 text-xl lg:text-2xl font-extrabold tracking-tight">
+          <Link to="/" className="shrink-0 text-xl lg:text-2xl font-extrabold tracking-tight">
             <span className="text-white">Cine</span>
             <span className="text-cyan-400">Phine</span>
-          </a>
+          </Link>
 
           {/* Middle: Nav links (desktop) */}
           <NavigationLinks className="hidden lg:flex items-center gap-5 text-sm" isMobile={false} />

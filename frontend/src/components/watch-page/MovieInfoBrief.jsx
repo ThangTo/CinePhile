@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 // import CastSection  from './CastSection'
 
 const MovieInfoBrief = ({ movie, activeEp }) => {
@@ -75,12 +76,12 @@ const MovieInfoBrief = ({ movie, activeEp }) => {
               {isExpanded ? "Thu gọn" : "Xem thêm"}
             </button>
           </div>
-          <a
-            href={`/movie/${movie.id}`}
+          <Link
+            to={`/movie/${movie.id}`}
             className="text-primaryColor hover:text-hoverPrimaryColor text-sm inline-block mt-2"
           >
             Thông tin phim &gt;
-          </a>
+          </Link>
         </div>
       </div>
       <div className="lg:col-span-4"></div>

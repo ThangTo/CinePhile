@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 /**
  * Reusable section header with title and optional link
@@ -13,12 +14,12 @@ const SectionHeader = ({ title, linkText, linkHref, className = "" }) => {
     <div className={`flex items-center justify-between mb-4 ${className}`}>
       <h3 className="text-xl sm:text-2xl font-bold">{title}</h3>
       {linkText && linkHref && (
-        <a
-          href={linkHref}
+        <Link
+          to={linkHref}
           className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors hidden sm:block"
         >
           {linkText} →
-        </a>
+        </Link>
       )}
     </div>
   );

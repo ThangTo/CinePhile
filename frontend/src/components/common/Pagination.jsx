@@ -11,23 +11,24 @@ const Pagination = ({ page, totalPages, onPrev, onNext }) => {
         className={`
             h-10 w-10 flex items-center justify-center
             rounded-full
-            bg-white/5
+            bg-bgColor2
             border border-white/10
             backdrop-blur
             shadow-sm
-            hover:bg-white/15 hover:scale-105
+            hover:bg-bgColor2/80 hover:scale-105
             transition-all duration-200
             text-white
+            hover:text-primaryColor
             ${page === 1 ? "opacity-30 cursor-not-allowed" : ""}
         `}
-        >
-        <span className="text-lg">←</span>
+      >
+        <i className="fa-solid fa-chevron-left text-sm " />
       </button>
 
-      <div className="flex items-center gap-2 bg-gray-800/80 backdrop-blur px-5 py-2.5 rounded-3xl border border-white/10 shadow-sm">
+      <div className="flex items-center gap-2 bg-bgColor2 backdrop-blur px-5 py-2.5 rounded-3xl border border-white/10 shadow-sm">
         <span className="text-gray-300 text-sm">Trang</span>
         <span className="font-semibold bg-gray-900 px-2.5 py-1 rounded-xl text-white text-sm shadow-inner">
-            {page}
+          {page}
         </span>
         <span className="text-gray-300 text-sm">/ {totalPages}</span>
       </div>
@@ -40,17 +41,18 @@ const Pagination = ({ page, totalPages, onPrev, onNext }) => {
         className={`
             h-10 w-10 flex items-center justify-center
             rounded-full
-            bg-white/5
+            bg-bgColor2
             border border-white/10
             backdrop-blur
             shadow-sm
-            hover:bg-white/15 hover:scale-105
+            hover:bg-bgColor2/80 hover:scale-105
             transition-all duration-200
             text-white
+            hover:text-primaryColor
             ${page === totalPages ? "opacity-30 cursor-not-allowed" : ""}
         `}
-        >
-        <span className="text-lg">→</span>
+      >
+        <i className="fa-solid fa-chevron-right text-sm " />
       </button>
     </div>
   );

@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { DESKTOP_MENU_ITEMS, DESKTOP_MENU_ITEM_CLASS } from "./constants";
 
 const PremiumBanner = ({ username }) => (
@@ -68,21 +69,27 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
             <div className="py-1">
               {/* Admin Panel Link (Only for admin) */}
               {user.role === "admin" && (
-                <a
-                  href="/admin"
+                <Link
+                  to="/admin"
+                  onClick={onToggle}
                   className="w-full flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-y border-purple-500/20 text-purple-300 hover:bg-purple-500/20 transition-colors"
                 >
                   <i className="fa-solid fa-shield-halved w-5 text-center" />
                   <span className="font-semibold">Admin Panel</span>
                   <i className="fa-solid fa-arrow-up-right-from-square ml-auto text-xs" />
-                </a>
+                </Link>
               )}
 
               {DESKTOP_MENU_ITEMS.map((item) => (
-                <a key={item.label} href={item.href} className={DESKTOP_MENU_ITEM_CLASS}>
+                <Link
+                  key={item.label}
+                  to={item.href}
+                  className={DESKTOP_MENU_ITEM_CLASS}
+                  onClick={onToggle}
+                >
                   <i className={`fa-solid ${item.icon} w-5 text-center`} />
                   <span>{item.label}</span>
-                </a>
+                </Link>
               ))}
               <button
                 onClick={onLogout}

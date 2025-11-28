@@ -102,9 +102,9 @@ const FilteredMovies = ({ pageType = "genre" }) => {
   }
 
   return (
-    <div className="min-h-screen bg-bgColor">
-      <main className="max-w-7xl mx-auto px-4 py-20">
-        <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6">
+    <div className="bg-bgColor">
+      <main className="w-full mx-auto px-4 py-20">
+        <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6 pl-4">
           Phim {displayLabel}
         </h1>
 
@@ -123,13 +123,14 @@ const FilteredMovies = ({ pageType = "genre" }) => {
                 />
               ))}
             </div>
-
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              onPrev={handlePrev}
-              onNext={handleNext}
-            />
+            {totalPages > 1 && (
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPrev={handlePrev}
+                onNext={handleNext}
+              />
+            )}
           </>
         )}
       </main>

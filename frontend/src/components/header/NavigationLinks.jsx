@@ -1,6 +1,8 @@
 import React from "react";
 import { GENRE_CATEGORIES, COUNTRY_CATEGORIES } from "./constants";
 import DropdownMenu from "./DropdownMenu";
+import useMovieTaxonomies from "hooks/useMovieTaxonomies";
+import { Link } from "react-router-dom";
 
 /**
  * Navigation Links Component - Flexible navigation for mobile and desktop
@@ -9,12 +11,15 @@ import DropdownMenu from "./DropdownMenu";
  * @param {boolean} props.isMobile - Mobile or desktop layout
  */
 const NavigationLinks = ({ className = "", isMobile = false }) => {
+  const { genres, countries } = useMovieTaxonomies();
+  const genreItems = genres.length ? genres : GENRE_CATEGORIES;
+  const countryItems = countries.length ? countries : COUNTRY_CATEGORIES;
+
   const links = [
     { label: "Phim Lẻ", href: "/phim-le", type: "link" },
     { label: "Phim Bộ", href: "/phim-bo", type: "link" },
-    { label: "Thể loại", type: "dropdown", items: GENRE_CATEGORIES },
-    { label: "Quốc gia", type: "dropdown", items: COUNTRY_CATEGORIES },
-    { label: "Xem Chung", href: "/xem-chung", type: "link" },
+    { label: "Thể loại", type: "dropdown", items: genreItems },
+    { label: "Quốc gia", type: "dropdown", items: countryItems },
   ];
 
   // Mobile: Grid layout with dropdowns
@@ -25,13 +30,13 @@ const NavigationLinks = ({ className = "", isMobile = false }) => {
           link.type === "dropdown" ? (
             <DropdownMenu key={link.label} label={link.label} items={link.items} isMobile={true} />
           ) : (
-            <a
+            <Link
               key={link.label}
-              href={link.href}
+              to={link.href}
               className="block text-white hover:text-hoverLinkColor transition-colors py-2"
             >
               {link.label}
-            </a>
+            </Link>
           )
         )}
       </div>
@@ -45,13 +50,13 @@ const NavigationLinks = ({ className = "", isMobile = false }) => {
         link.type === "dropdown" ? (
           <DropdownMenu key={link.label} label={link.label} items={link.items} isMobile={false} />
         ) : (
-          <a
+          <Link
             key={link.label}
-            href={link.href}
+            to={link.href}
             className="text-white hover:text-primaryColor transition-colors"
           >
             {link.label}
-          </a>
+          </Link>
         )
       )}
     </nav>
