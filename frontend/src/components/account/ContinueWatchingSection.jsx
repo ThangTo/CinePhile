@@ -16,22 +16,10 @@ const ContinueWatchingSection = ({ user }) => {
   useEffect(() => {
     const shouldUseMock = !!user && ENABLE_CONTINUE_WATCHING_MOCK;
 
-    if (!user) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-
     if (shouldUseMock) {
       setItems(CONTINUE_WATCHING_MOCK);
       setLoading(false);
       setError(null);
-      return;
-    }
-
-    if (!user.id) {
-      setItems([]);
-      setLoading(false);
       return;
     }
 
@@ -42,10 +30,10 @@ const ContinueWatchingSection = ({ user }) => {
 
         let response;
         try {
-          response = await userService.getContinueWatching(user.id, { limit: 30 });
+          response = await userService.getContinueWatching({ limit: 30 });
         } catch (apiError) {
           console.warn("Continue watching endpoint unavailable, fallback to history");
-          response = await userService.getHistory(user.id, { limit: 60 });
+          response = await userService.getHistory({ limit: 60 });
         }
 
         const historyData = response?.data || [];

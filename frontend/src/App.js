@@ -27,10 +27,6 @@ function App() {
             <Route path="/country/:slug" element={<CountryPage />} />
             <Route path="/watch/:id" element={<WatchPage />} />
             <Route path="/account" element={<AccountPage />} />
-            <Route path="/favorites" element={<AccountPage />} />
-            <Route path="/watchlist" element={<AccountPage />} />
-            <Route path="/account/continue-watching" element={<AccountPage />} />
-            <Route path="/notifications" element={<AccountPage />} />
             <Route
               path="/admin"
               element={

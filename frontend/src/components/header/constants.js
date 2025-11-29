@@ -1,17 +1,17 @@
 // Shared menu items for both mobile and desktop
 export const USER_MENU_ITEMS = [
-  { icon: "fa-heart", label: "Yêu thích", href: "/account/favorites" },
-  { icon: "fa-plus", label: "Danh sách", href: "/account/watchlist" },
-  { icon: "fa-clock", label: "Xem tiếp", href: "/account/continue-watching" },
-  { icon: "fa-user", label: "Tài khoản", href: "/account" },
+  { icon: "fa-heart", label: "Yêu thích", href: "favorites" },
+  { icon: "fa-plus", label: "Danh sách", href: "watchlist" },
+  { icon: "fa-clock", label: "Xem tiếp", href: "continue-watching" },
+  { icon: "fa-user", label: "Tài khoản", href: "profile" },
 ];
 
 // Desktop menu items (slightly different icons)
 export const DESKTOP_MENU_ITEMS = [
-  { icon: "fa-heart", label: "Yêu thích", href: "/account/favorites" },
-  { icon: "fa-list", label: "Danh sách", href: "/account/watchlist" },
-  { icon: "fa-history", label: "Xem tiếp", href: "/account/continue-watching" },
-  { icon: "fa-user", label: "Tài khoản", href: "/account" },
+  { icon: "fa-heart", label: "Yêu thích", href: "favorites" },
+  { icon: "fa-list", label: "Danh sách", href: "watchlist" },
+  { icon: "fa-history", label: "Xem tiếp", href: "continue-watching" },
+  { icon: "fa-user", label: "Tài khoản", href: "profile" },
 ];
 
 // Genre categories (Thể loại)

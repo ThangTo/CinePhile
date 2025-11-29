@@ -9,10 +9,23 @@ import userService from "services/user.service";
 import LoadingState from "components/common/LoadingState";
 import ContinueWatchingSection from "components/account/ContinueWatchingSection";
 
+const DEFAULT_TAB = "profile";
+
+const TAB_TITLES = {
+  profile: "Quản lý Tài khoản",
+  favorites: "Danh sách Yêu thích",
+  watchlist: "Danh sách của bạn",
+  notifications: "Thông báo",
+  "continue-watching": "Xem tiếp của bạn",
+};
+
 const AccountPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isLoading, updateUser, logout } = useAuth();
+  const searchParams = new URLSearchParams(location.search);
+  const queryTab = searchParams.get("tabs");
+  const activeTab = queryTab || DEFAULT_TAB;
 
   useEffect(() => {
     // Redirect if not authenticated
@@ -21,17 +34,23 @@ const AccountPage = () => {
     }
   }, [user, isLoading, navigate]);
 
+  useEffect(() => {
+    // Khi vào /account mà chưa có query tabs thì redirect sang tab mặc định
+    if (location.pathname === "/account" && !queryTab) {
+      navigate(`/account?tabs=${DEFAULT_TAB}`, { replace: true });
+    }
+  }, [location.pathname, queryTab, navigate]);
+
   const handleLogout = async () => {
     await logout();
     navigate("/");
   };
 
   const handleUpdateProfile = async (updatedData) => {
-    if (!user?.id) return;
-
     try {
-      // Update via API
-      const updatedUser = await userService.updateProfile(user.id, updatedData);
+      console.log("updatedData", updatedData);
+      const updatedUser = await userService.updateProfile(updatedData);
+      console.log("updatedUser", updatedUser);
       updateUser(updatedUser);
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -45,7 +64,7 @@ const AccountPage = () => {
     return <LoadingState />;
   }
 
-  const isContinueWatchingPage = location.pathname === "/account/continue-watching";
+  const isContinueWatchingPage = activeTab === "continue-watching";
 
   const renderMainContent = () => {
     if (isContinueWatchingPage) {
@@ -61,11 +80,11 @@ const AccountPage = () => {
     );
   };
 
-  const pageTitle = isContinueWatchingPage ? "Xem tiếp của bạn" : "Quản lý Tài khoản";
+  const pageTitle = TAB_TITLES[activeTab] || TAB_TITLES[DEFAULT_TAB];
 
   return (
     <div className="min-h-screen bg-account-bg-primary text-account-text-primary">
-      <div className="flex flex-col py-[50px] md:flex-row min-h-screen">
+      <div className="flex flex-col py-[50px] md:flex-row min-h-screen mx-auto">
         <AccountSidebar user={user} onLogout={handleLogout} />
 
         <main className="flex-1 p-5 md:mt-[40px] md:p-10 md:pt-2 box-border">

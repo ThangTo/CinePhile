@@ -1,29 +1,10 @@
 /**
- * Get user profile
- * @param {string|number} userId - User ID
- * @returns {Promise<Object>} User profile object
- */
-const getProfile = async (userId) => {
-  // TODO: Implement
-};
-
-/**
- * Update user profile
- * @param {string|number} userId - User ID
- * @param {Object} updates - Profile updates
- * @returns {Promise<Object>} Updated user profile
- */
-const updateProfile = async (userId, updates) => {
-  // TODO: Implement
-};
-
-/**
  * Add movie to favorites
  * @param {string|number} userId - User ID
  * @param {string|number} movieId - Movie ID
  * @returns {Promise<Object>} { message: string }
  */
-const addToFavorites = async (userId, movieId) => {
+const addToFavorites = async (movieId) => {
   // TODO: Implement
 };
 
@@ -33,7 +14,7 @@ const addToFavorites = async (userId, movieId) => {
  * @param {string|number} movieId - Movie ID
  * @returns {Promise<Object>} { message: string }
  */
-const removeFromFavorites = async (userId, movieId) => {
+const removeFromFavorites = async (movieId) => {
   // TODO: Implement
 };
 
@@ -43,7 +24,7 @@ const removeFromFavorites = async (userId, movieId) => {
  * @param {Object} filters - { page?, limit? }
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
-const getFavorites = async (userId, filters) => {
+const getFavorites = async (filters) => {
   // TODO: Implement
 };
 
@@ -53,7 +34,7 @@ const getFavorites = async (userId, filters) => {
  * @param {string|number} movieId - Movie ID
  * @returns {Promise<Object>} { message: string }
  */
-const addToWatchlist = async (userId, movieId) => {
+const addToWatchlist = async (movieId) => {
   // TODO: Implement
 };
 
@@ -63,7 +44,7 @@ const addToWatchlist = async (userId, movieId) => {
  * @param {string|number} movieId - Movie ID
  * @returns {Promise<Object>} { message: string }
  */
-const removeFromWatchlist = async (userId, movieId) => {
+const removeFromWatchlist = async (movieId) => {
   // TODO: Implement
 };
 
@@ -73,7 +54,7 @@ const removeFromWatchlist = async (userId, movieId) => {
  * @param {Object} filters - { page?, limit? }
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
-const getWatchlist = async (userId, filters) => {
+const getWatchlist = async (filters) => {
   // TODO: Implement
 };
 
@@ -83,13 +64,11 @@ const getWatchlist = async (userId, filters) => {
  * @param {Object} filters - { page?, limit? }
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
-const getHistory = async (userId, filters) => {
+const getHistory = async (filters) => {
   // TODO: Implement
 };
 
 module.exports = {
-  getProfile,
-  updateProfile,
   addToFavorites,
   removeFromFavorites,
   getFavorites,

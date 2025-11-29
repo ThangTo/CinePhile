@@ -1,24 +1,25 @@
 import React from "react";
-import logo2 from "assets/images/logo2.png";
+import logo3 from "assets/images/logo3.png";
 
-const menuLinks = ["Hỏi-Đáp", "Chính sách bảo mật", "Điều khoản sử dụng", "Giới thiệu", "Liên hệ"];
-const topicTags = ["Dongphim", "Ghienphim", "Motphim", "Subnhanh"];
+// const menuLinks = ["Hỏi-Đáp", "Chính sách bảo mật", "Điều khoản sử dụng", "Giới thiệu", "Liên hệ"];
+// const topicTags = ["Dongphim", "Ghienphim", "Motphim", "Subnhanh"];
 
 const SiteFooter = () => {
   return (
-    <footer className="border-t border-white/5 bg-[#0f111a]">
-      <div className="w-full px-4 py-10">
+    <footer className="bg-bgColor4 ">
+      <div className="w-full px-4 py-10 mx-auto">
         {/* Footer Element - Main Content */}
-        <div className="footer-element flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+        <div className="footer-element flex flex-col lg:flex-row items-center justify-center gap-8 mx-auto">
           {/* Footer Side Left - Brand + Social Icons + Links */}
-          <div className="footer-sideleft flex justify-center flex-col items-center md:items-start flex-1 w-full">
+          <div className="footer-sideleft flex justify-center flex-col items-center">
             {/* Brand Section */}
             <div className="flex items-start gap-4 mb-6">
               <div className="flex-shrink-0">
-                {/* <div className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg">
-                  <i className="fa-solid fa-play text-black text-xl"></i>
-                </div> */}
-                <img src={logo2} alt="CinePhine" className="w-14 h-14 object-cover rounded-full" />
+                <img
+                  src={logo3}
+                  alt="CinePhine"
+                  className="w-16 h-16 object-cover object-center rounded-full"
+                />
               </div>
               <div>
                 <h3 className="text-2xl font-extrabold text-white mb-1">
@@ -108,7 +109,7 @@ const SiteFooter = () => {
             </div>
 
             {/* Navigation Links */}
-            <div className="mb-6">
+            {/* <div className="mb-6">
               <nav className="flex flex-wrap justify-center gap-x-6 gap-y-3 text-sm">
                 {menuLinks.map((link) => (
                   <a
@@ -120,10 +121,10 @@ const SiteFooter = () => {
                   </a>
                 ))}
               </nav>
-            </div>
+            </div> */}
 
             {/* Topic Tags */}
-            <div className="mb-6">
+            {/* <div className="mb-6">
               <div className="flex flex-wrap gap-3">
                 {topicTags.map((tag) => (
                   <a
@@ -135,11 +136,11 @@ const SiteFooter = () => {
                   </a>
                 ))}
               </div>
-            </div>
+            </div> */}
 
             {/* Description */}
             <div className="mb-2">
-              <p className="text-sm font-normal text-[#AAAAAA] line-height-[1.6] text-center md:text-left">
+              <p className="text-sm font-normal text-[#AAAAAA] line-height-[1.6] text-center max-w-3xl mx-auto">
                 CinePhine - Phim hay có rồi - Trang xem phim online chất lượng cao miễn phí Vietsub,
                 thuyết minh, lồng tiếng full HD. Kho phim mới khổng lồ, phim chiếu rạp, phim bộ,
                 phim lẻ từ nhiều quốc gia như Việt Nam, Hàn Quốc, Trung Quốc, Thái Lan, Nhật Bản, Âu
@@ -149,17 +150,6 @@ const SiteFooter = () => {
 
             {/* Copyright */}
             <div className="text-xs text-gray-600">© 2025 CinePhine</div>
-          </div>
-
-          {/* Footer Icon - Large Logo on Right */}
-          <div className="hidden lg:flex footer-icon flex-1 flex-shrink-0">
-            <div className="relative group">
-              <div className="h-32 w-32 rounded-full bg-gradient-to-br from-primaryColor via-hoverPrimaryColor to-red-500 flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-105">
-                <i className="fa-solid fa-play text-black text-5xl"></i>
-              </div>
-              {/* Glow effect */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primaryColor to-hoverPrimaryColor blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-300 -z-10"></div>
-            </div>
           </div>
         </div>
       </div>

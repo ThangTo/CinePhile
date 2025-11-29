@@ -19,12 +19,8 @@ const ActionButtons = ({ movie }) => {
       openAuthModal("login");
       return;
     }
-    if (!user?.id) {
-      warning("Không tìm thấy thông tin người dùng!");
-      return;
-    }
     try {
-      await userService.addToFavorites(user.id, movie.id);
+      await userService.addToFavorites(movie.id);
       success("Đã thêm vào danh sách yêu thích!");
     } catch (error) {
       warning(error.message || "Không thể thêm vào yêu thích. Vui lòng thử lại!");

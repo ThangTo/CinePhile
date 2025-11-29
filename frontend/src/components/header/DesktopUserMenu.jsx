@@ -83,7 +83,7 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
               {DESKTOP_MENU_ITEMS.map((item) => (
                 <Link
                   key={item.label}
-                  to={item.href}
+                  to={`/account?tabs=${item.href}`}
                   className={DESKTOP_MENU_ITEM_CLASS}
                   onClick={onToggle}
                 >

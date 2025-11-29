@@ -34,16 +34,10 @@ const ContinueWatching = () => {
       return;
     }
 
-    if (!user?.id) {
-      setContinueWatchingData([]);
-      setLoading(false);
-      return;
-    }
-
     const fetchContinueWatching = async () => {
       try {
         setLoading(true);
-        const response = await userService.getHistory(user.id, { limit: 6 });
+        const response = await userService.getHistory({ limit: 6 });
         const historyData = response?.data || [];
 
         // Filter only movies that have been partially watched (not completed)
@@ -61,7 +55,7 @@ const ContinueWatching = () => {
     };
 
     fetchContinueWatching();
-  }, [isAuthenticated, user?.id, shouldUseMockData]);
+  }, [isAuthenticated, shouldUseMockData]);
 
   const handleMovieClick = (movie) => {
     const targetMovieId = movie.movieId || movie.id;

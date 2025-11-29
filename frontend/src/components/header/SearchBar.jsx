@@ -6,7 +6,7 @@ const SearchBar = ({ className = "", placeholder = "Tìm kiếm phim, diễn vi�
       <input
         type="text"
         placeholder={placeholder}
-        className="w-full bg-[#0b1220] text-gray-200 placeholder:text-gray-400 rounded-full pl-11 pr-4 py-2 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primaryColor focus:border-transparent"
+        className="w-full bg-bgColor text-gray-200 placeholder:text-gray-400 rounded-full pl-11 pr-4 py-2 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primaryColor focus:border-transparent"
       />
       <svg
         className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"

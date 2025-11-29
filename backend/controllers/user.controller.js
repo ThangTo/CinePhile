@@ -1,17 +1,14 @@
-const User = require("../models/user.model");
-const UserFavorite = require("../models/user_favorite.model");
-const UserWatchlist = require("../models/user_watchlist.model");
-const UserHistory = require("../models/user_history.model");
+const User = require('../models/user.model');
+const UserFavorite = require('../models/user_favorite.model');
+const UserWatchlist = require('../models/user_watchlist.model');
+const UserHistory = require('../models/user_history.model');
 
-// Helper to get user ID from request or default to first user
+// Helper to get user ID from authenticated request (via auth middleware)
 const getUserId = async (req) => {
-  if (req.params.id && req.params.id !== 'me') {
-    return req.params.id;
-  }
   if (req.user && req.user._id) {
     return req.user._id;
   }
-  throw new Error("User ID required");
+  throw new Error('User ID required');
 };
 
 /**
@@ -25,7 +22,7 @@ const getProfile = async (req, res) => {
     const userId = await getUserId(req);
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: 'User not found' });
     }
     res.status(200).json(user);
   } catch (error) {
@@ -45,19 +42,21 @@ const updateProfile = async (req, res) => {
     const userId = await getUserId(req);
     const updates = {};
     // Only allow updating specific fields
-    if (req.body.username) updates.username = req.body.username; // Note: changing username might require re-login or check uniqueness if not handled by mongoose plugin
+    if (req.body.username) updates.username = req.body.username;
     if (req.body.email) updates.email = req.body.email;
     if (req.body.avatar) updates.avatar = req.body.avatar;
     if (req.body.gender) updates.gender = req.body.gender;
+    console.log(updates);
 
     const user = await User.findByIdAndUpdate(
       userId,
       { $set: updates },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
+    console.log('user', user);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: 'User not found' });
     }
     res.status(200).json(user);
   } catch (error) {
@@ -77,18 +76,18 @@ const addToFavorites = async (req, res) => {
     const userId = await getUserId(req);
     const { movieId } = req.body;
     if (!movieId) {
-      return res.status(400).json({ message: "Movie ID is required" });
+      return res.status(400).json({ message: 'Movie ID is required' });
     }
 
     await UserFavorite.create({
       userId: userId,
-      movieId
+      movieId,
     });
 
-    res.status(201).json({ message: "Added to favorites" });
+    res.status(201).json({ message: 'Added to favorites' });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({ message: "Movie already in favorites" });
+      return res.status(400).json({ message: 'Movie already in favorites' });
     }
     res.status(500).json({ message: error.message });
   }
@@ -107,14 +106,14 @@ const removeFromFavorites = async (req, res) => {
     const { movieId } = req.params;
     const result = await UserFavorite.findOneAndDelete({
       userId: userId,
-      movieId
+      movieId,
     });
 
     if (!result) {
-      return res.status(404).json({ message: "Favorite not found" });
+      return res.status(404).json({ message: 'Favorite not found' });
     }
 
-    res.status(200).json({ message: "Removed from favorites" });
+    res.status(200).json({ message: 'Removed from favorites' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -148,8 +147,8 @@ const getFavorites = async (req, res) => {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -168,18 +167,18 @@ const addToWatchlist = async (req, res) => {
     const userId = await getUserId(req);
     const { movieId } = req.body;
     if (!movieId) {
-      return res.status(400).json({ message: "Movie ID is required" });
+      return res.status(400).json({ message: 'Movie ID is required' });
     }
 
     await UserWatchlist.create({
       userId: userId,
-      movieId
+      movieId,
     });
 
-    res.status(201).json({ message: "Added to watchlist" });
+    res.status(201).json({ message: 'Added to watchlist' });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({ message: "Movie already in watchlist" });
+      return res.status(400).json({ message: 'Movie already in watchlist' });
     }
     res.status(500).json({ message: error.message });
   }
@@ -198,14 +197,14 @@ const removeFromWatchlist = async (req, res) => {
     const { movieId } = req.params;
     const result = await UserWatchlist.findOneAndDelete({
       userId: userId,
-      movieId
+      movieId,
     });
 
     if (!result) {
-      return res.status(404).json({ message: "Watchlist item not found" });
+      return res.status(404).json({ message: 'Watchlist item not found' });
     }
 
-    res.status(200).json({ message: "Removed from watchlist" });
+    res.status(200).json({ message: 'Removed from watchlist' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -239,8 +238,8 @@ const getWatchlist = async (req, res) => {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -276,8 +275,8 @@ const getHistory = async (req, res) => {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

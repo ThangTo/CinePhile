@@ -52,7 +52,7 @@ const MobileUserMenu = ({ user, onLogout, onOpenAuth, onClose }) => {
             {USER_MENU_ITEMS.map((item) => (
               <Link
                 key={item.label}
-                to={item.href}
+                to={`/account?tabs=${item.href}`}
                 className={MOBILE_MENU_ITEM_CLASS}
                 onClick={onClose}
               >

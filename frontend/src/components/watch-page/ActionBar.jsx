@@ -5,7 +5,7 @@ import useToast from "hooks/useToast";
 import ToastContainer from "components/common/ToastContainer";
 
 const ActionBar = ({ movie }) => {
-  const { user, isAuthenticated, openAuthModal } = useAuth();
+  const { isAuthenticated, openAuthModal } = useAuth();
   const { toasts, removeToast, success, warning } = useToast();
 
   const handleAddFavorite = async () => {
@@ -13,12 +13,8 @@ const ActionBar = ({ movie }) => {
       openAuthModal("login");
       return;
     }
-    if (!user?.id) {
-      warning("Không tìm thấy thông tin người dùng!");
-      return;
-    }
     try {
-      await userService.addToFavorites(user.id, movie.id);
+      await userService.addToFavorites(movie.id);
       success("Đã thêm vào danh sách yêu thích!");
     } catch (error) {
       warning(error.message || "Không thể thêm vào yêu thích. Vui lòng thử lại!");
@@ -31,12 +27,8 @@ const ActionBar = ({ movie }) => {
       openAuthModal("login");
       return;
     }
-    if (!user?.id) {
-      warning("Không tìm thấy thông tin người dùng!");
-      return;
-    }
     try {
-      await userService.addToWatchlist(user.id, movie.id);
+      await userService.addToWatchlist(movie.id);
       success("Đã thêm vào danh sách!");
     } catch (error) {
       warning(error.message || "Không thể thêm vào danh sách. Vui lòng thử lại!");

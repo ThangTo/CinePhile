@@ -6,131 +6,120 @@ import apiRequest from "./utils/apiRequest";
 
 const userService = {
   /**
-   * Lấy profile của user
-   * @param {string|number} userId - User ID
+   * Lấy profile của user hiện tại (dựa trên token/cookie)
    * @returns {Promise<Object>} User profile object
    */
-  getProfile: (userId) => apiRequest(`/users/${userId}`, { requiresAuth: true }),
+  getProfile: () => apiRequest(`/users`, { requiresAuth: true }),
 
   /**
-   * Cập nhật profile của user
-   * @param {string|number} userId - User ID
+   * Cập nhật profile của user hiện tại
    * @param {Object} updates - Profile updates
    * @returns {Promise<Object>} Updated user profile
    */
-  updateProfile: (userId, updates) =>
-    apiRequest(`/users/${userId}`, {
+  updateProfile: (updates) =>
+    apiRequest(`/users`, {
       method: "PUT",
       data: updates,
       requiresAuth: true,
     }),
 
   /**
-   * Thêm movie vào favorites
-   * @param {string|number} userId - User ID
+   * Thêm movie vào favorites của user hiện tại
    * @param {string|number} movieId - Movie ID
    * @returns {Promise<Object>} { message }
    */
-  addToFavorites: (userId, movieId) =>
-    apiRequest(`/users/${userId}/favorites`, {
+  addToFavorites: (movieId) =>
+    apiRequest(`/users/favorites`, {
       method: "POST",
       data: { movieId },
       requiresAuth: true,
     }),
 
   /**
-   * Xóa movie khỏi favorites
-   * @param {string|number} userId - User ID
+   * Xóa movie khỏi favorites của user hiện tại
    * @param {string|number} movieId - Movie ID
    * @returns {Promise<Object>} { message }
    */
-  removeFromFavorites: (userId, movieId) =>
-    apiRequest(`/users/${userId}/favorites/${movieId}`, {
+  removeFromFavorites: (movieId) =>
+    apiRequest(`/users/favorites/${movieId}`, {
       method: "DELETE",
       requiresAuth: true,
     }),
 
   /**
-   * Lấy danh sách favorites
-   * @param {string|number} userId - User ID
+   * Lấy danh sách favorites của user hiện tại
    * @param {Object} params - { page?, limit? }
    * @returns {Promise<Object>} { data: [], pagination: {} }
    */
-  getFavorites: (userId, params = {}) =>
-    apiRequest(`/users/${userId}/favorites`, {
+  getFavorites: (params = {}) =>
+    apiRequest(`/users/favorites`, {
       params,
       requiresAuth: true,
     }),
 
   /**
-   * Thêm movie vào watchlist
-   * @param {string|number} userId - User ID
+   * Thêm movie vào watchlist của user hiện tại
    * @param {string|number} movieId - Movie ID
    * @returns {Promise<Object>} { message }
    */
-  addToWatchlist: (userId, movieId) =>
-    apiRequest(`/users/${userId}/watchlist`, {
+  addToWatchlist: (movieId) =>
+    apiRequest(`/users/watchlist`, {
       method: "POST",
       data: { movieId },
       requiresAuth: true,
     }),
 
   /**
-   * Xóa movie khỏi watchlist
-   * @param {string|number} userId - User ID
+   * Xóa movie khỏi watchlist của user hiện tại
    * @param {string|number} movieId - Movie ID
    * @returns {Promise<Object>} { message }
    */
-  removeFromWatchlist: (userId, movieId) =>
-    apiRequest(`/users/${userId}/watchlist/${movieId}`, {
+  removeFromWatchlist: (movieId) =>
+    apiRequest(`/users/watchlist/${movieId}`, {
       method: "DELETE",
       requiresAuth: true,
     }),
 
   /**
-   * Lấy danh sách watchlist
-   * @param {string|number} userId - User ID
+   * Lấy danh sách watchlist của user hiện tại
    * @param {Object} params - { page?, limit? }
    * @returns {Promise<Object>} { data: [], pagination: {} }
    */
-  getWatchlist: (userId, params = {}) =>
-    apiRequest(`/users/${userId}/watchlist`, {
+  getWatchlist: (params = {}) =>
+    apiRequest(`/users/watchlist`, {
       params,
       requiresAuth: true,
     }),
 
   /**
-   * Lấy lịch sử xem
-   * @param {string|number} userId - User ID
+   * Lấy lịch sử xem của user hiện tại
    * @param {Object} params - { page?, limit? }
    * @returns {Promise<Object>} { data: [], pagination: {} }
    */
-  getHistory: (userId, params = {}) =>
-    apiRequest(`/users/${userId}/history`, {
+  getHistory: (params = {}) =>
+    apiRequest(`/users/history`, {
       params,
       requiresAuth: true,
     }),
 
   /**
-   * Lấy danh sách phim đang xem tiếp (continue watching)
-   * @param {string|number} userId - User ID
+   * Lấy danh sách phim đang xem tiếp (continue watching) của user hiện tại
    * @param {Object} params - { page?, limit? }
    * @returns {Promise<Object>} { data: [], pagination: {} }
    */
-  getContinueWatching: (userId, params = {}) =>
-    apiRequest(`/users/${userId}/continue-watching`, {
+  getContinueWatching: (params = {}) =>
+    apiRequest(`/users/continue-watching`, {
       params,
       requiresAuth: true,
     }),
 
   /**
-   * Cập nhật tiến độ xem phim
-   * @param {string|number} userId - User ID
+   * Cập nhật tiến độ xem phim cho user hiện tại
    * @param {Object} progressData - { movieId, episodeId, progress, watchTime }
    * @returns {Promise<Object>} { message }
    */
-  updateWatchProgress: (userId, progressData) =>
-    apiRequest(`/users/${userId}/watch-progress`, {
+  updateWatchProgress: (progressData) =>
+    apiRequest(`/users/watch-progress`, {
       method: "POST",
       data: progressData,
       requiresAuth: true,

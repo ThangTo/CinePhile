@@ -3,42 +3,55 @@ import useToast from "hooks/useToast";
 import ToastContainer from "components/common/ToastContainer";
 import { cardStyles, buttonStyles } from "./shared-styles";
 
+const MAX_AVATAR_SIZE_MB = 5;
+
 const ProfileCard = ({ user, onUpdate }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const { toasts, removeToast, success, info } = useToast();
+  const { toasts, removeToast, success, info, error } = useToast();
 
   const handleChangeAvatar = () => {
-    // Create a file input dynamically
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
+
     input.onchange = async (e) => {
       const file = e.target.files[0];
-      if (file) {
-        setIsUploading(true);
-        // TODO: Upload to server
-        // For now, use a temporary URL
+      if (!file) return;
+
+      if (file.size > MAX_AVATAR_SIZE_MB * 1024 * 1024) {
+        error(`Vui lòng chọn ảnh nhỏ hơn ${MAX_AVATAR_SIZE_MB}MB`);
+        return;
+      }
+
+      setIsUploading(true);
+
+      try {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          // In production, this would be the URL from server
-          // For demo, we'll keep the same avatar
-          setIsUploading(false);
-          info("Chức năng upload ảnh sẽ được tích hợp với backend!");
+
+        reader.onloadend = async () => {
+          try {
+            const avatarDataUrl = reader.result;
+
+            // Gửi lên server thông qua onUpdate
+            await onUpdate({ avatar: avatarDataUrl });
+            success("Cập nhật ảnh đại diện thành công!");
+          } catch (err) {
+            console.error("Error updating avatar:", err);
+            error("Không thể cập nhật ảnh đại diện. Vui lòng thử lại!");
+          } finally {
+            setIsUploading(false);
+          }
         };
+
         reader.readAsDataURL(file);
+      } catch (err) {
+        console.error("Error reading avatar file:", err);
+        error("Không thể đọc file ảnh. Vui lòng thử lại!");
+        setIsUploading(false);
       }
     };
-    input.click();
-  };
 
-  const handleDeleteAvatar = () => {
-    if (window.confirm("Bạn có chắc muốn xóa ảnh đại diện?")) {
-      onUpdate({
-        avatar:
-          "https://www.dichvuinnhanh.com/wp-content/uploads/2024/12/chu-cun-khung-long-cute-a54f79c5.webp",
-      });
-      success("Đã xóa ảnh đại diện!");
-    }
+    input.click();
   };
 
   return (
@@ -62,16 +75,9 @@ const ProfileCard = ({ user, onUpdate }) => {
               >
                 {isUploading ? "Đang tải..." : "Thay đổi ảnh"}
               </button>
-              <button
-                className={`${buttonStyles.base} ${buttonStyles.dangerOutline}`}
-                onClick={handleDeleteAvatar}
-                disabled={isUploading}
-              >
-                Xóa
-              </button>
             </div>
           </div>
-          <div>
+          <div className="pb-6">
             <h3 className="text-[22px] font-semibold m-0 mb-2">{user.username}</h3>
             <p className="text-base text-account-text-secondary m-0">{user.email}</p>
           </div>

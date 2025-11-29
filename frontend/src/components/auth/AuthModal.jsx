@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "contexts/AuthContext";
+import bgFormLogin from "assets/images/bg-form-login.png";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
 const GOOGLE_AUTH_URL = `${API_BASE_URL}/auth/google`;
@@ -149,19 +150,19 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal Content */}
-      <div className="relative z-10 w-full min-h-[600px] max-w-4xl mx-auto my-auto flex bg-[#1a2332] rounded-2xl overflow-hidden shadow-2xl">
+      <div className="relative z-10 w-full min-h-[500px] max-w-4xl mx-auto my-auto flex bg-bgColor2 rounded-2xl overflow-hidden shadow-2xl">
         {/* Left Side - Branding */}
-        <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-[#2d3b52] to-[#1a2332] p-12 flex-col justify-center items-center relative overflow-hidden">
+        <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-bgColor2 to-bgColor2 p-12 flex-col justify-center items-center relative overflow-hidden">
           {/* Background pattern */}
           <img
-            src="https://www.rophim.li/images/rophim-login.jpg"
+            src={bgFormLogin}
             alt="Background"
             className="absolute inset-0 w-full h-full object-cover"
           />
         </div>
 
         {/* Right Side - Form */}
-        <div className="w-full md:w-1/2 bg-[#1f2937] p-8 md:p-12 relative">
+        <div className="w-full md:w-1/2 bg-bgColor2 p-8 md:p-12 relative">
           {/* Close Button */}
           <button
             onClick={onClose}
@@ -213,7 +214,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                   value={mode === "login" ? formData.email : formData.username}
                   onChange={handleChange}
                   placeholder={mode === "login" ? "Email" : "Tên hiển thị"}
-                  className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                  className="w-full px-4 py-3 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
                 />
                 {mode === "login" && errors.email && (
                   <p className="mt-1 text-red-500 text-sm">{errors.email}</p>
@@ -232,7 +233,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Email"
-                    className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                    className="w-full px-4 py-3 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
                   />
                   {errors.email && <p className="mt-1 text-red-500 text-sm">{errors.email}</p>}
                 </div>
@@ -246,7 +247,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Mật khẩu"
-                  className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                  className="w-full px-4 py-3 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
                 />
                 {errors.password && <p className="mt-1 text-red-500 text-sm">{errors.password}</p>}
               </div>
@@ -260,7 +261,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="Nhập lại mật khẩu"
-                    className="w-full px-4 py-3 bg-[#2d3b52] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                    className="w-full px-4 py-3 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
                   />
                   {errors.confirmPassword && (
                     <p className="mt-1 text-red-500 text-sm">{errors.confirmPassword}</p>
