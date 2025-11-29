@@ -16,6 +16,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState({
+    password: false,
+    confirmPassword: false,
+  });
 
   // Prevent body scroll when modal is open and scroll to top
   useEffect(() => {
@@ -139,6 +143,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
       confirmPassword: "",
     });
     setErrors({});
+    setShowPassword({
+      password: false,
+      confirmPassword: false,
+    });
   };
 
   return (
@@ -240,29 +248,61 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
               )}
 
               <div>
-                <input
-                  required
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Mật khẩu"
-                  className="w-full px-4 py-3 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    required
+                    type={showPassword.password ? "text" : "password"}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Mật khẩu"
+                    className="w-full px-4 py-3 pr-10 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    onClick={() =>
+                      setShowPassword({
+                        ...showPassword,
+                        password: !showPassword.password,
+                      })
+                    }
+                  >
+                    <i className={`fas ${showPassword.password ? "fa-eye-slash" : "fa-eye"}`}></i>
+                  </button>
+                </div>
                 {errors.password && <p className="mt-1 text-red-500 text-sm">{errors.password}</p>}
               </div>
 
               {mode === "register" && (
                 <div>
-                  <input
-                    required
-                    type="password"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    placeholder="Nhập lại mật khẩu"
-                    className="w-full px-4 py-3 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
-                  />
+                  <div className="relative">
+                    <input
+                      required
+                      type={showPassword.confirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      placeholder="Nhập lại mật khẩu"
+                      className="w-full px-4 py-3 pr-10 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                      onClick={() =>
+                        setShowPassword({
+                          ...showPassword,
+                          confirmPassword: !showPassword.confirmPassword,
+                        })
+                      }
+                    >
+                      <i
+                        className={`fas ${
+                          showPassword.confirmPassword ? "fa-eye-slash" : "fa-eye"
+                        }`}
+                      ></i>
+                    </button>
+                  </div>
                   {errors.confirmPassword && (
                     <p className="mt-1 text-red-500 text-sm">{errors.confirmPassword}</p>
                   )}

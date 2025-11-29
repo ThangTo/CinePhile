@@ -33,7 +33,7 @@ const register = async (userData) => {
   const { username, email, password } = userData;
   console.log('here');
 
-  // Check if user exists (passport-local-mongoose handles username uniqueness, but we check email too)
+  // Check if user exists by email (email is unique)
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     throw new Error('User with this email already exists');
@@ -158,16 +158,6 @@ const normalizeDisplayName = (name = '') => {
     .trim();
 };
 
-const generateUniqueUsername = async (base) => {
-  let username = base;
-  let counter = 1;
-  while (await User.findOne({ username })) {
-    username = `${base}${counter}`;
-    counter += 1;
-  }
-  return username;
-};
-
 const loginWithGoogleProfile = async (profile) => {
   const email = profile?.emails?.[0]?.value?.toLowerCase();
   if (!email) {
@@ -181,8 +171,7 @@ const loginWithGoogleProfile = async (profile) => {
     // New user - assign random default avatar
     const displayName =
       normalizeDisplayName(profile.displayName) || email.split('@')[0] || `user${Date.now()}`;
-    const baseUsername = displayName.toLowerCase().replace(/\s+/g, '');
-    const username = await generateUniqueUsername(baseUsername || `user${Date.now()}`);
+    const username = displayName.toLowerCase().replace(/\s+/g, '');
     const randomAvatar = getRandomAvatar();
 
     user = new User({
@@ -246,15 +235,26 @@ const updateProfile = async (userId, updates) => {
 const changePassword = async (userId, passwords) => {
   const { oldPassword, newPassword } = passwords;
 
-  const user = await User.findById(userId);
-  if (!user) {
-    throw new Error('User not found');
+  if (!oldPassword || !newPassword) {
+    throw new Error('Mật khẩu hiện tại và mật khẩu mới là bắt buộc');
   }
 
-  // Use passport-local-mongoose changePassword method
-  await user.changePassword(oldPassword, newPassword);
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('Người dùng không tồn tại');
+  }
 
-  return { message: 'Password changed successfully' };
+  try {
+    await user.changePassword(oldPassword, newPassword);
+  } catch (error) {
+    if (error.name === 'IncorrectPasswordError' || error.message.includes('Incorrect password')) {
+      throw new Error('Mật khẩu hiện tại không chính xác');
+    }
+    // Re-throw other errors with original message
+    throw new Error(error.message || 'Không thể thay đổi mật khẩu. Vui lòng thử lại.');
+  }
+
+  return { message: 'Mật khẩu đã được thay đổi thành công' };
 };
 
 /**

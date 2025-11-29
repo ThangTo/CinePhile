@@ -121,7 +121,9 @@ const changePassword = async (req, res) => {
     const result = await authService.changePassword(req.user._id, req.body);
     res.json(result);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    // Return 400 for validation errors, 401 for authentication errors
+    const statusCode = error.message.includes('không đúng') ? 401 : 400;
+    res.status(statusCode).json({ message: error.message });
   }
 };
 
