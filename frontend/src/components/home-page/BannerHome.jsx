@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { BannerContent, BannerBackground, useBannerConfig } from "components/banner/index";
 import movieService from "services/movie.service";
-import { InlineSpinner } from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 
 /**
  * Banner Home Component - Main hero banner for homepage
@@ -75,7 +75,7 @@ const BannerHome = ({ movie }) => {
   if (loading || !currentMovie) {
     return (
       <section className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[400px] md:h-[600px] flex items-center justify-center">
-        <InlineSpinner />
+        <BarSpinner />
       </section>
     );
   }

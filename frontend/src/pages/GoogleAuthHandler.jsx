@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "contexts/AuthContext";
-import LoadingState from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 
 const GoogleAuthHandler = () => {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ const GoogleAuthHandler = () => {
     handleCallback();
   }, [location.search, navigate, getCurrentUser]);
 
-  return <LoadingState message="Đang xử lý đăng nhập Google..." />;
+  return <BarSpinner />;
 };
 
 export default GoogleAuthHandler;

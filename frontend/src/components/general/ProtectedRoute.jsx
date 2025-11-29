@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
-import LoadingState from "components/common/LoadingState";
+import BarSpinner from "components/common/LoadingState";
 
 /**
  * Protected Route Wrapper
@@ -16,7 +16,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   // Đang load thông tin user
   if (isLoading) {
-    return <LoadingState message="Đang kiểm tra quyền truy cập..." />;
+    return <BarSpinner />;
   }
 
   // Chưa đăng nhập -> redirect về trang chủ

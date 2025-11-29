@@ -1,7 +1,7 @@
 import React from "react";
 import { useParams } from "react-router-dom";
 import { MobileLayout, DesktopLayout } from "components/movie-detail/index";
-import LoadingState from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 import ErrorState from "components/common/ErrorState";
 import useMovieDetail from "hooks/useMovieDetail";
 
@@ -12,7 +12,7 @@ const MovieDetail = () => {
 
   // Loading state
   if (loading) {
-    return <LoadingState />;
+    return <BarSpinner />;
   }
 
   // Error state

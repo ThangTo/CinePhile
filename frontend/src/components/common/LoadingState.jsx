@@ -10,11 +10,23 @@ const LoadingState = ({
   className = "min-h-screen bg-account-bg-primary text-account-text-primary",
 }) => {
   return (
-    <div className={`${className} flex items-center justify-center`}>
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-account-bg-tertiary border-t-account-accent rounded-full animate-spin mx-auto mb-4" />
-        <div className="text-xl">{message}</div>
+    <div className={`flex flex-col items-center justify-center gap-3 ${className}`}>
+      <div className="flex items-center justify-center gap-1.5 h-8">
+        <div className="w-1.5 h-6 bg-account-accent rounded-full animate-bounce" />
+
+        <div
+          className="w-1.5 h-8 bg-account-accent rounded-full animate-bounce"
+          style={{ animationDelay: "-0.2s" }}
+        />
+
+        <div
+          className="w-1.5 h-6 bg-account-accent rounded-full animate-bounce"
+          style={{ animationDelay: "-0.4s" }}
+        />
       </div>
+
+      {/* Message */}
+      {/* {message && <span className="text-sm text-account-text-primary font-medium">{message}</span>} */}
     </div>
   );
 };
@@ -32,6 +44,29 @@ export const InlineSpinner = ({ message = "Đang tải...", className = "" }) =>
         <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-account-bg-tertiary border-t-account-accent" />
         {message && <span className="text-sm">{message}</span>}
       </div>
+    </div>
+  );
+};
+
+export const BarSpinner = ({ message = "Đang xử lý...", className = "" }) => {
+  return (
+    <div className={`flex flex-col items-center justify-center gap-3 ${className}`}>
+      <div className="flex items-center justify-center gap-1.5 h-8">
+        <div className="w-1.5 h-6 bg-account-accent rounded-full animate-bounce" />
+
+        <div
+          className="w-1.5 h-8 bg-account-accent rounded-full animate-bounce"
+          style={{ animationDelay: "-0.2s" }}
+        />
+
+        <div
+          className="w-1.5 h-6 bg-account-accent rounded-full animate-bounce"
+          style={{ animationDelay: "-0.4s" }}
+        />
+      </div>
+
+      {/* Message */}
+      {/* {message && <span className="text-sm text-account-text-primary font-medium">{message}</span>} */}
     </div>
   );
 };

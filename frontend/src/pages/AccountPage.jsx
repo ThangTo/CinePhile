@@ -6,7 +6,7 @@ import AccountInfoCard from "components/account/AccountInfoCard";
 import SecurityCard from "components/account/SecurityCard";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
-import LoadingState from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 import ContinueWatchingSection from "components/account/ContinueWatchingSection";
 
 const DEFAULT_TAB = "profile";
@@ -61,7 +61,7 @@ const AccountPage = () => {
   };
 
   if (isLoading || !user) {
-    return <LoadingState />;
+    return <BarSpinner />;
   }
 
   const isContinueWatchingPage = activeTab === "continue-watching";

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { userAPI } from "services/admin.service";
 import UserFormModal from "./UserFormModal";
-import { InlineSpinner } from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 
 const UserTable = () => {
   const [users, setUsers] = useState([]);
@@ -96,7 +96,7 @@ const UserTable = () => {
   return (
     <div className="bg-gray-800 rounded-xl border border-white/10 overflow-hidden">
       {/* Loading state */}
-      {isLoading && users.length === 0 && <InlineSpinner className="p-6" />}
+      {isLoading && users.length === 0 && <BarSpinner className="p-6" />}
 
       {/* Header */}
       <div className="p-6 border-b border-white/10 flex items-center justify-between">

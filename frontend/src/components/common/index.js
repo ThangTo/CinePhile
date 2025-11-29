@@ -1,5 +1,5 @@
 // State Components
-export { default as LoadingState } from "./LoadingState";
+export { default as BarSpinner } from "./BarSpinner";
 export { default as ErrorState } from "./ErrorState";
 
 // Container Components

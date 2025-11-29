@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "hooks/useAuth";
 import userService from "services/user.service";
-import { InlineSpinner } from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 import {
   CONTINUE_WATCHING_MOCK,
   ENABLE_CONTINUE_WATCHING_MOCK,
@@ -90,7 +90,7 @@ const ContinueWatching = () => {
             <h2 className="text-xl sm:text-2xl font-bold text-white">Xem tiếp của bạn</h2>
           </div>
         </div>
-        <InlineSpinner className="py-4" />
+        <BarSpinner className="py-4" />
       </section>
     );
   }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import userService from "services/user.service";
-import { InlineSpinner } from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 import {
   CONTINUE_WATCHING_MOCK,
   ENABLE_CONTINUE_WATCHING_MOCK,
@@ -64,7 +64,7 @@ const ContinueWatchingSection = ({ user }) => {
   if (loading) {
     return (
       <div className="bg-account-bg-secondary rounded-2xl p-6 shadow-sm">
-        <InlineSpinner />
+        <BarSpinner />
       </div>
     );
   }

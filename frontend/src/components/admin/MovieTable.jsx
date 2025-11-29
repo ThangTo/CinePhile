@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { movieAPI } from "services/admin.service";
 import MovieFormModal from "./MovieFormModal";
-import { InlineSpinner } from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 
 const MovieTable = () => {
   const [movies, setMovies] = useState([]);
@@ -85,7 +85,7 @@ const MovieTable = () => {
   return (
     <div className="bg-gray-800 rounded-xl border border-white/10 overflow-hidden">
       {/* Loading state */}
-      {isLoading && movies.length === 0 && <InlineSpinner className="p-6" />}
+      {isLoading && movies.length === 0 && <BarSpinner className="p-6" />}
 
       {/* Header with search */}
       <div className="p-6 border-b border-white/10 flex items-center justify-between">

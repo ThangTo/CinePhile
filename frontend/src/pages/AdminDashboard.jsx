@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import StatCard from "components/admin/StatCard";
-import { InlineSpinner } from "components/common/LoadingState";
+import { BarSpinner } from "components/common/LoadingState";
 import MovieTable from "components/admin/MovieTable";
 import UserTable from "components/admin/UserTable";
 import AdminSidebar from "components/admin/AdminSidebar";
@@ -42,7 +42,7 @@ const AdminDashboard = () => {
   const renderContent = () => {
     // Show loading state for overview
     if (activeTab === "overview" && (isLoadingStats || !stats)) {
-      return <InlineSpinner className="min-h-[400px]" message="Đang tải thống kê..." />;
+      return <BarSpinner className="min-h-[400px]" />;
     }
 
     switch (activeTab) {

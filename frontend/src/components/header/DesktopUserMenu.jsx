@@ -19,6 +19,19 @@ const PremiumBanner = ({ username }) => (
   </div>
 );
 
+const UserStats = ({ coins }) => (
+  <div className="flex items-center gap-4 mt-3 text-sm">
+    <div className="flex items-center gap-2">
+      <i className="fa-solid fa-bookmark text-gray-400" />
+      <span className="text-white font-semibold">{coins}</span>
+      <i className="fa-solid fa-coins text-yellow-400" />
+    </div>
+    <button className="ml-auto bg-white/5 hover:bg-white/10 text-gray-200 px-3 py-1 rounded-md text-xs transition-colors">
+      + Nạp
+    </button>
+  </div>
+);
+
 const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) => {
   return (
     <div className="hidden sm:hidden md:hidden lg:flex items-center gap-3 relative" ref={menuRef}>
@@ -63,6 +76,7 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
               </div>
 
               <PremiumBanner username={user.username} />
+              <UserStats coins={user.coins} />
             </div>
 
             {/* Menu Items */}
