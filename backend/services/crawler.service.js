@@ -1,7 +1,8 @@
 const axios = require("axios");
-const MovieModel = require("../models/movie.model"); // Đường dẫn tới file model ở Bước 1
+const he = require("he"); // Import thư viện chuẩn hoá HTML Entities
+const MovieModel = require("../models/movie.model");
+const EpisodeModel = require("../models/episode.model"); 
 
-// Cấu hình đường dẫn gốc
 const API_BASE_URL = "https://phimapi.com";
 
 /**
@@ -22,106 +23,141 @@ const crawlMovies = async (page = 1) => {
     for (const movieItem of moviesList) {
       const slug = movieItem.slug;
 
-      // Kiểm tra xem phim này đã có trong DB chưa (để tránh gọi API chi tiết thừa thãi)
-      // (Tùy chọn: Bạn có thể bỏ qua bước check này nếu muốn luôn cập nhật tập mới nhất)
-      
-      // 3. Gọi API chi tiết để lấy link m3u8 và thông tin đầy đủ
-      // Lưu ý: Phải dùng try-catch trong vòng lặp để 1 phim lỗi không làm chết cả tiến trình
       try {
+        // --- Gọi API chi tiết ---
         const detailResponse = await axios.get(`${API_BASE_URL}/phim/${slug}`);
         const movieData = detailResponse.data.movie;
         const episodesData = detailResponse.data.episodes;
 
-        // 4. Chuẩn bị dữ liệu để lưu vào DB (Mapping Data)
-        // Ta phải map dữ liệu từ API sang đúng cấu trúc Model của ta
-        const payload = {
-          name: movieData.name,
+        // --- XỬ LÝ DỮ LIỆU ---
+
+        // A. Xử lý Categories & Actors
+        const categories = movieData.category ? movieData.category.map(c => ({ name: c.name, slug: c.slug })) : [];
+        const actors = movieData.actor ? movieData.actor : [];
+        const directors = movieData.director ? movieData.director : [];
+
+        // B. Logic Random Age (Thêm mới)
+        const ageGroups = ['T12', 'T16', '18+'];
+        const randomAge = ageGroups[Math.floor(Math.random() * ageGroups.length)];
+
+        // C. Mapping dữ liệu (Có dùng he.decode và thêm age_rating)
+        const moviePayload = {
+          // Dùng he.decode để sửa lỗi font chữ (vd: &amp; -> &)
+          name: he.decode(movieData.name || ""), 
           slug: movieData.slug,
-          origin_name: movieData.origin_name,
-          content: movieData.content,
+          original_name: he.decode(movieData.origin_name || ""), 
+          content: he.decode(movieData.content || ""), 
+          
           type: movieData.type,
           status: movieData.status,
           thumb_url: movieData.thumb_url,
           poster_url: movieData.poster_url,
+          trailer_url: movieData.trailer_url,
           time: movieData.time,
           year: movieData.year,
-          episodes: episodesData.map(server => ({
-            server_name: server.server_name,
-            items: server.server_data.map(ep => ({
-              name: ep.name,
-              slug: ep.slug,
-              embed: ep.link_embed,
-              m3u8: ep.link_m3u8, // Đây là cái ta cần nhất
-            })),
-          })),
+          lang: movieData.lang,
+          quality: movieData.quality,
+          
+          // Các field thống kê tập phim
+          currentEpisode: movieData.episode_current,
+          totalEpisodes: movieData.episode_total,
+          
+          // Mảng dữ liệu phụ
+          categories: categories,
+          actor: actors,
+          director: directors,
+          
+          // ID gốc và Age Rating mới thêm
+          source_id: movieData._id,
+          age_rating: randomAge, // <--- Đã thêm vào đây
         };
 
-        // 5. Lưu vào DB (Dùng upsert: Nếu có rồi thì update, chưa có thì tạo mới)
-        await MovieModel.findOneAndUpdate(
-          { slug: slug }, // Tìm theo slug
-          payload,        // Dữ liệu update
-          { upsert: true, new: true } // Tùy chọn tạo mới nếu không tìm thấy
+        // 3. LƯU MOVIE (Upsert)
+        const savedMovie = await MovieModel.findOneAndUpdate(
+          { slug: slug },
+          moviePayload,
+          { upsert: true, new: true } 
         );
 
-        console.log(`✅ Đã cập nhật: ${movieData.name}`);
+        // 4. LƯU EPISODES (Vào collection riêng)
+        if (episodesData && episodesData.length > 0) {
+            for (const server of episodesData) {
+                const serverData = server.server_data; 
+
+                for (const ep of serverData) {
+                    const episodePayload = {
+                        movieId: savedMovie._id, // Link với Movie ID vừa lưu
+                        episodeId: extractEpisodeNumber(ep.name),
+                        slug: ep.slug,
+                        link_embed: ep.link_embed,
+                        link_m3u8: ep.link_m3u8,
+                        duration: 0, 
+                    };
+
+                    // Upsert Episode: Tránh trùng lặp tập phim
+                    await EpisodeModel.findOneAndUpdate(
+                        { movieId: savedMovie._id, slug: ep.slug },
+                        episodePayload,
+                        { upsert: true }
+                    );
+                }
+            }
+        }
+
+        console.log(`✅ [${randomAge}] Đã cập nhật: ${moviePayload.name}`);
         count++;
 
       } catch (err) {
-        console.error(`❌ Lỗi khi lấy chi tiết phim ${slug}:`, err.message);
+        console.error(`❌ Lỗi phim ${slug}:`, err.message);
       }
     }
 
-    return {
-      status: "success",
-      message: `Đã quét xong trang ${page}`,
-      movies_count: count,
-    };
+    // Trả về movies_count để khớp với hàm runPageRange
+    return { status: "success", movies_count: count };
 
   } catch (error) {
     console.error("❌ Lỗi Crawl System:", error.message);
-    throw error; // Ném lỗi ra để Controller bắt
+    throw error;
   }
 };
 
+/**
+ * Hàm phụ trợ: Lấy số tập từ chuỗi (vd: "Tập 1" -> 1)
+ */
+const extractEpisodeNumber = (name) => {
+    const match = name.match(/\d+/);
+    return match ? parseInt(match[0]) : 0; 
+};
 
 /**
- * HÀM MỚI: Quản lý vòng lặp crawl từ trang startPage đến endPage.
- * @param {number} startPage - Trang bắt đầu
- * @param {number} endPage - Trang kết thúc
+ * Quản lý vòng lặp crawl nhiều trang
  */
 const runPageRange = async (startPage, endPage) => {
     let totalMovies = 0;
-    // Thêm biến tổng tập phim nếu bạn sửa crawlMovies để trả về episode count
-    // let totalEpisodes = 0; 
 
     for (let page = startPage; page <= endPage; page++) {
         try {
-            console.log(`\n\n================================`);
-            console.log(`➡️ BẮT ĐẦU XỬ LÝ PHẠM VI TRANG ${page} / ${endPage}`);
+            console.log(`\n================================`);
+            console.log(`➡️ ĐANG XỬ LÝ TRANG ${page} / ${endPage}`);
             console.log(`================================`);
             
-            // Gọi hàm crawlMovies để xử lý 1 trang
             const result = await crawlMovies(page); 
             
-            // CỘNG DỒN KẾT QUẢ TỪ TỪNG TRANG
+            // Cộng dồn kết quả
             totalMovies += result.movies_count || 0;
-            // totalEpisodes += result.episodes_count || 0;
             
-            // Tùy chọn: Đợi một chút để tránh quá tải API
+            // Nghỉ 1 chút (0.5s) để tránh spam API
             await new Promise(resolve => setTimeout(resolve, 500)); 
 
         } catch (error) {
-            console.error(`❌ Lỗi nghiêm trọng khi crawl trang ${page}. Tiêp tục trang kế:`, error.message);
-            // Tiếp tục vòng lặp sang trang kế tiếp dù có lỗi
+            console.error(`❌ Lỗi trang ${page}, bỏ qua sang trang kế.`);
         }
     }
 
-    // TRẢ VỀ KẾT QUẢ TỔNG HỢP VÀ THÔNG BÁO CHÍNH XÁC
     return {
         status: "success",
         message: `✅ Hoàn thành quét từ trang ${startPage} đến ${endPage}.`,
         movies_count: totalMovies,
-        // episodes_count: totalEpisodes,
     };
 };
 

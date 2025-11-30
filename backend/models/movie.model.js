@@ -1,60 +1,64 @@
 const mongoose = require('mongoose');
 
-// Định nghĩa Schema lồng nhau cho categories
-// Thuộc tính này được nhúng (embedded) trong movieSchema
-const categorySchema = new mongoose.Schema(
-  {
-    name: {
-      type: String, // Ví dụ: "Hành Động"
-    },
-    slug: {
-      type: String, // Ví dụ: "hanh-dong" -> dùng để filter/link
-    },
-  },
-  { _id: false },
-); // Tắt _id cho subdocument category
+const categorySchema = new mongoose.Schema({
+    name: String, 
+    slug: String  
+}, { _id: false });
 
-// Định nghĩa Movie Schema
-const movieSchema = new mongoose.Schema(
-  {
-    // --- CÁC TRƯỜNG CƠ BẢN ---
-    title: { type: String, required: true, index: true },
-    englishTitle: { type: String, index: true },
-    description: String,
-    poster: String,
-    backgroundImage: String,
-    type: { type: String, enum: ['movie', 'series'], default: 'movie' },
+const movieSchema = new mongoose.Schema({
+    // --- ĐỊNH DANH ---
+    source_id: { type: String, index: true }, 
+    slug: { type: String, unique: true, required: true, index: true },
+
+    // --- TÊN PHIM ---
+    name: { type: String, required: true, index: true },         
+    original_name: { type: String, index: true },                
+
+    // --- NỘI DUNG & MEDIA ---
+    content: { type: String },                                   
+    poster_url: { type: String },                                
+    thumb_url: { type: String },                                 
+    trailer_url: { type: String },                               
+
+    // --- THÔNG TIN CHI TIẾT ---
+    time: { type: String },                                      
     year: { type: Number, index: true },
-    duration: String,
-    quality: String,
-    country: { type: String, index: true },
-    genres: [{ type: String, index: true }],
-
-    slug: { type: String, unique: true, index: true },
-
-    // --- THỐNG KÊ & TRẠNG THÁI ---
-    viewCount: { type: Number, default: 0 },
+    lang: { type: String },                                      
+    quality: { type: String, default: 'HD' },                    
+    type: { type: String, enum: ['movie', 'tv', 'series'], index: true }, 
     status: { type: String, enum: ['upcoming', 'ongoing', 'completed'], default: 'ongoing' },
 
-    // Series info
-    currentEpisode: String,
 
-    isNewRelease: { type: Boolean, default: false, index: true },
+    age_rating: { 
+        type: String, 
+        enum: ['T12', 'T16', '18+'], 
+        default: 'T12',
+        index: true    
+    },
+    // --- ĐỘI NGŨ & PHÂN LOẠI ---
+    actor: [{ type: String }],                                   
+    director: [{ type: String }],                                
+    categories: [categorySchema],                                
 
-    // --- RATING SYSTEM (Computed Pattern) ---
-    rating: { type: Number, default: 0, index: true },
+    // --- SERIES INFO ---
+    season: { type: Number, default: 0 }, // Thêm field này theo Schema
+    currentEpisode: { type: String },                            
+    totalEpisodes: { type: Number, default: 0 },                 
+
+    // --- THỐNG KÊ ---
+    viewCount: { type: Number, default: 0 },
+    commentCount: { type: Number, default: 0 }, // Thêm field này theo Schema
+    imdb: { type: Number, default: 0 },         // Thêm field này theo Schema
+    rating: { type: Number, default: 0 },
     totalRatings: { type: Number, default: 0 },
-  },
-  { timestamps: true },
-);
+    
+    isNewRelease: { type: Boolean, default: false },             
+}, { 
+    timestamps: true 
+});
 
-// Index text search
-movieSchema.index({ title: 'text', englishTitle: 'text' });
+movieSchema.index({ name: 'text', original_name: 'text' });
+movieSchema.index({ "categories.slug": 1 });
 
-// Thêm index cho mảng categories để tìm kiếm/lọc hiệu quả.
-movieSchema.index({ categories: 1 });
-
-// Tạo Model
 const Movie = mongoose.model('Movie', movieSchema);
-
 module.exports = Movie;
