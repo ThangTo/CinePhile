@@ -5,6 +5,12 @@ const categorySchema = new mongoose.Schema({
     slug: String  
 }, { _id: false });
 
+// Schema phụ cho Category và Country (cấu trúc giống nhau)
+const subDataSchema = new mongoose.Schema({
+    name: String, 
+    slug: String  
+}, { _id: false });
+
 const movieSchema = new mongoose.Schema({
     // --- ĐỊNH DANH ---
     source_id: { type: String, index: true }, 
@@ -40,6 +46,7 @@ const movieSchema = new mongoose.Schema({
     director: [{ type: String }],                                
     categories: [categorySchema],                                
 
+    country: [subDataSchema],
     // --- SERIES INFO ---
     season: { type: Number, default: 0 }, // Thêm field này theo Schema
     currentEpisode: { type: String },                            

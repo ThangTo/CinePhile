@@ -33,6 +33,7 @@ const crawlMovies = async (page = 1) => {
 
         // A. Xử lý Categories & Actors
         const categories = movieData.category ? movieData.category.map(c => ({ name: c.name, slug: c.slug })) : [];
+        const countries = movieData.country ? movieData.country.map(c => ({ name: c.name, slug: c.slug })) : [];
         const actors = movieData.actor ? movieData.actor : [];
         const directors = movieData.director ? movieData.director : [];
 
@@ -64,6 +65,7 @@ const crawlMovies = async (page = 1) => {
           
           // Mảng dữ liệu phụ
           categories: categories,
+          country: countries,
           actor: actors,
           director: directors,
           
