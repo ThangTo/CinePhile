@@ -7,6 +7,8 @@ const CommentsList = ({
   onDislike,
   onReply,
   onMore,
+  onDelete,
+  currentUserId,
   showAll,
   onShowMore,
   hasMore,
@@ -22,6 +24,8 @@ const CommentsList = ({
           onDislike={onDislike}
           onReply={onReply}
           onMore={onMore}
+          onDelete={onDelete}
+          currentUserId={currentUserId}
         />
       ))}
 
