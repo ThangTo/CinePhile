@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { DESKTOP_MENU_ITEMS, DESKTOP_MENU_ITEM_CLASS } from "./constants";
+import { useNotifications } from "contexts/NotificationContext";
+import NotificationPanel from "components/notifications/NotificationPanel";
 
 const PremiumBanner = ({ username }) => (
   <div className="bg-gradient-to-r from-primaryColor/20 to-hoverPrimaryColor/20 border border-primaryColor/30 rounded-lg p-2.5">
@@ -33,12 +35,35 @@ const UserStats = ({ coins }) => (
 );
 
 const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) => {
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { unreadCount } = useNotifications();
+  const bellButtonRef = React.useRef(null);
+
   return (
     <div className="hidden sm:hidden md:hidden lg:flex items-center gap-3 relative" ref={menuRef}>
       {/* Notification Bell */}
-      <button className="relative p-2 text-gray-300 hover:text-white transition-colors">
-        <i className="fa-solid fa-bell text-xl" />
-      </button>
+      <div className="relative">
+        <button
+          ref={bellButtonRef}
+          onClick={() => {
+            setShowNotifications(!showNotifications);
+          }}
+          className="relative p-2 text-gray-300 hover:text-white transition-colors"
+        >
+          <i className="fa-solid fa-bell text-xl" />
+          {unreadCount > 0 && (
+            <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+        {showNotifications && (
+          <NotificationPanel
+            onClose={() => setShowNotifications(false)}
+            triggerRef={bellButtonRef}
+          />
+        )}
+      </div>
 
       {/* User Avatar and Dropdown */}
       <div className="relative">

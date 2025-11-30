@@ -4,6 +4,8 @@ import AccountSidebar from "components/account/AccountSidebar";
 import ProfileCard from "components/account/ProfileCard";
 import AccountInfoCard from "components/account/AccountInfoCard";
 import SecurityCard from "components/account/SecurityCard";
+import NotificationsTab from "components/notifications/NotificationsTab";
+import { useNotifications } from "contexts/NotificationContext";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
 import { BarSpinner } from "components/common/LoadingState";
@@ -23,6 +25,7 @@ const AccountPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isLoading, updateUser, logout } = useAuth();
+  const { setActiveNotificationId } = useNotifications();
   const searchParams = new URLSearchParams(location.search);
   const queryTab = searchParams.get("tabs");
   const activeTab = queryTab || DEFAULT_TAB;
@@ -40,6 +43,13 @@ const AccountPage = () => {
       navigate(`/account?tabs=${DEFAULT_TAB}`, { replace: true });
     }
   }, [location.pathname, queryTab, navigate]);
+
+  // Clear active notification when leaving notifications tab
+  useEffect(() => {
+    if (activeTab !== "notifications") {
+      setActiveNotificationId(null);
+    }
+  }, [activeTab, setActiveNotificationId]);
 
   const handleLogout = async () => {
     await logout();
@@ -69,6 +79,10 @@ const AccountPage = () => {
   const renderMainContent = () => {
     if (isContinueWatchingPage) {
       return <ContinueWatchingSection user={user} />;
+    }
+
+    if (activeTab === "notifications") {
+      return <NotificationsTab />;
     }
 
     return (

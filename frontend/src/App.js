@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "contexts/AuthContext";
+import { NotificationProvider } from "contexts/NotificationContext";
 import HomePage from "./pages/HomePage";
 import MovieDetail from "./pages/MovieDetail";
 import WatchPage from "./pages/WatchPage";
@@ -16,29 +17,31 @@ import GoogleAuthHandler from "pages/GoogleAuthHandler";
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/auth/google/callback" element={<GoogleAuthHandler />} />
-          {/* All routes use MainLayout (includes Header and Footer) */}
-          <Route path="/" element={<MainLayout />}>
-            <Route index element={<HomePage />} />
-            <Route path="/genre/:slug" element={<GenrePage />} />
-            <Route path="/movie/:id" element={<MovieDetail />} />
-            <Route path="/country/:slug" element={<CountryPage />} />
-            <Route path="/watch/:id" element={<WatchPage />} />
-            <Route path="/account" element={<AccountPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Router>
+      <NotificationProvider>
+        <Router>
+          <Routes>
+            <Route path="/auth/google/callback" element={<GoogleAuthHandler />} />
+            {/* All routes use MainLayout (includes Header and Footer) */}
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<HomePage />} />
+              <Route path="/genre/:slug" element={<GenrePage />} />
+              <Route path="/movie/:id" element={<MovieDetail />} />
+              <Route path="/country/:slug" element={<CountryPage />} />
+              <Route path="/watch/:id" element={<WatchPage />} />
+              <Route path="/account" element={<AccountPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Router>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

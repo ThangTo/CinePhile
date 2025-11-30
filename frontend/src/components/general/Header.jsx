@@ -6,6 +6,8 @@ import {
   NavigationLinks,
   SearchBar,
 } from "components/header/index";
+import { useNotifications } from "contexts/NotificationContext";
+import NotificationPanel from "components/notifications/NotificationPanel";
 import useAuth from "hooks/useAuth";
 
 const Header = () => {
@@ -13,10 +15,13 @@ const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [showMobileNotifications, setShowMobileNotifications] = useState(false);
   const menuRef = useRef(null);
+  const mobileBellButtonRef = useRef(null);
   const navigate = useNavigate();
   const { user, isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, logout } =
     useAuth();
+  const { unreadCount } = useNotifications();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -81,12 +86,33 @@ const Header = () => {
           {/* Right: Search + actions */}
           <div className="ml-auto flex items-center gap-3">
             {user ? (
-              <button
-                className="lg:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                aria-label="Notifications"
-              >
-                <i className="fa-solid fa-bell text-xl" />
-              </button>
+              <div className="lg:hidden relative">
+                <button
+                  ref={mobileBellButtonRef}
+                  onClick={() => {
+                    setShowMobileNotifications(!showMobileNotifications);
+                    setShowMobileMenu(false);
+                    setShowMobileSearch(false);
+                  }}
+                  className="relative p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
+                  aria-label="Notifications"
+                >
+                  <i className="fa-solid fa-bell text-xl" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showMobileNotifications && (
+                  <div className="absolute right-0 top-full mt-2 z-50">
+                    <NotificationPanel
+                      onClose={() => setShowMobileNotifications(false)}
+                      triggerRef={mobileBellButtonRef}
+                    />
+                  </div>
+                )}
+              </div>
             ) : null}
             {/* Mobile Search Button */}
             <button
