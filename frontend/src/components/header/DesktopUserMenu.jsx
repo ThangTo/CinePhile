@@ -86,7 +86,7 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
                 <Link
                   to="/admin"
                   onClick={onToggle}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-y border-purple-500/20 text-purple-300 hover:bg-purple-500/20 transition-colors"
+                  className="w-full flex items-center mt-[-4px] gap-3 px-4 py-2.5 bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-y border-purple-500/20 text-purple-300 hover:bg-purple-500/20 transition-colors"
                 >
                   <i className="fa-solid fa-shield-halved w-5 text-center" />
                   <span className="font-semibold">Admin Panel</span>

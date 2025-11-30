@@ -78,21 +78,21 @@ const AdminDashboard = () => {
                 title="Online"
                 value={stats.activeUsers}
                 icon="fa-circle"
-                color="yellow"
+                color="green"
                 trend={stats.trends.activeUsers}
               />
             </div>
 
             {/* Charts placeholder */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-gray-800 rounded-xl p-6 border border-white/10">
+              <div className="bg-bgColor3 rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4">Lượt Xem Theo Tuần</h3>
                 <div className="h-64 flex items-center justify-center text-gray-500">
                   <i className="fa-solid fa-chart-line text-4xl"></i>
                   <span className="ml-4">Biểu đồ sẽ hiển thị ở đây</span>
                 </div>
               </div>
-              <div className="bg-gray-800 rounded-xl p-6 border border-white/10">
+              <div className="bg-bgColor3 rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4">Thể Loại Phổ Biến</h3>
                 <div className="h-64 flex items-center justify-center text-gray-500">
                   <i className="fa-solid fa-chart-pie text-4xl"></i>
@@ -147,7 +147,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? "ml-64" : "ml-20"}`}>
         {/* Top Bar */}
-        <div className="bg-gray-800 border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+        <div className="bg-bgColor4 border-b border-white/10 px-6 py-4 h-16 flex items-center justify-between sticky top-0 z-10">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="text-white hover:text-primaryColor transition-colors"
@@ -161,12 +161,6 @@ const AdminDashboard = () => {
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                 3
               </span>
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              className="text-white hover:text-primaryColor transition-colors"
-            >
-              <i className="fa-solid fa-home text-xl"></i>
             </button>
           </div>
         </div>

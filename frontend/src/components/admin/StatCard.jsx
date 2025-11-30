@@ -13,7 +13,7 @@ const StatCard = ({ title, value, icon, color = "blue", trend }) => {
   const isPositive = trend?.startsWith("+");
 
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-white/10 hover:border-primaryColor/50 transition-all">
+    <div className="bg-bgColor3 rounded-xl p-6 border border-white/10 hover:border-primaryColor/50 transition-all">
       <div className="flex items-center justify-between mb-4">
         <div
           className={`w-12 h-12 rounded-lg bg-gradient-to-br ${COLOR_GRADIENTS[color]} flex items-center justify-center`}

@@ -27,16 +27,16 @@ function App() {
             <Route path="/country/:slug" element={<CountryPage />} />
             <Route path="/watch/:id" element={<WatchPage />} />
             <Route path="/account" element={<AccountPage />} />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </Router>
     </AuthProvider>

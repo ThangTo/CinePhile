@@ -83,7 +83,7 @@ const MovieTable = () => {
   };
 
   return (
-    <div className="bg-gray-800 rounded-xl border border-white/10 overflow-hidden">
+    <div className="bg-bgColor3 rounded-xl border border-white/10 overflow-hidden">
       {/* Loading state */}
       {isLoading && movies.length === 0 && <BarSpinner className="p-6" />}
 
@@ -96,7 +96,7 @@ const MovieTable = () => {
             placeholder="Tìm kiếm phim..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-gray-900 border border-white/10 rounded-lg pl-12 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
+            className="w-full bg-bgColor border border-white/10 rounded-lg pl-12 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
           />
         </div>
         <button
@@ -111,7 +111,7 @@ const MovieTable = () => {
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-900 border-b border-white/10">
+          <thead className="bg-bgColor  border-b border-white/10">
             <tr>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
                 ID
