@@ -44,15 +44,19 @@ const mapEpisode = (episode) => ({
 /**
  * Helper: shape comment
  */
-const mapComment = (comment) => ({
-  id: comment._id.toString(),
-  user: comment.userId?.username || 'Ẩn danh',
-  avatar: comment.userId?.avatar || 'https://i.pravatar.cc/150?img=5',
-  content: comment.content,
-  episode: comment.episodeId,
-  likes: comment.likes,
-  createdAt: comment.createdAt,
-});
+const mapComment = (comment) => {
+  return {
+    id: comment._id?.toString() || comment.id,
+    userId: comment.userId?._id?.toString() || comment.userId?.toString() || comment.userId,
+    user: comment.userId?.username || 'Ẩn danh',
+    avatar: comment.userId?.avatar || 'https://i.pravatar.cc/150?img=5',
+    content: comment.content,
+    episode: comment.episodeId,
+    likes: comment.likes || 0,
+    dislikes: comment.dislikes || 0,
+    createdAt: comment.createdAt,
+  };
+};
 
 /**
  * Helper: build Mongo filters from query params
@@ -264,6 +268,40 @@ const postComment = async (identifier, userId, data = {}) => {
 };
 
 /**
+ * Delete a comment (requires auth)
+ * Only the comment owner can delete their own comment
+ */
+const deleteComment = async (commentId, userId) => {
+  if (!userId) {
+    throw new Error('Authentication required');
+  }
+  
+  if (!mongoose.Types.ObjectId.isValid(commentId)) {
+    throw new Error('Invalid comment ID');
+  }
+
+  const comment = await Comment.findById(commentId);
+  if (!comment) {
+    throw new Error('Comment not found');
+  }
+
+  // Check if user is the owner of the comment
+  const userIdStr = userId.toString();
+  const commentUserIdStr = comment.userId.toString();
+  
+  if (userIdStr !== commentUserIdStr) {
+    throw new Error('You can only delete your own comments');
+  }
+
+  await Comment.findByIdAndDelete(commentId);
+  
+  return {
+    message: 'Comment deleted successfully',
+    commentId: commentId
+  };
+};
+
+/**
  * Rate movie (requires auth)
  */
 const rateMovie = async (identifier, userId, rating) => {
@@ -306,6 +344,117 @@ const rateMovie = async (identifier, userId, rating) => {
   };
 };
 
+/**
+ * Like a comment (requires auth)
+ * Logic đơn giản: chỉ tăng/giảm số like
+ * Frontend sẽ quản lý trạng thái active (isLiked/isDisliked) bằng localStorage
+ */
+const likeComment = async (commentId, userId, isCurrentlyLiked = false, isCurrentlyDisliked = false) => {
+  if (!userId) {
+    throw new Error('Authentication required');
+  }
+  
+  if (!mongoose.Types.ObjectId.isValid(commentId)) {
+    throw new Error('Invalid comment ID');
+  }
+
+  const comment = await Comment.findById(commentId);
+  if (!comment) {
+    throw new Error('Comment not found');
+  }
+
+  let result;
+  
+  if (isCurrentlyLiked) {
+    // User đã like -> bỏ like (toggle off) -> giảm số like
+    await Comment.findByIdAndUpdate(commentId, {
+      $inc: { likes: -1 }
+    });
+    const updatedComment = await Comment.findById(commentId);
+    result = {
+      message: 'Đã bỏ like',
+      likes: Math.max(0, updatedComment.likes),
+      dislikes: updatedComment.dislikes
+    };
+  } else {
+    // User chưa like -> thêm like -> tăng số like
+    // Nếu đang dislike, cần giảm dislike và tăng like
+    if (isCurrentlyDisliked) {
+      await Comment.findByIdAndUpdate(commentId, {
+        $inc: { likes: 1, dislikes: -1 }
+      });
+    } else {
+      await Comment.findByIdAndUpdate(commentId, {
+        $inc: { likes: 1 }
+      });
+    }
+    const updatedComment = await Comment.findById(commentId);
+    result = {
+      message: 'Đã like comment',
+      likes: updatedComment.likes,
+      dislikes: Math.max(0, updatedComment.dislikes)
+    };
+  }
+  console.log(result);
+
+  return result;
+};
+
+/**
+ * Dislike a comment (requires auth)
+ * Logic đơn giản: chỉ tăng/giảm số dislike
+ * Frontend sẽ quản lý trạng thái active (isLiked/isDisliked) bằng localStorage
+ */
+const dislikeComment = async (commentId, userId, isCurrentlyDisliked = false, isCurrentlyLiked = false) => {
+  if (!userId) {
+    throw new Error('Authentication required');
+  }
+  
+  if (!mongoose.Types.ObjectId.isValid(commentId)) {
+    throw new Error('Invalid comment ID');
+  }
+
+  const comment = await Comment.findById(commentId);
+  if (!comment) {
+    throw new Error('Comment not found');
+  }
+
+  let result;
+  
+  if (isCurrentlyDisliked) {
+    // User đã dislike -> bỏ dislike (toggle off) -> giảm số dislike
+    await Comment.findByIdAndUpdate(commentId, {
+      $inc: { dislikes: -1 }
+    });
+    const updatedComment = await Comment.findById(commentId);
+    result = {
+      message: 'Đã bỏ dislike',
+      likes: updatedComment.likes,
+      dislikes: Math.max(0, updatedComment.dislikes)
+    };
+  } else {
+    // User chưa dislike -> thêm dislike -> tăng số dislike
+    // Nếu đang like, cần giảm like và tăng dislike
+    if (isCurrentlyLiked) {
+      await Comment.findByIdAndUpdate(commentId, {
+        $inc: { likes: -1, dislikes: 1 }
+      });
+    } else {
+      await Comment.findByIdAndUpdate(commentId, {
+        $inc: { dislikes: 1 }
+      });
+    }
+    const updatedComment = await Comment.findById(commentId);
+    result = {
+      message: 'Đã dislike comment',
+      likes: Math.max(0, updatedComment.likes),
+      dislikes: updatedComment.dislikes
+    };
+  }
+
+  return result;
+};
+
 module.exports = {
   getAll,
   getById,
@@ -319,4 +468,7 @@ module.exports = {
   getComments,
   postComment,
   rateMovie,
+  likeComment,
+  dislikeComment,
+  deleteComment,
 };

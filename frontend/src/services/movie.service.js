@@ -81,9 +81,11 @@ const movieService = {
    * Lấy comments của movie
    * @param {string|number} id - Movie ID
    * @param {Object} params - { page?, limit?, sort? }
+   * @param {boolean} requiresAuth - Gửi token nếu user đã đăng nhập (optional)
    * @returns {Promise<Object>} { data: [], pagination: {} }
    */
-  getComments: (id, params = {}) => apiRequest(`/movies/${id}/comments`, { params }),
+  getComments: (id, params = {}, requiresAuth = false) => 
+    apiRequest(`/movies/${id}/comments`, { params, requiresAuth }),
 
   /**
    * Đăng comment cho movie (yêu cầu auth)
@@ -108,6 +110,45 @@ const movieService = {
     apiRequest(`/movies/${id}/rate`, {
       method: "POST",
       data: { rating },
+      requiresAuth: true,
+    }),
+
+  /**
+   * Like một comment (yêu cầu auth)
+   * @param {string} commentId - Comment ID
+   * @param {boolean} isCurrentlyLiked - Trạng thái like hiện tại
+   * @param {boolean} isCurrentlyDisliked - Trạng thái dislike hiện tại
+   * @returns {Promise<Object>} { message, likes, dislikes }
+   */
+  likeComment: (commentId, isCurrentlyLiked = false, isCurrentlyDisliked = false) =>
+    apiRequest(`/comments/${commentId}/like`, {
+      method: "POST",
+      data: { isCurrentlyLiked, isCurrentlyDisliked },
+      requiresAuth: true,
+    }),
+
+  /**
+   * Dislike một comment (yêu cầu auth)
+   * @param {string} commentId - Comment ID
+   * @param {boolean} isCurrentlyDisliked - Trạng thái dislike hiện tại
+   * @param {boolean} isCurrentlyLiked - Trạng thái like hiện tại
+   * @returns {Promise<Object>} { message, likes, dislikes }
+   */
+  dislikeComment: (commentId, isCurrentlyDisliked = false, isCurrentlyLiked = false) =>
+    apiRequest(`/comments/${commentId}/dislike`, {
+      method: "POST",
+      data: { isCurrentlyDisliked, isCurrentlyLiked },
+      requiresAuth: true,
+    }),
+
+  /**
+   * Xóa một comment (yêu cầu auth, chỉ có thể xóa comment của chính mình)
+   * @param {string} commentId - Comment ID
+   * @returns {Promise<Object>} { message, commentId }
+   */
+  deleteComment: (commentId) =>
+    apiRequest(`/comments/${commentId}`, {
+      method: "DELETE",
       requiresAuth: true,
     }),
 };

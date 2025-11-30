@@ -199,6 +199,107 @@ const rateMovie = async (req, res) => {
   }
 };
 
+/**
+ * POST /comments/:commentId/like
+ * Like a comment (requires authentication)
+ * @param {string} req.params.commentId - Comment ID
+ * @param {Object} req.body - { isCurrentlyLiked?: boolean, isCurrentlyDisliked?: boolean }
+ * @param {Object} req.user - Authed user
+ */
+const likeComment = async (req, res) => {
+  try {
+    console.log('[Like Comment] Request:', {
+      commentId: req.params.commentId,
+      userId: req.user?._id,
+      body: req.body,
+      path: req.path,
+      url: req.url
+    });
+    
+    if (!req.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    const result = await movieService.likeComment(
+      req.params.commentId,
+      req.user._id,
+      req.body.isCurrentlyLiked || false,
+      req.body.isCurrentlyDisliked || false,
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('[Like Comment] Error:', error);
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /comments/:commentId/dislike
+ * Dislike a comment (requires authentication)
+ * @param {string} req.params.commentId - Comment ID
+ * @param {Object} req.body - { isCurrentlyDisliked?: boolean, isCurrentlyLiked?: boolean }
+ * @param {Object} req.user - Authed user
+ */
+const dislikeComment = async (req, res) => {
+  try {
+    console.log('[Dislike Comment] Request:', {
+      commentId: req.params.commentId,
+      userId: req.user?._id,
+      body: req.body,
+      path: req.path,
+      url: req.url
+    });
+    
+    if (!req.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    const result = await movieService.dislikeComment(
+      req.params.commentId,
+      req.user._id,
+      req.body.isCurrentlyDisliked || false,
+      req.body.isCurrentlyLiked || false,
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('[Dislike Comment] Error:', error);
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ message: error.message });
+  }
+};
+
+/**
+ * DELETE /comments/:commentId
+ * Delete a comment (requires authentication)
+ * Only the comment owner can delete their own comment
+ * @param {string} req.params.commentId - Comment ID
+ * @param {Object} req.user - Authed user
+ */
+const deleteComment = async (req, res) => {
+  try {
+    console.log('[Delete Comment] Request:', {
+      commentId: req.params.commentId,
+      userId: req.user?._id
+    });
+    
+    if (!req.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    const result = await movieService.deleteComment(
+      req.params.commentId,
+      req.user._id
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('[Delete Comment] Error:', error);
+    const statusCode = error.message.includes('not found') ? 404 : 
+                      error.message.includes('only delete') ? 403 : 400;
+    res.status(statusCode).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -212,4 +313,7 @@ module.exports = {
   getComments,
   postComment,
   rateMovie,
+  likeComment,
+  dislikeComment,
+  deleteComment,
 };

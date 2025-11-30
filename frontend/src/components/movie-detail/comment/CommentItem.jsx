@@ -1,6 +1,12 @@
 import React from "react";
 
-const CommentItem = ({ comment, onLike, onDislike, onReply, onMore }) => {
+const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, currentUserId }) => {
+  // Kiểm tra xem comment có phải của user hiện tại không
+  const isOwner = currentUserId && (
+    comment.userId === currentUserId || 
+    comment.userId?._id === currentUserId ||
+    comment.userId?.id === currentUserId
+  );
   return (
     <div className="bg-bgColor sm:p-4 py-3 rounded-lg hover:border-white/10 transition-colors">
       <div className="flex items-start gap-3">
@@ -42,24 +48,48 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore }) => {
           </p>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-4 text-sm text-gray-400">
+          <div className="flex items-center gap-2 text-sm">
             <button
               onClick={() => onLike && onLike(comment.id)}
-              className="flex items-center gap-1.5 hover:text-blue-400 transition-colors group"
+              className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all duration-200 group ${
+                comment.isLiked
+                  ? "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"
+                  : "text-gray-400 hover:bg-gray-700/50 hover:text-blue-500"
+              }`}
             >
-              <i className="fa-solid fa-arrow-up text-sm group-hover:scale-110 transition-transform" />
-              <span className="font-medium">{comment.likes || 0}</span>
+              <i className={`fa-solid fa-thumbs-up text-base transition-all duration-200 ${
+                comment.isLiked 
+                  ? "scale-110 drop-shadow-lg" 
+                  : "group-hover:scale-110 group-hover:rotate-[-5deg]"
+              }`} />
+              <span className={`font-semibold min-w-[1rem] text-center transition-colors ${
+                comment.isLiked ? "text-blue-500" : "text-gray-400"
+              }`}>
+                {comment.likes || 0}
+              </span>
             </button>
 
             <button
               onClick={() => onDislike && onDislike(comment.id)}
-              className="flex items-center gap-1.5 hover:text-red-400 transition-colors group"
+              className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all duration-200 group ${
+                comment.isDisliked
+                  ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                  : "text-gray-400 hover:bg-gray-700/50 hover:text-red-500"
+              }`}
             >
-              <i className="fa-solid fa-arrow-down text-sm group-hover:scale-110 transition-transform" />
-              {comment.dislikes > 0 && <span className="font-medium">{comment.dislikes}</span>}
+              <i className={`fa-solid fa-thumbs-down text-base transition-all duration-200 ${
+                comment.isDisliked 
+                  ? "scale-110 drop-shadow-lg" 
+                  : "group-hover:scale-110 group-hover:rotate-[5deg]"
+              }`} />
+              <span className={`font-semibold min-w-[1rem] text-center transition-colors ${
+                comment.isDisliked ? "text-red-500" : "text-gray-400"
+              }`}>
+                {comment.dislikes || 0}
+              </span>
             </button>
 
-            <button
+            {/* <button
               onClick={() => onReply && onReply(comment.id)}
               className="flex items-center gap-1.5 hover:text-blue-400 transition-colors group"
             >
@@ -70,15 +100,27 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore }) => {
                   {comment.replies}
                 </span>
               )}
-            </button>
+            </button> */}
 
-            <button
-              onClick={() => onMore && onMore(comment.id)}
-              className="flex items-center gap-1.5 hover:text-gray-200 transition-colors group"
-            >
-              <i className="fa-solid fa-ellipsis group-hover:scale-110 transition-transform" />
-              <span className="hidden lg:inline">Thêm</span>
-            </button>
+            {/* Hiển thị icon thùng rác nếu là comment của user hiện tại, ngược lại hiển thị icon ... */}
+            {isOwner ? (
+              <button
+                onClick={() => onDelete && onDelete(comment.id)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-all duration-200 group"
+                title="Xóa bình luận"
+              >
+                <i className="fa-solid fa-trash text-sm group-hover:scale-110 transition-transform" />
+                <span className="hidden lg:inline">Xóa</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => onMore && onMore(comment.id)}
+                className="flex items-center gap-1.5 hover:text-gray-200 transition-colors group"
+              >
+                <i className="fa-solid fa-ellipsis group-hover:scale-110 transition-transform" />
+                <span className="hidden lg:inline">Thêm</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

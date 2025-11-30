@@ -60,6 +60,7 @@ const userRoutes = require('./routes/user.routes');
 const healthRoutes = require('./routes/health.routes');
 const adminRoutes = require('./routes/admin.routes');
 const crawlerRoutes = require('./routes/crawler.routes');
+const commentRoutes = require('./routes/comment.routes');
 
 // API endpoints
 app.use('/api/v1/movies', movieRoutes);
@@ -68,6 +69,13 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/crawl', crawlerRoutes);
+
+// Debug: Log all requests to comments
+app.use('/api/v1/comments', (req, res, next) => {
+  console.log(`[App] Comments route accessed: ${req.method} ${req.path}`);
+  next();
+});
+app.use('/api/v1/comments', commentRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).send('Server is running');
