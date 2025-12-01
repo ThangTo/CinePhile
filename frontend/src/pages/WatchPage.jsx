@@ -44,8 +44,9 @@ const WatchPage = () => {
     setActiveEp(episodeParam);
   }, [episodeParam]);
 
-  const handleEpisodeChange = (episodeId) => {
-    navigate(`/watch/${id}?ep=${episodeId}`);
+  const handleEpisodeChange = (episodeNumber) => {
+    // episodeNumber can be either episode.episode or episode.id (for backward compatibility)
+    navigate(`/watch/${id}?ep=${episodeNumber}`);
   };
 
   if (loading) {
@@ -60,7 +61,12 @@ const WatchPage = () => {
     );
   }
 
-  const currentEpisode = episodes.find((ep) => ep.id === activeEp) || episodes[0];
+  // Find episode by episode number (not id)
+  // Backend returns: { id: ObjectId, episode: episodeId (number), ... }
+  const currentEpisode =
+    episodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
+    episodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
+    episodes[0];
 
   return (
     <div className="min-h-screen bg-bgColor">

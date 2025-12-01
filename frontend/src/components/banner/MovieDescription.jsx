@@ -7,7 +7,9 @@ import React from "react";
  * @param {string} props.description - Movie description text
  */
 const MovieDescription = ({ description }) => (
-  <p className="md:mt-6 text-gray-300 md:text-sm hidden md:block">{description}</p>
+  <p className="md:mt-6 text-gray-300 md:text-sm hidden md:line-clamp-5 overflow-hidden">
+    {description}
+  </p>
 );
 
 export default MovieDescription;

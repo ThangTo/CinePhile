@@ -90,7 +90,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
     paginatedData: paginatedMovies,
     handlePrev,
     handleNext,
-  } = usePagination(filtered, 8);
+  } = usePagination(filtered, 24);
 
   const emptyText =
     pageType === "genre"

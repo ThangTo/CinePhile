@@ -3,6 +3,11 @@ const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
 const Comment = require('../models/comment.model');
 const Rating = require('../models/rating.model');
+const {
+  transformMovie,
+  transformMovies,
+  transformPaginatedResult,
+} = require('../utils/movieTransformer');
 
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -63,12 +68,16 @@ const mapComment = (comment) => {
  */
 const buildQuery = (filters = {}) => {
   const query = {};
-  if (filters.genre) query.genres = filters.genre;
+  if (filters.genre) {
+    // Support both 'categories.slug' and 'genres' for backward compatibility
+    query['categories.slug'] = filters.genre;
+  }
   if (filters.country) query.country = filters.country;
   if (filters.year) query.year = Number(filters.year);
   if (filters.q) {
     const regex = new RegExp(filters.q, 'i');
-    query.$or = [{ title: regex }, { englishTitle: regex }, { slug: regex }];
+    // Search in DB fields: name (title), original_name (englishTitle), slug
+    query.$or = [{ name: regex }, { original_name: regex }, { slug: regex }];
   }
   return query;
 };
@@ -86,13 +95,7 @@ const paginate = async (builder, { page = 1, limit = 12 } = {}) => {
       .skip(skip)
       .limit(perPage)
       .lean()
-      .then((docs) =>
-        docs.map((doc) => {
-          const payload = { ...doc, id: doc._id.toString() };
-          delete payload._id;
-          return payload;
-        }),
-      ),
+      .then((docs) => transformMovies(docs)),
     Movie.countDocuments(builder.getFilter()),
   ]);
 
@@ -112,7 +115,8 @@ const paginate = async (builder, { page = 1, limit = 12 } = {}) => {
  */
 const getAll = async (filters = {}, pagination = {}) => {
   const builder = Movie.find(buildQuery(filters)).sort({ createdAt: -1 });
-  return paginate(builder, pagination);
+  const result = await paginate(builder, pagination);
+  return transformPaginatedResult(result);
 };
 
 /**
@@ -123,7 +127,7 @@ const getById = async (identifier) => {
   if (!movieDoc) {
     throw new Error('Movie not found');
   }
-  const movie = toPlain(movieDoc);
+  const movie = transformMovie(movieDoc);
   const episodes = await Episode.find({ movieId: movieDoc._id }).sort({ episodeId: 1 }).lean();
   movie.episodes = episodes.map(mapEpisode);
   return movie;
@@ -135,11 +139,7 @@ const getById = async (identifier) => {
 const getTrending = async (limit = 10) => {
   const data = await Movie.find().sort({ viewCount: -1 }).limit(limit).lean();
   return {
-    data: data.map((doc) => {
-      const payload = { ...doc, id: doc._id.toString() };
-      delete payload._id;
-      return payload;
-    }),
+    data: transformMovies(data),
   };
 };
 
@@ -149,11 +149,7 @@ const getTrending = async (limit = 10) => {
 const getTopRated = async (limit = 10) => {
   const data = await Movie.find().sort({ rating: -1, totalRatings: -1 }).limit(limit).lean();
   return {
-    data: data.map((doc) => {
-      const payload = { ...doc, id: doc._id.toString() };
-      delete payload._id;
-      return payload;
-    }),
+    data: transformMovies(data),
   };
 };
 
@@ -163,11 +159,7 @@ const getTopRated = async (limit = 10) => {
 const getNewReleases = async (limit = 10) => {
   const data = await Movie.find().sort({ createdAt: -1 }).limit(limit).lean();
   return {
-    data: data.map((doc) => {
-      const payload = { ...doc, id: doc._id.toString() };
-      delete payload._id;
-      return payload;
-    }),
+    data: transformMovies(data),
   };
 };
 
@@ -176,7 +168,8 @@ const getNewReleases = async (limit = 10) => {
  */
 const getByGenre = async (genre, pagination = {}) => {
   const builder = Movie.find(buildQuery({ genre })).sort({ createdAt: -1 });
-  return paginate(builder, pagination);
+  const result = await paginate(builder, pagination);
+  return transformPaginatedResult(result);
 };
 
 /**
@@ -184,7 +177,8 @@ const getByGenre = async (genre, pagination = {}) => {
  */
 const search = async (q, pagination = {}) => {
   const builder = Movie.find(buildQuery({ q })).sort({ createdAt: -1 });
-  return paginate(builder, pagination);
+  const result = await paginate(builder, pagination);
+  return transformPaginatedResult(result);
 };
 
 /**
@@ -275,7 +269,7 @@ const deleteComment = async (commentId, userId) => {
   if (!userId) {
     throw new Error('Authentication required');
   }
-  
+
   if (!mongoose.Types.ObjectId.isValid(commentId)) {
     throw new Error('Invalid comment ID');
   }
@@ -288,16 +282,16 @@ const deleteComment = async (commentId, userId) => {
   // Check if user is the owner of the comment
   const userIdStr = userId.toString();
   const commentUserIdStr = comment.userId.toString();
-  
+
   if (userIdStr !== commentUserIdStr) {
     throw new Error('You can only delete your own comments');
   }
 
   await Comment.findByIdAndDelete(commentId);
-  
+
   return {
     message: 'Comment deleted successfully',
-    commentId: commentId
+    commentId: commentId,
   };
 };
 
@@ -349,11 +343,16 @@ const rateMovie = async (identifier, userId, rating) => {
  * Logic đơn giản: chỉ tăng/giảm số like
  * Frontend sẽ quản lý trạng thái active (isLiked/isDisliked) bằng localStorage
  */
-const likeComment = async (commentId, userId, isCurrentlyLiked = false, isCurrentlyDisliked = false) => {
+const likeComment = async (
+  commentId,
+  userId,
+  isCurrentlyLiked = false,
+  isCurrentlyDisliked = false,
+) => {
   if (!userId) {
     throw new Error('Authentication required');
   }
-  
+
   if (!mongoose.Types.ObjectId.isValid(commentId)) {
     throw new Error('Invalid comment ID');
   }
@@ -364,35 +363,35 @@ const likeComment = async (commentId, userId, isCurrentlyLiked = false, isCurren
   }
 
   let result;
-  
+
   if (isCurrentlyLiked) {
     // User đã like -> bỏ like (toggle off) -> giảm số like
     await Comment.findByIdAndUpdate(commentId, {
-      $inc: { likes: -1 }
+      $inc: { likes: -1 },
     });
     const updatedComment = await Comment.findById(commentId);
     result = {
       message: 'Đã bỏ like',
       likes: Math.max(0, updatedComment.likes),
-      dislikes: updatedComment.dislikes
+      dislikes: updatedComment.dislikes,
     };
   } else {
     // User chưa like -> thêm like -> tăng số like
     // Nếu đang dislike, cần giảm dislike và tăng like
     if (isCurrentlyDisliked) {
       await Comment.findByIdAndUpdate(commentId, {
-        $inc: { likes: 1, dislikes: -1 }
+        $inc: { likes: 1, dislikes: -1 },
       });
     } else {
       await Comment.findByIdAndUpdate(commentId, {
-        $inc: { likes: 1 }
+        $inc: { likes: 1 },
       });
     }
     const updatedComment = await Comment.findById(commentId);
     result = {
       message: 'Đã like comment',
       likes: updatedComment.likes,
-      dislikes: Math.max(0, updatedComment.dislikes)
+      dislikes: Math.max(0, updatedComment.dislikes),
     };
   }
   console.log(result);
@@ -405,11 +404,16 @@ const likeComment = async (commentId, userId, isCurrentlyLiked = false, isCurren
  * Logic đơn giản: chỉ tăng/giảm số dislike
  * Frontend sẽ quản lý trạng thái active (isLiked/isDisliked) bằng localStorage
  */
-const dislikeComment = async (commentId, userId, isCurrentlyDisliked = false, isCurrentlyLiked = false) => {
+const dislikeComment = async (
+  commentId,
+  userId,
+  isCurrentlyDisliked = false,
+  isCurrentlyLiked = false,
+) => {
   if (!userId) {
     throw new Error('Authentication required');
   }
-  
+
   if (!mongoose.Types.ObjectId.isValid(commentId)) {
     throw new Error('Invalid comment ID');
   }
@@ -420,35 +424,35 @@ const dislikeComment = async (commentId, userId, isCurrentlyDisliked = false, is
   }
 
   let result;
-  
+
   if (isCurrentlyDisliked) {
     // User đã dislike -> bỏ dislike (toggle off) -> giảm số dislike
     await Comment.findByIdAndUpdate(commentId, {
-      $inc: { dislikes: -1 }
+      $inc: { dislikes: -1 },
     });
     const updatedComment = await Comment.findById(commentId);
     result = {
       message: 'Đã bỏ dislike',
       likes: updatedComment.likes,
-      dislikes: Math.max(0, updatedComment.dislikes)
+      dislikes: Math.max(0, updatedComment.dislikes),
     };
   } else {
     // User chưa dislike -> thêm dislike -> tăng số dislike
     // Nếu đang like, cần giảm like và tăng dislike
     if (isCurrentlyLiked) {
       await Comment.findByIdAndUpdate(commentId, {
-        $inc: { likes: -1, dislikes: 1 }
+        $inc: { likes: -1, dislikes: 1 },
       });
     } else {
       await Comment.findByIdAndUpdate(commentId, {
-        $inc: { dislikes: 1 }
+        $inc: { dislikes: 1 },
       });
     }
     const updatedComment = await Comment.findById(commentId);
     result = {
       message: 'Đã dislike comment',
       likes: Math.max(0, updatedComment.likes),
-      dislikes: updatedComment.dislikes
+      dislikes: updatedComment.dislikes,
     };
   }
 

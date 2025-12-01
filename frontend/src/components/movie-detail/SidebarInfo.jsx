@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import CastSection from "components/movie-detail/CastSection";
 import { GenreTag, MovieInfo } from "components/banner/index";
 import { useBannerConfig } from "components/banner/useBannerConfig";
+import StatusBadge from "./StatusBadge";
 
 const SidebarInfo = ({ movie }) => {
   const { infoBadges } = useBannerConfig(movie);
@@ -13,12 +14,12 @@ const SidebarInfo = ({ movie }) => {
         <div className="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/10">
           <img src={movie.poster} alt={movie.title} className="w-full h-full object-cover" />
         </div>
-        {movie.completed && (
-          <div className="absolute -top-2 -right-2 bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-lg">
-            <i className="fa-solid fa-check" />
-            Hoàn thành
-          </div>
-        )}
+        <StatusBadge
+          status={movie.status}
+          currentEpisode={movie.currentEpisode}
+          totalEpisodes={movie.totalEpisodes}
+          className="absolute -top-2 -right-2"
+        />
       </div>
 
       {/* Movie Title */}
@@ -85,7 +86,12 @@ const SidebarInfo = ({ movie }) => {
         {movie.status && (
           <div className="flex">
             <span className="font-semibold text-gray-400 w-28">Trạng thái:</span>
-            <span className="text-green-400">{movie.status}</span>
+            <StatusBadge
+              status={movie.status}
+              currentEpisode={movie.currentEpisode}
+              totalEpisodes={movie.totalEpisodes}
+              className="text-green-400"
+            />
           </div>
         )}
         {movie.description && (

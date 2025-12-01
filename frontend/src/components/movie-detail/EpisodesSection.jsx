@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAudioTypeChange }) => {
+  const navigate = useNavigate();
+  // If no activeEpisode provided, default to first episode
+  const defaultActiveEpisode = activeEpisode || 1;
   const [isCondensed, setIsCondensed] = useState(false);
   const [openPart, setOpenPart] = useState(false);
   const [activePart, setActivePart] = useState(movie.part || "Phần 1");
@@ -129,35 +133,73 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
 
       {/* Lưới tập phim */}
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-        {(isCondensed ? movie.episodes.slice(0, 12) : movie.episodes).map((episode) => {
-          const isActive = activeEpisode === episode.id;
-          return (
-            <button
-              key={episode.id}
-              onClick={() => onEpisodeClick && onEpisodeClick(episode.id)}
-              className={`group flex items-center justify-center gap-3 lg:rounded-xl rounded-md font-normal text-sm md:text-base px-2 md:px-6 py-[11px] md:py-[15px] transition-colors ${
-                isActive
-                  ? "border-primaryColor bg-primaryColor text-black"
-                  : "bg-bgColor2 text-white hover:bg-bgColor2/80"
-              }`}
-            >
-              <i
-                className={`fa-solid fa-play text-sm transition-colors ${
-                  isActive
-                    ? "opacity-100 text-black"
-                    : "opacity-80 group-hover:opacity-100 group-hover:text-primaryColor"
-                }`}
-              />
-              <span
-                className={`font-normal text-sm md:font-medium transition-colors ${
-                  isActive ? "text-black" : "group-hover:text-primaryColor"
+        {(() => {
+          // Tạo map để dễ dàng tìm episode theo số tập
+          const episodeMap = new Map();
+          (movie.episodes || []).forEach((ep) => {
+            const epNum = ep.episode || ep.episodeId;
+            if (epNum) episodeMap.set(epNum, ep);
+          });
+
+          // Lấy totalEpisodes từ movie (fallback là số lượng episodes hiện có)
+          const totalEpisodes = movie.totalEpisodes || movie.episodes?.length || 0;
+
+          // Tạo array từ 1 đến totalEpisodes
+          const allEpisodes = Array.from({ length: totalEpisodes }, (_, i) => i + 1);
+
+          // Áp dụng condensed mode nếu cần
+          const episodesToShow = isCondensed ? allEpisodes.slice(0, 12) : allEpisodes;
+
+          return episodesToShow.map((episodeNumber) => {
+            const episode = episodeMap.get(episodeNumber);
+            const isAvailable = !!episode;
+            const isActive = defaultActiveEpisode === episodeNumber;
+
+            return (
+              <button
+                key={episodeNumber}
+                disabled={!isAvailable}
+                onClick={() => {
+                  if (!isAvailable) return;
+                  if (onEpisodeClick) {
+                    onEpisodeClick(episodeNumber);
+                  } else {
+                    // Navigate to watch page if no click handler provided (MovieDetail page)
+                    navigate(`/watch/${movie.id}?ep=${episodeNumber}`);
+                  }
+                }}
+                className={`group flex items-center justify-center gap-3 lg:rounded-xl rounded-md font-normal text-sm md:text-base px-2 md:px-6 py-[11px] md:py-[15px] transition-colors ${
+                  !isAvailable
+                    ? "bg-bgColor2/30 text-gray-500 opacity-50 cursor-not-allowed"
+                    : isActive
+                    ? "border-primaryColor bg-primaryColor text-black"
+                    : "bg-bgColor2 text-white hover:bg-bgColor2/80"
                 }`}
               >
-                Tập {episode?.title?.replace(/\D/g, "") || episode.title}
-              </span>
-            </button>
-          );
-        })}
+                <i
+                  className={`fa-solid fa-play text-sm transition-colors ${
+                    !isAvailable
+                      ? "opacity-30"
+                      : isActive
+                      ? "opacity-100 text-black"
+                      : "opacity-80 group-hover:opacity-100 group-hover:text-primaryColor"
+                  }`}
+                />
+                <span
+                  className={`font-normal text-sm md:font-medium transition-colors ${
+                    !isAvailable
+                      ? "text-gray-500"
+                      : isActive
+                      ? "text-black"
+                      : "group-hover:text-primaryColor"
+                  }`}
+                >
+                  Tập {episodeNumber}
+                </span>
+              </button>
+            );
+          });
+        })()}
       </div>
     </>
   );

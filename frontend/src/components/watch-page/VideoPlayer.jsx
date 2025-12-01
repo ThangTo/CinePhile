@@ -232,8 +232,9 @@ const VideoPlayer = ({
   };
 
   const handleNextEpisode = () => {
-    if (episode.id < totalEpisodes) {
-      onEpisodeChange(episode.id + 1);
+    const currentEpNumber = episode?.episode || episode?.episodeId || 1;
+    if (currentEpNumber < totalEpisodes) {
+      onEpisodeChange(currentEpNumber + 1);
     }
   };
 
@@ -411,7 +412,7 @@ const VideoPlayer = ({
       <video
         ref={videoRef}
         className="w-full h-full cursor-pointer rounded-lg"
-        src={currentVideoUrl}
+        src={episode?.videoUrl || episode?.link_m3u8 || episode?.link_embed || currentVideoUrl}
         onClick={handlePlayPause}
         style={{ width: "100%", height: "100%", objectFit: "contain" }}
       />
@@ -555,32 +556,38 @@ const VideoPlayer = ({
           <div className="flex items-center gap-1 md:gap-2">
             {/* Desktop/Tablet (md+): Show all buttons individually */}
             {/* Next Episode - Desktop/Tablet only */}
-            {episode?.id < totalEpisodes && (
-              <div className="hidden md:block">
-                <Tooltip text={`Xem tập ${episode.id + 1}`}>
-                  <button
-                    onClick={handleNextEpisode}
-                    className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                  >
-                    <i className="fa-solid fa-forward-step text-white text-sm lg:text-base" />
-                  </button>
-                </Tooltip>
-              </div>
-            )}
+            {(() => {
+              const currentEpNumber = episode?.episode || episode?.episodeId || 1;
+              return currentEpNumber < totalEpisodes ? (
+                <div className="hidden md:block">
+                  <Tooltip text={`Xem tập ${currentEpNumber + 1}`}>
+                    <button
+                      onClick={handleNextEpisode}
+                      className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
+                    >
+                      <i className="fa-solid fa-forward-step text-white text-sm lg:text-base" />
+                    </button>
+                  </Tooltip>
+                </div>
+              ) : null;
+            })()}
 
             {/* Next Episode - Mobile */}
-            {episode?.id < totalEpisodes && (
-              <div className="md:hidden">
-                <Tooltip text={`Tập ${episode.id + 1}`}>
-                  <button
-                    onClick={handleNextEpisode}
-                    className="w-7 h-7 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                  >
-                    <i className="fa-solid fa-forward-step text-white text-xs" />
-                  </button>
-                </Tooltip>
-              </div>
-            )}
+            {(() => {
+              const currentEpNumber = episode?.episode || episode?.episodeId || 1;
+              return currentEpNumber < totalEpisodes ? (
+                <div className="md:hidden">
+                  <Tooltip text={`Tập ${currentEpNumber + 1}`}>
+                    <button
+                      onClick={handleNextEpisode}
+                      className="w-7 h-7 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
+                    >
+                      <i className="fa-solid fa-forward-step text-white text-xs" />
+                    </button>
+                  </Tooltip>
+                </div>
+              ) : null;
+            })()}
 
             {/* Audio Selection - Desktop/Tablet only */}
             <div className="hidden md:flex relative audio-menu-container">

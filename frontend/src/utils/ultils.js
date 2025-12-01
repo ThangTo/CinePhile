@@ -11,3 +11,20 @@ export const normalizeArray = (value) => {
   }
   return [];
 };
+
+export const parseEpisodeNumber = (ep) => {
+  if (ep === undefined || ep === null || ep === "") return 0;
+
+  // If it's already a number, return it
+  if (typeof ep === "number") return ep;
+
+  // If it's a string, try to extract number
+  if (typeof ep === "string") {
+    // Remove all non-digit characters and parse
+    const numStr = ep.replace(/\D/g, "");
+    const num = parseInt(numStr, 10);
+    return isNaN(num) ? 0 : num;
+  }
+
+  return 0;
+};

@@ -1,5 +1,6 @@
 import React from "react";
 import CastSection from "./CastSection";
+import StatusBadge from "./StatusBadge";
 
 const MovieInfo = ({ movie }) => {
   return (
@@ -13,12 +14,12 @@ const MovieInfo = ({ movie }) => {
               alt={movie.title}
               className="w-full max-w-sm mx-auto rounded-lg shadow-2xl"
             />
-            {movie.completed && (
-              <div className="absolute -top-2 -left-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                <i className="fa-solid fa-check" />
-                Đã hoàn thành: {movie.totalEpisodes} / {movie.totalEpisodes} tập
-              </div>
-            )}
+            <StatusBadge
+              status={movie.status}
+              currentEpisode={movie.currentEpisode}
+              totalEpisodes={movie.totalEpisodes}
+              className="absolute -top-2 -left-2"
+            />
           </div>
         </div>
 

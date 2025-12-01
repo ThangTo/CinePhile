@@ -32,9 +32,9 @@ const MovieInfoBrief = ({ movie, activeEp }) => {
             <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">
               {movie.year}
             </span>
-            <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">
+            {/* <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">
               {movie.part}
-            </span>
+            </span> */}
             <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">
               Tập {activeEp}
             </span>
