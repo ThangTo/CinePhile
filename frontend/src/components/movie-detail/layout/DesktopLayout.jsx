@@ -36,7 +36,7 @@ const DesktopLayout = ({ movie, activeTab, setActiveTab, audioType, onAudioTypeC
           <main className="col-span-8 space-y-6">
             {/* Action Buttons */}
             <div className="bg-bgColor2/50 backdrop-blur-sm rounded-full overflow-hidden">
-              <ActionButtons movie={movie} />
+              <ActionButtons movie={movie} audioType={audioType} />
             </div>
 
             {/* Tabs, Content & Comments */}

@@ -8,7 +8,7 @@ const LocalStrategy = require('passport-local').Strategy;
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('./models/user.model');
 const cookieParser = require('cookie-parser');
-const authService = require('./services/auth.service');
+// const authService = require('./services/auth.service');
 const { getGoogleCallbackUrl } = require('./utils/authUtils');
 
 // Middleware

@@ -75,35 +75,53 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
             )}
           </div>
 
-          {/* Nút "Phụ đề" */}
+          {/* Nút chọn ngôn ngữ (Vietsub / Thuyết Minh / Lồng tiếng) dựa trên movie.lang */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => onAudioTypeChange && onAudioTypeChange("subtitle")}
-              className={`flex lg:inline-flex items-center gap-2 rounded-md px-2 py-1 sm:px-4 sm:py-2 text-gray-200 text-sm transition-colors
-              ${
-                audioType === "subtitle"
-                  ? "border border-primaryColor"
-                  : "lg:border lg:border-white/15 hover:border-primaryColor"
-              }`}
-            >
-              <i className="fa-solid fa-file-alt" />
-              <span>Phụ đề</span>
-            </button>
-            {/* Nút "Lồng tiếng" — chỉ hiển thị nếu API có */}
-            {/* {movie.hasDub && ( */}
-            <button
-              onClick={() => onAudioTypeChange && onAudioTypeChange("dub")}
-              className={`flex lg:inline-flex items-center gap-2 rounded-md px-2 py-1 sm:px-4 sm:py-2 text-gray-200 text-sm transition-colors
+            {(() => {
+              const rawLang = (movie.lang || "").toLowerCase();
+              const parts = rawLang
+                .split("+")
+                .map((p) => p.trim())
+                .filter(Boolean);
+
+              const options = [];
+              const addIfNotExists = (key, label) => {
+                if (!options.some((o) => o.key === key)) {
+                  options.push({ key, label });
+                }
+              };
+
+              parts.forEach((part) => {
+                if (part.includes("vietsub")) addIfNotExists("vietsub", "Vietsub");
+                if (part.includes("thuyết minh") || part.includes("thuyet minh"))
+                  addIfNotExists("thuyet-minh", "Thuyết Minh");
+                if (part.includes("lồng tiếng") || part.includes("long tieng"))
+                  addIfNotExists("long-tieng", "Lồng tiếng");
+              });
+
+              // Nếu lang trống hoặc không parse được, không hiển thị gì (hoặc có thể fallback sau)
+              if (options.length === 0) addIfNotExists("vietsub", "Vietsub");
+
+              return options.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => onAudioTypeChange && onAudioTypeChange(opt.key)}
+                  className={`flex lg:inline-flex items-center gap-2 rounded-md px-2 py-1 sm:px-4 sm:py-2 text-gray-200 text-sm transition-colors
                 ${
-                  audioType === "dub"
+                  audioType === opt.key
                     ? "border border-primaryColor"
                     : "lg:border lg:border-white/15 hover:border-primaryColor"
                 }`}
-            >
-              <i className="fa-solid fa-microphone" />
-              <span>Lồng tiếng</span>
-            </button>
-            {/* )} */}
+                >
+                  <i
+                    className={`fa-solid ${
+                      opt.key === "vietsub" ? "fa-file-alt" : "fa-microphone"
+                    }`}
+                  />
+                  <span>{opt.label}</span>
+                </button>
+              ));
+            })()}
           </div>
         </div>
 
@@ -165,7 +183,8 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
                     onEpisodeClick(episodeNumber);
                   } else {
                     // Navigate to watch page if no click handler provided (MovieDetail page)
-                    navigate(`/watch/${movie.id}?ep=${episodeNumber}`);
+                    const audioQuery = audioType ? `&audio=${encodeURIComponent(audioType)}` : "";
+                    navigate(`/watch/${movie.id}?ep=${episodeNumber}${audioQuery}`);
                   }
                 }}
                 className={`group flex items-center justify-center gap-3 lg:rounded-xl rounded-md font-normal text-sm md:text-base px-2 md:px-6 py-[11px] md:py-[15px] transition-colors ${

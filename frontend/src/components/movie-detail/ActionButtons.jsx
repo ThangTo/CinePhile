@@ -7,7 +7,7 @@ import RatingModal from "components/watch-page/RatingModal";
 import userService from "services/user.service";
 import movieService from "services/movie.service";
 
-const ActionButtons = ({ movie }) => {
+const ActionButtons = ({ movie, audioType }) => {
   const navigate = useNavigate();
   const { toasts, removeToast, success, info, warning } = useToast();
   const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, user } =
@@ -92,7 +92,13 @@ const ActionButtons = ({ movie }) => {
         {/* Watch Now Button */}
         <div className="flex items-center justify-start gap-6">
           <button
-            onClick={() => navigate(`/watch/${movie.id}?ep=1`)}
+            onClick={() =>
+              navigate(
+                `/watch/${movie.id}?ep=1${
+                  audioType ? `&audio=${encodeURIComponent(audioType)}` : ""
+                }`
+              )
+            }
             className="bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText px-8 py-3 rounded-full font-semibold flex items-center gap-2 transition-all shadow-lg"
           >
             <i className="fa-solid fa-play text-lg" />

@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Tooltip from "./Tooltip";
+import Hls from "hls.js";
 
 const VideoPlayer = ({
   movie,
@@ -29,10 +30,63 @@ const VideoPlayer = ({
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
 
-  // Mock video URL - replace with actual API
-  const currentVideoUrl =
-    videoUrl ||
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+  const hlsRef = useRef(null);
+
+  const hlsSource = useMemo(() => {
+    if (episode?.link_m3u8) return episode.link_m3u8;
+    if (episode?.videoUrl && episode.videoUrl.includes(".m3u8")) return episode.videoUrl;
+    if (videoUrl && videoUrl.includes(".m3u8")) return videoUrl;
+    return null;
+  }, [episode, videoUrl]);
+
+  const fileSource = useMemo(() => {
+    const candidate = videoUrl || episode?.videoUrl;
+    if (candidate && !candidate.includes(".m3u8") && !candidate.includes("embed")) {
+      return candidate;
+    }
+    return null;
+  }, [episode, videoUrl]);
+
+  const embedSource = useMemo(() => {
+    if (episode?.link_embed) return episode.link_embed;
+    if (episode?.videoUrl && episode.videoUrl.includes("embed")) return episode.videoUrl;
+    return null;
+  }, [episode]);
+
+  const hasNativePlayer = Boolean(hlsSource || fileSource);
+
+  // Parse available audio options from movie.lang (e.g. "Vietsub+Thuyết Minh+Lồng Tiếng")
+  const audioOptions = useMemo(() => {
+    const rawLang = (movie?.lang || "").toLowerCase();
+    const parts = rawLang
+      .split("+")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const opts = [];
+    const addIfNotExists = (key, label) => {
+      if (!opts.some((o) => o.key === key)) {
+        opts.push({ key, label });
+      }
+    };
+
+    parts.forEach((part) => {
+      if (part.includes("vietsub")) addIfNotExists("vietsub", "Vietsub");
+      if (part.includes("thuyết minh") || part.includes("thuyet minh"))
+        addIfNotExists("thuyet-minh", "Thuyết Minh");
+      if (part.includes("lồng tiếng") || part.includes("long tieng"))
+        addIfNotExists("long-tieng", "Lồng tiếng");
+    });
+
+    // Nếu lang trống hoặc không parse được, mặc định có Vietsub
+    if (opts.length === 0) {
+      addIfNotExists("vietsub", "Vietsub");
+    }
+
+    return opts;
+  }, [movie]);
+
+  const currentAudioLabel = audioOptions.find((o) => o.key === audioType)?.label || "Âm thanh";
 
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return "00:00";
@@ -45,7 +99,7 @@ const VideoPlayer = ({
   useEffect(() => {
     const video = videoRef.current;
     // video.focus();
-    if (!video) return;
+    if (!video || !hasNativePlayer) return;
 
     const handleTimeUpdate = () => setCurrentTime(video.currentTime);
     const handleDurationChange = () => setDuration(video.duration);
@@ -69,7 +123,42 @@ const VideoPlayer = ({
       video.removeEventListener("waiting", handleWaiting);
       video.removeEventListener("canplay", handleCanPlay);
     };
-  }, []);
+  }, [hasNativePlayer, episode]);
+
+  // Initialize HLS / regular sources when episode changes
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (!hlsSource) {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      if (fileSource) {
+        video.src = fileSource;
+      }
+      return;
+    }
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+      hls.loadSource(hlsSource);
+      hls.attachMedia(video);
+      hlsRef.current = hls;
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsSource;
+    } else {
+      console.warn("Trình duyệt không hỗ trợ phát HLS, sẽ dùng link nhúng nếu có.");
+    }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [hlsSource, fileSource]);
 
   // Auto-hide controls (both playing and paused states)
   useEffect(() => {
@@ -409,16 +498,31 @@ const VideoPlayer = ({
       }}
     >
       {/* Actual Video Element */}
-      <video
-        ref={videoRef}
-        className="w-full h-full cursor-pointer rounded-lg"
-        src={episode?.videoUrl || episode?.link_m3u8 || episode?.link_embed || currentVideoUrl}
-        onClick={handlePlayPause}
-        style={{ width: "100%", height: "100%", objectFit: "contain" }}
-      />
+      {hasNativePlayer ? (
+        <video
+          ref={videoRef}
+          className="w-full h-full cursor-pointer rounded-lg"
+          src={!hlsSource ? fileSource : undefined}
+          onClick={handlePlayPause}
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        />
+      ) : embedSource ? (
+        <iframe
+          src={embedSource}
+          title="Movie player"
+          allow="autoplay; fullscreen"
+          allowFullScreen
+          className="w-full h-full rounded-lg border-0"
+          style={{ minHeight: 360 }}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-white text-sm text-center px-4">
+          Chưa có nguồn phát cho tập phim này. Vui lòng thử tập khác hoặc quay lại sau.
+        </div>
+      )}
 
       {/* Background Poster Image*/}
-      {!isPlaying && currentTime === 0 && movie?.backgroundImage && (
+      {hasNativePlayer && !isPlaying && currentTime === 0 && movie?.backgroundImage && (
         <div className="absolute inset-0 z-[5] pointer-events-none">
           <img
             src={movie.backgroundImage}
@@ -430,14 +534,14 @@ const VideoPlayer = ({
       )}
 
       {/* Buffering Indicator */}
-      {isBuffering && (
+      {hasNativePlayer && isBuffering && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
         </div>
       )}
 
       {/* Center Play Button Overlay */}
-      {!isPlaying && !isBuffering && (
+      {hasNativePlayer && !isPlaying && !isBuffering && (
         <div
           className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer z-10"
           onClick={handlePlayPause}
@@ -451,7 +555,7 @@ const VideoPlayer = ({
       {/* Video Controls Overlay */}
       <div
         className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none ${
-          showControls ? "opacity-100" : "opacity-0"
+          showControls && hasNativePlayer ? "opacity-100" : "opacity-0"
         }`}
       >
         {/* Progress Bar */}
@@ -590,46 +694,40 @@ const VideoPlayer = ({
             })()}
 
             {/* Audio Selection - Desktop/Tablet only */}
-            <div className="hidden md:flex relative audio-menu-container">
-              <Tooltip text={audioType === "subtitle" ? "Tiếng gốc" : "Lồng tiếng"}>
-                <button
-                  onClick={toggleAudioMenu}
-                  className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                >
-                  <i className="fa-solid fa-microphone text-white text-sm lg:text-base" />
-                </button>
-              </Tooltip>
-              <div
-                className={`absolute top-1/2 right-0 -translate-y-1/2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[140px] z-[130] origin-right transition-all duration-300 ease-out ${
-                  showAudioMenu
-                    ? "opacity-100 -translate-x-[calc(100%+0.75rem)] scale-100"
-                    : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
-                }`}
-              >
-                <button
-                  onClick={() => handleAudioChange("subtitle")}
-                  className={`w-full px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                    audioType === "subtitle" ? "bg-white/20" : ""
+            {audioOptions.length > 0 && (
+              <div className="hidden md:flex relative audio-menu-container">
+                <Tooltip text={currentAudioLabel}>
+                  <button
+                    onClick={toggleAudioMenu}
+                    className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
+                  >
+                    <i className="fa-solid fa-microphone text-white text-sm lg:text-base" />
+                  </button>
+                </Tooltip>
+                <div
+                  className={`absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[140px] z-[130] origin-bottom-right transition-all duration-300 ease-out ${
+                    showAudioMenu
+                      ? "opacity-100 translate-y-0 scale-100"
+                      : "opacity-0 translate-y-2 scale-95 pointer-events-none"
                   }`}
                 >
-                  <span className="text-right">Tiếng gốc</span>
-                  {audioType === "subtitle" && (
-                    <i className="fa-solid fa-check text-primaryColor text-xs" />
-                  )}
-                </button>
-                <button
-                  onClick={() => handleAudioChange("dub")}
-                  className={`w-full px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                    audioType === "dub" ? "bg-white/20" : ""
-                  }`}
-                >
-                  <span className="text-right">Lồng tiếng</span>
-                  {audioType === "dub" && (
-                    <i className="fa-solid fa-check text-primaryColor text-xs" />
-                  )}
-                </button>
+                  {audioOptions.map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => handleAudioChange(opt.key)}
+                      className={`w-full px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
+                        audioType === opt.key ? "bg-white/20" : ""
+                      }`}
+                    >
+                      <span className="text-right">{opt.label}</span>
+                      {audioType === opt.key && (
+                        <i className="fa-solid fa-check text-primaryColor text-xs" />
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* CC - Desktop/Tablet only */}
             <div className="hidden md:block">
@@ -663,10 +761,10 @@ const VideoPlayer = ({
                 </button>
               </Tooltip>
               <div
-                className={`absolute top-1/2 right-0 -translate-y-1/2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[120px] z-[130] origin-right transition-all duration-300 ease-out ${
+                className={`absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[120px] z-[130] origin-bottom-right transition-all duration-300 ease-out ${
                   showSpeedMenu
-                    ? "opacity-100 -translate-x-[calc(100%+0.75rem)] scale-100"
-                    : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
+                    ? "opacity-100 translate-y-0 scale-100"
+                    : "opacity-0 translate-y-2 scale-95 pointer-events-none"
                 }`}
               >
                 {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
@@ -698,10 +796,10 @@ const VideoPlayer = ({
                 </button>
               </Tooltip>
               <div
-                className={`absolute top-1/2 right-0 -translate-y-1/2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[140px] z-[130] origin-right transition-all duration-300 ease-out ${
+                className={`absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[140px] z-[130] origin-bottom-right transition-all duration-300 ease-out ${
                   showQualityMenu
-                    ? "opacity-100 -translate-x-[calc(100%+0.75rem)] scale-100"
-                    : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
+                    ? "opacity-100 translate-y-0 scale-100"
+                    : "opacity-0 translate-y-2 scale-95 pointer-events-none"
                 }`}
               >
                 {["Auto", "1080p", "720p", "480p", "360p"].map((q) => (
@@ -750,52 +848,46 @@ const VideoPlayer = ({
               {showMoreMenu && (
                 <div className="absolute bottom-full right-0 mb-2 bg-black/85 backdrop-blur-md rounded-lg shadow-xl min-w-[140px] z-[200] text-xs">
                   {/* Audio Selection */}
-                  <div className="audio-menu-container relative text-right">
-                    <button
-                      onClick={toggleAudioMenu}
-                      className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-between gap-3 text-right"
-                    >
-                      <i
-                        className={`fa-solid fa-chevron-left text-xs transition-transform ${
-                          showAudioMenu ? "-rotate-180" : ""
+                  {audioOptions.length > 0 && (
+                    <div className="audio-menu-container relative text-right">
+                      <button
+                        onClick={toggleAudioMenu}
+                        className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-between gap-3 text-right"
+                      >
+                        <i
+                          className={`fa-solid fa-chevron-left text-xs transition-transform ${
+                            showAudioMenu ? "-rotate-180" : ""
+                          }`}
+                        />
+                        <div className="flex items-center gap-2 justify-end">
+                          <span className="text-right">{currentAudioLabel}</span>
+                          <i className="fa-solid fa-microphone text-base" />
+                        </div>
+                      </button>
+                      <div
+                        className={`absolute top-8 right-3 -translate-y-1/2 bg-black/85 rounded-lg border border-white/10 min-w-[120px] shadow-lg origin-right transition-all duration-300 ease-out ${
+                          showAudioMenu
+                            ? "opacity-100 -translate-x-[calc(100%+0.5rem)] scale-100"
+                            : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
                         }`}
-                      />
-                      <div className="flex items-center gap-2 justify-end">
-                        <span className="text-right">Âm thanh</span>
-                        <i className="fa-solid fa-microphone text-base" />
+                      >
+                        {audioOptions.map((opt) => (
+                          <button
+                            key={opt.key}
+                            onClick={() => handleAudioChange(opt.key)}
+                            className={`w-full px-3 py-2 text-white text-xs hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
+                              audioType === opt.key ? "bg-white/10" : ""
+                            }`}
+                          >
+                            <span>{opt.label}</span>
+                            {audioType === opt.key && (
+                              <i className="fa-solid fa-check text-primaryColor text-[10px]" />
+                            )}
+                          </button>
+                        ))}
                       </div>
-                    </button>
-                    <div
-                      className={`absolute top-8 right-3 -translate-y-1/2 bg-black/85 rounded-lg border border-white/10 min-w-[120px] shadow-lg origin-right transition-all duration-300 ease-out ${
-                        showAudioMenu
-                          ? "opacity-100 -translate-x-[calc(100%+0.5rem)] scale-100"
-                          : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
-                      }`}
-                    >
-                      <button
-                        onClick={() => handleAudioChange("subtitle")}
-                        className={`w-full px-3 py-2 text-white text-xs hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                          audioType === "subtitle" ? "bg-white/10" : ""
-                        }`}
-                      >
-                        <span>Tiếng gốc</span>
-                        {audioType === "subtitle" && (
-                          <i className="fa-solid fa-check text-primaryColor text-[10px]" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleAudioChange("dub")}
-                        className={`w-full px-3 py-2 text-white text-xs hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                          audioType === "dub" ? "bg-white/10" : ""
-                        }`}
-                      >
-                        <span>Lồng tiếng</span>
-                        {audioType === "dub" && (
-                          <i className="fa-solid fa-check text-primaryColor text-[10px]" />
-                        )}
-                      </button>
                     </div>
-                  </div>
+                  )}
 
                   {/* CC */}
                   <button

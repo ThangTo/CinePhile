@@ -11,7 +11,7 @@ const useMovieDetail = (id) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("episodes");
-  const [audioType, setAudioType] = useState("subtitle");
+  const [audioType, setAudioType] = useState(null);
 
   useEffect(() => {
     const fetchMovie = async () => {
@@ -40,6 +40,15 @@ const useMovieDetail = (id) => {
       fetchMovie();
     }
   }, [id]);
+
+  // Đặt audioType mặc định theo tập đầu tiên (nếu có)
+  useEffect(() => {
+    if (!movie || audioType) return;
+    const firstEp = (movie.episodes || [])[0];
+    if (firstEp && firstEp.audioType) {
+      setAudioType(firstEp.audioType);
+    }
+  }, [movie, audioType]);
 
   return {
     movie,

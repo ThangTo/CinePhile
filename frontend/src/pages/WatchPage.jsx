@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import VideoPlayer from "components/watch-page/VideoPlayer";
 import ActionBar from "components/watch-page/ActionBar";
 import RatingSidebar from "components/watch-page/RatingSidebar";
 import EpisodesSection from "components/movie-detail/EpisodesSection";
 import CommentsSection from "components/movie-detail/CommentsSection";
-import CastSection from "components/movie-detail/CastSection";
 import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
 import { fetchMovieById, fetchEpisodes } from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
@@ -15,12 +14,13 @@ const WatchPage = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const episodeParam = parseInt(searchParams.get("ep") || "1", 10);
+  const audioParam = searchParams.get("audio") || null;
 
   const [movie, setMovie] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [activeEp, setActiveEp] = useState(episodeParam);
   const [loading, setLoading] = useState(true);
-  const [audioType, setAudioType] = useState("subtitle");
+  const [audioType, setAudioType] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -30,7 +30,12 @@ const WatchPage = () => {
         // Handle response format: could be direct object/array or wrapped in { data }
         setMovie(m?.data || m);
         const episodesData = eps?.data || eps || [];
-        setEpisodes(Array.isArray(episodesData) ? episodesData : []);
+        const normalizedEpisodes = Array.isArray(episodesData) ? episodesData : [];
+        setEpisodes(normalizedEpisodes);
+
+        // Ưu tiên audio từ URL (?audio=), nếu không có thì lấy audioType của tập đầu tiên
+        const initialAudio = audioParam || normalizedEpisodes[0]?.audioType || null;
+        setAudioType(initialAudio);
       } catch (error) {
         console.error("Error loading movie:", error);
       } finally {
@@ -38,7 +43,7 @@ const WatchPage = () => {
       }
     };
     load();
-  }, [id]);
+  }, [id, audioParam]);
 
   useEffect(() => {
     setActiveEp(episodeParam);
@@ -46,8 +51,21 @@ const WatchPage = () => {
 
   const handleEpisodeChange = (episodeNumber) => {
     // episodeNumber can be either episode.episode or episode.id (for backward compatibility)
-    navigate(`/watch/${id}?ep=${episodeNumber}`);
+    const audioQuery = audioType ? `&audio=${encodeURIComponent(audioType)}` : "";
+    navigate(`/watch/${id}?ep=${episodeNumber}${audioQuery}`);
   };
+
+  // Lọc danh sách tập theo audioType (vietsub / thuyet-minh / long-tieng)
+  const filteredEpisodes = useMemo(() => {
+    if (!episodes || episodes.length === 0) return [];
+    if (!audioType) return episodes;
+
+    const match = episodes.filter((ep) => ep.audioType === audioType);
+    if (match.length > 0) return match;
+
+    // Fallback: nếu dữ liệu cũ chưa có audioType, dùng toàn bộ
+    return episodes;
+  }, [episodes, audioType]);
 
   if (loading) {
     return <BarSpinner />;
@@ -64,9 +82,9 @@ const WatchPage = () => {
   // Find episode by episode number (not id)
   // Backend returns: { id: ObjectId, episode: episodeId (number), ... }
   const currentEpisode =
-    episodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
-    episodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
-    episodes[0];
+    filteredEpisodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
+    filteredEpisodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
+    filteredEpisodes[0];
 
   return (
     <div className="min-h-screen bg-bgColor">
@@ -94,7 +112,7 @@ const WatchPage = () => {
               movie={movie}
               episode={currentEpisode}
               onEpisodeChange={handleEpisodeChange}
-              totalEpisodes={episodes.length}
+              totalEpisodes={filteredEpisodes.length}
               audioType={audioType}
               onAudioTypeChange={setAudioType}
             />
@@ -112,7 +130,7 @@ const WatchPage = () => {
 
             {/* Episodes Section */}
             <EpisodesSection
-              movie={{ ...movie, episodes }}
+              movie={{ ...movie, episodes: filteredEpisodes }}
               activeEpisode={activeEp}
               onEpisodeClick={handleEpisodeChange}
               audioType={audioType}
