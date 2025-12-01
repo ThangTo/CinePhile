@@ -32,13 +32,13 @@ const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" })
         let response;
         switch (sectionType) {
           case "trending":
-            response = await movieService.getTrending(20);
+            response = await movieService.getTrending(30);
             break;
           case "newReleases":
-            response = await movieService.getNewReleases(20);
+            response = await movieService.getNewReleases(30);
             break;
           default:
-            response = await movieService.getAll({ limit: 20 });
+            response = await movieService.getAll({ limit: 30 });
         }
         setAllMovies(response.data || []);
       } catch (error) {

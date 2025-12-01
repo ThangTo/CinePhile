@@ -97,6 +97,56 @@ const getByGenre = async (req, res) => {
 };
 
 /**
+ * GET /movies/meta/filters
+ * Get available genres & countries for filtering
+ */
+const getFilters = async (_req, res) => {
+  try {
+    const data = await movieService.getFilterOptions();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /movies/country/:country
+ * Get movies filtered by country
+ * @param {string} req.params.country - country slug
+ */
+const getByCountry = async (req, res) => {
+  try {
+    const result = await movieService.getByCountry(req.params.country, {
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /movies/type/:type
+ * Filter movies by type (single/series)
+ */
+const getByType = async (req, res) => {
+  try {
+    if (!['single', 'series'].includes(req.params.type)) {
+      throw new Error('Invalid movie type. Use "single" or "series"');
+    }
+    const result = await movieService.getByType(req.params.type, {
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    res.json(result);
+  } catch (error) {
+    const status = error.message.includes('Invalid movie type') ? 400 : 500;
+    res.status(status).json({ message: error.message });
+  }
+};
+
+/**
  * GET /movies/search/query
  * Search movies
  * @param {string} req.query.q - Search query
@@ -213,13 +263,13 @@ const likeComment = async (req, res) => {
       userId: req.user?._id,
       body: req.body,
       path: req.path,
-      url: req.url
+      url: req.url,
     });
-    
+
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
-    
+
     const result = await movieService.likeComment(
       req.params.commentId,
       req.user._id,
@@ -248,13 +298,13 @@ const dislikeComment = async (req, res) => {
       userId: req.user?._id,
       body: req.body,
       path: req.path,
-      url: req.url
+      url: req.url,
     });
-    
+
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
-    
+
     const result = await movieService.dislikeComment(
       req.params.commentId,
       req.user._id,
@@ -280,22 +330,22 @@ const deleteComment = async (req, res) => {
   try {
     console.log('[Delete Comment] Request:', {
       commentId: req.params.commentId,
-      userId: req.user?._id
+      userId: req.user?._id,
     });
-    
+
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
-    
-    const result = await movieService.deleteComment(
-      req.params.commentId,
-      req.user._id
-    );
+
+    const result = await movieService.deleteComment(req.params.commentId, req.user._id);
     res.json(result);
   } catch (error) {
     console.error('[Delete Comment] Error:', error);
-    const statusCode = error.message.includes('not found') ? 404 : 
-                      error.message.includes('only delete') ? 403 : 400;
+    const statusCode = error.message.includes('not found')
+      ? 404
+      : error.message.includes('only delete')
+      ? 403
+      : 400;
     res.status(statusCode).json({ message: error.message });
   }
 };
@@ -307,6 +357,9 @@ module.exports = {
   getTopRated,
   getNewReleases,
   getByGenre,
+  getByCountry,
+  getByType,
+  getFilters,
   search,
   getEpisodes,
   getCast,

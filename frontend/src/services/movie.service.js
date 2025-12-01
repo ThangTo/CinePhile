@@ -49,6 +49,27 @@ const movieService = {
   getByGenre: (genre, params = {}) => apiRequest(`/movies/genre/${genre}`, { params }),
 
   /**
+   * Lấy movies theo country
+   * @param {string} country - Country slug
+   * @param {Object} params - { page?, limit? }
+   * @returns {Promise<Object>} { data: [], pagination: {} }
+   */
+  getByCountry: (country, params = {}) => apiRequest(`/movies/country/${country}`, { params }),
+
+  /**
+   * Lấy movies theo type (single/series)
+   * @param {'single'|'series'} type
+   * @param {Object} params - { page?, limit? }
+   */
+  getByType: (type, params = {}) => apiRequest(`/movies/type/${type}`, { params }),
+
+  /**
+   * Lấy metadata filter (genres & countries)
+   * @returns {Promise<Object>} { genres: [], countries: [] }
+   */
+  getFilterOptions: () => apiRequest("/movies/meta/filters"),
+
+  /**
    * Tìm kiếm movies
    * @param {string} query - Search query
    * @param {Object} params - { page?, limit? }
@@ -84,7 +105,7 @@ const movieService = {
    * @param {boolean} requiresAuth - Gửi token nếu user đã đăng nhập (optional)
    * @returns {Promise<Object>} { data: [], pagination: {} }
    */
-  getComments: (id, params = {}, requiresAuth = false) => 
+  getComments: (id, params = {}, requiresAuth = false) =>
     apiRequest(`/movies/${id}/comments`, { params, requiresAuth }),
 
   /**

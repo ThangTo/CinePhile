@@ -8,6 +8,7 @@ import WatchPage from "./pages/WatchPage";
 import AccountPage from "./pages/AccountPage";
 import GenrePage from "./pages/GenrePage";
 import CountryPage from "./pages/CountryPage";
+import MovieTypePage from "./pages/MovieTypePage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/general/ProtectedRoute";
 import MainLayout from "layouts/MainLayout";
@@ -27,6 +28,7 @@ function App() {
               <Route path="/genre/:slug" element={<GenrePage />} />
               <Route path="/movie/:id" element={<MovieDetail />} />
               <Route path="/country/:slug" element={<CountryPage />} />
+              <Route path="/type/:slug" element={<MovieTypePage />} />
               <Route path="/watch/:id" element={<WatchPage />} />
               <Route path="/account" element={<AccountPage />} />
               <Route path="*" element={<NotFoundPage />} />

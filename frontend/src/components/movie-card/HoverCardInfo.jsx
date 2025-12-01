@@ -31,11 +31,11 @@ const HoverCardInfo = ({ rating, ageRating, year, season, currentEpisode, totalE
       )}
 
       {/* Season */}
-      {season && (
+      {/* {season && (
         <span className="bg-gray-700 text-white px-2 py-1 rounded text-xs font-semibold border border-gray-600">
           Phần {season}
         </span>
-      )}
+      )} */}
 
       {/* Episode Count */}
       {totalEpisodes && (

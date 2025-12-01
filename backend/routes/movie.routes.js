@@ -21,8 +21,17 @@ router.get('/new/releases', movieController.getNewReleases);
 // GET /api/v1/movies/search/query - Search movies (must be before /:id)
 router.get('/search/query', movieController.search);
 
+// GET /api/v1/movies/meta/filters - Get available filters
+router.get('/meta/filters', movieController.getFilters);
+
 // GET /api/v1/movies/genre/:genre - Get movies by genre (must be before /:id)
 router.get('/genre/:genre', movieController.getByGenre);
+
+// GET /api/v1/movies/country/:country - Get movies by country
+router.get('/country/:country', movieController.getByCountry);
+
+// GET /api/v1/movies/type/:type - Get movies by type (single/series)
+router.get('/type/:type', movieController.getByType);
 
 // GET /api/v1/movies/:id/episodes - Get movie episodes (must be before /:id)
 router.get('/:id/episodes', movieController.getEpisodes);

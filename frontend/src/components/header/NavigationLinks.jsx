@@ -16,8 +16,8 @@ const NavigationLinks = ({ className = "", isMobile = false }) => {
   const countryItems = countries.length ? countries : COUNTRY_CATEGORIES;
 
   const links = [
-    { label: "Phim Lẻ", href: "/phim-le", type: "link" },
-    { label: "Phim Bộ", href: "/phim-bo", type: "link" },
+    { label: "Phim Lẻ", href: "/type/phim-le", type: "link" },
+    { label: "Phim Bộ", href: "/type/phim-bo", type: "link" },
     { label: "Thể loại", type: "dropdown", items: genreItems },
     { label: "Quốc gia", type: "dropdown", items: countryItems },
   ];

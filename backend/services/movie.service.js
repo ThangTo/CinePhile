@@ -72,7 +72,15 @@ const buildQuery = (filters = {}) => {
     // Support both 'categories.slug' and 'genres' for backward compatibility
     query['categories.slug'] = filters.genre;
   }
-  if (filters.country) query.country = filters.country;
+  if (filters.country) {
+    // Countries are stored as [{ name, slug }]
+    query['country.slug'] = filters.country;
+  }
+  if (filters.type === 'single') {
+    query.totalEpisodes = 1;
+  } else if (filters.type === 'series') {
+    query.totalEpisodes = { $gt: 1 };
+  }
   if (filters.year) query.year = Number(filters.year);
   if (filters.q) {
     const regex = new RegExp(filters.q, 'i');
@@ -170,6 +178,65 @@ const getByGenre = async (genre, pagination = {}) => {
   const builder = Movie.find(buildQuery({ genre })).sort({ createdAt: -1 });
   const result = await paginate(builder, pagination);
   return transformPaginatedResult(result);
+};
+
+/**
+ * Get movies by country
+ */
+const getByCountry = async (country, pagination = {}) => {
+  const builder = Movie.find(buildQuery({ country })).sort({ createdAt: -1 });
+  const result = await paginate(builder, pagination);
+  return transformPaginatedResult(result);
+};
+
+/**
+ * Get movies by type (single vs series)
+ */
+const getByType = async (type, pagination = {}) => {
+  const builder = Movie.find(buildQuery({ type })).sort({ createdAt: -1 });
+  const result = await paginate(builder, pagination);
+  return transformPaginatedResult(result);
+};
+
+/**
+ * Get available filter options (genres & countries)
+ */
+const getFilterOptions = async () => {
+  const [genresRaw, countriesRaw] = await Promise.all([
+    Movie.aggregate([
+      { $unwind: { path: '$categories', preserveNullAndEmptyArrays: false } },
+      { $match: { 'categories.slug': { $ne: null } } },
+      {
+        $group: {
+          _id: '$categories.slug',
+          name: { $first: '$categories.name' },
+        },
+      },
+      { $sort: { name: 1 } },
+    ]),
+    Movie.aggregate([
+      { $unwind: { path: '$country', preserveNullAndEmptyArrays: false } },
+      { $match: { 'country.slug': { $ne: null } } },
+      {
+        $group: {
+          _id: '$country.slug',
+          name: { $first: '$country.name' },
+        },
+      },
+      { $sort: { name: 1 } },
+    ]),
+  ]);
+
+  return {
+    genres: genresRaw.map((item) => ({
+      slug: item._id,
+      name: item.name || item._id,
+    })),
+    countries: countriesRaw.map((item) => ({
+      slug: item._id,
+      name: item.name || item._id,
+    })),
+  };
 };
 
 /**
@@ -466,6 +533,9 @@ module.exports = {
   getTopRated,
   getNewReleases,
   getByGenre,
+  getByCountry,
+  getByType,
+  getFilterOptions,
   search,
   getEpisodes,
   getCast,
