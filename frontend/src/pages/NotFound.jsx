@@ -131,10 +131,10 @@ const NotFoundPage = () => {
               <NotFoundGraphicSVG />
               <div className="block text-center mt-5">
                 <h5 className="md:text-xl text-lg leading-8 text-white font-medium mb-1.5">
-                  <span className="text-primaryColor font-semibold ">Oops!</span> It seems like
-                  you've taken a wrong turn
+                  <span className="text-primaryColor font-semibold ">Ohh!</span> Chúng tôi không tìm
+                  thấy trang bạn đang tìm kiếm.
                 </h5>
-                <p className="text-sm text-gray-500">We're working to bring it back.</p>
+                <p className="text-md text-gray-500"> Có vẻ như bạn đã đi sai hướng.</p>
               </div>
 
               {/* --- Return Home Button --- */}
@@ -142,7 +142,7 @@ const NotFoundPage = () => {
                 onClick={() => navigate("/")}
                 className="mt-8 bg-primaryColor text-black rounded-full cursor-pointer leading-6 font-medium text-center shadow-md transition-all duration-500 py-3 px-8 text-base hover:bg-primaryColor/80 focus:outline-none focus:ring-2 focus:ring-primaryColor focus:ring-opacity-50"
               >
-                Return Home
+                Quay về trang chủ
               </button>
               {/* --------------------------- */}
             </div>

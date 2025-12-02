@@ -6,4 +6,29 @@
   body {
     @apply bg-[#191b24] text-white font-sans;
   }
+
+  /* Custom scrollbar – áp dụng toàn site */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #111827;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: #111827;
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #6366f1, #ec4899);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #4f46e5, #db2777);
+  }
 }

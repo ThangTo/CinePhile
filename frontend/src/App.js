@@ -8,6 +8,7 @@ import WatchPage from "./pages/WatchPage";
 import AccountPage from "./pages/AccountPage";
 import GenrePage from "./pages/GenrePage";
 import CountryPage from "./pages/CountryPage";
+import SearchResults from "./pages/SearchResults";
 import MovieTypePage from "./pages/MovieTypePage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/general/ProtectedRoute";
@@ -29,6 +30,7 @@ function App() {
               <Route path="/movie/:id" element={<MovieDetail />} />
               <Route path="/country/:slug" element={<CountryPage />} />
               <Route path="/type/:slug" element={<MovieTypePage />} />
+              <Route path="/search" element={<SearchResults />} />
               <Route path="/watch/:id" element={<WatchPage />} />
               <Route path="/account" element={<AccountPage />} />
               <Route path="*" element={<NotFoundPage />} />

@@ -138,7 +138,7 @@ const transformPaginatedResult = (result) => {
     ...result,
     data: transformMovies(result.data || result.movies || []),
     // Also handle 'movies' key for backward compatibility
-    movies: transformMovies(result.movies || result.data || []),
+    // movies: transformMovies(result.movies || result.data || []),
   };
 };
 

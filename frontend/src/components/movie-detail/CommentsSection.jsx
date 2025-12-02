@@ -10,7 +10,7 @@ import movieService from "services/movie.service";
 const getTimeAgo = (date) => {
   const now = new Date();
   const diffInSeconds = Math.floor((now - date) / 1000);
-  
+
   if (diffInSeconds < 60) return "Vừa xong";
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút trước`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
@@ -19,19 +19,17 @@ const getTimeAgo = (date) => {
   return `${Math.floor(diffInSeconds / 31536000)} năm trước`;
 };
 
-  // Helper function để format comment từ backend
+// Helper function để format comment từ backend
 // userId được truyền vào để lưu trạng thái theo từng user
 const formatComment = (comment, currentUserId = null) => {
-  const timeAgo = comment.createdAt 
-    ? getTimeAgo(new Date(comment.createdAt))
-    : "Vừa xong";
-  
+  const timeAgo = comment.createdAt ? getTimeAgo(new Date(comment.createdAt)) : "Vừa xong";
+
   // Lấy trạng thái like/dislike từ localStorage theo userId
   const likedComments = getLikedComments(currentUserId);
   const dislikedComments = getDislikedComments(currentUserId);
   const isLiked = likedComments.includes(comment.id);
   const isDisliked = dislikedComments.includes(comment.id);
-  
+
   return {
     ...comment,
     time: timeAgo,
@@ -73,7 +71,7 @@ const setLikedComment = (commentId, isLiked, userId) => {
       localStorage.setItem(`likedComments_${userId}`, JSON.stringify(liked));
     }
   } else {
-    const filtered = liked.filter(id => id !== commentId);
+    const filtered = liked.filter((id) => id !== commentId);
     localStorage.setItem(`likedComments_${userId}`, JSON.stringify(filtered));
   }
 };
@@ -87,7 +85,7 @@ const setDislikedComment = (commentId, isDisliked, userId) => {
       localStorage.setItem(`dislikedComments_${userId}`, JSON.stringify(disliked));
     }
   } else {
-    const filtered = disliked.filter(id => id !== commentId);
+    const filtered = disliked.filter((id) => id !== commentId);
     localStorage.setItem(`dislikedComments_${userId}`, JSON.stringify(filtered));
   }
 };
@@ -113,7 +111,7 @@ const CommentsSection = ({ movie, className = "" }) => {
         const commentsData = response.data || [];
         // Format comments để match với frontend format (load từ localStorage theo userId)
         const userId = user?._id || user?.id || null;
-        const formattedComments = commentsData.map(comment => formatComment(comment, userId));
+        const formattedComments = commentsData.map((comment) => formatComment(comment, userId));
         setComments(formattedComments);
       } catch (error) {
         console.error("Error fetching comments:", error);
@@ -156,24 +154,33 @@ const CommentsSection = ({ movie, className = "" }) => {
       openAuthModal("login");
       return;
     }
-    
+
     const userId = user?._id || user?.id || null;
     if (!userId) {
       warning("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
       return;
     }
-    
+
     // Lấy trạng thái hiện tại từ state
-    const comment = comments.find(c => c.id === commentId);
+    const comment = comments.find((c) => c.id === commentId);
     const isCurrentlyLiked = comment?.isLiked || false;
     const isCurrentlyDisliked = comment?.isDisliked || false;
-    
-    console.log('[Frontend] Like comment:', { commentId, userId, isCurrentlyLiked, isCurrentlyDisliked });
-    
+
+    console.log("[Frontend] Like comment:", {
+      commentId,
+      userId,
+      isCurrentlyLiked,
+      isCurrentlyDisliked,
+    });
+
     try {
-      const response = await movieService.likeComment(commentId, isCurrentlyLiked, isCurrentlyDisliked);
-      console.log('[Frontend] Like response:', response);
-      
+      const response = await movieService.likeComment(
+        commentId,
+        isCurrentlyLiked,
+        isCurrentlyDisliked
+      );
+      console.log("[Frontend] Like response:", response);
+
       // Cập nhật localStorage theo userId
       if (isCurrentlyLiked) {
         // Bỏ like
@@ -186,7 +193,7 @@ const CommentsSection = ({ movie, className = "" }) => {
           setDislikedComment(commentId, false, userId);
         }
       }
-      
+
       // Cập nhật comment trong state
       setComments((prev) =>
         prev.map((comment) =>
@@ -207,7 +214,7 @@ const CommentsSection = ({ movie, className = "" }) => {
       console.error("[Frontend] Error details:", {
         status: error.status,
         message: error.message,
-        raw: error.raw
+        raw: error.raw,
       });
       warning(error.message || "Không thể like bình luận. Vui lòng thử lại!");
     }
@@ -218,21 +225,25 @@ const CommentsSection = ({ movie, className = "" }) => {
       openAuthModal("login");
       return;
     }
-    
+
     const userId = user?._id || user?.id || null;
     if (!userId) {
       warning("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
       return;
     }
-    
+
     // Lấy trạng thái hiện tại từ state
-    const comment = comments.find(c => c.id === commentId);
+    const comment = comments.find((c) => c.id === commentId);
     const isCurrentlyDisliked = comment?.isDisliked || false;
     const isCurrentlyLiked = comment?.isLiked || false;
-    
+
     try {
-      const response = await movieService.dislikeComment(commentId, isCurrentlyDisliked, isCurrentlyLiked);
-      
+      const response = await movieService.dislikeComment(
+        commentId,
+        isCurrentlyDisliked,
+        isCurrentlyLiked
+      );
+
       // Cập nhật localStorage theo userId
       if (isCurrentlyDisliked) {
         // Bỏ dislike
@@ -245,7 +256,7 @@ const CommentsSection = ({ movie, className = "" }) => {
           setLikedComment(commentId, false, userId);
         }
       }
-      
+
       // Cập nhật comment trong state
       setComments((prev) =>
         prev.map((comment) =>
@@ -288,12 +299,12 @@ const CommentsSection = ({ movie, className = "" }) => {
       openAuthModal("login");
       return;
     }
-    
+
     // Xác nhận trước khi xóa
     if (!window.confirm("Bạn có chắc chắn muốn xóa bình luận này?")) {
       return;
     }
-    
+
     try {
       await movieService.deleteComment(commentId);
       // Xóa comment khỏi state
@@ -400,7 +411,7 @@ const CommentsSection = ({ movie, className = "" }) => {
             showAll={showAllComments}
             onShowMore={() => setShowAllComments(true)}
             hasMore={hasMoreComments}
-            className="pt-4 lg:pt-0 space-y-3 lg:space-y-4"
+            className="pt-4 lg:pt-0 space-y-2"
           />
         )}
 

@@ -7,6 +7,8 @@ import { buildSlugMap, slugify } from "utils/slugify";
 import { GENRE_CATEGORIES, COUNTRY_CATEGORIES } from "components/header/constants";
 import { BarSpinner } from "components/common/LoadingState";
 import useFilterOptions from "hooks/useFilterOptions";
+import EmptyState from "components/common/EmptyState";
+import ErrorState from "components/common/ErrorState";
 
 const PAGE_SIZE = 32;
 const TYPE_FILTERS = {
@@ -137,7 +139,11 @@ const FilteredMovies = ({ pageType = "genre" }) => {
       : "Không tìm thấy phim cho loại này.";
 
   if (loading) {
-    return <BarSpinner />;
+    return (
+      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+        <BarSpinner />
+      </div>
+    );
   }
 
   return (
@@ -148,9 +154,9 @@ const FilteredMovies = ({ pageType = "genre" }) => {
         </h1>
 
         {error ? (
-          <p className="text-red-400">{error}</p>
+          <ErrorState message={error} />
         ) : movies.length === 0 ? (
-          <p className="text-gray-300">{emptyText}</p>
+          <EmptyState title={emptyText} iconClassName="fa-film" />
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">

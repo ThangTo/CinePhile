@@ -2,25 +2,25 @@ import React from "react";
 
 const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, currentUserId }) => {
   // Kiểm tra xem comment có phải của user hiện tại không
-  const isOwner = currentUserId && (
-    comment.userId === currentUserId || 
-    comment.userId?._id === currentUserId ||
-    comment.userId?.id === currentUserId
-  );
+  const isOwner =
+    currentUserId &&
+    (comment.userId === currentUserId ||
+      comment.userId?._id === currentUserId ||
+      comment.userId?.id === currentUserId);
   return (
-    <div className="bg-bgColor sm:p-4 py-3 rounded-lg hover:border-white/10 transition-colors">
+    <div className="bg-bgColor sm:p-2 py-2 rounded-lg hover:border-white/10 transition-colors">
       <div className="flex items-start gap-3">
         {/* Avatar */}
         <img
           src={comment.avatar}
           alt={comment.user}
-          className="w-10 h-10 rounded-full flex-shrink-0 ring-2 ring-white/10"
+          className="w-12 h-12 rounded-full flex-shrink-0 ring-2 ring-white/10"
         />
 
         <div className="flex-1 min-w-0">
           {/* User info & badges */}
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="font-semibold text-white">{comment.user}</span>
+            <span className="font-semibold text-sm text-white">{comment.user}</span>
             {comment.badge === "vip" && (
               <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded text-xs font-bold">
                 <i className="fa-solid fa-infinity text-xs" />
@@ -43,7 +43,7 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
           )}
 
           {/* Comment content */}
-          <p className="text-gray-300 text-sm lg:text-base mb-3 leading-relaxed break-words whitespace-pre-wrap">
+          <p className="text-gray-300 text-sm mb-3 leading-relaxed break-words whitespace-pre-wrap">
             {comment.content}
           </p>
 
@@ -57,14 +57,18 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
                   : "text-gray-400 hover:bg-gray-700/50 hover:text-blue-500"
               }`}
             >
-              <i className={`fa-solid fa-thumbs-up text-base transition-all duration-200 ${
-                comment.isLiked 
-                  ? "scale-110 drop-shadow-lg" 
-                  : "group-hover:scale-110 group-hover:rotate-[-5deg]"
-              }`} />
-              <span className={`font-semibold min-w-[1rem] text-center transition-colors ${
-                comment.isLiked ? "text-blue-500" : "text-gray-400"
-              }`}>
+              <i
+                className={`fa-solid fa-thumbs-up text-base transition-all duration-200 ${
+                  comment.isLiked
+                    ? "scale-110 drop-shadow-lg"
+                    : "group-hover:scale-110 group-hover:rotate-[-5deg]"
+                }`}
+              />
+              <span
+                className={`font-semibold min-w-[1rem] text-center transition-colors ${
+                  comment.isLiked ? "text-blue-500" : "text-gray-400"
+                }`}
+              >
                 {comment.likes || 0}
               </span>
             </button>
@@ -77,14 +81,18 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
                   : "text-gray-400 hover:bg-gray-700/50 hover:text-red-500"
               }`}
             >
-              <i className={`fa-solid fa-thumbs-down text-base transition-all duration-200 ${
-                comment.isDisliked 
-                  ? "scale-110 drop-shadow-lg" 
-                  : "group-hover:scale-110 group-hover:rotate-[5deg]"
-              }`} />
-              <span className={`font-semibold min-w-[1rem] text-center transition-colors ${
-                comment.isDisliked ? "text-red-500" : "text-gray-400"
-              }`}>
+              <i
+                className={`fa-solid fa-thumbs-down text-base transition-all duration-200 ${
+                  comment.isDisliked
+                    ? "scale-110 drop-shadow-lg"
+                    : "group-hover:scale-110 group-hover:rotate-[5deg]"
+                }`}
+              />
+              <span
+                className={`font-semibold min-w-[1rem] text-center transition-colors ${
+                  comment.isDisliked ? "text-red-500" : "text-gray-400"
+                }`}
+              >
                 {comment.dislikes || 0}
               </span>
             </button>
@@ -113,13 +121,14 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
                 <span className="hidden lg:inline">Xóa</span>
               </button>
             ) : (
-              <button
-                onClick={() => onMore && onMore(comment.id)}
-                className="flex items-center gap-1.5 hover:text-gray-200 transition-colors group"
-              >
-                <i className="fa-solid fa-ellipsis group-hover:scale-110 transition-transform" />
-                <span className="hidden lg:inline">Thêm</span>
-              </button>
+              <></>
+              // <button
+              //   onClick={() => onMore && onMore(comment.id)}
+              //   className="flex items-center gap-1.5 hover:text-gray-200 transition-colors group"
+              // >
+              //   <i className="fa-solid fa-ellipsis group-hover:scale-110 transition-transform" />
+              //   <span className="hidden lg:inline">Thêm</span>
+              // </button>
             )}
           </div>
         </div>
