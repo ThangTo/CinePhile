@@ -52,51 +52,56 @@ const Chatbot = () => {
     return div;
   };
 
+  const buildChatMetadata = () => {
+    return {
+      page: window.location.pathname,  
+    };
+  };
+
   // Generate bot response using API
   const generateBotResponse = async (incomingMessageDiv) => {
     const messageElement = incomingMessageDiv.querySelector(".message-text");
-
+    // incoming message: message from user to bot (user message)
     chatHistoryRef.current.push({
       role: "user",
       parts: [
-        { text: userDataRef.current.message },
-        ...(userDataRef.current.file.data ? [{ inline_data: userDataRef.current.file }] : []),
+        { text: userDataRef.current.message }
+        // ...(userDataRef.current.file.data ? [{ inline_data: userDataRef.current.file }] : []),
       ],
     });
 
-    // API request options
-    // Note: Knowledge base is already added to chatHistory as first model message
-    const requestOptions = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: chatHistoryRef.current,
-      }),
-    };
-
     try {
-      // Fetch bot response from API
-      const response = await fetch(API_URL, requestOptions);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error.message);
+      // Build payload for API request
+      const payload = {
+        message: userDataRef.current.message,
+        history: chatHistoryRef.current,
+        metadata: buildChatMetadata(),
+      } 
+      const res = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1"}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // để gửi cookie auth
+        body: JSON.stringify(payload),
+      });
 
-      // Extract and display bot's response text
-      const apiResponseText = data.candidates[0].content.parts[0].text
-        .replace(/\*\*(.*?)\*\*/g, "$1")
-        .trim();
-      messageElement.innerText = apiResponseText;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      const answerText = (data.answer || "").trim();  // Lấy phần text từ answer
+      messageElement.innerText = answerText;
       chatHistoryRef.current.push({
         role: "model",
-        parts: [{ text: apiResponseText }],
+        parts: [{ text: answerText }],
       });
+   
     } catch (error) {
       messageElement.innerText = error.message;
       messageElement.style.color = "#ff0000";
     } finally {
       userDataRef.current.file = {};
-      incomingMessageDiv.classList.remove("thinking");
+      incomingMessageDiv.classList.remove("thinking");  // remove thinking indicator
       if (chatBodyRef.current) {
-        chatBodyRef.current.scrollTo({ behavior: "smooth", top: chatBodyRef.current.scrollHeight });
+        chatBodyRef.current.scrollTo({ behavior: "smooth", top: chatBodyRef.current.scrollHeight });  // scroll to bottom of chat body
       }
     }
   };
