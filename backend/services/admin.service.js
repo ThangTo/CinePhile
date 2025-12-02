@@ -1,3 +1,6 @@
+const MovieModel = require('../models/movie.model');
+const UserModel = require('../models/user.model');
+const EpisodeModel = require('../models/episode.model');
 /**
  * Admin Service
  * Business logic for admin operations
@@ -34,7 +37,7 @@ const getAllMovies = async (options = {}) => {
  */
 const getMovieById = async (id) => {
   // TODO: Implement - Get movie from database by ID
-  return null;
+  return await MovieModel.findById(id);
 };
 
 /**
@@ -44,7 +47,7 @@ const getMovieById = async (id) => {
  */
 const createMovie = async (movieData) => {
   // TODO: Implement - Create movie in database
-  return movieData;
+  return await MovieModel.create(movieData);
 };
 
 /**
@@ -55,7 +58,7 @@ const createMovie = async (movieData) => {
  */
 const updateMovie = async (id, movieData) => {
   // TODO: Implement - Update movie in database
-  return null;
+  return await MovieModel.findByIdAndUpdate(id, movieData, { new: true });
 };
 
 /**
