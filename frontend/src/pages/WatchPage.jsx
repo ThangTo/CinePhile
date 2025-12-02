@@ -70,9 +70,10 @@ const WatchPage = () => {
     setActiveEp(episodeParam);
   }, [episodeParam]);
 
-  const handleEpisodeChange = (episodeNumber) => {
+  const handleEpisodeChange = (episodeNumber, nextAudioType) => {
     // episodeNumber can be either episode.episode or episode.id (for backward compatibility)
-    const audioQuery = audioType ? `&audio=${encodeURIComponent(audioType)}` : "";
+    const effectiveAudio = nextAudioType ?? audioType;
+    const audioQuery = effectiveAudio ? `&audio=${encodeURIComponent(effectiveAudio)}` : "";
     navigate(`/watch/${id}?ep=${episodeNumber}${audioQuery}`);
   };
 

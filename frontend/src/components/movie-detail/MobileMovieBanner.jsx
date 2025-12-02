@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GenreTag, BannerBackground, MovieInfo, useBannerConfig } from "components/banner/index";
+import StatusBadge from "./StatusBadge";
 
 /**
  * Mobile Movie Hero Component - Hero section for mobile movie detail page
@@ -47,7 +48,7 @@ const MobileMovieBanner = ({ movie }) => {
           </div>
 
           {/* Rating Badge - Top Right of Poster */}
-          {movie.rating && (
+          {movie.rating > 0 && (
             <div className="absolute -top-2 -right-2 bg-blue-600 text-white px-3 py-2 rounded-full flex items-center gap-1 shadow-lg z-10">
               <i className="fa-solid fa-star text-primaryColor text-sm" />
               <span className="font-bold text-base">{movie.rating.toFixed(1)}</span>
@@ -91,14 +92,6 @@ const MobileMovieBanner = ({ movie }) => {
               </div>
             )}
 
-            {/* Status */}
-            {movie.status && (
-              <div className="flex items-center gap-2 text-sm">
-                <i className="fa-solid fa-circle-check text-green-500" />
-                <span className="text-green-400">{movie.status}</span>
-              </div>
-            )}
-
             {/* Description */}
             <div>
               <h3 className="text-white font-semibold mb-2">Giới thiệu:</h3>
@@ -109,9 +102,20 @@ const MobileMovieBanner = ({ movie }) => {
 
             {/* Additional Info */}
             <div className="space-y-2 text-sm">
+              {movie.status && (
+                <div className="flex items-start gap-2">
+                  <span className="text-gray-400 font-medium min-w-[90px]">Trạng thái:</span>
+                  <StatusBadge
+                    status={movie.status}
+                    currentEpisode={movie.currentEpisode}
+                    totalEpisodes={movie.totalEpisodes}
+                    className="text-green-400"
+                  />
+                </div>
+              )}
               {movie.duration && (
                 <div className="flex items-start gap-2">
-                  <span className="text-gray-400 font-medium min-w-[90px]">Thời lượng:</span>
+                  <span className=" text-gray-400 font-medium min-w-[90px]">Thời lượng:</span>
                   <span className="text-white">{movie.duration}</span>
                 </div>
               )}

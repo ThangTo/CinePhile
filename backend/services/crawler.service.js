@@ -44,7 +44,7 @@ const crawlMovies = async (page = 1) => {
         const directors = movieData.director ? movieData.director : [];
 
         // B. Logic Random Age (Thêm mới)
-        const ageGroups = ['T12', 'T16', '18+'];
+        const ageGroups = ['T12', 'T14', 'T16', '18+'];
         const randomAge = ageGroups[Math.floor(Math.random() * ageGroups.length)];
 
         // C. Mapping dữ liệu (Có dùng he.decode và thêm age_rating)

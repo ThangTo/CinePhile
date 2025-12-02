@@ -18,14 +18,19 @@ const StatusBadge = ({ status, currentEpisode, totalEpisodes, className = "" }) 
     badgeContent = "Sắp ra mắt";
     badgeClass = "bg-purple-500/80 text-white";
   } else if (status === "completed" || (currentEpNum > 0 && currentEpNum === totalEpisodes)) {
-    badgeContent = `Đã hoàn thành ${currentEpNum || totalEpisodes}/${totalEpisodes} tập`;
+    badgeContent =
+      currentEpNum > 1 ? `Đã hoàn thành ${currentEpNum}/${totalEpisodes} tập` : `Đã hoàn thành `;
     badgeClass = "bg-green-500/80 text-white";
   } else if (status === "ongoing" && currentEpNum > 0 && currentEpNum < totalEpisodes) {
-    badgeContent = `Đang cập nhật ${currentEpNum}/${totalEpisodes} tập`;
+    badgeContent =
+      currentEpNum > 1 ? `Đang cập nhật ${currentEpNum}/${totalEpisodes} tập` : `Đang cập nhật`;
     badgeClass = "bg-orange-500/80 text-white";
   } else if (status === "ongoing" && totalEpisodes > 0) {
     // Fallback cho ongoing nhưng chưa có currentEpisode
-    badgeContent = `Đang cập nhật ${currentEpNum || 0}/${totalEpisodes} tập`;
+    badgeContent =
+      currentEpNum > 1
+        ? `Đang cập nhật ${currentEpNum || 0}/${totalEpisodes} tập`
+        : `Đang cập nhật`;
     badgeClass = "bg-orange-500/80 text-white";
   }
 

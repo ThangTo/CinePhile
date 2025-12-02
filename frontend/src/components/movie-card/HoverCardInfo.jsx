@@ -10,7 +10,7 @@ const HoverCardInfo = ({ rating, ageRating, year, season, currentEpisode, totalE
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* IMDb Rating - Reuse InfoBadge with custom styling */}
-      {rating && (
+      {rating > 0 && (
         <div className="inline-flex">
           <InfoBadge label="IMDb" value={rating} isIMDb={true} />
         </div>

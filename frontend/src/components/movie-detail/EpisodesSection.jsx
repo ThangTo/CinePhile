@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import iconPD from "assets/images/icons/pd.svg";
+import iconTM from "assets/images/icons/tm.svg";
+import iconLT from "assets/images/icons/lt.svg";
 
 const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAudioTypeChange }) => {
   const navigate = useNavigate();
@@ -22,6 +25,178 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  // Tính tổng số tập để phân biệt phim lẻ / phim bộ
+  const totalEpisodes = movie.totalEpisodes || movie.episodes?.length || 0;
+  const isSingleMovie = totalEpisodes <= 1;
+
+  // Helper: build audio options từ movie.lang (giống logic cũ)
+  const buildAudioOptions = () => {
+    const rawLang = (movie.lang || "").toLowerCase();
+    const parts = rawLang
+      .split("+")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const options = [];
+    const addIfNotExists = (key, label, description, colorKey) => {
+      if (!options.some((o) => o.key === key)) {
+        options.push({ key, label, description, colorKey });
+      }
+    };
+
+    parts.forEach((part) => {
+      if (part.includes("vietsub")) {
+        addIfNotExists("vietsub", "Phụ đề", "Bản Vietsub chuẩn nét", "purple");
+      }
+      if (part.includes("thuyết minh") || part.includes("thuyet minh")) {
+        addIfNotExists("thuyet-minh", "Thuyết minh", "Giọng thuyết minh dễ nghe", "green");
+      }
+      if (part.includes("lồng tiếng") || part.includes("long tieng")) {
+        addIfNotExists("long-tieng", "Lồng tiếng", "Thích hợp xem cùng gia đình", "blue");
+      }
+    });
+
+    // Nếu lang trống hoặc không parse được, fallback 1 bản Vietsub
+    if (options.length === 0) {
+      addIfNotExists("vietsub", "Phụ đề", "Bản Vietsub chuẩn nét", "purple");
+    }
+
+    return options;
+  };
+
+  const audioOptions = buildAudioOptions();
+
+  // Giao diện bản chiếu cho phim lẻ (một tập nhưng nhiều bản audio)
+  if (isSingleMovie) {
+    const handleSelectVersion = (audioKey) => {
+      if (onAudioTypeChange) {
+        onAudioTypeChange(audioKey);
+      }
+
+      if (onEpisodeClick) {
+        onEpisodeClick(1, audioKey);
+      } else {
+        // Nếu ở MovieDetail, điều hướng sang WatchPage
+        const audioQuery = audioKey ? `&audio=${encodeURIComponent(audioKey)}` : "";
+        navigate(`/watch/${movie.id}?ep=1${audioQuery}`);
+      }
+    };
+
+    // Màu nền đồng nhất cho từng bản (không dùng gradient nền nữa)
+    const bgColorClasses = {
+      purple: "bg-[#312e81]",
+      blue: "bg-[#1d4ed8]",
+      green: "bg-[#15803d] ",
+    };
+
+    // Overlay gradient trên poster, khớp với màu nền của bản (trạng thái bình thường)
+    const overlayGradients = {
+      // Bắt đầu bằng màu đặc (alpha = 1) để che hoàn toàn viền bên trái, sau đó mờ dần
+      purple: "linear-gradient(to right, rgba(49, 46, 129, 1), rgba(49, 46, 129, 0))",
+      blue: "linear-gradient(to right, rgba(29, 78, 216, 1), rgba(29, 78, 216, 0))",
+      green: "linear-gradient(to right, rgba(21, 128, 61, 1), rgba(21, 128, 61, 0))",
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between  md:pb-4">
+          <h3 className="text-lg md:text-xl font-semibold text-white">Các bản chiếu</h3>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-3">
+          {audioOptions.map((opt) => {
+            const isActive = audioType === opt.key;
+            const bgClass = bgColorClasses[opt.colorKey] || bgColorClasses.blue;
+
+            return (
+              <button
+                key={opt.key}
+                onClick={() => handleSelectVersion(opt.key)}
+                className={`${
+                  isActive ? "border border-primaryColor" : ""
+                } group relative h-12 overflow-hidden rounded-2xl ${bgClass} text-left text-white min-h-[180px] transition-transform duration-200 hover:-translate-y-1`}
+              >
+                <div className="flex items-between gap-4">
+                  {/* Left content */}
+                  <div className="flex-1 flex flex-col justify-between p-4 z-10">
+                    {/* Header badge */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-full bg-black/25 flex items-center justify-center">
+                        <img
+                          src={
+                            opt.key === "vietsub"
+                              ? iconPD
+                              : opt.key === "thuyet-minh"
+                              ? iconTM
+                              : iconLT
+                          }
+                          alt={opt.label}
+                          className="w-4 h-4"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs uppercase tracking-wide text-gray-200">
+                          {opt.label}
+                        </span>
+                        <span className="text-[11px] text-gray-300/90">{opt.description}</span>
+                      </div>
+                    </div>
+
+                    {/* Movie title */}
+                    <div className="space-y-1 mb-4">
+                      <p className="text-base md:text-lg font-semibold line-clamp-2">
+                        {movie.title}
+                      </p>
+                    </div>
+
+                    {/* Action button */}
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-medium border ${
+                          isActive
+                            ? "border-white bg-white/10 text-white"
+                            : "border-white/40 bg-black/20 text-gray-100"
+                        }`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        {isActive ? "Đang xem bản này" : "Sẵn sàng phát"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right poster image */}
+                  {movie.poster && (
+                    <div className="hidden sm:block absolute right-0 top-0 w-[40%] h-full rounded-xl overflow-hidden">
+                      <img
+                        src={movie.poster}
+                        alt={movie.title}
+                        className="w-full h-full object-cover scale-110"
+                        draggable="false"
+                      />
+                      {/* Overlay thường */}
+                      <div
+                        className="absolute inset-0 transition-opacity duration-200"
+                        style={{
+                          backgroundImage: overlayGradients[opt.colorKey] || overlayGradients.blue,
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Active border glow */}
+                {isActive && (
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-offset-2 ring-offset-bgColor ring-primaryColor/80" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Giao diện tập phim cho phim bộ (giữ nguyên logic cũ)
   return (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -77,51 +252,23 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
 
           {/* Nút chọn ngôn ngữ (Vietsub / Thuyết Minh / Lồng tiếng) dựa trên movie.lang */}
           <div className="flex items-center gap-2">
-            {(() => {
-              const rawLang = (movie.lang || "").toLowerCase();
-              const parts = rawLang
-                .split("+")
-                .map((p) => p.trim())
-                .filter(Boolean);
-
-              const options = [];
-              const addIfNotExists = (key, label) => {
-                if (!options.some((o) => o.key === key)) {
-                  options.push({ key, label });
-                }
-              };
-
-              parts.forEach((part) => {
-                if (part.includes("vietsub")) addIfNotExists("vietsub", "Vietsub");
-                if (part.includes("thuyết minh") || part.includes("thuyet minh"))
-                  addIfNotExists("thuyet-minh", "Thuyết Minh");
-                if (part.includes("lồng tiếng") || part.includes("long tieng"))
-                  addIfNotExists("long-tieng", "Lồng tiếng");
-              });
-
-              // Nếu lang trống hoặc không parse được, không hiển thị gì (hoặc có thể fallback sau)
-              if (options.length === 0) addIfNotExists("vietsub", "Vietsub");
-
-              return options.map((opt) => (
-                <button
-                  key={opt.key}
-                  onClick={() => onAudioTypeChange && onAudioTypeChange(opt.key)}
-                  className={`flex lg:inline-flex items-center gap-2 rounded-md px-2 py-1 sm:px-4 sm:py-2 text-gray-200 text-sm transition-colors
+            {audioOptions.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => onAudioTypeChange && onAudioTypeChange(opt.key)}
+                className={`flex lg:inline-flex items-center gap-2 rounded-md px-2 py-1 sm:px-4 sm:py-2 text-gray-200 text-sm transition-colors
                 ${
                   audioType === opt.key
                     ? "border border-primaryColor"
                     : "lg:border lg:border-white/15 hover:border-primaryColor"
                 }`}
-                >
-                  <i
-                    className={`fa-solid ${
-                      opt.key === "vietsub" ? "fa-file-alt" : "fa-microphone"
-                    }`}
-                  />
-                  <span>{opt.label}</span>
-                </button>
-              ));
-            })()}
+              >
+                <i
+                  className={`fa-solid ${opt.key === "vietsub" ? "fa-file-alt" : "fa-microphone"}`}
+                />
+                <span>{opt.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
