@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import SectionHeader from "components/common/SectionHeader";
 import ScrollContainer from "components/common/ScrollContainer";
 import MovieCard from "components/home-page/MovieCard";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
+import { preloadCriticalImages } from "utils/imagePreloader";
+import { slugify } from "utils/slugify";
 
 /**
  * Movie section with horizontal scrolling for ALL screen sizes
@@ -12,15 +14,60 @@ import { BarSpinner } from "components/common/LoadingState";
  * @param {Array} props.movies - Array of movie objects (optional, fetches from API if not provided)
  * @param {string} props.sectionType - Type of section: 'trending' | 'newReleases'
  * @param {string} props.linkHref - Optional "View all" link
+ * @param {'single'|'series'|null} typeMovies - Filter by movie type: 'single' for phim lẻ, 'series' for phim bộ
+ * @param {string|null} genre - Filter by genre name (e.g., 'Hành Động', 'Tình Cảm')
  */
-const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" }) => {
+const SectionRow = ({
+  title,
+  movies,
+  sectionType = "trending",
+  linkHref = "#",
+  typeMovies = null,
+  genre = null,
+}) => {
   const [allMovies, setAllMovies] = useState(movies || []);
   const [loading, setLoading] = useState(!movies);
+  const normalizedGenre = genre ? slugify(genre) : null;
+
+  // Helper function to filter movies (memoized with useCallback)
+  const filterMovies = useCallback(
+    (moviesList) => {
+      let filtered = moviesList;
+
+      // Filter by type if specified
+      if (typeMovies === "single") {
+        filtered = filtered.filter((movie) => movie.totalEpisodes === 1);
+      } else if (typeMovies === "series") {
+        filtered = filtered.filter((movie) => movie.totalEpisodes > 1);
+      }
+
+      // Filter by genre if specified
+      if (normalizedGenre) {
+        filtered = filtered.filter((movie) => {
+          const genres = movie.genres || movie.categories || [];
+          // Normalize genre labels to slug for comparison
+          const normalizedMovieGenres = genres
+            .map((g) => {
+              if (typeof g === "string") return slugify(g);
+              if (typeof g === "object") return slugify(g.name || g.label || "");
+              return "";
+            })
+            .filter(Boolean);
+
+          return normalizedMovieGenres.includes(normalizedGenre);
+        });
+      }
+
+      return filtered;
+    },
+    [typeMovies, normalizedGenre]
+  );
 
   useEffect(() => {
-    // If movies prop is provided, use it directly
+    // If movies prop is provided, use it directly (but still filter if needed)
     if (movies) {
-      setAllMovies(movies);
+      const filteredMovies = filterMovies(movies);
+      setAllMovies(filteredMovies);
       setLoading(false);
       return;
     }
@@ -30,17 +77,40 @@ const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" })
       try {
         setLoading(true);
         let response;
-        switch (sectionType) {
-          case "trending":
-            response = await movieService.getTrending(30);
-            break;
-          case "newReleases":
-            response = await movieService.getNewReleases(30);
-            break;
-          default:
-            response = await movieService.getAll({ limit: 30 });
+        // Fetch more movies to ensure we have enough after filtering
+        // Increase limit if we have multiple filters
+        const hasFilters = typeMovies || normalizedGenre;
+        const fetchLimit = hasFilters ? 100 : 30;
+
+        // If genre is specified, use getByGenre API for better performance
+        if (normalizedGenre) {
+          response = await movieService.getByGenre(normalizedGenre, { limit: fetchLimit });
+        } else {
+          switch (sectionType) {
+            case "trending":
+              response = await movieService.getTrending(fetchLimit);
+              break;
+            case "newReleases":
+              response = await movieService.getNewReleases(fetchLimit);
+              break;
+            default:
+              response = await movieService.getAll({ limit: fetchLimit });
+          }
         }
-        setAllMovies(response.data || []);
+
+        let moviesData = response.data || [];
+
+        // Apply filters
+        moviesData = filterMovies(moviesData);
+
+        setAllMovies(moviesData);
+
+        // Preload critical images (first 15 movies) in background
+        if (moviesData.length > 0) {
+          preloadCriticalImages(moviesData).catch((err) => {
+            console.warn("Failed to preload some images:", err);
+          });
+        }
       } catch (error) {
         console.error(`Error fetching ${sectionType} movies:`, error);
         setAllMovies([]);
@@ -50,7 +120,7 @@ const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" })
     };
 
     fetchMovies();
-  }, [sectionType, movies]);
+  }, [sectionType, movies, typeMovies, normalizedGenre, filterMovies]);
 
   const displayMovies = allMovies;
 
@@ -67,7 +137,7 @@ const SectionRow = ({ title, movies, sectionType = "trending", linkHref = "#" })
 
   return (
     <section className="w-full py-2 sm:py-6 overflow-visible">
-      <div className="px-4">
+      <div className="px-6">
         <SectionHeader title={title} linkHref={linkHref} />
       </div>
 

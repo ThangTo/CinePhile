@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import OptimizedImage from "components/common/OptimizedImage";
 // import CastSection  from './CastSection'
 
 const MovieInfoBrief = ({ movie, activeEp }) => {
@@ -9,10 +10,11 @@ const MovieInfoBrief = ({ movie, activeEp }) => {
       <div className="mt-6 grid gap-6 lg:grid-cols-8">
         {/* Poster */}
         <div className="lg:col-span-1">
-          <img
+          <OptimizedImage
             src={movie.poster}
             alt={movie.title}
             className="w-full aspect-[2/3] object-cover rounded-lg shadow-lg"
+            priority={true}
           />
         </div>
 

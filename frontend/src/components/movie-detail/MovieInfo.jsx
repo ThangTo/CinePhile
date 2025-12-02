@@ -1,6 +1,7 @@
 import React from "react";
 import CastSection from "./CastSection";
 import StatusBadge from "./StatusBadge";
+import OptimizedImage from "components/common/OptimizedImage";
 
 const MovieInfo = ({ movie }) => {
   return (
@@ -9,10 +10,11 @@ const MovieInfo = ({ movie }) => {
         {/* Left: Poster */}
         <div className="lg:col-span-1">
           <div className="relative">
-            <img
+            <OptimizedImage
               src={movie.poster}
               alt={movie.title}
               className="w-full max-w-sm mx-auto rounded-lg shadow-2xl"
+              priority={true}
             />
             <StatusBadge
               status={movie.status}

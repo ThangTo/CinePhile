@@ -1,4 +1,5 @@
 import React from "react";
+import OptimizedImage from "components/common/OptimizedImage";
 
 /**
  * Banner Background Component - Displays background image with gradient overlays
@@ -17,10 +18,12 @@ const BannerBackground = ({
   <>
     {/* Background image */}
     <div className={`relative inset-0 z-0 ${className}`}>
-      <img
+      <OptimizedImage
         src={backgroundImage}
         alt={title}
         className="h-full w-full object-cover object-right aspect-[16/9]"
+        priority={true}
+        lazy={false}
       />
       <div className={`absolute inset-0 z-0 bg-gradient-to-t  ${classNameOverlay}`} />
       {overlayTop && (

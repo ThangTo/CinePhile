@@ -366,6 +366,30 @@ const deleteComment = async (commentId, userId) => {
 };
 
 /**
+ * Increment view count for a movie
+ * No authentication required - anyone can view
+ */
+const incrementView = async (identifier) => {
+  const movieDoc = await findMovie(identifier);
+  if (!movieDoc) {
+    throw new Error('Movie not found');
+  }
+
+  // Use $inc to atomically increment viewCount
+  await Movie.findByIdAndUpdate(movieDoc._id, {
+    $inc: { viewCount: 1 },
+  });
+
+  // Return updated view count
+  const updated = await Movie.findById(movieDoc._id).select('viewCount').lean();
+  return {
+    message: 'View count updated',
+    viewCount: updated.viewCount,
+    movieId: movieDoc._id.toString(),
+  };
+};
+
+/**
  * Rate movie (requires auth)
  */
 const rateMovie = async (identifier, userId, rating) => {
@@ -545,6 +569,7 @@ module.exports = {
   getComments,
   postComment,
   rateMovie,
+  incrementView,
   likeComment,
   dislikeComment,
   deleteComment,

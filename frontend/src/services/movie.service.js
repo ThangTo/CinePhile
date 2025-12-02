@@ -122,6 +122,16 @@ const movieService = {
     }),
 
   /**
+   * Tăng view count cho movie (không yêu cầu auth)
+   * @param {string|number} id - Movie ID
+   * @returns {Promise<Object>} { message, viewCount, movieId }
+   */
+  incrementView: (id) =>
+    apiRequest(`/movies/${id}/view`, {
+      method: "POST",
+    }),
+
+  /**
    * Đánh giá movie (yêu cầu auth)
    * @param {string|number} id - Movie ID
    * @param {number} rating - Rating từ 1-10

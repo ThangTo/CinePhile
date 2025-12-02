@@ -231,6 +231,20 @@ const postComment = async (req, res) => {
 };
 
 /**
+ * POST /movies/:id/view
+ * Increment view count for a movie (no authentication required)
+ * @param {string} req.params.id - Movie ID or slug
+ */
+const incrementView = async (req, res) => {
+  try {
+    const result = await movieService.incrementView(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
+};
+
+/**
  * POST /movies/:id/rate
  * Rate movie (requires authentication)
  * @param {string} req.params.id - Movie ID or slug
@@ -366,6 +380,7 @@ module.exports = {
   getComments,
   postComment,
   rateMovie,
+  incrementView,
   likeComment,
   dislikeComment,
   deleteComment,

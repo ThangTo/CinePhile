@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import WithHoverCard from "components/common/WithHoverCard";
+import OptimizedImage from "components/common/OptimizedImage";
 
 const MovieCard = ({
   movie,
@@ -32,11 +33,12 @@ const MovieCard = ({
         onClick={handleClick}
       >
         <div className="relative rounded-2xl overflow-hidden">
-          <img
+          <OptimizedImage
             src={movie.poster}
             alt={movie.title}
             className="w-full aspect-[2/3] object-cover transition-transform duration-300 group-hover:scale-105 pointer-events-none"
-            draggable="false"
+            preloadOnHover={true}
+            priority={true}
           />
           <div className="absolute left-2 top-1 z-10">
             <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white shadow">
@@ -49,8 +51,8 @@ const MovieCard = ({
           {!compact && <p className="text-[10px] text-gray-400 mb-1">{movie.year || "N/A"}</p>}
           <h3
             className={`${
-              compact ? "text-sm line-clamp-1" : "text-base line-clamp-2"
-            } font-semibold text-white `}
+              compact ? "text-sm" : "text-base"
+            } font-semibold text-white line-clamp-1 `}
           >
             {movie.title}
           </h3>

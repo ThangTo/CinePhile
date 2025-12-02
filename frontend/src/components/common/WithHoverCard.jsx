@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMovieHover } from "hooks/useMovieHover";
 import MovieHoverCard from "components/movie-card/MovieHoverCard";
+import { preloadImage } from "utils/imagePreloader";
 
 const WithHoverCard = ({
   children,
@@ -111,6 +112,17 @@ const WithHoverCard = ({
   const onEnter = (e) => {
     isPointerInsideRef.current = true;
     handleMouseEnter(e);
+
+    // Preload hover card background image immediately on hover
+    // This ensures the image is ready when the hover card appears (after delay)
+    if (movie) {
+      const backgroundImage = movie.backgroundImage || movie.posterUrl || movie.poster;
+      if (backgroundImage) {
+        preloadImage(backgroundImage).catch(() => {
+          // Silently fail if preload fails
+        });
+      }
+    }
   };
   const onLeave = (e) => {
     isPointerInsideRef.current = false;

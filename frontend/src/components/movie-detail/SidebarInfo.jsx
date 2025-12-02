@@ -3,6 +3,7 @@ import CastSection from "components/movie-detail/CastSection";
 import { GenreTag, MovieInfo } from "components/banner/index";
 import { useBannerConfig } from "components/banner/useBannerConfig";
 import StatusBadge from "./StatusBadge";
+import OptimizedImage from "components/common/OptimizedImage";
 
 const SidebarInfo = ({ movie }) => {
   const { infoBadges } = useBannerConfig(movie);
@@ -12,7 +13,12 @@ const SidebarInfo = ({ movie }) => {
       {/* Poster */}
       <div className="relative w-48">
         <div className="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/10">
-          <img src={movie.poster} alt={movie.title} className="w-full h-full object-cover" />
+          <OptimizedImage
+            src={movie.poster}
+            alt={movie.title}
+            className="w-full h-full object-cover"
+            priority={true}
+          />
         </div>
         <StatusBadge
           status={movie.status}

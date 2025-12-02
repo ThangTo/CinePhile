@@ -12,7 +12,11 @@ const MovieDetail = () => {
 
   // Loading state
   if (loading) {
-    return <BarSpinner />;
+    return (
+      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+        <BarSpinner />
+      </div>
+    );
   }
 
   // Error state

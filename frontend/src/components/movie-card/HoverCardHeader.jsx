@@ -1,4 +1,5 @@
 import React from "react";
+import OptimizedImage from "components/common/OptimizedImage";
 
 /**
  * Hover Card Header Component - Backdrop image with title overlay
@@ -15,11 +16,12 @@ const HoverCardHeader = ({ backgroundImage, title, subtitle, onClick, compact = 
     } w-full overflow-hidden cursor-pointer hover:brightness-110 transition-all`}
     onClick={onClick}
   >
-    <img
+    <OptimizedImage
       src={backgroundImage}
       alt={title}
       className="h-full w-full object-cover"
-      draggable="false"
+      lazy={false}
+      priority={true}
     />
     {/* Gradient overlay */}
     <div className="absolute inset-0 bg-gradient-to-t from-gray-800 via-gray-700/10 to-transparent" />

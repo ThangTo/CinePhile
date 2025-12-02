@@ -56,8 +56,8 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
     if (!el) return;
 
     // Check if can scroll in this direction
-    if (direction === 'left' && !canScrollLeft) return;
-    if (direction === 'right' && !canScrollRight) return;
+    if (direction === "left" && !canScrollLeft) return;
+    if (direction === "right" && !canScrollRight) return;
 
     // Get all children elements (movie cards)
     const children = Array.from(el.children);
@@ -71,22 +71,23 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
     const cardRect = firstChild.getBoundingClientRect();
     const cardWidth = cardRect.width;
     if (!cardWidth) return;
-    
+
     // Get gap value from computed style (handles responsive gaps - 0)
     const computedStyle = window.getComputedStyle(el);
     // Try to get gap or columnGap (for flexbox, columnGap is used)
-    const gapString = computedStyle.columnGap || computedStyle.gap || '0';
+    const gapString = computedStyle.columnGap || computedStyle.gap || "0";
     const gapValue = parseFloat(gapString) || 0;
-    
+
     // Scroll by card width + gap and CLAMP to bounds so no extra trailing space
     const scrollAmount = cardWidth + gapValue;
     const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
-    const target = direction === 'left'
-      ? Math.max(0, el.scrollLeft - scrollAmount)
-      : Math.min(maxScroll, el.scrollLeft + scrollAmount);
-    
+    const target =
+      direction === "left"
+        ? Math.max(0, el.scrollLeft - scrollAmount)
+        : Math.min(maxScroll, el.scrollLeft + scrollAmount);
+
     el.scrollTo({ left: target, behavior: "smooth" });
-    
+
     // Check position after scroll (with delay to account for smooth scroll)
     setTimeout(checkScrollPosition, 300);
   };
@@ -95,7 +96,7 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
     <div className={`relative ${className}`}>
       <div
         ref={scrollerRef}
-        className={`flex ${gap} overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing select-none lg:py-6`}
+        className={`flex ${gap} overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing select-none lg:py-2`}
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
@@ -130,7 +131,7 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
         <>
           {canScrollLeft && (
             <button
-              onClick={() => scrollByCard('left')}
+              onClick={() => scrollByCard("left")}
               className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-lg hover:bg-gray-100 transition-colors z-20 cursor-pointer"
               aria-label="Scroll left"
             >
@@ -139,13 +140,15 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
           )}
           {canScrollRight ? (
             <button
-              onClick={() => scrollByCard('right')}
+              onClick={() => scrollByCard("right")}
               className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-lg hover:bg-gray-100 transition-colors z-20 cursor-pointer"
               aria-label="Scroll right"
             >
               <i className="fa-solid fa-chevron-right text-lg"></i>
             </button>
-          ) : <div className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 h-10 w-14 items-center justify-center rounded-full bg-transparent text-black transition-colors z-20 cursor-pointer"></div>}
+          ) : (
+            <div className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 h-10 w-14 items-center justify-center rounded-full bg-transparent text-black transition-colors z-20 cursor-pointer"></div>
+          )}
         </>
       )}
     </div>

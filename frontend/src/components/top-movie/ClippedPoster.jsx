@@ -1,5 +1,6 @@
 import React, { useId } from "react";
 import "styles/TopMovie.css";
+import OptimizedImage from "components/common/OptimizedImage";
 
 // Polygon coordinates for clipped corners
 const POLY_EVEN = `
@@ -37,11 +38,13 @@ const ClippedPoster = ({ src, alt, isOdd = false }) => {
   return (
     <div className={`card ${isOdd ? "odd" : ""} aspect-[2/3]`}>
       <div className={`shape ${isOdd ? "is-odd" : "is-even"}`}>
-        <img
+        <OptimizedImage
           src={src}
           alt={alt}
           className="w-full h-full object-cover pointer-events-none select-none"
-          draggable="false"
+          preloadOnHover={true}
+          priority={true}
+          lazy={false}
         />
 
         {/* SVG gradient border */}

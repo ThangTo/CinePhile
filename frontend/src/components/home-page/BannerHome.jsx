@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { BannerContent, BannerBackground, useBannerConfig } from "components/banner/index";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
+import { preloadMovieImages } from "utils/imagePreloader";
+import OptimizedImage from "components/common/OptimizedImage";
 
 /**
  * Banner Home Component - Main hero banner for homepage
@@ -22,8 +24,16 @@ const BannerHome = ({ movie }) => {
           setLoading(true);
           const response = await movieService.getTrending(5);
           const list = response?.data || [];
-          setMovies(Array.isArray(list) ? list.slice(0, 5) : []);
+          const moviesData = Array.isArray(list) ? list.slice(0, 5) : [];
+          setMovies(moviesData);
           setCurrentIndex(0);
+
+          // Preload all banner images immediately (critical for first impression)
+          if (moviesData.length > 0) {
+            preloadMovieImages(moviesData, { batchSize: 2 }).catch((err) => {
+              console.warn("Failed to preload banner images:", err);
+            });
+          }
         } catch (error) {
           console.error("Error fetching banner movies:", error);
           setMovies([]);
@@ -108,10 +118,11 @@ const BannerHome = ({ movie }) => {
                   isActive ? "scale-105 ring-2 ring-primaryColor" : "hover:scale-105"
                 }`}
               >
-                <img
+                <OptimizedImage
                   src={m.poster}
                   alt={m.title}
                   className="w-14 h-20 lg:w-16 lg:h-24 object-cover"
+                  priority={index === 0}
                 />
                 {isActive && <div className="absolute inset-0 bg-black/20 pointer-events-none" />}
               </button>

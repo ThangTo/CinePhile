@@ -45,6 +45,9 @@ router.get('/:id/comments', movieController.getComments);
 // POST /api/v1/movies/:id/comments - Post comment
 router.post('/:id/comments', authMiddleware, movieController.postComment);
 
+// POST /api/v1/movies/:id/view - Increment view count (no auth required)
+router.post('/:id/view', movieController.incrementView);
+
 // POST /api/v1/movies/:id/rate - Rate movie
 router.post('/:id/rate', authMiddleware, movieController.rateMovie);
 

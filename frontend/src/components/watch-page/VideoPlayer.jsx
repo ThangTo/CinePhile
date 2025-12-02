@@ -90,9 +90,12 @@ const VideoPlayer = ({
 
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return "00:00";
-    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   // Update video time
@@ -160,26 +163,14 @@ const VideoPlayer = ({
     };
   }, [hlsSource, fileSource]);
 
-  // Auto-hide controls (both playing and paused states)
+  // Clear timeout on unmount
   useEffect(() => {
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-
-    if (!showControls) {
-      return;
-    }
-
-    controlsTimeoutRef.current = setTimeout(() => {
-      setShowControls(false);
-    }, 3000);
-
     return () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [isPlaying, showControls]);
+  }, []);
 
   const handlePlayPause = () => {
     const video = videoRef.current;
@@ -314,10 +305,24 @@ const VideoPlayer = ({
   };
 
   const handleMouseMove = () => {
+    if (!hasNativePlayer) return;
+
     setShowControls(true);
+
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
     }
+
+    const delay = isFullscreen ? 2000 : 3000; // 2s khi fullscreen, 3s bình thường
+
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+      // Ẩn luôn các menu phụ khi auto-hide
+      setShowMoreMenu(false);
+      setShowSpeedMenu(false);
+      setShowQualityMenu(false);
+      setShowAudioMenu(false);
+    }, delay);
   };
 
   const handleNextEpisode = () => {
@@ -486,8 +491,7 @@ const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className="relative w-full bg-black rounded-lg"
-      style={{ aspectRatio: "16/9", maxWidth: "100%", height: "auto" }}
+      className="relative w-full bg-black rounded-lg aspect-[16/9] max-w-full"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
         if (isPlaying) setShowControls(false);
@@ -554,12 +558,12 @@ const VideoPlayer = ({
 
       {/* Video Controls Overlay */}
       <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none ${
+        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none ${
           showControls && hasNativePlayer ? "opacity-100" : "opacity-0"
         }`}
       >
         {/* Progress Bar */}
-        <div className="mb-2 md:mb-3 lg:mb-4 pointer-events-auto">
+        <div className="mb-2 pointer-events-auto">
           <div
             className="group/seek w-full h-0.5 md:h-1 bg-white/30 rounded-full cursor-pointer hover:h-1 md:hover:h-1.5 transition-all"
             onClick={handleSeek}
@@ -730,13 +734,13 @@ const VideoPlayer = ({
             )}
 
             {/* CC - Desktop/Tablet only */}
-            <div className="hidden md:block">
+            {/* <div className="hidden md:block">
               <Tooltip text="Phụ đề">
                 <button className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105">
                   <span className="text-white font-bold text-xs lg:text-sm">CC</span>
                 </button>
               </Tooltip>
-            </div>
+            </div> */}
 
             {/* Picture in Picture - Desktop/Tablet only */}
             <div className="hidden md:block">
@@ -890,13 +894,13 @@ const VideoPlayer = ({
                   )}
 
                   {/* CC */}
-                  <button
+                  {/* <button
                     onClick={() => setShowMoreMenu(false)}
                     className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right"
                   >
                     <span className="text-right">Phụ đề</span>
                     <i className="fa-solid fa-closed-captioning text-base" />
-                  </button>
+                  </button> */}
 
                   {/* Picture in Picture */}
                   <button

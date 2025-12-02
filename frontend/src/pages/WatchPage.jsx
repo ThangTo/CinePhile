@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import VideoPlayer from "components/watch-page/VideoPlayer";
 import ActionBar from "components/watch-page/ActionBar";
@@ -7,6 +7,7 @@ import EpisodesSection from "components/movie-detail/EpisodesSection";
 import CommentsSection from "components/movie-detail/CommentsSection";
 import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
 import { fetchMovieById, fetchEpisodes } from "services/movie.service";
+import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
 
 const WatchPage = () => {
@@ -21,6 +22,7 @@ const WatchPage = () => {
   const [activeEp, setActiveEp] = useState(episodeParam);
   const [loading, setLoading] = useState(true);
   const [audioType, setAudioType] = useState(null);
+  const viewCountedRef = useRef(false);
 
   useEffect(() => {
     const load = async () => {
@@ -45,6 +47,25 @@ const WatchPage = () => {
     load();
   }, [id, audioParam]);
 
+  // Increment view count when page loads (only once per movie)
+  useEffect(() => {
+    if (!movie || viewCountedRef.current) return;
+
+    const incrementView = async () => {
+      try {
+        await movieService.incrementView(id);
+        viewCountedRef.current = true;
+        // Optionally update local movie state with new view count
+        // setMovie(prev => ({ ...prev, views: (prev.views || 0) + 1 }));
+      } catch (error) {
+        console.error("Error incrementing view count:", error);
+        // Silently fail - don't block user experience
+      }
+    };
+
+    incrementView();
+  }, [movie, id]);
+
   useEffect(() => {
     setActiveEp(episodeParam);
   }, [episodeParam]);
@@ -68,7 +89,11 @@ const WatchPage = () => {
   }, [episodes, audioType]);
 
   if (loading) {
-    return <BarSpinner />;
+    return (
+      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+        <BarSpinner />
+      </div>
+    );
   }
 
   if (!movie) {

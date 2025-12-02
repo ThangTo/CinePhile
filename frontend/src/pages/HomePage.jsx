@@ -26,11 +26,21 @@ const HomePage = () => {
         {/* New Releases Section - Uses mock data */}
         <SectionRow title="Phim Mới Cập Nhật" sectionType="newReleases" linkHref="/new-releases" />
 
-        {/* Top 10 Section */}
-        <Top10Movie />
+        {/* Top 10 Phim Bộ Hôm Nay */}
+        <Top10Movie title="Top 10 Phim Bộ Hôm Nay" linkHref="/top10" type="series" />
 
         {/* Another Trending Section */}
-        <SectionRow title="Mãn Nhãn Với Phim Chiếu Rạp" sectionType="trending" linkHref="/cinema" />
+        <SectionRow
+          title="Mãn Nhãn Với Phim Chiếu Rạp"
+          sectionType="trending"
+          typeMovies="single"
+          linkHref="/cinema"
+        />
+
+        <SectionRow title="Gia Đình Là Số 1" linkHref="/family" genre="Gia Đình" />
+
+        {/* Top 10 Phim Lẻ Hôm Nay */}
+        <Top10Movie title="Top 10 Phim Lẻ Hôm Nay" linkHref="/top10" type="single" />
       </div>
 
       {/* Quick Admin Login - Development Tool */}
