@@ -61,6 +61,7 @@ const healthRoutes = require('./routes/health.routes');
 const adminRoutes = require('./routes/admin.routes');
 const crawlerRoutes = require('./routes/crawler.routes');
 const commentRoutes = require('./routes/comment.routes');
+const chatRoutes = require('./routes/chat.routes');
 
 // API endpoints
 app.use('/api/v1/movies', movieRoutes);
@@ -76,6 +77,7 @@ app.use('/api/v1/comments', (req, res, next) => {
   next();
 });
 app.use('/api/v1/comments', commentRoutes);
+app.use('/api/v1/chat', chatRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).send('Server is running');
