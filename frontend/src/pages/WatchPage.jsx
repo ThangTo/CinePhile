@@ -7,6 +7,7 @@ import EpisodesSection from "components/movie-detail/EpisodesSection";
 import CommentsSection from "components/movie-detail/CommentsSection";
 import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
 import { fetchMovieById, fetchEpisodes } from "services/movie.service";
+import { enrichMovieWithSeriesParts } from "utils/seriesGrouping";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
 
@@ -30,7 +31,9 @@ const WatchPage = () => {
       try {
         const [m, eps] = await Promise.all([fetchMovieById(id), fetchEpisodes(id)]);
         // Handle response format: could be direct object/array or wrapped in { data }
-        setMovie(m?.data || m);
+        const baseMovie = m?.data || m;
+        const enrichedMovie = await enrichMovieWithSeriesParts(baseMovie);
+        setMovie(enrichedMovie);
         const episodesData = eps?.data || eps || [];
         const normalizedEpisodes = Array.isArray(episodesData) ? episodesData : [];
         setEpisodes(normalizedEpisodes);
@@ -161,6 +164,16 @@ const WatchPage = () => {
               onEpisodeClick={handleEpisodeChange}
               audioType={audioType}
               onAudioTypeChange={setAudioType}
+              onPartChange={(partLabel) => {
+                if (!movie?.seriesParts || !Array.isArray(movie.seriesParts)) return;
+                const match = partLabel.match(/Phần\s*(\d+)/i);
+                const partNumber = match ? parseInt(match[1], 10) : 1;
+                const target = movie.seriesParts.find((p) => p.partNumber === partNumber);
+                if (!target) return;
+
+                const audioQuery = audioType ? `&audio=${encodeURIComponent(audioType)}` : "";
+                navigate(`/watch/${target.id}?ep=1${audioQuery}`);
+              }}
             />
 
             {/* Comments - constrained to left grid column on desktop */}

@@ -4,13 +4,25 @@ import iconPD from "assets/images/icons/pd.svg";
 import iconTM from "assets/images/icons/tm.svg";
 import iconLT from "assets/images/icons/lt.svg";
 
-const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAudioTypeChange }) => {
+const EpisodeSection = ({
+  movie,
+  activeEpisode,
+  onEpisodeClick,
+  audioType,
+  onAudioTypeChange,
+  onPartChange,
+}) => {
   const navigate = useNavigate();
   // If no activeEpisode provided, default to first episode
   const defaultActiveEpisode = activeEpisode || 1;
   const [isCondensed, setIsCondensed] = useState(false);
   const [openPart, setOpenPart] = useState(false);
   const [activePart, setActivePart] = useState(movie.part || "Phần 1");
+
+  // Đồng bộ lại activePart khi movie/part thay đổi (khi điều hướng sang phần khác)
+  useEffect(() => {
+    setActivePart(movie.part || "Phần 1");
+  }, [movie.part]);
 
   // danh sách phần lấy từ API (fallback 1 phần)
   const parts = movie.parts?.length ? movie.parts : [movie.part || "Phần 1"];
@@ -232,6 +244,9 @@ const EpisodeSection = ({ movie, activeEpisode, onEpisodeClick, audioType, onAud
                           onClick={() => {
                             setActivePart(p);
                             setOpenPart(false);
+                            if (onPartChange) {
+                              onPartChange(p);
+                            }
                           }}
                           className={`w-full text-left px-4 py-2 text-sm transition-colors
                             ${

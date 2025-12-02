@@ -5,6 +5,7 @@ import MovieCard from "components/home-page/MovieCard";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
 import { preloadCriticalImages } from "utils/imagePreloader";
+import { groupSeriesMovies } from "utils/seriesGrouping";
 import { slugify } from "utils/slugify";
 
 /**
@@ -57,6 +58,9 @@ const SectionRow = ({
           return normalizedMovieGenres.includes(normalizedGenre);
         });
       }
+
+      // Group multi-part series into single card with parts metadata
+      filtered = groupSeriesMovies(filtered);
 
       return filtered;
     },

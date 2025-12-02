@@ -1,18 +1,22 @@
-import React, { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import useToast from "hooks/useToast";
 import useAuth from "hooks/useAuth";
+import useMovieRating from "hooks/useMovieRating";
 import ToastContainer from "components/common/ToastContainer";
 import RatingModal from "components/watch-page/RatingModal";
 import userService from "services/user.service";
-import movieService from "services/movie.service";
 
 const ActionButtons = ({ movie, audioType }) => {
   const navigate = useNavigate();
   const { toasts, removeToast, success, info, warning } = useToast();
-  const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, user } =
-    useAuth();
-  const [showRatingModal, setShowRatingModal] = useState(false);
+  const { isAuthenticated, openAuthModal } = useAuth();
+  const {
+    isModalOpen,
+    openRatingModal,
+    closeRatingModal,
+    rateMovie: rateMovieWithHook,
+  } = useMovieRating(movie);
 
   const handleAddFavorite = async () => {
     if (!isAuthenticated) {
@@ -25,21 +29,6 @@ const ActionButtons = ({ movie, audioType }) => {
     } catch (error) {
       warning(error.message || "Không thể thêm vào yêu thích. Vui lòng thử lại!");
       console.error("Error adding to favorites:", error);
-    }
-  };
-
-  const handleRate = async (rating) => {
-    if (!isAuthenticated) {
-      openAuthModal("login");
-      return;
-    }
-    try {
-      await movieService.rateMovie(movie.id, rating);
-      success("Đánh giá của bạn đã được ghi nhận!");
-      setShowRatingModal(false);
-    } catch (error) {
-      warning(error.message || "Không thể gửi đánh giá. Vui lòng thử lại!");
-      console.error("Error rating movie:", error);
     }
   };
 
@@ -76,14 +65,6 @@ const ActionButtons = ({ movie, audioType }) => {
       top: offsetPosition,
       behavior: "smooth",
     });
-  };
-
-  const handleOpenRateModal = () => {
-    if (!isAuthenticated) {
-      openAuthModal("login");
-      return;
-    }
-    setShowRatingModal(true);
   };
 
   return (
@@ -140,7 +121,7 @@ const ActionButtons = ({ movie, audioType }) => {
         </div>
 
         <button
-          onClick={handleOpenRateModal}
+          onClick={openRatingModal}
           className="bg-blue-600 hover:bg-blue-700 text-white lg:px-4 px-2 py-2 rounded-full flex items-center gap-2 font-semibold shadow-lg transition-all"
         >
           <i className="fa-solid fa-smile text-lg" />
@@ -151,10 +132,10 @@ const ActionButtons = ({ movie, audioType }) => {
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <RatingModal
-        isOpen={showRatingModal}
-        onClose={() => setShowRatingModal(false)}
+        isOpen={isModalOpen}
+        onClose={closeRatingModal}
         movie={movie}
-        onRate={handleRate}
+        onRate={rateMovieWithHook}
       />
     </>
   );

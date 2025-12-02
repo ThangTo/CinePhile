@@ -2,7 +2,7 @@ import React from "react";
 import EpisodesSection from "./EpisodesSection";
 import CastSection from "./CastSection";
 
-const TabContent = ({ activeTab, movie, audioType, onAudioTypeChange }) => {
+const TabContent = ({ activeTab, movie, audioType, onAudioTypeChange, onPartChange }) => {
   const renderTabContent = () => {
     switch (activeTab) {
       case "episodes":
@@ -11,6 +11,7 @@ const TabContent = ({ activeTab, movie, audioType, onAudioTypeChange }) => {
             movie={movie}
             audioType={audioType}
             onAudioTypeChange={onAudioTypeChange}
+            onPartChange={onPartChange}
           />
         );
 

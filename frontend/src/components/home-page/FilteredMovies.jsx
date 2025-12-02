@@ -9,6 +9,7 @@ import { BarSpinner } from "components/common/LoadingState";
 import useFilterOptions from "hooks/useFilterOptions";
 import EmptyState from "components/common/EmptyState";
 import ErrorState from "components/common/ErrorState";
+import { groupSeriesMovies } from "utils/seriesGrouping";
 
 const PAGE_SIZE = 32;
 const TYPE_FILTERS = {
@@ -60,7 +61,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
           }
         }
 
-        const moviesData = response?.data || [];
+        let moviesData = response?.data || [];
         const paginationData = response?.pagination ||
           response?.data?.pagination || {
             page,
@@ -68,6 +69,9 @@ const FilteredMovies = ({ pageType = "genre" }) => {
             total: moviesData.length,
             limit: PAGE_SIZE,
           };
+
+        // Group multi-part series into single card with parts metadata
+        moviesData = groupSeriesMovies(moviesData);
 
         setMovies(moviesData);
         setPagination({

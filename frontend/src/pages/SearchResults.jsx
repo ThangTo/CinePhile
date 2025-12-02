@@ -6,6 +6,7 @@ import { BarSpinner } from "components/common/LoadingState";
 import EmptyState from "components/common/EmptyState";
 import ErrorState from "components/common/ErrorState";
 import movieService from "services/movie.service";
+import { groupSeriesMovies } from "utils/seriesGrouping";
 
 const PAGE_SIZE = 24;
 
@@ -41,7 +42,7 @@ const SearchResults = () => {
       try {
         const params = { page, limit: PAGE_SIZE };
         const response = await movieService.search(query, params);
-        const moviesData = response?.data || [];
+        let moviesData = response?.data || [];
         const paginationData = response?.pagination ||
           response?.data?.pagination || {
             page,
@@ -49,6 +50,9 @@ const SearchResults = () => {
             total: moviesData.length,
             limit: PAGE_SIZE,
           };
+
+        // Group multi-part series into single card with parts metadata
+        moviesData = groupSeriesMovies(moviesData);
 
         setMovies(moviesData);
         setPagination({

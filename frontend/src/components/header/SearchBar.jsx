@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import movieService from "services/movie.service";
 import LoadingState from "components/common/LoadingState";
+import { groupSeriesMovies } from "utils/seriesGrouping";
 
 const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_DELAY = 400;
@@ -31,7 +32,8 @@ const SearchBar = ({ className = "", placeholder = "Tìm kiếm phim, diễn vi�
       try {
         const res = await movieService.search(query.trim(), { limit: 6, page: 1 });
         const movies = res?.data || [];
-        setResults(movies);
+        const grouped = groupSeriesMovies(movies);
+        setResults(grouped);
         setIsOpen(true);
       } catch (err) {
         console.error("Search error:", err);

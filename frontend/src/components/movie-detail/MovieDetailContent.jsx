@@ -14,6 +14,7 @@ const MovieDetailContent = ({
   audioType,
   onAudioTypeChange,
   commentsSectionClass = "",
+  onPartChange,
 }) => {
   return (
     <>
@@ -24,6 +25,7 @@ const MovieDetailContent = ({
         movie={movie}
         audioType={audioType}
         onAudioTypeChange={onAudioTypeChange}
+        onPartChange={onPartChange}
       />
 
       <CommentsSection movie={movie} className={commentsSectionClass} />
