@@ -67,10 +67,16 @@ const updateMovie = async (id, movieData) => {
  * @returns {Promise<boolean>} Success status
  */
 const deleteMovie = async (id) => {
-  // TODO: Implement - Delete movie from database
-  return true;
+  const movie = await MovieModel.findByIdAndDelete(id);
+  
+  if (movie) {
+    // TÍNH NĂNG QUAN TRỌNG: Cascade Delete
+    // Khi xóa phim, phải xóa luôn tất cả tập phim của nó để sạch DB
+    await EpisodeModel.deleteMany({ movieId: id });
+    return true;
+  }
+  return false;
 };
-
 /**
  * Search movies
  * @param {string} query - Search query
@@ -78,17 +84,8 @@ const deleteMovie = async (id) => {
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
 const searchMovies = async (query, options = {}) => {
-  // TODO: Implement - Search movies in database
-  const { page = 1, limit = 20 } = options;
-  return {
-    data: [],
-    pagination: {
-      page: Number(page),
-      limit: Number(limit),
-      total: 0,
-      totalPages: 0,
-    },
-  };
+  // Tái sử dụng logic của getAllMovies cho gọn code
+  return await getAllMovies({ ...options, search: queryStr });
 };
 
 /**
@@ -101,15 +98,37 @@ const searchMovies = async (query, options = {}) => {
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
 const getAllUsers = async (options = {}) => {
-  // TODO: Implement - Get users from database with pagination
   const { page = 1, limit = 20, search } = options;
+  const pageNum = Number(page) || 1;
+  const limitNum = Number(limit) || 20;
+  const skip = (pageNum - 1) * limitNum;
+
+  let query = {};
+  if (search) {
+    query = {
+      $or: [
+        { username: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ]
+    };
+  }
+
+  const [users, total] = await Promise.all([
+    UserModel.find(query)
+      .select('-password') // QUAN TRỌNG: Không bao giờ trả về password
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum),
+    UserModel.countDocuments(query)
+  ]);
+
   return {
-    data: [],
+    data: users,
     pagination: {
-      page: Number(page),
-      limit: Number(limit),
-      total: 0,
-      totalPages: 0,
+      page: pageNum,
+      limit: limitNum,
+      total: total,
+      totalPages: Math.ceil(total / limitNum),
     },
   };
 };
@@ -121,7 +140,8 @@ const getAllUsers = async (options = {}) => {
  */
 const getUserById = async (id) => {
   // TODO: Implement - Get user from database by ID
-  return null;
+  return await UserModel.findById(id).select('-password');
+  
 };
 
 /**
@@ -131,7 +151,9 @@ const getUserById = async (id) => {
  */
 const createUser = async (userData) => {
   // TODO: Implement - Create user in database
-  return userData;
+  // Lưu ý: Controller cần đảm bảo hash password trước khi truyền vào đây
+  // Hoặc Model User đã có middleware pre-save để hash password
+  return await UserModel.create(userData);
 };
 
 /**
@@ -142,7 +164,7 @@ const createUser = async (userData) => {
  */
 const updateUser = async (id, userData) => {
   // TODO: Implement - Update user in database
-  return null;
+  return await UserModel.findByIdAndUpdate(id, userData, { new: true }).select('-password');
 };
 
 /**
@@ -152,8 +174,11 @@ const updateUser = async (id, userData) => {
  */
 const deleteUser = async (id) => {
   // TODO: Implement - Delete user from database
-  return true;
+  const result = await UserModel.findByIdAndDelete(id);
+  return !!result; // Trả về true/false
 };
+
+
 
 /**
  * Toggle user status (active/inactive)
@@ -162,7 +187,13 @@ const deleteUser = async (id) => {
  */
 const toggleUserStatus = async (id) => {
   // TODO: Implement - Toggle user status in database
-  return null;
+  const user = await UserModel.findById(id);
+  if (!user) return null;
+
+  // Đảo trạng thái isBanned (Khóa/Mở khóa)
+  // Đảm bảo trong User Schema có trường này (hoặc trường isActive)
+  user.isBanned = !user.isBanned; 
+  return await user.save();
 };
 
 /**

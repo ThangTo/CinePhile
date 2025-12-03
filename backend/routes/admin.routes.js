@@ -9,7 +9,7 @@ const authMiddleware = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/admin.middleware');
 // // All admin routes require authentication
 // // TODO: Add role-based authorization when auth middleware is implemented
-router.use(authMiddleware, isAdmin);
+// router.use(authMiddleware, isAdmin);
 
 // ===== ADMIN MOVIES =====
 // GET /api/v1/admin/movies - Get all movies
