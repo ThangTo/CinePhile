@@ -15,14 +15,14 @@ const { isAdmin } = require('../middleware/admin.middleware');
 // GET /api/v1/admin/movies - Get all movies
 router.get('/movies', adminController.getAllMovies);
 
+// GET /api/v1/admin/movies/search - Search movies
+router.get('/movies/search', adminController.searchMovies);
+
 // GET /api/v1/admin/movies/:id - Get movie by ID
 router.get('/movies/:id', adminController.getMovieById);
 
 // POST /api/v1/admin/movies - Create movie
 router.post('/movies', adminController.createMovie);
-
-// GET /api/v1/admin/movies/search - Search movies
-router.get('/movies/search', adminController.searchMovies);
 
 // PUT /api/v1/admin/movies/:id - Update movie
 router.put('/movies/:id', adminController.updateMovie);

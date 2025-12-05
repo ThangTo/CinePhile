@@ -15,21 +15,42 @@ const EpisodeModel = require('../models/episode.model');
  * @param {Object} options - { page, limit, search }
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
-const getAllMovies = async (options = {}) => {
-  // TODO: Implement - Get movies from database with pagination
-  const { page = 1, limit = 20, search } = options;
-  // Placeholder return
+const getAllMovies = async ({ page, limit, search }) => {
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 20;
+  const skip = (pageNum - 1) * limitNum;
+
+  // Xây dựng bộ lọc tìm kiếm (Search Query)
+  let query = {};
+  if (search) {
+    query = {
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { slug: { $regex: search, $options: 'i' } },
+        { original_name: { $regex: search, $options: 'i' } }
+      ]
+    };
+  }
+
+  // Gọi Database
+  const movies = await MovieModel.find(query)
+    .sort({ createdAt: -1 }) // Mới nhất lên đầu
+    .skip(skip)
+    .limit(limitNum)
+    .select('-content -actor -director'); // Bỏ bớt field nặng để load nhanh
+
+  const total = await MovieModel.countDocuments(query);
+
   return {
-    data: [],
+    data: movies,
     pagination: {
-      page: Number(page),
-      limit: Number(limit),
-      total: 0,
-      totalPages: 0,
-    },
+      totalItems: total,
+      totalPages: Math.ceil(total / limitNum),
+      currentPage: pageNum,
+      limit: limitNum
+    }
   };
 };
-
 /**
  * Get movie by ID
  * @param {string|number} id - Movie ID
@@ -85,7 +106,7 @@ const deleteMovie = async (id) => {
  */
 const searchMovies = async (query, options = {}) => {
   // Tái sử dụng logic của getAllMovies cho gọn code
-  return await getAllMovies({ ...options, search: queryStr });
+  return await getAllMovies({ ...options, search: query });
 };
 
 /**
@@ -206,16 +227,29 @@ const toggleUserStatus = async (id) => {
  */
 const getStats = async () => {
   // TODO: Implement - Get statistics from database
+  // Lấy số liệu thực từ DB
+  const [totalMovies, totalUsers, totalViewsData] = await Promise.all([
+    MovieModel.countDocuments(),
+    UserModel.countDocuments(),
+    MovieModel.aggregate([{ $group: { _id: null, total: { $sum: "$viewCount" } } }])
+  ]);
+  // Tính user mới trong tháng (Ví dụ đơn giản)
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  const newUsers = await UserModel.countDocuments({ createdAt: { $gte: startOfMonth } });
+
+  const totalViews = totalViewsData.length > 0 ? totalViewsData[0].total : 0;
+  
   return {
-    totalMovies: 0,
-    totalUsers: 0,
-    totalViews: 0,
-    activeUsers: 0,
+    totalMovies: totalMovies,
+    totalUsers: totalUsers,
+    totalViews: totalViews,
+    activeUsers: newUsers,
     trends: {
-      movies: '0%',
-      users: '0%',
-      views: '0%',
-      active: '0%',
+      movies: '10%', // hardcode tạm thời
+      users: '20%',
+      views: '30%',
+      active: '40%',
     },
   };
 };
@@ -227,6 +261,19 @@ const getStats = async () => {
  */
 const getChartData = async (type) => {
   // TODO: Implement - Get chart data from database
+  // trả về dạng chuẩn để vẽ biểu đồ
+  if (type === 'top-movies' || !type) {
+    const topMovies = await MovieModel.find()
+      .sort({ viewCount: -1 })
+      .limit(5)
+      .select('name viewCount');// 
+      
+    return {
+      labels: topMovies.map(m => m.name),
+      data: topMovies.map(m => m.viewCount)
+    };
+  }
+  // Placeholder cho các loại chart khác
   return {
     labels: [],
     data: [],
