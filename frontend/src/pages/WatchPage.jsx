@@ -10,6 +10,7 @@ import { fetchMovieById, fetchEpisodes } from "services/movie.service";
 import { enrichMovieWithSeriesParts } from "utils/seriesGrouping";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
+import CastSection from "components/movie-detail/CastSection";
 
 const WatchPage = () => {
   const navigate = useNavigate();
@@ -186,14 +187,14 @@ const WatchPage = () => {
           <div className="hidden lg:block lg:col-span-4 pl-6 border-l-2 border-borderColor">
             <div className="gap-8 flex flex-col">
               <RatingSidebar movie={movie} />
-              {/* <CastSection movie={movie} layout="vertical" /> */}
+              <CastSection movie={movie} layout="vertical" />
             </div>
           </div>
 
           {/* Mobile/Tablet Layout: Rating + Cast below Episodes (sm and below) */}
           <div className="lg:hidden w-full space-y-6 mt-6">
             <RatingSidebar movie={movie} />
-            {/* <CastSection movie={movie} layout="vertical" /> */}
+            <CastSection movie={movie} layout="vertical" />
           </div>
 
           {/* Mobile/Tablet Comments below rating & cast */}

@@ -2,6 +2,7 @@ const axios = require('axios');
 const he = require('he'); // Import thư viện chuẩn hoá HTML Entities
 const MovieModel = require('../models/movie.model');
 const EpisodeModel = require('../models/episode.model');
+const { ensureCastForNames } = require('../integrations/cast.service');
 
 const API_BASE_URL = 'https://phimapi.com';
 
@@ -85,6 +86,20 @@ const crawlMovies = async (page = 1) => {
           upsert: true,
           new: true,
         });
+
+        // 3b. ĐẢM BẢO CAST (diễn viên/đạo diễn) ĐƯỢC LƯU TRONG COLLECTION CAST (TMDb)
+        // Không block nếu TMDb lỗi; chỉ log và tiếp tục crawl.
+        try {
+          if (Array.isArray(actors) && actors.length) {
+            await ensureCastForNames(actors, 'actor');
+          }
+          if (Array.isArray(directors) && directors.length) {
+            await ensureCastForNames(directors, 'director');
+          }
+        } catch (castError) {
+          // eslint-disable-next-line no-console
+          console.error('⚠️  Lỗi khi đồng bộ cast từ TMDb:', castError.message);
+        }
 
         // 4. LƯU EPISODES (Vào collection riêng) - có phân server/audioType
         if (episodesData && episodesData.length > 0) {

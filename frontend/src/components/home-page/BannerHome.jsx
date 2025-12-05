@@ -91,7 +91,7 @@ const BannerHome = ({ movie }) => {
   }
 
   return (
-    <section className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0">
+    <section className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[300px] md:h-[600px]">
       {/* Background with gradients */}
       <BannerBackground
         backgroundImage={currentMovie.backgroundImage || currentMovie.poster}
@@ -123,6 +123,8 @@ const BannerHome = ({ movie }) => {
                   alt={m.title}
                   className="w-14 h-20 lg:w-16 lg:h-24 object-cover"
                   priority={index === 0}
+                  lazy={false}
+                  preloadOnHover={false}
                 />
                 {isActive && <div className="absolute inset-0 bg-black/20 pointer-events-none" />}
               </button>

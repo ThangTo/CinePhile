@@ -20,16 +20,17 @@ const useMovieDetail = (id) => {
       setError(null);
 
       try {
-        // Fetch movie data from service (handles both mock and real API)
         const movieData = await movieService.getById(id);
         const enriched = await enrichMovieWithSeriesParts(movieData);
 
-        if (enriched) {
-          setMovie(enriched);
-        } else {
+        if (!enriched) {
           setError(`Movie with ID ${id} not found`);
           console.error(`Movie with ID ${id} not found`);
+          setLoading(false);
+          return;
         }
+
+        setMovie(enriched);
       } catch (err) {
         setError(err.message || "Error fetching movie");
         console.error("Error fetching movie:", err);

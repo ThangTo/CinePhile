@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import CommentInput from "components/movie-detail/comment/CommentInput";
 import CommentsList from "components/movie-detail/comment/CommentsList";
+import RatingsList from "components/movie-detail/comment/RatingsList";
 import useToast from "hooks/useToast";
 import useAuth from "hooks/useAuth";
 import ToastContainer from "components/common/ToastContainer";
@@ -96,7 +97,9 @@ const CommentsSection = ({ movie, className = "" }) => {
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [showAllComments, setShowAllComments] = useState(false);
   const [comments, setComments] = useState(movie?.comments || []);
+  const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(!movie?.comments);
+  const [loadingRatings, setLoadingRatings] = useState(false);
   const { toasts, removeToast, success, warning } = useToast();
   const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, user } =
     useAuth();
@@ -122,6 +125,25 @@ const CommentsSection = ({ movie, className = "" }) => {
     };
     fetchComments();
   }, [movie, user]);
+
+  // Fetch ratings when switching to ratings view
+  useEffect(() => {
+    const fetchRatings = async () => {
+      if (!movie?.id || activeView !== "ratings" || ratings.length > 0) return;
+      try {
+        setLoadingRatings(true);
+        const response = await movieService.getRatings(movie.id);
+        const ratingsData = response.data || [];
+        setRatings(ratingsData);
+      } catch (error) {
+        console.error("Error fetching ratings:", error);
+        setRatings([]);
+      } finally {
+        setLoadingRatings(false);
+      }
+    };
+    fetchRatings();
+  }, [movie?.id, activeView]);
 
   const handleSubmitComment = async () => {
     if (!isAuthenticated) {
@@ -415,11 +437,17 @@ const CommentsSection = ({ movie, className = "" }) => {
           />
         )}
 
-        {/* Ratings View (Placeholder) */}
+        {/* Ratings View */}
         {activeView === "ratings" && (
-          <div className="text-center py-12 text-gray-400">
-            <i className="fa-solid fa-star text-4xl mb-4 opacity-50" />
-            <p>Chức năng đánh giá đang được phát triển...</p>
+          <div className="pt-4 lg:pt-0">
+            {loadingRatings ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primaryColor"></div>
+                <p className="text-gray-400 mt-4">Đang tải đánh giá...</p>
+              </div>
+            ) : (
+              <RatingsList ratings={ratings} />
+            )}
           </div>
         )}
       </section>

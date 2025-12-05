@@ -44,10 +44,7 @@ export const useMovieHover = (showDelay = 500, hideDelay = 100) => {
     // Delay hiding to allow mouse to move to hover card
     hideTimeoutRef.current = setTimeout(() => {
       setIsAnimating(false);
-      // Wait for animation to complete before removing from DOM
-      setTimeout(() => {
-        setShowHoverCard(false);
-      }, 200);
+      setShowHoverCard(false);
     }, hideDelay);
   };
 

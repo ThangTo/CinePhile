@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Tooltip from "./Tooltip";
 import Hls from "hls.js";
+import useAuth from "hooks/useAuth";
 
 const VideoPlayer = ({
   movie,
@@ -25,6 +26,13 @@ const VideoPlayer = ({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [quality, setQuality] = useState("Auto");
   const [isBuffering, setIsBuffering] = useState(false);
+  const [availableLevels, setAvailableLevels] = useState([]);
+  const [currentActualQuality, setCurrentActualQuality] = useState(null); // Chất lượng thực tế đang phát
+
+  // Check premium status
+  const { user } = useAuth();
+  const isPremium =
+    user?.isPremium === true || user?.premium === true || user?.subscription === "premium";
 
   const videoRef = useRef(null);
   const containerRef = useRef(null);
@@ -145,12 +153,67 @@ const VideoPlayer = ({
     }
 
     if (Hls.isSupported()) {
-      const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        // Cấu hình để có thể điều khiển quality
+        abrEwmaDefaultEstimate: 500000, // Bitrate estimate (500kbps)
+        maxBufferLength: 30, // Max buffer length in seconds
+        maxMaxBufferLength: 60,
+      });
+
       hls.loadSource(hlsSource);
       hls.attachMedia(video);
       hlsRef.current = hls;
+
+      // Lắng nghe khi manifest được load để lấy danh sách levels
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        const levels = hls.levels || [];
+        setAvailableLevels(levels);
+
+        // Set chất lượng thực tế ban đầu
+        if (hls.currentLevel >= 0 && hls.currentLevel < levels.length) {
+          const currentLevel = levels[hls.currentLevel];
+          const actualHeight = currentLevel?.height || null;
+          setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+        } else if (levels.length > 0) {
+          // Nếu đang ở Auto mode, lấy level đầu tiên làm mặc định
+          const firstLevel = levels[0];
+          const actualHeight = firstLevel?.height || null;
+          setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+        }
+      });
+
+      // Lắng nghe khi level thay đổi
+      hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+        const currentLevel = hls.levels[data.level];
+        const actualHeight = currentLevel?.height || null;
+        setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+      });
+
+      // Lắng nghe lỗi và tự động recover
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.error("HLS Network Error, attempting recovery...");
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.error("HLS Media Error, attempting recovery...");
+              hls.recoverMediaError();
+              break;
+            default:
+              console.error("HLS Fatal Error:", data);
+              hls.destroy();
+              break;
+          }
+        }
+      });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari native HLS - không hỗ trợ quality control qua JS
       video.src = hlsSource;
+      console.warn("Safari native HLS - Quality control không khả dụng");
     } else {
       console.warn("Trình duyệt không hỗ trợ phát HLS, sẽ dùng link nhúng nếu có.");
     }
@@ -373,6 +436,194 @@ const VideoPlayer = ({
     });
   };
 
+  // Helper: Build quality options list (luôn có đầy đủ options)
+  const qualityOptions = useMemo(() => {
+    const standardOptions = ["Auto", "1080p", "720p", "480p", "360p"];
+
+    // Đảm bảo availableLevels là array
+    const levels = Array.isArray(availableLevels) ? availableLevels : [];
+
+    // Nếu có available levels, merge với standard options và loại bỏ duplicate
+    if (levels.length > 0) {
+      const heightsFromLevels = [...new Set(levels.map((l) => l?.height).filter(Boolean))].sort(
+        (a, b) => b - a
+      );
+
+      const options = ["Auto"];
+      heightsFromLevels.forEach((h) => {
+        const label = `${h}p`;
+        if (!options.includes(label)) {
+          options.push(label);
+        }
+      });
+
+      // Thêm các standard options nếu chưa có
+      standardOptions.slice(1).forEach((opt) => {
+        if (!options.includes(opt)) {
+          options.push(opt);
+        }
+      });
+
+      const sorted = options.sort((a, b) => {
+        if (a === "Auto") return -1;
+        if (b === "Auto") return 1;
+        const heightA = parseInt(a.replace("p", ""), 10) || 0;
+        const heightB = parseInt(b.replace("p", ""), 10) || 0;
+        return heightB - heightA;
+      });
+
+      // Đảm bảo luôn trả về array
+      return Array.isArray(sorted) ? sorted : standardOptions;
+    }
+
+    // Fallback: luôn trả về standardOptions
+    return Array.isArray(standardOptions) ? standardOptions : ["Auto", "720p", "480p", "360p"];
+  }, [availableLevels]);
+
+  // Helper: Map quality string to HLS level index
+  const getLevelIndexForQuality = (qualityStr, levels) => {
+    if (!levels || levels.length === 0) {
+      console.warn("⚠️ No HLS levels available");
+      return -1;
+    }
+    if (qualityStr === "Auto") return -1;
+
+    const targetHeight = parseInt(qualityStr.replace("p", ""), 10);
+    if (isNaN(targetHeight)) {
+      console.warn(`⚠️ Invalid quality string: ${qualityStr}`);
+      return -1;
+    }
+
+    // Tìm level có height gần nhất với target
+    let bestMatch = -1;
+    let minDiff = Infinity;
+
+    for (let i = 0; i < levels.length; i++) {
+      const level = levels[i];
+      if (!level.height) continue;
+
+      const diff = Math.abs(level.height - targetHeight);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestMatch = i;
+      }
+    }
+
+    // Nếu chênh lệch quá lớn (> 100px), không match
+    if (minDiff > 100) {
+      console.warn(`⚠️ No level found close to ${targetHeight}px (min diff: ${minDiff}px)`);
+      return -1;
+    }
+
+    return bestMatch;
+  };
+
+  // Helper: Check if quality requires premium
+  const isQualityPremium = (qualityStr) => {
+    if (qualityStr === "Auto") return false;
+    const height = parseInt(qualityStr.replace("p", ""), 10);
+    // 1080p và cao hơn yêu cầu premium
+    return height >= 1080;
+  };
+
+  // Apply quality level to HLS instance
+  const applyQualityLevel = useCallback((hls, qualityStr) => {
+    if (!hls) {
+      console.warn("⚠️ HLS instance not available");
+      return;
+    }
+    if (!hls.levels || hls.levels.length === 0) {
+      console.warn("⚠️ HLS levels not loaded yet");
+      return;
+    }
+
+    if (qualityStr === "Auto") {
+      hls.currentLevel = -1; // Auto
+      // Force reload để áp dụng ngay
+      if (hls.media && hls.media.readyState >= 2) {
+        hls.startLoad();
+      }
+      return;
+    }
+
+    const levelIndex = getLevelIndexForQuality(qualityStr, hls.levels);
+    if (levelIndex >= 0 && levelIndex < hls.levels.length) {
+      const previousLevel = hls.currentLevel;
+
+      // Chỉ đổi nếu level khác
+      if (previousLevel !== levelIndex) {
+        hls.currentLevel = levelIndex;
+        // Force reload để áp dụng quality mới ngay lập tức
+        if (hls.media && hls.media.readyState >= 2) {
+          hls.startLoad();
+        }
+      }
+    } else {
+      console.warn(`⚠️ Could not find matching level for ${qualityStr}, keeping current level`);
+      // Nếu không tìm được level matching, vẫn cập nhật currentActualQuality từ level hiện tại
+      if (hls.currentLevel >= 0 && hls.currentLevel < hls.levels.length) {
+        const currentLevel = hls.levels[hls.currentLevel];
+        const actualHeight = currentLevel?.height || null;
+        setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+      }
+    }
+  }, []);
+
+  // Handle quality change
+  const handleQualityChange = (newQuality) => {
+    // Check premium requirement
+    if (isQualityPremium(newQuality) && !isPremium) {
+      console.warn("⚠️ Chất lượng này yêu cầu tài khoản Premium");
+      return;
+    }
+
+    setQuality(newQuality);
+    setShowQualityMenu(false);
+    setShowMoreMenu(false);
+
+    // Apply quality change to HLS if available
+    if (hlsRef.current) {
+      if (hlsRef.current.levels && hlsRef.current.levels.length > 0) {
+        applyQualityLevel(hlsRef.current, newQuality);
+      } else {
+        console.warn("⚠️ HLS levels not ready, will apply when ready");
+      }
+    } else {
+      console.warn("⚠️ HLS instance not available");
+    }
+  };
+
+  // Update quality when HLS instance changes
+  useEffect(() => {
+    if (hlsRef.current && hlsRef.current.levels && availableLevels.length > 0) {
+      applyQualityLevel(hlsRef.current, quality);
+    }
+  }, [quality, availableLevels.length, applyQualityLevel]);
+
+  // Tính toán độ blur dựa trên sự chênh lệch chất lượng
+  // Logic: Nếu chất lượng thực tế > chất lượng đã chọn → làm mờ để "giả lập" chất lượng thấp hơn
+  const blurAmount = useMemo(() => {
+    if (quality === "Auto" || !currentActualQuality) return 0;
+
+    const selectedHeight = parseInt(quality.replace("p", ""), 10);
+    const actualHeight = parseInt(currentActualQuality.replace("p", ""), 10);
+
+    if (isNaN(selectedHeight) || isNaN(actualHeight)) return 0;
+    if (actualHeight <= selectedHeight) return 0; // Không cần blur nếu chất lượng thực tế <= chất lượng đã chọn
+
+    // Tính độ chênh lệch phần trăm (khi actualHeight > selectedHeight)
+    const diffPercent = ((actualHeight - selectedHeight) / actualHeight) * 100;
+
+    // Áp dụng blur dựa trên độ chênh lệch:
+    // - Chênh lệch 20-40%: blur nhẹ (0.5px)
+    // - Chênh lệch 40-60%: blur vừa (1px)
+    // - Chênh lệch >60%: blur mạnh (2px)
+    if (diffPercent >= 60) return 2;
+    if (diffPercent >= 40) return 1;
+    if (diffPercent >= 20) return 0.5;
+    return 0;
+  }, [quality, currentActualQuality]);
+
   // Handle fullscreen changes (e.g., user presses ESC or rotates screen)
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -508,7 +759,13 @@ const VideoPlayer = ({
           className="w-full h-full cursor-pointer rounded-lg"
           src={!hlsSource ? fileSource : undefined}
           onClick={handlePlayPause}
-          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            filter: blurAmount > 0 ? `blur(${blurAmount}px)` : "none",
+            transition: "filter 0.3s ease-in-out",
+          }}
         />
       ) : embedSource ? (
         <iframe
@@ -806,22 +1063,46 @@ const VideoPlayer = ({
                     : "opacity-0 translate-y-2 scale-95 pointer-events-none"
                 }`}
               >
-                {["Auto", "1080p", "720p", "480p", "360p"].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => {
-                      setQuality(q);
-                      setShowQualityMenu(false);
-                      setShowMoreMenu(false);
-                    }}
-                    className={`w-full px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                      quality === q ? "bg-white/20" : ""
-                    }`}
-                  >
-                    <span className="text-right">{q}</span>
-                    {quality === q && <i className="fa-solid fa-check text-primaryColor text-xs" />}
-                  </button>
-                ))}
+                {Array.isArray(qualityOptions)
+                  ? qualityOptions.map((q) => {
+                      const requiresPremium = isQualityPremium(q);
+                      const isDisabled = requiresPremium && !isPremium;
+                      const isSelected = quality === q;
+
+                      return (
+                        <button
+                          key={q}
+                          onClick={() => !isDisabled && handleQualityChange(q)}
+                          disabled={isDisabled}
+                          className={`w-full px-4 py-2 text-sm transition-colors flex items-center justify-end gap-2 text-right ${
+                            isDisabled
+                              ? "text-gray-500 cursor-not-allowed opacity-50"
+                              : "text-white hover:bg-white/10"
+                          } ${isSelected && !isDisabled ? "bg-white/20" : ""}`}
+                          title={
+                            isDisabled
+                              ? "Yêu cầu tài khoản Premium để xem chất lượng này"
+                              : undefined
+                          }
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-right">{q}</span>
+                            {requiresPremium && (
+                              <i
+                                className={`fa-solid fa-crown text-xs ${
+                                  isPremium ? "text-yellow-400" : "text-gray-500"
+                                }`}
+                                title="Premium"
+                              />
+                            )}
+                          </div>
+                          {isSelected && !isDisabled && (
+                            <i className="fa-solid fa-check text-primaryColor text-xs" />
+                          )}
+                        </button>
+                      );
+                    })
+                  : null}
               </div>
             </div>
 
@@ -977,24 +1258,41 @@ const VideoPlayer = ({
                           : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
                       }`}
                     >
-                      {["Auto", "1080p", "720p", "480p", "360p"].map((q) => (
-                        <button
-                          key={q}
-                          onClick={() => {
-                            setQuality(q);
-                            setShowQualityMenu(false);
-                            setShowMoreMenu(false);
-                          }}
-                          className={`w-full px-3 py-2 text-white text-xs hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                            quality === q ? "bg-white/10" : ""
-                          }`}
-                        >
-                          <span>{q}</span>
-                          {quality === q && (
-                            <i className="fa-solid fa-check text-primaryColor text-[10px]" />
-                          )}
-                        </button>
-                      ))}
+                      {Array.isArray(qualityOptions)
+                        ? qualityOptions.map((q) => {
+                            const requiresPremium = isQualityPremium(q);
+                            const isDisabled = requiresPremium && !isPremium;
+                            const isSelected = quality === q;
+
+                            return (
+                              <button
+                                key={q}
+                                onClick={() => !isDisabled && handleQualityChange(q)}
+                                disabled={isDisabled}
+                                className={`w-full px-3 py-2 text-xs transition-colors flex items-center justify-end gap-2 text-right ${
+                                  isDisabled
+                                    ? "text-gray-500 cursor-not-allowed opacity-50"
+                                    : "text-white hover:bg-white/10"
+                                } ${isSelected && !isDisabled ? "bg-white/10" : ""}`}
+                                title={isDisabled ? "Yêu cầu tài khoản Premium" : undefined}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span>{q}</span>
+                                  {requiresPremium && (
+                                    <i
+                                      className={`fa-solid fa-crown text-[10px] ${
+                                        isPremium ? "text-yellow-400" : "text-gray-500"
+                                      }`}
+                                    />
+                                  )}
+                                </div>
+                                {isSelected && !isDisabled && (
+                                  <i className="fa-solid fa-check text-primaryColor text-[10px]" />
+                                )}
+                              </button>
+                            );
+                          })
+                        : null}
                     </div>
                   </div>
                 </div>

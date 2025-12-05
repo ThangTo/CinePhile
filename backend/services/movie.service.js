@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
+const Cast = require('../models/cast.model');
 const Comment = require('../models/comment.model');
 const Rating = require('../models/rating.model');
 const {
@@ -264,14 +265,90 @@ const getEpisodes = async (identifier) => {
 };
 
 /**
- * Get cast list (schema does not store cast -> return empty array)
+ * Get cast list for a movie
+ * - Dựa trên danh sách tên actor trong movie
+ * - Join với collection Cast (nếu đã được backfill từ TMDb)
+ * - Giữ nguyên thứ tự theo movie.actor
  */
 const getCast = async (identifier) => {
   const movieDoc = await findMovie(identifier);
   if (!movieDoc) {
     throw new Error('Movie not found');
   }
-  return [];
+
+  const actorNames = Array.isArray(movieDoc.actor)
+    ? movieDoc.actor.map((n) => (n || '').trim()).filter(Boolean)
+    : [];
+
+  if (!actorNames.length) return [];
+
+  const uniqueNames = [...new Set(actorNames)];
+
+  // Lấy cast từ collection Cast theo MỘT query lớn:
+  // - name
+  // - alsoKnownAs (bao gồm alias + tên gốc từ movies đã được lưu)
+  // - nameLatin
+  const castDocs = await Cast.find({
+    $or: [
+      { name: { $in: uniqueNames } },
+      { alsoKnownAs: { $in: uniqueNames } },
+      { nameLatin: { $in: uniqueNames } },
+    ],
+  })
+    .lean()
+    .exec();
+
+  // Map theo nhiều key để truy xuất nhanh trong bộ nhớ
+  const byName = new Map(); // key: name
+  const byAlias = new Map(); // key: alsoKnownAs item
+  const byLatin = new Map(); // key: nameLatin
+
+  const chooseBetter = (existing, candidate) => {
+    if (!existing) return candidate;
+    const p1 = existing.popularity || 0;
+    const p2 = candidate.popularity || 0;
+    return p2 > p1 ? candidate : existing;
+  };
+
+  for (const doc of castDocs) {
+    const name = (doc.name || '').trim();
+    if (name) {
+      byName.set(name, chooseBetter(byName.get(name), doc));
+    }
+
+    const latin = (doc.nameLatin || '').trim();
+    if (latin) {
+      byLatin.set(latin, chooseBetter(byLatin.get(latin), doc));
+    }
+
+    if (Array.isArray(doc.alsoKnownAs)) {
+      for (const aliasRaw of doc.alsoKnownAs) {
+        const alias = (aliasRaw || '').trim();
+        if (!alias) continue;
+        byAlias.set(alias, chooseBetter(byAlias.get(alias), doc));
+      }
+    }
+  }
+
+  // Build kết quả theo thứ tự actorNames ban đầu
+  const result = actorNames.map((name) => {
+    // Ưu tiên: name exact -> alsoKnownAs -> nameLatin
+    const doc = byName.get(name) || byAlias.get(name) || byLatin.get(name) || null;
+    const avatar = doc?.profileUrl || doc?.profilePath || null;
+
+    return {
+      id: doc?._id?.toString() || null,
+      name,
+      avatar,
+      profileUrl: doc?.profileUrl || null,
+      profilePath: doc?.profilePath || null,
+      tmdbId: doc?.tmdbId || null,
+      knownForDepartment: doc?.knownForDepartment || null,
+      popularity: doc?.popularity || 0,
+    };
+  });
+
+  return result;
 };
 
 /**
@@ -433,6 +510,54 @@ const rateMovie = async (identifier, userId, rating) => {
 };
 
 /**
+ * Get ratings list for a movie
+ * @param {string} identifier - Movie ID or slug
+ * @param {Object} filters - Pagination filters
+ * @returns {Promise<Object>} Ratings with user info
+ */
+const getRatings = async (identifier, filters = {}) => {
+  const movieDoc = await findMovie(identifier);
+  if (!movieDoc) {
+    throw new Error('Movie not found');
+  }
+
+  const currentPage = Math.max(parseInt(filters.page, 10) || 1, 1);
+  const perPage = Math.max(parseInt(filters.limit, 10) || 20, 1);
+  const skip = (currentPage - 1) * perPage;
+
+  const User = require('../models/user.model');
+
+  const [rows, total] = await Promise.all([
+    Rating.find({ movieId: movieDoc._id })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(perPage)
+      .populate('userId', 'username avatar')
+      .lean(),
+    Rating.countDocuments({ movieId: movieDoc._id }),
+  ]);
+
+  const ratings = rows.map((rating) => ({
+    id: rating._id.toString(),
+    userId: rating.userId?._id?.toString() || rating.userId?.toString() || rating.userId,
+    user: rating.userId?.username || 'Ẩn danh',
+    avatar: rating.userId?.avatar || 'https://i.pravatar.cc/150?img=5',
+    rating: rating.rating,
+    createdAt: rating.createdAt,
+  }));
+
+  return {
+    data: ratings,
+    pagination: {
+      page: currentPage,
+      limit: perPage,
+      total,
+      totalPages: Math.max(Math.ceil(total / perPage), 1),
+    },
+  };
+};
+
+/**
  * Like a comment (requires auth)
  * Logic đơn giản: chỉ tăng/giảm số like
  * Frontend sẽ quản lý trạng thái active (isLiked/isDisliked) bằng localStorage
@@ -569,6 +694,7 @@ module.exports = {
   getComments,
   postComment,
   rateMovie,
+  getRatings,
   incrementView,
   likeComment,
   dislikeComment,

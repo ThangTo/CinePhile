@@ -264,6 +264,24 @@ const rateMovie = async (req, res) => {
 };
 
 /**
+ * GET /movies/:id/ratings
+ * Get ratings list for a movie
+ * @param {string} req.params.id - Movie ID or slug
+ * @param {Object} req.query - { page?, limit? }
+ */
+const getRatings = async (req, res) => {
+  try {
+    const ratings = await movieService.getRatings(req.params.id, {
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    res.json(ratings);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
+};
+
+/**
  * POST /comments/:commentId/like
  * Like a comment (requires authentication)
  * @param {string} req.params.commentId - Comment ID
@@ -307,14 +325,6 @@ const likeComment = async (req, res) => {
  */
 const dislikeComment = async (req, res) => {
   try {
-    console.log('[Dislike Comment] Request:', {
-      commentId: req.params.commentId,
-      userId: req.user?._id,
-      body: req.body,
-      path: req.path,
-      url: req.url,
-    });
-
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
@@ -380,6 +390,7 @@ module.exports = {
   getComments,
   postComment,
   rateMovie,
+  getRatings,
   incrementView,
   likeComment,
   dislikeComment,

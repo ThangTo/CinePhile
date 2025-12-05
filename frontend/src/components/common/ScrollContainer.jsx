@@ -96,7 +96,7 @@ const ScrollContainer = ({ children, gap = "gap-4", showArrows = true, className
     <div className={`relative ${className}`}>
       <div
         ref={scrollerRef}
-        className={`flex ${gap} overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing select-none lg:py-2`}
+        className={`flex ${gap} overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing select-none lg:py-4`}
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",

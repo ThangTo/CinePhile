@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 
-const RATING_OPTIONS = [
+export const RATING_OPTIONS = [
   { id: 5, emoji: "😭", label: "Dở tệ", value: 2 },
   { id: 4, emoji: "😕", label: "Phim chán", value: 4 },
   { id: 3, emoji: "😊", label: "Khá ổn", value: 6 },

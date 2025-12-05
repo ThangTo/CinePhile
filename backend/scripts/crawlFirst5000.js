@@ -14,8 +14,8 @@ async function crawlFirst5000() {
     await connectDB();
     console.log('✅ Đã kết nối MongoDB');
 
-    const startPage = 701;
-    const endPage = 900; // 500 page * 10 phim/page ≈ 5000 phim
+    const startPage = 1139;
+    const endPage = 1200; // 500 page * 10 phim/page ≈ 5000 phim
 
     console.log(`🚀 Bắt đầu crawl khoảng 5000 phim (từ trang ${startPage} đến ${endPage})...`);
 

@@ -145,6 +145,17 @@ const movieService = {
     }),
 
   /**
+   * Lấy danh sách ratings của movie
+   * @param {string|number} id - Movie ID
+   * @param {Object} params - { page?, limit? }
+   * @returns {Promise<Object>} { data: [], pagination: {} }
+   */
+  getRatings: (id, params = {}) =>
+    apiRequest(`/movies/${id}/ratings`, {
+      params,
+    }),
+
+  /**
    * Like một comment (yêu cầu auth)
    * @param {string} commentId - Comment ID
    * @param {boolean} isCurrentlyLiked - Trạng thái like hiện tại

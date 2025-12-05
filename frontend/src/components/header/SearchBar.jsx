@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import movieService from "services/movie.service";
 import LoadingState from "components/common/LoadingState";
 import { groupSeriesMovies } from "utils/seriesGrouping";
+import OptimizedImage from "components/common/OptimizedImage";
 
 const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_DELAY = 400;
@@ -133,10 +134,13 @@ const SearchBar = ({ className = "", placeholder = "Tìm kiếm phim, diễn vi�
                     >
                       <div className="flex-shrink-0 w-10 h-14 rounded-md overflow-hidden bg-bgColor4">
                         {movie.poster && (
-                          <img
+                          <OptimizedImage
                             src={movie.poster}
                             alt={movie.title}
                             className="w-full h-full object-cover"
+                            priority={true}
+                            lazy={false}
+                            preloadOnHover={false}
                           />
                         )}
                       </div>

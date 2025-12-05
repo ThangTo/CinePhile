@@ -24,6 +24,7 @@ const BannerBackground = ({
         className="h-full w-full object-cover object-right aspect-[16/9]"
         priority={true}
         lazy={false}
+        preloadOnHover={false}
       />
       <div className={`absolute inset-0 z-0 bg-gradient-to-t  ${classNameOverlay}`} />
       {overlayTop && (
