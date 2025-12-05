@@ -30,4 +30,9 @@ router.get('/watchlist', authMiddleware, userController.getWatchlist);
 // GET /api/v1/users/history - Get watch history
 router.get('/history', authMiddleware, userController.getHistory);
 
+// Ví dụ trong user.routes.js
+router.post('/progress',authMiddleware, userController.saveProgress);
+
+
+
 module.exports = router;

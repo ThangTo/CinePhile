@@ -3,8 +3,9 @@ const UserFavorite = require('../models/user_favorite.model');
 const UserWatchlist = require('../models/user_watchlist.model');
 const UserHistory = require('../models/user_history.model');
 
+const userService = require('../services/user.service');
 // Helper to get user ID from authenticated request (via auth middleware)
-const getUserId = async (req) => {
+const getUserId = (req) => {
   if (req.user && req.user._id) {
     return req.user._id;
   }
@@ -283,6 +284,28 @@ const getHistory = async (req, res) => {
   }
 };
 
+/**
+ * POST /users/history/sync (hoặc /progress)
+ * Save/Update watch progress
+ * @param {Object} req.body - { movieId, episodeId, watchTime, duration }
+ */
+const saveProgress = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+
+    if (!req.body.movieId) {
+      return res.status(400).json({ message: 'Movie ID is required' });
+    }
+    // Gọi Service để xử lý Upsert
+    const result = await userService.saveProgress(userId, req.body);
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error){
+    res.status(500).json({ message: error.message });
+  }
+
+};
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -293,4 +316,5 @@ module.exports = {
   removeFromWatchlist,
   getWatchlist,
   getHistory,
+  saveProgress
 };
