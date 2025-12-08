@@ -2,55 +2,82 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import userService from "services/user.service";
 import { BarSpinner } from "components/common/LoadingState";
-import {
-  CONTINUE_WATCHING_MOCK,
-  ENABLE_CONTINUE_WATCHING_MOCK,
-} from "constants/continueWatchingMock";
+import Pagination from "components/common/Pagination";
 
 const ContinueWatchingSection = ({ user }) => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 8,
+    totalPages: 1,
+    total: 0,
+  });
+
+  const fetchData = async (page = 1) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await userService.getContinueWatching({
+        limit: pagination.limit,
+        page,
+      });
+      const historyData = response?.data || [];
+      const pag = response?.pagination || {};
+
+      // Format data để hiển thị
+      const formattedData = historyData.map((item) => {
+        const movie = item.movieId || {};
+        const episode = item.episodeId || {};
+
+        const episodeNumber = episode.episodeId || episode.episode || 1;
+        const audioType = episode.audioType || null;
+
+        return {
+          id: item._id || item.id,
+          movieId: movie._id || movie.id || item.movieId,
+          title: movie.name || movie.title,
+          englishTitle: movie.englishTitle,
+          poster: movie.poster_url || movie.poster || movie.thumb_url,
+          progress: item.progress || 0,
+          watchTime: item.watchTime || 0,
+          duration: item.duration || 0,
+          durationMinutes: movie.durationMinutes || Math.floor((item.duration || 0) / 60),
+          lastWatchedEpisode: episodeNumber,
+          lastWatchedAudioType: audioType,
+          lastWatchedAt: item.lastWatchedAt,
+          movie: movie,
+          episode: episode,
+        };
+      });
+
+      setItems(formattedData);
+      setPagination((prev) => ({
+        ...prev,
+        page: pag.page || page,
+        totalPages: pag.totalPages || prev.totalPages,
+        total: pag.total || prev.total,
+      }));
+    } catch (fetchError) {
+      console.error("Error loading continue watching data:", fetchError);
+      setError("Không thể tải dữ liệu xem tiếp. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const shouldUseMock = !!user && ENABLE_CONTINUE_WATCHING_MOCK;
-
-    if (shouldUseMock) {
-      setItems(CONTINUE_WATCHING_MOCK);
+    if (!user) {
+      setItems([]);
       setLoading(false);
-      setError(null);
       return;
     }
 
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        let response;
-        try {
-          response = await userService.getContinueWatching({ limit: 30 });
-        } catch (apiError) {
-          console.warn("Continue watching endpoint unavailable, fallback to history");
-          response = await userService.getHistory({ limit: 60 });
-        }
-
-        const historyData = response?.data || [];
-        const continueWatching = historyData.filter(
-          (item) => item.progress && item.progress > 0 && item.progress < 100
-        );
-
-        setItems(continueWatching);
-      } catch (fetchError) {
-        console.error("Error loading continue watching data:", fetchError);
-        setError("Không thể tải dữ liệu xem tiếp. Vui lòng thử lại sau.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchData(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleWatch = (item) => {
@@ -58,7 +85,33 @@ const ContinueWatchingSection = ({ user }) => {
     if (!movieId) return;
 
     const episode = item.lastWatchedEpisode || 1;
-    navigate(`/watch/${movieId}?ep=${episode}`);
+    const audioType = item.lastWatchedAudioType;
+    const audioQuery = audioType ? `&audio=${encodeURIComponent(audioType)}` : "";
+    const watchTime = item.watchTime || null;
+
+    // Navigate với resumeTime trong location.state
+    navigate(`/watch/${movieId}?ep=${episode}${audioQuery}`, {
+      state: { resumeTime: watchTime },
+    });
+  };
+
+  const handleDeleteProgress = async (e, movie) => {
+    e.stopPropagation(); // Ngăn chặn click event bubble lên parent div
+
+    const targetMovieId = movie.movieId || movie.id;
+    if (!targetMovieId) {
+      return;
+    }
+
+    try {
+      await userService.deleteProgress(targetMovieId);
+
+      // Remove item from local state
+      setItems((prev) => prev.filter((item) => (item.movieId || item.id) !== targetMovieId));
+    } catch (error) {
+      console.error("Error deleting progress:", error);
+      setError("Không thể xóa phim khỏi danh sách xem tiếp. Vui lòng thử lại sau.");
+    }
   };
 
   if (loading) {
@@ -101,34 +154,51 @@ const ContinueWatchingSection = ({ user }) => {
     <div className="bg-account-bg-secondary rounded-2xl p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <p className="text-account-text-secondary">{items.length} phim đang xem</p>
+          <p className="text-account-text-secondary">
+            {pagination.total || items.length} phim đang xem
+          </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {items.map((item) => {
-          const title = item.title || item.movie?.title;
+          const title = item.title || item.movie?.name || item.movie?.title || "Không có tiêu đề";
           const engTitle = item.englishTitle || item.movie?.englishTitle;
-          const duration = item.durationMinutes || item.movie?.durationMinutes || 69;
+          const duration = item.durationMinutes || Math.floor((item.duration || 0) / 60) || 0;
           const progressPercent = Math.min(Math.max(item.progress || 0, 0), 100);
           const progressMinutes = Math.round((progressPercent / 100) * duration);
+          const poster = item.poster || item.movie?.poster_url || item.movie?.thumb_url || "";
 
           return (
             <div
               key={`${item.movieId || item.id}-${item.lastWatchedEpisode || 0}`}
-              className="bg-bgColor4 rounded-2xl p-4 shadow-lg border border-white/5 cursor-pointer hover:opacity-80 transition-all duration-300"
+              className="bg-bgColor3 rounded-2xl p-4 shadow-lg border border-white/5 cursor-pointer hover:opacity-80 transition-all duration-300"
               onClick={() => handleWatch(item)}
             >
               <div className="relative rounded-2xl overflow-hidden">
-                <img
-                  src={item.poster || item.movie?.poster}
-                  alt={title}
-                  className="w-full aspect-[2/3] object-cover"
-                  loading="lazy"
-                />
-                <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
+                {poster ? (
+                  <img
+                    src={poster}
+                    alt={title}
+                    className="w-full aspect-[2/3] object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.src = "https://via.placeholder.com/300x450?text=No+Image";
+                    }}
+                  />
+                ) : (
+                  <div className="w-full aspect-[2/3] bg-gray-800 flex items-center justify-center">
+                    <i className="fa-solid fa-image text-gray-600 text-4xl" />
+                  </div>
+                )}
+                <button
+                  onClick={(e) => handleDeleteProgress(e, item)}
+                  className="absolute top-3 right-3 bg-black/60 hover:bg-red-600 text-white text-[10px] px-2 py-1 rounded-full transition-colors z-10"
+                  aria-label="Xóa khỏi danh sách xem tiếp"
+                  title="Xóa khỏi danh sách xem tiếp"
+                >
                   <i className="fa-solid fa-xmark" />
-                </div>
+                </button>
                 <div className="absolute bottom-0 left-6 right-6 h-1.5 bg-white/15 rounded-full">
                   <div
                     className="h-full bg-primaryColor rounded-full"
@@ -148,6 +218,18 @@ const ContinueWatchingSection = ({ user }) => {
           );
         })}
       </div>
+
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center mt-6">
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            onPrev={() => fetchData(Math.max(1, pagination.page - 1))}
+            onNext={() => fetchData(Math.min(pagination.totalPages, pagination.page + 1))}
+            className="bg-bgColor3"
+          />
+        </div>
+      )}
     </div>
   );
 };

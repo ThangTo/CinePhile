@@ -30,9 +30,16 @@ router.get('/watchlist', authMiddleware, userController.getWatchlist);
 // GET /api/v1/users/history - Get watch history
 router.get('/history', authMiddleware, userController.getHistory);
 
-// Ví dụ trong user.routes.js
-router.post('/progress',authMiddleware, userController.saveProgress);
+// GET /api/v1/users/continue-watching - Get continue watching list
+router.get('/continue-watching', authMiddleware, userController.getContinueWatching);
 
+// GET /api/v1/users/progress/:movieId - Get watch progress for a specific movie
+router.get('/progress/:movieId', authMiddleware, userController.getProgress);
 
+// POST /api/v1/users/progress - Save/Update watch progress
+router.post('/progress', authMiddleware, userController.saveProgress);
+
+// DELETE /api/v1/users/progress/:movieId - Delete watch progress
+router.delete('/progress/:movieId', authMiddleware, userController.deleteProgress);
 
 module.exports = router;

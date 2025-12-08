@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import movieService from "services/movie.service";
+import userService from "services/user.service";
+import useAuth from "hooks/useAuth";
 import { enrichMovieWithSeriesParts } from "utils/seriesGrouping";
 
 /**
  * Custom hook to fetch and manage movie detail data
  * @param {string} id - Movie ID
- * @returns {Object} - { movie, loading, error, activeTab, setActiveTab, audioType, setAudioType }
+ * @returns {Object} - { movie, loading, error, activeTab, setActiveTab, audioType, setAudioType, savedProgress, showResumeModal, setShowResumeModal }
  */
 const useMovieDetail = (id) => {
   const [movie, setMovie] = useState(null);
@@ -13,6 +15,9 @@ const useMovieDetail = (id) => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("episodes");
   const [audioType, setAudioType] = useState(null);
+  const [savedProgress, setSavedProgress] = useState(null);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     const fetchMovie = async () => {
@@ -53,6 +58,42 @@ const useMovieDetail = (id) => {
     }
   }, [movie, audioType]);
 
+  // Load watch progress and auto-show modal when movie is loaded
+  useEffect(() => {
+    const movieId = movie?.id || movie?._id;
+    if (!isAuthenticated || !user || !movieId) {
+      setSavedProgress(null);
+      setShowResumeModal(false);
+      return;
+    }
+
+    const loadProgress = async () => {
+      try {
+        const response = await userService.getProgress(movieId);
+        if (response?.success && response?.data) {
+          const progress = response.data;
+          // Chỉ hiển thị resume nếu progress < 95% (chưa xem xong) và watchTime > 5
+          if (progress.progress < 95 && progress.watchTime > 5) {
+            setSavedProgress(progress);
+            setShowResumeModal(true); // Tự động hiển thị modal
+          } else {
+            setSavedProgress(null);
+            setShowResumeModal(false);
+          }
+        } else {
+          setSavedProgress(null);
+          setShowResumeModal(false);
+        }
+      } catch (error) {
+        console.error("Failed to load watch progress:", error);
+        setSavedProgress(null);
+        setShowResumeModal(false);
+      }
+    };
+
+    loadProgress();
+  }, [isAuthenticated, user, movie?.id, movie?._id]);
+
   return {
     movie,
     loading,
@@ -61,6 +102,9 @@ const useMovieDetail = (id) => {
     setActiveTab,
     audioType,
     setAudioType,
+    savedProgress,
+    showResumeModal,
+    setShowResumeModal,
   };
 };
 

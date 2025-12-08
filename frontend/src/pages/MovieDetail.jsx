@@ -3,12 +3,23 @@ import { useParams } from "react-router-dom";
 import { MobileLayout, DesktopLayout } from "components/movie-detail/index";
 import { BarSpinner } from "components/common/LoadingState";
 import ErrorState from "components/common/ErrorState";
+import ResumePromptModal from "components/movie-detail/ResumePromptModal";
 import useMovieDetail from "hooks/useMovieDetail";
 
 const MovieDetail = () => {
   const { id } = useParams();
-  const { movie, loading, error, activeTab, setActiveTab, audioType, setAudioType } =
-    useMovieDetail(id);
+  const {
+    movie,
+    loading,
+    error,
+    activeTab,
+    setActiveTab,
+    audioType,
+    setAudioType,
+    savedProgress,
+    showResumeModal,
+    setShowResumeModal,
+  } = useMovieDetail(id);
 
   // Loading state
   if (loading) {
@@ -40,6 +51,15 @@ const MovieDetail = () => {
 
       {/* Desktop Layout */}
       <DesktopLayout {...layoutProps} />
+
+      {/* Resume Prompt Modal */}
+      <ResumePromptModal
+        isOpen={showResumeModal}
+        onClose={() => setShowResumeModal(false)}
+        savedProgress={savedProgress}
+        movie={movie}
+        audioType={audioType}
+      />
     </div>
   );
 };

@@ -1,13 +1,13 @@
 /**
  * Default avatars for new users
- * Fun and colorful avatar images
+ * Avatar files are stored in backend/data/avatars/
  */
 const DEFAULT_AVATARS = [
-  'https://i.pravatar.cc/150?img=1', // Smiling person
-  'https://i.pravatar.cc/150?img=5', // Person with glasses
-  'https://i.pravatar.cc/150?img=12', // Person with hat
-  'https://i.pravatar.cc/150?img=33', // Person with beard
-  'https://i.pravatar.cc/150?img=68', // Person with smile
+  'avt1.jpg', // Smiling person
+  'avt2.webp', // Person with glasses
+  'avt3.jpg', // Person with hat
+  'avt4.jpg', // Person with beard
+  'avt5.jpg', // Person with smile
 ];
 
 /**
@@ -16,7 +16,12 @@ const DEFAULT_AVATARS = [
  */
 const getRandomAvatar = () => {
   const randomIndex = Math.floor(Math.random() * DEFAULT_AVATARS.length);
-  return DEFAULT_AVATARS[randomIndex];
+  const avatarFilename = DEFAULT_AVATARS[randomIndex];
+
+  // Build full URL using API_BASE_URL or default to localhost
+  const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+
+  return `${apiBaseUrl}/api/v1/avatars/${avatarFilename}`;
 };
 
 module.exports = {

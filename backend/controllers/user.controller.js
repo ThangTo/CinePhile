@@ -259,33 +259,66 @@ const getHistory = async (req, res) => {
     const userId = await getUserId(req);
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
 
-    const history = await UserHistory.find({ userId: userId })
-      .sort({ lastWatchedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate('movieId')
-      .populate('episodeId');
+    const result = await userService.getHistory(userId, { page, limit });
 
-    const total = await UserHistory.countDocuments({ userId: userId });
-
-    res.status(200).json({
-      data: history,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    });
+    res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
 /**
- * POST /users/history/sync (hoặc /progress)
+ * GET /users/continue-watching
+ * Get continue watching list (requires authentication)
+ * @param {Object} req.user - User object from auth middleware
+ * @param {Object} req.query - { page?, limit? }
+ * @returns {Object} { data: Array, pagination: Object }
+ */
+const getContinueWatching = async (req, res) => {
+  try {
+    const userId = await getUserId(req);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const result = await userService.getContinueWatching(userId, { page, limit });
+
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /users/progress/:movieId
+ * Get watch progress for a specific movie
+ * @param {string} req.params.movieId - Movie ID
+ * @param {Object} req.user - User object from auth middleware
+ * @returns {Object} Progress object or null
+ */
+const getProgress = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { movieId } = req.params;
+
+    if (!movieId) {
+      return res.status(400).json({ message: 'Movie ID is required' });
+    }
+
+    const progress = await userService.getProgress(userId, movieId);
+
+    if (!progress) {
+      return res.status(200).json({ success: true, data: null });
+    }
+
+    res.status(200).json({ success: true, data: progress });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /users/progress
  * Save/Update watch progress
  * @param {Object} req.body - { movieId, episodeId, watchTime, duration }
  */
@@ -296,14 +329,49 @@ const saveProgress = async (req, res) => {
     if (!req.body.movieId) {
       return res.status(400).json({ message: 'Movie ID is required' });
     }
+
     // Gọi Service để xử lý Upsert
     const result = await userService.saveProgress(userId, req.body);
 
     res.status(200).json({ success: true, data: result });
-  } catch (error){
+  } catch (error) {
+    // Validation errors
+    if (error.message.includes('required') || error.message.includes('must be')) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: error.message });
   }
+};
 
+/**
+ * DELETE /users/progress/:movieId
+ * Delete watch progress/history for a specific movie
+ * @param {string} req.params.movieId - Movie ID
+ * @param {Object} req.user - User object from auth middleware
+ * @returns {Object} { success: boolean, message: string }
+ */
+const deleteProgress = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { movieId } = req.params;
+
+    if (!movieId) {
+      return res.status(400).json({ message: 'Movie ID is required' });
+    }
+
+    const deleted = await userService.deleteProgress(userId, movieId);
+
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Progress not found' });
+    }
+
+    res.status(200).json({ success: true, message: 'Progress deleted successfully' });
+  } catch (error) {
+    if (error.message.includes('required')) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: error.message });
+  }
 };
 
 module.exports = {
@@ -316,5 +384,8 @@ module.exports = {
   removeFromWatchlist,
   getWatchlist,
   getHistory,
-  saveProgress
+  getContinueWatching,
+  getProgress,
+  saveProgress,
+  deleteProgress,
 };

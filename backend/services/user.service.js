@@ -1,5 +1,51 @@
 const UserHistory = require('../models/user_history.model');
+const { transformMovie } = require('../utils/movieTransformer');
 
+/**
+ * Transform a single history item
+ * @param {Object} item - History item (Mongoose document or plain object)
+ * @returns {Object} Transformed history item
+ */
+const transformHistoryItem = (item) => {
+  if (!item) return null;
+
+  const itemObj = item.toObject ? item.toObject({ versionKey: false }) : item;
+
+  // Transform movieId nếu có
+  if (itemObj.movieId) {
+    itemObj.movieId = transformMovie(itemObj.movieId);
+  }
+
+  // Transform episodeId: _id -> id
+  if (itemObj.episodeId) {
+    const episode = itemObj.episodeId.toObject
+      ? itemObj.episodeId.toObject({ versionKey: false })
+      : itemObj.episodeId;
+    itemObj.episodeId = {
+      ...episode,
+      id: episode._id?.toString() || episode.id,
+    };
+    delete itemObj.episodeId._id;
+  }
+
+  // Transform history item _id -> id
+  const transformed = {
+    ...itemObj,
+    id: itemObj._id?.toString() || itemObj.id,
+  };
+  delete transformed._id;
+  return transformed;
+};
+
+/**
+ * Transform an array of history items
+ * @param {Array} items - Array of history items
+ * @returns {Array} Array of transformed history items
+ */
+const transformHistoryItems = (items) => {
+  if (!Array.isArray(items)) return [];
+  return items.map(transformHistoryItem).filter(Boolean);
+};
 /**
  * Add movie to favorites
  * @param {string|number} userId - User ID
@@ -76,53 +122,157 @@ const getHistory = async (userId, { page = 1, limit = 10 }) => {
       .sort({ lastWatchedAt: -1 })
       .skip(skip)
       .limit(limitNum)
-      .populate('movieId', 'name slug thumb_url poster_url')
-      .populate('episodeId', 'name slug filename'),
-    UserHistory.countDocuments({ userId })
+      .populate('movieId', 'name original_name slug thumb_url poster_url durationMinutes')
+      .populate('episodeId', 'name slug filename episodeId audioType'),
+    UserHistory.countDocuments({ userId }),
   ]);
+
   return {
-    data: history,
+    data: transformHistoryItems(history),
     pagination: {
       page: pageNum,
       limit: limitNum,
       total,
-      totalPages: Math.ceil(total / limitNum)
-    }
+      totalPages: Math.ceil(total / limitNum),
+    },
   };
+};
+
+/**
+ * Get continue watching list (phim đang xem tiếp)
+ * @param {string|number} userId - User ID
+ * @param {Object} filters - { page?, limit? }
+ * @returns {Promise<Object>} { data: Array, pagination: Object }
+ */
+const getContinueWatching = async (userId, { page = 1, limit = 10 }) => {
+  const pageNum = Number(page) || 1;
+  const limitNum = Number(limit) || 10;
+  const skip = (pageNum - 1) * limitNum;
+
+  // Lọc các phim có progress > 0 và < 100 (chưa xem xong)
+  const query = {
+    userId,
+    progress: { $gt: 0, $lt: 100 },
+  };
+
+  const [history, total] = await Promise.all([
+    UserHistory.find(query)
+      .sort({ lastWatchedAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate('movieId', 'name original_name slug thumb_url poster_url durationMinutes')
+      .populate('episodeId', 'name slug filename episodeId audioType'),
+    UserHistory.countDocuments(query),
+  ]);
+
+  return {
+    data: transformHistoryItems(history),
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.ceil(total / limitNum),
+    },
+  };
+};
+
+/**
+ * Get watch progress for a specific movie
+ * @param {string} userId - ID của user
+ * @param {string} movieId - ID của movie
+ * @returns {Promise<Object|null>} Progress object hoặc null nếu chưa có
+ */
+const getProgress = async (userId, movieId) => {
+  const history = await UserHistory.findOne({ userId, movieId })
+    .populate('movieId', 'name original_name slug thumb_url poster_url')
+    .populate('episodeId', 'name slug filename episodeId');
+
+  if (!history) {
+    return null;
+  }
+
+  return transformHistoryItem(history);
 };
 
 /**
  * Save/Sync Progress (Lưu tiến độ xem phim)
  * @param {string} userId - ID của user
- * @param {Object} data - Dữ liệu { movieId, episodeId, watchTime, duration }
+ * @param {Object} data - Dữ liệu { movieId, episodeId, audioType, watchTime, duration }
  */
 const saveProgress = async (userId, { movieId, episodeId, watchTime, duration }) => {
-  // 1. Tính phần trăm tiến độ (0-100%)
-  let progressPercent = 0;
-  if (duration > 0) {
-    progressPercent = (watchTime / duration) * 100;
-    // Giới hạn max là 100% để tránh lỗi số học
-    if (progressPercent > 100) progressPercent = 100;
+  // Validation
+  if (!movieId) {
+    throw new Error('Movie ID is required');
   }
 
-  // 2. Thực hiện Upsert (Update hoặc Insert)
-  // Tìm theo [userId + movieId]. Nếu có rồi thì cập nhật, chưa có thì tạo mới.
+  if (watchTime === undefined || watchTime === null) {
+    throw new Error('Watch time is required');
+  }
+
+  if (duration === undefined || duration === null || duration <= 0) {
+    throw new Error('Duration must be greater than 0');
+  }
+
+  // Chỉ lưu nếu đã xem ít nhất 5 giây (tránh lưu khi mới load)
+  if (watchTime < 5) {
+    watchTime = 0;
+  }
+
+  // Không lưu nếu đã xem gần hết (>95%) - coi như đã xem xong
+  const progressPercent = (watchTime / duration) * 100;
+  if (progressPercent > 95) {
+    // Có thể xóa history hoặc đánh dấu đã xem xong
+    // Ở đây ta vẫn lưu nhưng set progress = 100
+    const history = await UserHistory.findOneAndUpdate(
+      { userId, movieId },
+      {
+        episodeId: episodeId || null,
+        watchTime: duration,
+        duration: duration,
+        progress: 100,
+        lastWatchedAt: Date.now(),
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+    return history;
+  }
+
+  // Tính phần trăm tiến độ (0-100%)
+  const finalProgress = Math.min(100, Math.max(0, progressPercent));
+
+  // Thực hiện Upsert (Update hoặc Insert)
   const history = await UserHistory.findOneAndUpdate(
-    { userId: userId, movieId: movieId }, 
+    { userId, movieId },
     {
-      episodeId: episodeId,
-      watchTime: watchTime,
-      duration: duration,
-      progress: progressPercent,
-      lastWatchedAt: Date.now() // Cập nhật thời gian xem mới nhất
+      episodeId: episodeId || null,
+      watchTime: Math.floor(watchTime), // Làm tròn xuống
+      duration: Math.floor(duration),
+      progress: finalProgress,
+      lastWatchedAt: Date.now(),
     },
-    { 
-      new: true,    // Trả về dữ liệu mới sau khi update
-      upsert: true, // Quan trọng: Chưa có thì tạo mới
-      setDefaultsOnInsert: true 
-    }
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    },
   );
+
   return history;
+};
+
+/**
+ * Delete watch progress/history for a specific movie
+ * @param {string} userId - ID của user
+ * @param {string} movieId - ID của movie
+ * @returns {Promise<Object|null>} Deleted history object hoặc null nếu không tìm thấy
+ */
+const deleteProgress = async (userId, movieId) => {
+  if (!movieId) {
+    throw new Error('Movie ID is required');
+  }
+
+  const deleted = await UserHistory.findOneAndDelete({ userId, movieId });
+  return deleted;
 };
 
 module.exports = {
@@ -133,5 +283,8 @@ module.exports = {
   removeFromWatchlist,
   getWatchlist,
   getHistory,
-  saveProgress
+  getContinueWatching,
+  getProgress,
+  saveProgress,
+  deleteProgress,
 };

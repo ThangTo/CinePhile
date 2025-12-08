@@ -114,7 +114,40 @@ const userService = {
     }),
 
   /**
-   * Cập nhật tiến độ xem phim cho user hiện tại
+   * Lấy tiến độ xem phim cho một movie cụ thể
+   * @param {string|number} movieId - Movie ID
+   * @returns {Promise<Object>} { success: boolean, data: progress object hoặc null }
+   */
+  getProgress: (movieId) =>
+    apiRequest(`/users/progress/${movieId}`, {
+      requiresAuth: true,
+    }),
+
+  /**
+   * Lưu/Cập nhật tiến độ xem phim cho user hiện tại
+   * @param {Object} progressData - { movieId, episodeId?, watchTime, duration }
+   * @returns {Promise<Object>} { success: boolean, data: progress object }
+   */
+  saveProgress: (progressData) =>
+    apiRequest(`/users/progress`, {
+      method: "POST",
+      data: progressData,
+      requiresAuth: true,
+    }),
+
+  /**
+   * Xóa tiến độ xem phim (resume watching) cho một movie cụ thể
+   * @param {string|number} movieId - Movie ID
+   * @returns {Promise<Object>} { success: boolean, message: string }
+   */
+  deleteProgress: (movieId) =>
+    apiRequest(`/users/progress/${movieId}`, {
+      method: "DELETE",
+      requiresAuth: true,
+    }),
+
+  /**
+   * Cập nhật tiến độ xem phim cho user hiện tại (deprecated - dùng saveProgress)
    * @param {Object} progressData - { movieId, episodeId, progress, watchTime }
    * @returns {Promise<Object>} { message }
    */

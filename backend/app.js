@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const path = require('path');
 const app = express();
 
 const passport = require('passport');
@@ -24,6 +25,10 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 app.use(morgan('dev'));
 app.use(passport.initialize());
+
+// Serve static avatar files
+app.use('/api/v1/avatars', express.static(path.join(__dirname, 'data/avatars')));
+
 passport.use(new LocalStrategy({ usernameField: 'email' }, User.authenticate()));
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());

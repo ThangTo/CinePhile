@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import VideoPlayer from "components/watch-page/VideoPlayer";
 import ActionBar from "components/watch-page/ActionBar";
 import RatingSidebar from "components/watch-page/RatingSidebar";
@@ -14,10 +14,12 @@ import CastSection from "components/movie-detail/CastSection";
 
 const WatchPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const episodeParam = parseInt(searchParams.get("ep") || "1", 10);
   const audioParam = searchParams.get("audio") || null;
+  const resumeTime = location.state?.resumeTime || null;
 
   const [movie, setMovie] = useState(null);
   const [episodes, setEpisodes] = useState([]);
@@ -145,6 +147,7 @@ const WatchPage = () => {
               totalEpisodes={filteredEpisodes.length}
               audioType={audioType}
               onAudioTypeChange={setAudioType}
+              resumeTime={resumeTime}
             />
 
             {/* Action Bar - Only favorite and add buttons */}

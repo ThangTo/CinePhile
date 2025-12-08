@@ -23,7 +23,7 @@ const MobileLayout = ({ movie, activeTab, setActiveTab, audioType, onAudioTypeCh
   return (
     <div className="lg:hidden">
       {/* Hero Section */}
-      <MobileMovieBanner movie={movie} />
+      <MobileMovieBanner movie={movie} audioType={audioType} />
 
       {/* Tabs, Content & Comments */}
       <MovieDetailContent

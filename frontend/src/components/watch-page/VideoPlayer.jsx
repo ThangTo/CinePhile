@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import Tooltip from "./Tooltip";
 import Hls from "hls.js";
 import useAuth from "hooks/useAuth";
+import userService from "services/user.service";
+import VideoOverlays from "../video/VideoOverlays";
+import VideoControls from "../video/VideoControls";
 
 const VideoPlayer = ({
   movie,
@@ -11,6 +13,7 @@ const VideoPlayer = ({
   totalEpisodes,
   audioType,
   onAudioTypeChange,
+  resumeTime = null,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -28,6 +31,8 @@ const VideoPlayer = ({
   const [isBuffering, setIsBuffering] = useState(false);
   const [availableLevels, setAvailableLevels] = useState([]);
   const [currentActualQuality, setCurrentActualQuality] = useState(null); // Chất lượng thực tế đang phát
+  const [bufferedPercentage, setBufferedPercentage] = useState(0); // Phần trăm video đã buffered
+  const [hasAutoPlayed, setHasAutoPlayed] = useState(false); // Đánh dấu đã auto-play chưa
 
   // Check premium status
   const { user } = useAuth();
@@ -37,6 +42,9 @@ const VideoPlayer = ({
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+  const saveProgressIntervalRef = useRef(null);
+  const hasAutoSeekedRef = useRef(false); // Đánh dấu đã auto-seek chưa
+  const lastEpisodeIdRef = useRef(null); // Lưu episode ID cuối cùng để detect thay đổi
 
   const hlsRef = useRef(null);
 
@@ -96,28 +104,49 @@ const VideoPlayer = ({
 
   const currentAudioLabel = audioOptions.find((o) => o.key === audioType)?.label || "Âm thanh";
 
-  const formatTime = (seconds) => {
-    if (!seconds || isNaN(seconds)) return "00:00";
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
-
-  // Update video time
+  // Update video time and buffered percentage
   useEffect(() => {
     const video = videoRef.current;
     // video.focus();
     if (!video || !hasNativePlayer) return;
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
-    const handleDurationChange = () => setDuration(video.duration);
+    const updateBufferedPercentage = () => {
+      if (video.buffered.length > 0) {
+        const currentDuration = video.duration || duration;
+        if (currentDuration > 0) {
+          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+          const bufferedPercent = (bufferedEnd / currentDuration) * 100;
+          setBufferedPercentage(Math.min(100, Math.max(0, bufferedPercent)));
+        }
+      } else {
+        setBufferedPercentage(0);
+      }
+    };
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      // Update buffered percentage mỗi khi time update
+      updateBufferedPercentage();
+    };
+
+    const handleDurationChange = () => {
+      setDuration(video.duration);
+      // Update buffered when duration changes
+      updateBufferedPercentage();
+    };
+
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
-    const handleWaiting = () => setIsBuffering(true);
+    const handleWaiting = () => {
+      setIsBuffering(true);
+    };
+
     const handleCanPlay = () => setIsBuffering(false);
+
+    const handleProgress = () => {
+      // Update buffered percentage on progress (khi có thêm data được load)
+      updateBufferedPercentage();
+    };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("durationchange", handleDurationChange);
@@ -125,6 +154,7 @@ const VideoPlayer = ({
     video.addEventListener("pause", handlePause);
     video.addEventListener("waiting", handleWaiting);
     video.addEventListener("canplay", handleCanPlay);
+    video.addEventListener("progress", handleProgress);
 
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate);
@@ -133,8 +163,178 @@ const VideoPlayer = ({
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("waiting", handleWaiting);
       video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("progress", handleProgress);
     };
-  }, [hasNativePlayer, episode]);
+  }, [hasNativePlayer, episode, duration]);
+
+  // Reset auto-play/seek state when episode changes
+  useEffect(() => {
+    const currentEpisodeId = episode?._id || episode?.id;
+    if (lastEpisodeIdRef.current !== currentEpisodeId) {
+      hasAutoSeekedRef.current = false;
+      setHasAutoPlayed(false);
+      lastEpisodeIdRef.current = currentEpisodeId;
+    }
+  }, [episode?._id, episode?.id]);
+
+  // Load progress and auto-seek when video is ready
+  useEffect(() => {
+    const video = videoRef.current;
+    const movieId = movie?._id || movie?.id;
+    if (!video || !hasNativePlayer || hasAutoPlayed || !user || !movieId) return;
+
+    let shouldSeek = false;
+    let seekTime = 0;
+
+    const loadProgressAndSeek = async () => {
+      try {
+        // Ưu tiên resumeTime từ location.state (từ ContinueWatching)
+        if (resumeTime && resumeTime > 0) {
+          shouldSeek = true;
+          seekTime = Math.max(0, resumeTime - 3); // Seek về trước 3 giây
+        } else {
+          // Nếu không có từ location.state, load từ backend
+          const response = await userService.getProgress(movieId);
+          if (response?.success && response?.data) {
+            const progress = response.data;
+
+            // Chỉ auto-seek nếu progress < 95% và watchTime > 5
+            if (progress.progress < 95 && progress.watchTime > 5) {
+              // Kiểm tra episode nếu có (cho series)
+              if (episode?._id || episode?.id) {
+                const savedEpisodeId =
+                  progress.episodeId?._id || progress.episodeId?.id || progress.episodeId;
+                const currentEpisodeId = episode._id || episode.id;
+                if (savedEpisodeId && savedEpisodeId.toString() === currentEpisodeId.toString()) {
+                  shouldSeek = true;
+                  seekTime = Math.max(0, progress.watchTime - 3);
+                }
+              } else {
+                // Phim lẻ, không cần check episode
+                shouldSeek = true;
+                seekTime = Math.max(0, progress.watchTime - 3);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load progress for auto-seek:", error);
+      }
+    };
+
+    const handleCanPlayThrough = async () => {
+      // Load progress trước
+      await loadProgressAndSeek();
+
+      // Auto-seek nếu cần
+      if (shouldSeek && !hasAutoSeekedRef.current) {
+        video.currentTime = seekTime;
+        setCurrentTime(seekTime);
+        hasAutoSeekedRef.current = true;
+      }
+
+      // Auto-play video
+      try {
+        await video.play();
+        setIsPlaying(true);
+        setHasAutoPlayed(true);
+      } catch (error) {
+        console.error("Auto-play failed:", error);
+        // Một số browser chặn auto-play, không sao
+      }
+    };
+
+    // Nếu video đã sẵn sàng, thực hiện ngay
+    if (video.readyState >= 3) {
+      // HAVE_FUTURE_DATA hoặc cao hơn
+      handleCanPlayThrough();
+    } else {
+      video.addEventListener("canplaythrough", handleCanPlayThrough);
+    }
+
+    return () => {
+      video.removeEventListener("canplaythrough", handleCanPlayThrough);
+    };
+  }, [
+    hasNativePlayer,
+    resumeTime,
+    hasAutoPlayed,
+    user,
+    movie?._id,
+    movie?.id,
+    episode?._id,
+    episode?.id,
+  ]);
+
+  // Auto-save progress periodically
+  useEffect(() => {
+    const movieId = movie?._id || movie?.id;
+    if (!user || !movieId || !hasNativePlayer) return;
+
+    const saveProgress = async () => {
+      const video = videoRef.current;
+      if (!video || video.paused || !duration || duration <= 0) return;
+
+      const watchTime = Math.floor(video.currentTime);
+      // Chỉ lưu nếu đã xem ít nhất 5 giây
+      if (watchTime < 5) return;
+
+      try {
+        const episodeId = episode?._id || episode?.id || null;
+
+        await userService.saveProgress({
+          movieId: movieId,
+          episodeId: episodeId,
+          watchTime: watchTime,
+          duration: Math.floor(duration),
+        });
+
+        console.log("[Resume Watch] Progress saved successfully");
+      } catch (error) {
+        console.error("[Resume Watch] Failed to save progress:", error);
+      }
+    };
+
+    // Lưu mỗi 15 giây
+    saveProgressIntervalRef.current = setInterval(saveProgress, 15000);
+
+    return () => {
+      if (saveProgressIntervalRef.current) {
+        clearInterval(saveProgressIntervalRef.current);
+      }
+    };
+  }, [user, movie?._id, movie?.id, episode?._id, episode?.id, duration, hasNativePlayer]);
+
+  // Save progress on pause
+  useEffect(() => {
+    const video = videoRef.current;
+    const movieId = movie?._id || movie?.id;
+    if (!video || !user || !movieId || !hasNativePlayer) return;
+
+    const handlePause = async () => {
+      if (!duration || duration <= 0) return;
+      const watchTime = Math.floor(video.currentTime);
+      if (watchTime < 5) return;
+
+      try {
+        const episodeId = episode?._id || episode?.id || null;
+
+        await userService.saveProgress({
+          movieId: movieId,
+          episodeId: episodeId,
+          watchTime: watchTime,
+          duration: Math.floor(duration),
+        });
+      } catch (error) {
+        console.error("[Resume Watch] Failed to save progress on pause:", error);
+      }
+    };
+
+    video.addEventListener("pause", handlePause);
+    return () => {
+      video.removeEventListener("pause", handlePause);
+    };
+  }, [user, movie?._id, movie?.id, episode?._id, episode?.id, duration, hasNativePlayer]);
 
   // Initialize HLS / regular sources when episode changes
   useEffect(() => {
@@ -154,12 +354,27 @@ const VideoPlayer = ({
 
     if (Hls.isSupported()) {
       const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        // Cấu hình để có thể điều khiển quality
-        abrEwmaDefaultEstimate: 500000, // Bitrate estimate (500kbps)
-        maxBufferLength: 30, // Max buffer length in seconds
-        maxMaxBufferLength: 60,
+        // --- CHIẾN THUẬT BUFFER CHO MẠNG LAG ---
+
+        // 1. Tăng bộ nhớ đệm lên mức cao (mặc định chỉ 30s)
+        // Nếu mạng rớt 1 phút, user vẫn xem được nhờ buffer này.
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120, // Cho phép buffer tới 2 phút video
+
+        // 2. Tải trước đoạn video (Start Fragment)
+        // Giúp video chạy nhanh hơn khi vừa bấm play
+        startFragPrefetch: true,
+
+        // 3. Cấu hình Timeout (Rất quan trọng với link phim lậu/crawl)
+        // Mặc định Hls.js đợi rất ngắn, server phim lag chút là nó báo lỗi ngay.
+        // Ta tăng thời gian chờ lên để nó "kiên nhẫn" tải cho xong.
+        manifestLoadingTimeOut: 20000, // Chờ file m3u8 tối đa 20s
+        fragLoadingTimeOut: 25000, // Chờ file .ts tối đa 25s
+
+        // 4. Số lần thử lại nếu lỗi (Retry)
+        manifestLoadingMaxRetry: 5, // Thử lại 5 lần nếu lỗi kết nối
+        fragLoadingMaxRetry: 5,
+        levelLoadingMaxRetry: 5,
       });
 
       hls.loadSource(hlsSource);
@@ -182,6 +397,12 @@ const VideoPlayer = ({
           const actualHeight = firstLevel?.height || null;
           setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
         }
+      });
+
+      // Lắng nghe khi có fragment được load để đảm bảo video sẵn sàng
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        // Video đã có data, có thể phát được
+        setIsBuffering(false);
       });
 
       // Lắng nghe khi level thay đổi
@@ -223,6 +444,11 @@ const VideoPlayer = ({
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      // Cleanup progress saving interval
+      if (saveProgressIntervalRef.current) {
+        clearInterval(saveProgressIntervalRef.current);
+        saveProgressIntervalRef.current = null;
+      }
     };
   }, [hlsSource, fileSource]);
 
@@ -246,7 +472,7 @@ const VideoPlayer = ({
     }
   };
 
-  const handleSeek = (e) => {
+  const handleSeek = async (e) => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -254,6 +480,22 @@ const VideoPlayer = ({
     const clickX = e.clientX - rect.left;
     const newTime = (clickX / rect.width) * duration;
     video.currentTime = newTime;
+
+    // Lưu progress khi seek
+    const movieId = movie?._id || movie?.id;
+    if (user && movieId && duration > 0) {
+      try {
+        const episodeId = episode?._id || episode?.id || null;
+        await userService.saveProgress({
+          movieId: movieId,
+          episodeId: episodeId,
+          watchTime: Math.floor(newTime),
+          duration: Math.floor(duration),
+        });
+      } catch (error) {
+        console.error("[Resume Watch] Failed to save progress on seek:", error);
+      }
+    }
   };
 
   const handleVolumeChange = (e) => {
@@ -782,525 +1024,70 @@ const VideoPlayer = ({
         </div>
       )}
 
-      {/* Background Poster Image*/}
-      {hasNativePlayer && !isPlaying && currentTime === 0 && movie?.backgroundImage && (
-        <div className="absolute inset-0 z-[5] pointer-events-none">
-          <img
-            src={movie.backgroundImage}
-            alt={movie.title}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/60" />
-        </div>
-      )}
-
-      {/* Buffering Indicator */}
-      {hasNativePlayer && isBuffering && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
-        </div>
-      )}
-
-      {/* Center Play Button Overlay */}
-      {hasNativePlayer && !isPlaying && !isBuffering && (
-        <div
-          className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer z-10"
-          onClick={handlePlayPause}
-        >
-          <button className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-white/90 opacity-30 hover:bg-white rounded-full flex items-center justify-center transition-all transform hover:scale-110 shadow-2xl pointer-events-none">
-            <i className="fa-solid fa-play text-black text-xl md:text-2xl lg:text-4xl ml-0.5 md:ml-1 lg:ml-1.5" />
-          </button>
-        </div>
-      )}
+      {/* Video Overlays (Poster, Buffering, Play Button) */}
+      <VideoOverlays
+        hasNativePlayer={hasNativePlayer}
+        isBuffering={isBuffering}
+        isPlaying={isPlaying}
+        movie={movie}
+        currentTime={currentTime}
+        onPlayPause={handlePlayPause}
+      />
 
       {/* Video Controls Overlay */}
-      <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none ${
-          showControls && hasNativePlayer ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        {/* Progress Bar */}
-        <div className="mb-2 pointer-events-auto">
-          <div
-            className="group/seek w-full h-0.5 md:h-1 bg-white/30 rounded-full cursor-pointer hover:h-1 md:hover:h-1.5 transition-all"
-            onClick={handleSeek}
-          >
-            <div
-              className="h-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor rounded-full transition-all duration-100 relative"
-              style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 md:w-2.5 md:h-2.5 lg:w-3 lg:h-3 bg-white rounded-full opacity-0 group-hover/seek:opacity-100 shadow-lg" />
-            </div>
-          </div>
-          <div className="flex justify-between text-[10px] md:text-xs text-white mt-1 md:mt-1.5 font-medium">
-            <span>{formatTime(currentTime)}</span>
-            <span>{formatTime(duration)}</span>
-          </div>
-        </div>
-
-        {/* Control Buttons */}
-        <div className="flex items-center justify-between gap-2 md:gap-3 pointer-events-auto">
-          <div className="flex items-center gap-2 md:gap-3">
-            {/* Play/Pause */}
-            <Tooltip text={isPlaying ? "Tạm dừng (k)" : "Phát (k)"}>
-              <button
-                onClick={handlePlayPause}
-                className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 bg-white hover:bg-white/90 rounded-full flex items-center justify-center transition-all transform hover:scale-105 shadow-lg"
-              >
-                <i
-                  className={`fa-solid ${
-                    isPlaying ? "fa-pause" : "fa-play"
-                  } text-black text-xs md:text-sm lg:text-lg ${!isPlaying && "ml-0.5"}`}
-                />
-              </button>
-            </Tooltip>
-
-            {/* Skip Buttons */}
-            <Tooltip text="Tua lại 10 giây">
-              <button
-                onClick={() => handleSkip(-10)}
-                className="w-7 h-7 md:w-8 md:h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-              >
-                <div className="relative">
-                  <i className="fa-solid fa-rotate-left text-white text-xs md:text-sm lg:text-base" />
-                  <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] md:text-[9px] lg:text-[10px] text-white font-bold">
-                    10
-                  </span>
-                </div>
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Tua tới 10 giây">
-              <button
-                onClick={() => handleSkip(10)}
-                className="w-7 h-7 md:w-8 md:h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-              >
-                <div className="relative">
-                  <i className="fa-solid fa-rotate-right text-white text-xs md:text-sm lg:text-base" />
-                  <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] md:text-[9px] lg:text-[10px] text-white font-bold">
-                    10
-                  </span>
-                </div>
-              </button>
-            </Tooltip>
-
-            {/* Volume */}
-            <div className="flex items-center gap-1 md:gap-2 group/volume">
-              <Tooltip text={isMuted ? "Bật tiếng" : "Tắt tiếng"}>
-                <button onClick={toggleMute} className="hover:scale-110 transition-transform">
-                  <i
-                    className={`fa-solid ${
-                      isMuted || volume === 0
-                        ? "fa-volume-xmark"
-                        : volume < 0.5
-                        ? "fa-volume-low"
-                        : "fa-volume-high"
-                    } text-white text-sm md:text-base lg:text-xl`}
-                  />
-                </button>
-              </Tooltip>
-              <div className="relative w-0 group-hover/volume:w-16 md:group-hover/volume:w-20 lg:group-hover/volume:w-24 h-1 md:h-1.5 transition-all duration-300">
-                <div className="absolute inset-0 bg-white/30 rounded-lg" />
-                <div
-                  className="absolute inset-y-0 left-0 bg-white rounded-lg"
-                  style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
-                />
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className="absolute inset-0 w-full h-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 md:[&::-webkit-slider-thumb]:w-3 md:[&::-webkit-slider-thumb]:h-3 lg:[&::-webkit-slider-thumb]:w-3.5 lg:[&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:h-2.5 md:[&::-moz-range-thumb]:w-3 md:[&::-moz-range-thumb]:h-3 lg:[&::-moz-range-thumb]:w-3.5 lg:[&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 md:gap-2">
-            {/* Desktop/Tablet (md+): Show all buttons individually */}
-            {/* Next Episode - Desktop/Tablet only */}
-            {(() => {
-              const currentEpNumber = episode?.episode || episode?.episodeId || 1;
-              return currentEpNumber < totalEpisodes ? (
-                <div className="hidden md:block">
-                  <Tooltip text={`Xem tập ${currentEpNumber + 1}`}>
-                    <button
-                      onClick={handleNextEpisode}
-                      className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                    >
-                      <i className="fa-solid fa-forward-step text-white text-sm lg:text-base" />
-                    </button>
-                  </Tooltip>
-                </div>
-              ) : null;
-            })()}
-
-            {/* Next Episode - Mobile */}
-            {(() => {
-              const currentEpNumber = episode?.episode || episode?.episodeId || 1;
-              return currentEpNumber < totalEpisodes ? (
-                <div className="md:hidden">
-                  <Tooltip text={`Tập ${currentEpNumber + 1}`}>
-                    <button
-                      onClick={handleNextEpisode}
-                      className="w-7 h-7 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                    >
-                      <i className="fa-solid fa-forward-step text-white text-xs" />
-                    </button>
-                  </Tooltip>
-                </div>
-              ) : null;
-            })()}
-
-            {/* Audio Selection - Desktop/Tablet only */}
-            {audioOptions.length > 0 && (
-              <div className="hidden md:flex relative audio-menu-container">
-                <Tooltip text={currentAudioLabel}>
-                  <button
-                    onClick={toggleAudioMenu}
-                    className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                  >
-                    <i className="fa-solid fa-microphone text-white text-sm lg:text-base" />
-                  </button>
-                </Tooltip>
-                <div
-                  className={`absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[140px] z-[130] origin-bottom-right transition-all duration-300 ease-out ${
-                    showAudioMenu
-                      ? "opacity-100 translate-y-0 scale-100"
-                      : "opacity-0 translate-y-2 scale-95 pointer-events-none"
-                  }`}
-                >
-                  {audioOptions.map((opt) => (
-                    <button
-                      key={opt.key}
-                      onClick={() => handleAudioChange(opt.key)}
-                      className={`w-full px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                        audioType === opt.key ? "bg-white/20" : ""
-                      }`}
-                    >
-                      <span className="text-right">{opt.label}</span>
-                      {audioType === opt.key && (
-                        <i className="fa-solid fa-check text-primaryColor text-xs" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* CC - Desktop/Tablet only */}
-            {/* <div className="hidden md:block">
-              <Tooltip text="Phụ đề">
-                <button className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105">
-                  <span className="text-white font-bold text-xs lg:text-sm">CC</span>
-                </button>
-              </Tooltip>
-            </div> */}
-
-            {/* Picture in Picture - Desktop/Tablet only */}
-            <div className="hidden md:block">
-              <Tooltip text="Thu nhỏ">
-                <button
-                  onClick={handlePictureInPicture}
-                  className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                >
-                  <i className="fa-solid fa-images text-white text-sm lg:text-base" />
-                </button>
-              </Tooltip>
-            </div>
-
-            {/* Speed Menu - Desktop/Tablet only */}
-            <div className="hidden md:flex relative speed-menu-container">
-              <Tooltip text="Tốc độ phát">
-                <button
-                  onClick={toggleSpeedMenu}
-                  className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                >
-                  <i className="fa-solid fa-gauge-high text-white text-sm lg:text-base" />
-                </button>
-              </Tooltip>
-              <div
-                className={`absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[120px] z-[130] origin-bottom-right transition-all duration-300 ease-out ${
-                  showSpeedMenu
-                    ? "opacity-100 translate-y-0 scale-100"
-                    : "opacity-0 translate-y-2 scale-95 pointer-events-none"
-                }`}
-              >
-                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
-                  <button
-                    key={speed}
-                    onClick={() => handleSpeedChange(speed)}
-                    className={`w-full px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                      playbackRate === speed ? "bg-white/20" : ""
-                    }`}
-                  >
-                    <span className="text-right">{speed}x</span>
-                    {playbackRate === speed && (
-                      <i className="fa-solid fa-check text-primaryColor text-xs" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quality - Desktop/Tablet only */}
-            <div className="hidden md:flex relative quality-menu-container">
-              <Tooltip text="Chất lượng">
-                <button
-                  onClick={toggleQualityMenu}
-                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm px-3 py-2 lg:px-3.5 lg:py-2.5 rounded-full transition-all hover:scale-105"
-                >
-                  <span className="text-white text-xs lg:text-sm font-medium">{quality}</span>
-                  <i className="fa-solid fa-cog text-white text-sm lg:text-base" />
-                </button>
-              </Tooltip>
-              <div
-                className={`absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 overflow-hidden shadow-xl min-w-[140px] z-[130] origin-bottom-right transition-all duration-300 ease-out ${
-                  showQualityMenu
-                    ? "opacity-100 translate-y-0 scale-100"
-                    : "opacity-0 translate-y-2 scale-95 pointer-events-none"
-                }`}
-              >
-                {Array.isArray(qualityOptions)
-                  ? qualityOptions.map((q) => {
-                      const requiresPremium = isQualityPremium(q);
-                      const isDisabled = requiresPremium && !isPremium;
-                      const isSelected = quality === q;
-
-                      return (
-                        <button
-                          key={q}
-                          onClick={() => !isDisabled && handleQualityChange(q)}
-                          disabled={isDisabled}
-                          className={`w-full px-4 py-2 text-sm transition-colors flex items-center justify-end gap-2 text-right ${
-                            isDisabled
-                              ? "text-gray-500 cursor-not-allowed opacity-50"
-                              : "text-white hover:bg-white/10"
-                          } ${isSelected && !isDisabled ? "bg-white/20" : ""}`}
-                          title={
-                            isDisabled
-                              ? "Yêu cầu tài khoản Premium để xem chất lượng này"
-                              : undefined
-                          }
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-right">{q}</span>
-                            {requiresPremium && (
-                              <i
-                                className={`fa-solid fa-crown text-xs ${
-                                  isPremium ? "text-yellow-400" : "text-gray-500"
-                                }`}
-                                title="Premium"
-                              />
-                            )}
-                          </div>
-                          {isSelected && !isDisabled && (
-                            <i className="fa-solid fa-check text-primaryColor text-xs" />
-                          )}
-                        </button>
-                      );
-                    })
-                  : null}
-              </div>
-            </div>
-
-            {/* Fullscreen - Always visible */}
-            <Tooltip text={isFullscreen ? "Thoát toàn màn hình (f)" : "Toàn màn hình (f)"}>
-              <button
-                onClick={toggleFullscreen}
-                className="w-7 h-7 md:w-8 md:h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-              >
-                <i
-                  className={`fa-solid ${
-                    isFullscreen ? "fa-compress" : "fa-expand"
-                  } text-white text-xs md:text-sm lg:text-base`}
-                />
-              </button>
-            </Tooltip>
-
-            {/* More Menu (3 dots) - Mobile only (sm and below) */}
-            <div className="relative more-menu-container md:hidden">
-              <Tooltip text="Thêm tùy chọn">
-                <button
-                  onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className="w-7 h-7 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
-                >
-                  <i className="fa-solid fa-ellipsis-vertical text-white text-xs" />
-                </button>
-              </Tooltip>
-              {showMoreMenu && (
-                <div className="absolute bottom-full right-0 mb-2 bg-black/85 backdrop-blur-md rounded-lg shadow-xl min-w-[140px] z-[200] text-xs">
-                  {/* Audio Selection */}
-                  {audioOptions.length > 0 && (
-                    <div className="audio-menu-container relative text-right">
-                      <button
-                        onClick={toggleAudioMenu}
-                        className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-between gap-3 text-right"
-                      >
-                        <i
-                          className={`fa-solid fa-chevron-left text-xs transition-transform ${
-                            showAudioMenu ? "-rotate-180" : ""
-                          }`}
-                        />
-                        <div className="flex items-center gap-2 justify-end">
-                          <span className="text-right">{currentAudioLabel}</span>
-                          <i className="fa-solid fa-microphone text-base" />
-                        </div>
-                      </button>
-                      <div
-                        className={`absolute top-8 right-3 -translate-y-1/2 bg-black/85 rounded-lg border border-white/10 min-w-[120px] shadow-lg origin-right transition-all duration-300 ease-out ${
-                          showAudioMenu
-                            ? "opacity-100 -translate-x-[calc(100%+0.5rem)] scale-100"
-                            : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
-                        }`}
-                      >
-                        {audioOptions.map((opt) => (
-                          <button
-                            key={opt.key}
-                            onClick={() => handleAudioChange(opt.key)}
-                            className={`w-full px-3 py-2 text-white text-xs hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                              audioType === opt.key ? "bg-white/10" : ""
-                            }`}
-                          >
-                            <span>{opt.label}</span>
-                            {audioType === opt.key && (
-                              <i className="fa-solid fa-check text-primaryColor text-[10px]" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* CC */}
-                  {/* <button
-                    onClick={() => setShowMoreMenu(false)}
-                    className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right"
-                  >
-                    <span className="text-right">Phụ đề</span>
-                    <i className="fa-solid fa-closed-captioning text-base" />
-                  </button> */}
-
-                  {/* Picture in Picture */}
-                  <button
-                    onClick={() => {
-                      handlePictureInPicture();
-                      setShowMoreMenu(false);
-                    }}
-                    className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right"
-                  >
-                    <span className="text-right">Thu nhỏ</span>
-                    <i className="fa-solid fa-images text-base" />
-                  </button>
-
-                  {/* Speed */}
-                  <div className="speed-menu-container relative text-right">
-                    <button
-                      onClick={toggleSpeedMenu}
-                      className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-between gap-3 text-right"
-                    >
-                      <i
-                        className={`fa-solid fa-chevron-left text-xs transition-transform ${
-                          showSpeedMenu ? "-rotate-180" : ""
-                        }`}
-                      />
-                      <div className="flex items-center gap-2 justify-end">
-                        <span className="text-right">Tốc độ: {playbackRate}x</span>
-                        <i className="fa-solid fa-gauge-high text-base" />
-                      </div>
-                    </button>
-                    <div
-                      className={`absolute top-8 right-3 -translate-y-1/2 bg-black/85 rounded-lg border border-white/10 min-w-[120px] shadow-lg origin-right transition-all duration-300 ease-out ${
-                        showSpeedMenu
-                          ? "opacity-100 -translate-x-[calc(100%+0.5rem)] scale-100"
-                          : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
-                      }`}
-                    >
-                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
-                        <button
-                          key={speed}
-                          onClick={() => handleSpeedChange(speed)}
-                          className={`w-full px-3 py-2 text-white text-xs hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right ${
-                            playbackRate === speed ? "bg-white/10" : ""
-                          }`}
-                        >
-                          <span>{speed}x</span>
-                          {playbackRate === speed && (
-                            <i className="fa-solid fa-check text-primaryColor text-[10px]" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quality */}
-                  <div className="quality-menu-container relative text-right">
-                    <button
-                      onClick={toggleQualityMenu}
-                      className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-between gap-3 text-right"
-                    >
-                      <i
-                        className={`fa-solid fa-chevron-left text-xs transition-transform ${
-                          showQualityMenu ? "-rotate-180" : ""
-                        }`}
-                      />
-                      <div className="flex items-center gap-2 justify-end">
-                        <span className="text-right">Chất lượng: {quality}</span>
-                        <i className="fa-solid fa-cog text-base" />
-                      </div>
-                    </button>
-                    <div
-                      className={`absolute top-8 right-3 -translate-y-1/2 bg-black/85 rounded-lg border border-white/10 min-w-[120px] shadow-lg origin-right transition-all duration-300 ease-out ${
-                        showQualityMenu
-                          ? "opacity-100 -translate-x-[calc(100%+0.5rem)] scale-100"
-                          : "opacity-0 -translate-x-2 scale-95 pointer-events-none"
-                      }`}
-                    >
-                      {Array.isArray(qualityOptions)
-                        ? qualityOptions.map((q) => {
-                            const requiresPremium = isQualityPremium(q);
-                            const isDisabled = requiresPremium && !isPremium;
-                            const isSelected = quality === q;
-
-                            return (
-                              <button
-                                key={q}
-                                onClick={() => !isDisabled && handleQualityChange(q)}
-                                disabled={isDisabled}
-                                className={`w-full px-3 py-2 text-xs transition-colors flex items-center justify-end gap-2 text-right ${
-                                  isDisabled
-                                    ? "text-gray-500 cursor-not-allowed opacity-50"
-                                    : "text-white hover:bg-white/10"
-                                } ${isSelected && !isDisabled ? "bg-white/10" : ""}`}
-                                title={isDisabled ? "Yêu cầu tài khoản Premium" : undefined}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <span>{q}</span>
-                                  {requiresPremium && (
-                                    <i
-                                      className={`fa-solid fa-crown text-[10px] ${
-                                        isPremium ? "text-yellow-400" : "text-gray-500"
-                                      }`}
-                                    />
-                                  )}
-                                </div>
-                                {isSelected && !isDisabled && (
-                                  <i className="fa-solid fa-check text-primaryColor text-[10px]" />
-                                )}
-                              </button>
-                            );
-                          })
-                        : null}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <VideoControls
+        showControls={showControls}
+        hasNativePlayer={hasNativePlayer}
+        // Progress Bar
+        currentTime={currentTime}
+        duration={duration}
+        bufferedPercentage={bufferedPercentage}
+        onSeek={handleSeek}
+        videoRef={videoRef}
+        // Play/Pause
+        isPlaying={isPlaying}
+        onPlayPause={handlePlayPause}
+        // Skip
+        onSkip={handleSkip}
+        // Volume
+        volume={volume}
+        isMuted={isMuted}
+        onVolumeChange={handleVolumeChange}
+        onToggleMute={toggleMute}
+        // Next Episode
+        episode={episode}
+        totalEpisodes={totalEpisodes}
+        onNextEpisode={handleNextEpisode}
+        // Audio
+        audioOptions={audioOptions}
+        audioType={audioType}
+        currentAudioLabel={currentAudioLabel}
+        showAudioMenu={showAudioMenu}
+        onToggleAudioMenu={toggleAudioMenu}
+        onAudioChange={handleAudioChange}
+        // Speed
+        playbackRate={playbackRate}
+        showSpeedMenu={showSpeedMenu}
+        onToggleSpeedMenu={toggleSpeedMenu}
+        onSpeedChange={handleSpeedChange}
+        // Quality
+        quality={quality}
+        qualityOptions={qualityOptions}
+        showQualityMenu={showQualityMenu}
+        onToggleQualityMenu={toggleQualityMenu}
+        onQualityChange={handleQualityChange}
+        isPremium={isPremium}
+        isQualityPremium={isQualityPremium}
+        // Fullscreen
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        // Picture in Picture
+        onPictureInPicture={handlePictureInPicture}
+        // Mobile More Menu
+        showMoreMenu={showMoreMenu}
+        onToggleMoreMenu={() => setShowMoreMenu(!showMoreMenu)}
+        setShowMoreMenu={setShowMoreMenu}
+      />
     </div>
   );
 };
