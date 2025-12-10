@@ -4,6 +4,8 @@ const MovieModel = require('../models/movie.model');
 const EpisodeModel = require('../models/episode.model');
 const { ensureCastForNames } = require('../integrations/cast.service');
 
+const { createNotification } = require('../controllers/notification.controller');
+
 const API_BASE_URL = 'https://phimapi.com';
 
 /**
@@ -86,6 +88,21 @@ const crawlMovies = async (page = 1) => {
           upsert: true,
           new: true,
         });
+        
+        // --- [THÊM MỚI] GỬI THÔNG BÁO ---
+        // Logic: Gửi thông báo khi phim được cập nhật/thêm mới
+        try {
+            await createNotification({
+                title: 'Cập nhật phim',
+                message: `Phim ${moviePayload.name} (${moviePayload.currentEpisode}) vừa được cập nhật.`,
+                type: 'movie_update',
+                movieId: savedMovie._id
+            });
+        } catch (notiError) {
+            console.error(`⚠️ Lỗi gửi thông báo phim ${slug}:`, notiError.message);
+        }
+
+
 
         // 3b. ĐẢM BẢO CAST (diễn viên/đạo diễn) ĐƯỢC LƯU TRONG COLLECTION CAST (TMDb)
         // Không block nếu TMDb lỗi; chỉ log và tiếp tục crawl.
