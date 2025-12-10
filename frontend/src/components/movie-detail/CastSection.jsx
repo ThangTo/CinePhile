@@ -90,6 +90,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
                     alt={actor.name || "Diễn viên"}
                     className="w-full h-full object-cover group-hover:opacity-80 transition-transform duration-300"
                     lazy={true}
+                    size="80"
                   />
                   <div className="absolute inset-0 z-0 bg-gradient-to-t from-bgColor via-bgColor/10 to-transparent" />
                 </div>
@@ -134,6 +135,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
                   alt={actor.name || "Diễn viên"}
                   className="h-full w-full object-cover"
                   lazy={true}
+                  size="150"
                 />
               </div>
               <div className="text-sm font-semibold text-gray-200">{actor.name || "Không rõ"}</div>

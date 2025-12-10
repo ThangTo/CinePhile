@@ -10,28 +10,53 @@ const UserTable = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    limit: 20,
+  });
 
-  // Load users from API on mount
-  useEffect(() => {
-    const loadUsers = async () => {
-      setIsLoading(true);
-      try {
-        const usersData = await userAPI.getAll();
-        setUsers(Array.isArray(usersData) ? usersData : []);
-      } catch (err) {
-        setError("Không thể tải danh sách người dùng: " + err.message);
-      } finally {
-        setIsLoading(false);
+  // Load users from API with search and pagination
+  const loadUsers = async (page = 1, search = "") => {
+    setIsLoading(true);
+    try {
+      const response = await userAPI.getAll({ page, limit: 20, search });
+      // Handle both paginated response { data: [], pagination: {} } and direct array
+      if (response.data && response.pagination) {
+        setUsers(Array.isArray(response.data) ? response.data : []);
+        setPagination(response.pagination);
+      } else {
+        // Fallback for direct array response
+        const usersData = Array.isArray(response) ? response : [];
+        setUsers(usersData);
+        setPagination({
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: usersData.length,
+          limit: 20,
+        });
       }
-    };
-    loadUsers();
+    } catch (err) {
+      setError("Không thể tải danh sách người dùng: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load users on mount
+  useEffect(() => {
+    loadUsers(1, "");
   }, []);
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Debounce search - reload when search term changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadUsers(1, searchTerm);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Bạn có chắc muốn xóa người dùng này?")) return;
@@ -39,11 +64,16 @@ const UserTable = () => {
     setIsLoading(true);
     try {
       await userAPI.delete(id);
-      // Reload users to ensure consistency
-      const usersData = await userAPI.getAll();
-      setUsers(Array.isArray(usersData) ? usersData : []);
+      // Remove from local state instead of reloading all
+      setUsers((prev) => prev.filter((user) => user.id !== id));
+      setPagination((prev) => ({
+        ...prev,
+        totalItems: Math.max(0, prev.totalItems - 1),
+      }));
     } catch (err) {
       setError("Không thể xóa người dùng: " + err.message);
+      // Reload on error to ensure consistency
+      loadUsers(pagination.currentPage, searchTerm);
     } finally {
       setIsLoading(false);
     }
@@ -52,12 +82,13 @@ const UserTable = () => {
   const toggleStatus = async (id) => {
     setIsLoading(true);
     try {
-      await userAPI.toggleStatus(id);
-      // Reload users to ensure consistency
-      const usersData = await userAPI.getAll();
-      setUsers(Array.isArray(usersData) ? usersData : []);
+      const updatedUser = await userAPI.toggleStatus(id);
+      // Update local state instead of reloading all
+      setUsers((prev) => prev.map((user) => (user.id === id ? updatedUser : user)));
     } catch (err) {
       setError("Không thể thay đổi trạng thái: " + err.message);
+      // Reload on error to ensure consistency
+      loadUsers(pagination.currentPage, searchTerm);
     } finally {
       setIsLoading(false);
     }
@@ -78,13 +109,16 @@ const UserTable = () => {
     setError(null);
     try {
       if (selectedUser) {
-        await userAPI.update(selectedUser.id, userData);
+        // Update
+        const updatedUser = await userAPI.update(selectedUser.id, userData);
+        // Update local state instead of reloading all
+        setUsers((prev) => prev.map((user) => (user.id === selectedUser.id ? updatedUser : user)));
       } else {
+        // Create
         await userAPI.create(userData);
+        // Reload to get proper pagination
+        loadUsers(pagination.currentPage, searchTerm);
       }
-      // Reload users to ensure consistency
-      const usersData = await userAPI.getAll();
-      setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (err) {
       setError(err.message);
       throw err;
@@ -148,7 +182,7 @@ const UserTable = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((user) => (
+            {users.map((user) => (
               <tr
                 key={user.id}
                 className="border-b border-white/5 hover:bg-white/5 transition-colors"
@@ -215,12 +249,31 @@ const UserTable = () => {
         </table>
       </div>
 
-      {/* Footer */}
+      {/* Footer with Pagination */}
       <div className="p-6 border-t border-white/10 flex items-center justify-between">
         <span className="text-sm text-gray-400">
-          Hiển thị <span className="text-white font-semibold">{filteredUsers.length}</span> người
-          dùng
+          Hiển thị <span className="text-white font-semibold">{users.length}</span> /{" "}
+          <span className="text-white font-semibold">{pagination.totalItems}</span> người dùng
         </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => loadUsers(pagination.currentPage - 1, searchTerm)}
+            disabled={pagination.currentPage <= 1}
+            className="px-4 py-2 bg-gray-900 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+          >
+            Trước
+          </button>
+          <span className="px-4 py-2 text-white">
+            Trang {pagination.currentPage} / {pagination.totalPages}
+          </span>
+          <button
+            onClick={() => loadUsers(pagination.currentPage + 1, searchTerm)}
+            disabled={pagination.currentPage >= pagination.totalPages}
+            className="px-4 py-2 bg-gray-900 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+          >
+            Sau
+          </button>
+        </div>
       </div>
 
       {/* Error message */}

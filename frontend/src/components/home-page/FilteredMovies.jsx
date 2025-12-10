@@ -127,12 +127,8 @@ const FilteredMovies = ({ pageType = "genre" }) => {
       : TYPE_FILTERS[requestedKey]?.label) ||
     requestedKey.replace(/-/g, " ");
 
-  const handlePrev = () => {
-    setPage((prev) => Math.max(prev - 1, 1));
-  };
-
-  const handleNext = () => {
-    setPage((prev) => Math.min(prev + 1, pagination.totalPages || prev + 1));
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
   };
 
   const emptyText =
@@ -178,8 +174,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
               <Pagination
                 page={pagination.page}
                 totalPages={pagination.totalPages}
-                onPrev={handlePrev}
-                onNext={handleNext}
+                onPageChange={handlePageChange}
               />
             )}
           </>

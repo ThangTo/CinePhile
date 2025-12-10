@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { movieAPI } from "services/admin.service";
 import MovieFormModal from "./MovieFormModal";
 import { BarSpinner } from "components/common/LoadingState";
+import OptimizedImage from "components/common/OptimizedImage";
+import Pagination from "components/common/Pagination";
 
 const MovieTable = () => {
   const [movies, setMovies] = useState([]);
@@ -10,26 +12,53 @@ const MovieTable = () => {
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    limit: 20,
+  });
 
-  // Load movies from API on mount
-  useEffect(() => {
-    const loadMovies = async () => {
-      setIsLoading(true);
-      try {
-        const moviesData = await movieAPI.getAll();
-        setMovies(Array.isArray(moviesData) ? moviesData : []);
-      } catch (err) {
-        setError("Không thể tải danh sách phim: " + err.message);
-      } finally {
-        setIsLoading(false);
+  // Load movies from API with search and pagination
+  const loadMovies = async (page = 1, search = "") => {
+    setIsLoading(true);
+    try {
+      const response = await movieAPI.getAll({ page, limit: 20, search });
+      // Handle both paginated response { data: [], pagination: {} } and direct array
+      if (response.data && response.pagination) {
+        setMovies(Array.isArray(response.data) ? response.data : []);
+        setPagination(response.pagination);
+      } else {
+        // Fallback for direct array response
+        const moviesData = Array.isArray(response) ? response : [];
+        setMovies(moviesData);
+        setPagination({
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: moviesData.length,
+          limit: 20,
+        });
       }
-    };
-    loadMovies();
+    } catch (err) {
+      setError("Không thể tải danh sách phim: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load movies on mount
+  useEffect(() => {
+    loadMovies(1, "");
   }, []);
 
-  const filteredMovies = movies.filter((movie) =>
-    movie.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Debounce search - reload when search term changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadMovies(1, searchTerm);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Bạn có chắc muốn xóa phim này?")) return;
@@ -37,11 +66,16 @@ const MovieTable = () => {
     setIsLoading(true);
     try {
       await movieAPI.delete(id);
-      // Reload movies to ensure consistency
-      const moviesData = await movieAPI.getAll();
-      setMovies(Array.isArray(moviesData) ? moviesData : []);
+      // Remove from local state instead of reloading all
+      setMovies((prev) => prev.filter((movie) => movie.id !== id));
+      setPagination((prev) => ({
+        ...prev,
+        totalItems: Math.max(0, prev.totalItems - 1),
+      }));
     } catch (err) {
       setError("Không thể xóa phim: " + err.message);
+      // Reload on error to ensure consistency
+      loadMovies(pagination.currentPage, searchTerm);
     } finally {
       setIsLoading(false);
     }
@@ -63,16 +97,16 @@ const MovieTable = () => {
     try {
       if (selectedMovie) {
         // Update
-        await movieAPI.update(selectedMovie.id, movieData);
-        // Reload movies to ensure consistency
-        const moviesData = await movieAPI.getAll();
-        setMovies(Array.isArray(moviesData) ? moviesData : []);
+        const updatedMovie = await movieAPI.update(selectedMovie.id, movieData);
+        // Update local state instead of reloading all
+        setMovies((prev) =>
+          prev.map((movie) => (movie.id === selectedMovie.id ? updatedMovie : movie))
+        );
       } else {
         // Create
         await movieAPI.create(movieData);
-        // Reload movies to ensure consistency
-        const moviesData = await movieAPI.getAll();
-        setMovies(Array.isArray(moviesData) ? moviesData : []);
+        // Reload to get proper pagination
+        loadMovies(pagination.currentPage, searchTerm);
       }
     } catch (err) {
       setError(err.message);
@@ -80,6 +114,10 @@ const MovieTable = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePageChange = (newPage) => {
+    loadMovies(newPage, searchTerm);
   };
 
   return (
@@ -137,17 +175,20 @@ const MovieTable = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredMovies.map((movie) => (
+            {movies.map((movie, index) => (
               <tr
                 key={movie.id}
                 className="border-b border-white/5 hover:bg-white/5 transition-colors"
               >
-                <td className="px-6 py-4 text-sm text-gray-300">{movie.id}</td>
+                <td className="px-6 py-4 text-sm text-gray-300">{index + 1}</td>
                 <td className="px-6 py-4">
-                  <img
+                  <OptimizedImage
                     src={movie.poster}
                     alt={movie.title}
                     className="w-12 h-16 object-cover rounded"
+                    priority={true}
+                    lazy={false}
+                    preloadOnHover={false}
                   />
                 </td>
                 <td className="px-6 py-4">
@@ -158,7 +199,7 @@ const MovieTable = () => {
                 <td className="px-6 py-4">
                   <span className="inline-flex items-center gap-1 text-primaryColor font-semibold">
                     <i className="fa-solid fa-star text-xs"></i>
-                    {movie.rating}
+                    {movie.rating.toFixed(1)}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-300">
@@ -191,22 +232,19 @@ const MovieTable = () => {
       {/* Pagination */}
       <div className="p-6 border-t border-white/10 flex items-center justify-between">
         <span className="text-sm text-gray-400">
-          Hiển thị <span className="text-white font-semibold">{filteredMovies.length}</span> phim
+          Hiển thị <span className="text-white font-semibold">{movies.length}</span> /{" "}
+          <span className="text-white font-semibold">{pagination.totalItems}</span> phim
         </span>
-        <div className="flex items-center gap-2">
-          <button className="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded-lg transition-colors">
-            Trước
-          </button>
-          <button className="px-4 py-2 bg-primaryColor text-black font-semibold rounded-lg">
-            1
-          </button>
-          <button className="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded-lg transition-colors">
-            2
-          </button>
-          <button className="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded-lg transition-colors">
-            Sau
-          </button>
-        </div>
+        {pagination.totalPages > 1 && (
+          <div className="flex justify-end items-center mt-[-32px]">
+            <Pagination
+              page={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={handlePageChange}
+              className="bg-bgColor3"
+            />
+          </div>
+        )}
       </div>
 
       {/* Error message */}

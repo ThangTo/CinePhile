@@ -20,6 +20,8 @@ const OptimizedImage = ({
   preloadOnHover = true,
   lazy = true,
   priority = false, // If true, load immediately without lazy loading
+  size = 400,
+  quality = 100,
   ...props
 }) => {
   // If lazy is false or priority is true, load immediately
@@ -141,7 +143,7 @@ const OptimizedImage = ({
       {/* Actual image */}
       {imageSrc && (
         <img
-          src={imageSrc}
+          src={`https://images.weserv.nl/?url=${imageSrc}&w=${size}&q=${quality}`}
           alt={alt}
           className={`${isLoaded ? "opacity-100" : "opacity-0"} ${className}`}
           draggable="false"

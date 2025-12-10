@@ -73,12 +73,8 @@ const SearchResults = () => {
     fetchResults();
   }, [query, page]);
 
-  const handlePrev = () => {
-    setPage((prev) => Math.max(prev - 1, 1));
-  };
-
-  const handleNext = () => {
-    setPage((prev) => Math.min(prev + 1, pagination.totalPages || prev + 1));
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
   };
 
   if (!query) {
@@ -131,8 +127,7 @@ const SearchResults = () => {
               <Pagination
                 page={pagination.page}
                 totalPages={pagination.totalPages}
-                onPrev={handlePrev}
-                onNext={handleNext}
+                onPageChange={handlePageChange}
               />
             )}
           </>

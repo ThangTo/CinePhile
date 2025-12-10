@@ -110,7 +110,7 @@ const paginate = async (builder, { page = 1, limit = 12 } = {}) => {
       .then((docs) => transformMovies(docs)),
     Movie.countDocuments(builder.getFilter()),
   ]);
-  
+
   return {
     data: rows,
     pagination: {

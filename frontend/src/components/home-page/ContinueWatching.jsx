@@ -212,8 +212,8 @@ const ContinueWatching = () => {
                   <p className="text-[10px] text-gray-400 mb-1">
                     Tập {item.lastWatchedEpisode || 1} · {progressMinutes}m / {duration}m
                   </p>
-                  <h3 className="text-white text-sm font-semibold">{title}</h3>
-                  {engTitle && <p className="text-gray-400 text-xs">{engTitle}</p>}
+                  <h3 className="text-white text-sm font-semibold line-clamp-2">{title}</h3>
+                  {engTitle && <p className="text-gray-400 text-xs line-clamp-1">{engTitle}</p>}
                 </div>
               </div>
             );

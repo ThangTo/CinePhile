@@ -125,6 +125,8 @@ const BannerHome = ({ movie }) => {
                   priority={index === 0}
                   lazy={false}
                   preloadOnHover={false}
+                  size="70"
+                  quality="80"
                 />
                 {isActive && <div className="absolute inset-0 bg-black/20 pointer-events-none" />}
               </button>

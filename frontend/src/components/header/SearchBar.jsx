@@ -141,6 +141,8 @@ const SearchBar = ({ className = "", placeholder = "Tìm kiếm phim, diễn vi�
                             priority={true}
                             lazy={false}
                             preloadOnHover={false}
+                            size="40"
+                            quality="100"
                           />
                         )}
                       </div>

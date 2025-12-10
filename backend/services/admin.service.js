@@ -1,6 +1,7 @@
 const MovieModel = require('../models/movie.model');
 const UserModel = require('../models/user.model');
 const EpisodeModel = require('../models/episode.model');
+const { transformMovies } = require('../utils/movieTransformer');
 /**
  * Admin Service
  * Business logic for admin operations
@@ -27,8 +28,8 @@ const getAllMovies = async ({ page, limit, search }) => {
       $or: [
         { name: { $regex: search, $options: 'i' } },
         { slug: { $regex: search, $options: 'i' } },
-        { original_name: { $regex: search, $options: 'i' } }
-      ]
+        { original_name: { $regex: search, $options: 'i' } },
+      ],
     };
   }
 
@@ -39,16 +40,18 @@ const getAllMovies = async ({ page, limit, search }) => {
     .limit(limitNum)
     .select('-content -actor -director'); // Bỏ bớt field nặng để load nhanh
 
+  const transformedMovies = transformMovies(movies);
+
   const total = await MovieModel.countDocuments(query);
 
   return {
-    data: movies,
+    data: transformedMovies,
     pagination: {
       totalItems: total,
       totalPages: Math.ceil(total / limitNum),
       currentPage: pageNum,
-      limit: limitNum
-    }
+      limit: limitNum,
+    },
   };
 };
 /**
@@ -89,7 +92,7 @@ const updateMovie = async (id, movieData) => {
  */
 const deleteMovie = async (id) => {
   const movie = await MovieModel.findByIdAndDelete(id);
-  
+
   if (movie) {
     // TÍNH NĂNG QUAN TRỌNG: Cascade Delete
     // Khi xóa phim, phải xóa luôn tất cả tập phim của nó để sạch DB
@@ -129,8 +132,8 @@ const getAllUsers = async (options = {}) => {
     query = {
       $or: [
         { username: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ]
+        { email: { $regex: search, $options: 'i' } },
+      ],
     };
   }
 
@@ -140,7 +143,7 @@ const getAllUsers = async (options = {}) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum),
-    UserModel.countDocuments(query)
+    UserModel.countDocuments(query),
   ]);
 
   return {
@@ -162,7 +165,6 @@ const getAllUsers = async (options = {}) => {
 const getUserById = async (id) => {
   // TODO: Implement - Get user from database by ID
   return await UserModel.findById(id).select('-password');
-  
 };
 
 /**
@@ -199,8 +201,6 @@ const deleteUser = async (id) => {
   return !!result; // Trả về true/false
 };
 
-
-
 /**
  * Toggle user status (active/inactive)
  * @param {string|number} id - User ID
@@ -213,7 +213,7 @@ const toggleUserStatus = async (id) => {
 
   // Đảo trạng thái isBanned (Khóa/Mở khóa)
   // Đảm bảo trong User Schema có trường này (hoặc trường isActive)
-  user.isBanned = !user.isBanned; 
+  user.isBanned = !user.isBanned;
   return await user.save();
 };
 
@@ -231,7 +231,7 @@ const getStats = async () => {
   const [totalMovies, totalUsers, totalViewsData] = await Promise.all([
     MovieModel.countDocuments(),
     UserModel.countDocuments(),
-    MovieModel.aggregate([{ $group: { _id: null, total: { $sum: "$viewCount" } } }])
+    MovieModel.aggregate([{ $group: { _id: null, total: { $sum: '$viewCount' } } }]),
   ]);
   // Tính user mới trong tháng (Ví dụ đơn giản)
   const startOfMonth = new Date();
@@ -239,7 +239,7 @@ const getStats = async () => {
   const newUsers = await UserModel.countDocuments({ createdAt: { $gte: startOfMonth } });
 
   const totalViews = totalViewsData.length > 0 ? totalViewsData[0].total : 0;
-  
+
   return {
     totalMovies: totalMovies,
     totalUsers: totalUsers,
@@ -266,11 +266,11 @@ const getChartData = async (type) => {
     const topMovies = await MovieModel.find()
       .sort({ viewCount: -1 })
       .limit(5)
-      .select('name viewCount');// 
-      
+      .select('name viewCount'); //
+
     return {
-      labels: topMovies.map(m => m.name),
-      data: topMovies.map(m => m.viewCount)
+      labels: topMovies.map((m) => m.name),
+      data: topMovies.map((m) => m.viewCount),
     };
   }
   // Placeholder cho các loại chart khác

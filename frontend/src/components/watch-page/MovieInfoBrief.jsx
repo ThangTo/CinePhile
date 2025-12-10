@@ -15,6 +15,7 @@ const MovieInfoBrief = ({ movie, activeEp }) => {
             alt={movie.title}
             className="w-full aspect-[2/3] object-cover rounded-lg shadow-lg"
             priority={true}
+            size="150"
           />
         </div>
 

@@ -39,6 +39,7 @@ const MovieCard = ({
             className="w-full aspect-[2/3] object-cover transition-transform duration-300 group-hover:scale-105 pointer-events-none"
             preloadOnHover={true}
             priority={true}
+            size={compact ? "160" : "250"}
           />
           <div className="absolute left-2 top-1 z-10">
             <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white shadow">

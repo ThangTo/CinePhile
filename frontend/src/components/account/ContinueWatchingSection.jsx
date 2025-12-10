@@ -80,6 +80,10 @@ const ContinueWatchingSection = ({ user }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  const handlePageChange = (newPage) => {
+    fetchData(newPage);
+  };
+
   const handleWatch = (item) => {
     const movieId = item.movieId || item.id;
     if (!movieId) return;
@@ -224,8 +228,7 @@ const ContinueWatchingSection = ({ user }) => {
           <Pagination
             page={pagination.page}
             totalPages={pagination.totalPages}
-            onPrev={() => fetchData(Math.max(1, pagination.page - 1))}
-            onNext={() => fetchData(Math.min(pagination.totalPages, pagination.page + 1))}
+            onPageChange={handlePageChange}
             className="bg-bgColor3"
           />
         </div>

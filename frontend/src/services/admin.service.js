@@ -20,7 +20,7 @@ export const movieAPI = {
       requiresAuth: true,
     });
     // Handle both wrapped response { data: [] } and direct array
-    return Array.isArray(response) ? response : response.data || response;
+    return response;
   },
 
   /**
