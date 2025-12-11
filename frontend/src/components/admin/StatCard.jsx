@@ -10,7 +10,9 @@ const COLOR_GRADIENTS = {
 };
 
 const StatCard = ({ title, value, icon, color = "blue", trend }) => {
-  const isPositive = trend?.startsWith("+");
+  // Normalize trend to string with sign for display, accept both string and number
+  const normalizedTrend = typeof trend === "number" ? `${trend >= 0 ? "+" : ""}${trend}%` : trend;
+  const isPositive = typeof trend === "number" ? trend >= 0 : normalizedTrend?.startsWith("+");
 
   return (
     <div className="bg-bgColor3 rounded-xl p-6 border border-white/10 hover:border-primaryColor/50 transition-all">
@@ -20,11 +22,11 @@ const StatCard = ({ title, value, icon, color = "blue", trend }) => {
         >
           <i className={`fa-solid ${icon} text-white text-xl`}></i>
         </div>
-        {trend && (
+        {normalizedTrend && (
           <span
             className={`text-sm font-semibold ${isPositive ? "text-green-400" : "text-red-400"}`}
           >
-            {trend}
+            {normalizedTrend}
           </span>
         )}
       </div>

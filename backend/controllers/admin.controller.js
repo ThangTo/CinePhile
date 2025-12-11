@@ -1,4 +1,6 @@
 const adminService = require('../services/admin.service');
+const { transformMovieData, slugify } = require('../utils/movieAdminUtils');
+const { transformMovie } = require('../utils/movieTransformer');
 
 /**
  * Admin Movies Controllers
@@ -29,7 +31,9 @@ const getMovieById = async (req, res) => {
     if (!movie) {
       return res.status(404).json({ message: 'Movie not found' });
     }
-    res.json(movie);
+    // Transform movie to frontend format before sending
+    const transformedMovie = transformMovie(movie);
+    res.json(transformedMovie);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -41,8 +45,19 @@ const getMovieById = async (req, res) => {
  */
 const createMovie = async (req, res) => {
   try {
-    const movie = await adminService.createMovie(req.body);
-    res.status(201).json(movie);
+    // Validate required fields
+    if (!req.body.name && !req.body.title) {
+      return res.status(400).json({ message: 'Movie name is required' });
+    }
+
+    // Transform data from frontend format to DB format
+    const transformedData = transformMovieData(req.body, false);
+
+    // Create movie (service will handle slug uniqueness)
+    const movie = await adminService.createMovie(transformedData);
+    // Transform movie to frontend format before sending
+    const transformedMovie = transformMovie(movie);
+    res.status(201).json(transformedMovie);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -55,11 +70,30 @@ const createMovie = async (req, res) => {
 const updateMovie = async (req, res) => {
   try {
     const { id } = req.params;
-    const movie = await adminService.updateMovie(id, req.body);
+
+    // Transform data from frontend format to DB format
+    const transformedData = transformMovieData(req.body, true);
+
+    // Handle slug generation if name changed but slug not provided
+    const existingMovie = await adminService.getMovieById(id);
+    if (!existingMovie) {
+      return res.status(404).json({ message: 'Movie not found' });
+    }
+
+    const newName = transformedData.name || req.body.title;
+    if (newName && newName !== existingMovie.name && !transformedData.slug && !req.body.slug) {
+      // Name changed but slug not provided, generate new slug
+      transformedData.slug = slugify(newName);
+    }
+
+    // Update movie (service will handle slug uniqueness)
+    const movie = await adminService.updateMovie(id, transformedData);
     if (!movie) {
       return res.status(404).json({ message: 'Movie not found' });
     }
-    res.json(movie);
+    // Transform movie to frontend format before sending
+    const transformedMovie = transformMovie(movie);
+    res.json(transformedMovie);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

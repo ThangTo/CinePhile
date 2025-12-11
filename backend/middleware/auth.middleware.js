@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const authService = require('../services/auth.service');
+const { attachAuthCookies } = require('../utils/authUtils');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -17,18 +19,64 @@ const authMiddleware = async (req, res, next) => {
     }
 
     if (!token) {
+      // Try to refresh token if refresh token exists
+      const refreshToken = req.cookies?.refreshToken;
+      if (refreshToken) {
+        try {
+          const newTokens = await authService.refreshToken(refreshToken);
+          attachAuthCookies(res, newTokens);
+          // Verify new token and get user
+          const decoded = jwt.verify(newTokens.token, process.env.JWT_SECRET);
+          const user = await User.findById(decoded.userId);
+          if (user) {
+            req.user = user;
+            return next();
+          }
+        } catch (refreshError) {
+          // Refresh token is invalid, clear cookies and return unauthorized
+          res.clearCookie('accessToken');
+          res.clearCookie('refreshToken');
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
+      }
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.userId);
 
-    if (!user) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      req.user = user;
+      return next();
+    } catch (tokenError) {
+      // Token expired or invalid, try to refresh
+      if (tokenError.name === 'TokenExpiredError' || tokenError.name === 'JsonWebTokenError') {
+        const refreshToken = req.cookies?.refreshToken;
+        if (refreshToken) {
+          try {
+            const newTokens = await authService.refreshToken(refreshToken);
+            attachAuthCookies(res, newTokens);
+            // Verify new token and get user
+            const decoded = jwt.verify(newTokens.token, process.env.JWT_SECRET);
+            const user = await User.findById(decoded.userId);
+            if (user) {
+              req.user = user;
+              return next();
+            }
+          } catch (refreshError) {
+            // Refresh token is invalid, clear cookies and return unauthorized
+            res.clearCookie('accessToken');
+            res.clearCookie('refreshToken');
+            return res.status(401).json({ message: 'Unauthorized' });
+          }
+        }
+      }
+      throw tokenError;
     }
-
-    req.user = user;
-    return next();
   } catch (error) {
     if (!isProduction) {
       console.error('Auth middleware error:', error);

@@ -1,11 +1,39 @@
 const MovieModel = require('../models/movie.model');
 const UserModel = require('../models/user.model');
 const EpisodeModel = require('../models/episode.model');
+const UserHistoryModel = require('../models/user_history.model');
 const { transformMovies } = require('../utils/movieTransformer');
+
 /**
  * Admin Service
  * Business logic for admin operations
  */
+
+/**
+ * Helper: Generate unique slug by appending number if exists
+ * @param {string} baseSlug - Base slug
+ * @param {string} excludeId - Movie ID to exclude from uniqueness check
+ * @returns {Promise<string>} Unique slug
+ */
+const generateUniqueSlug = async (baseSlug, excludeId = null) => {
+  let slug = baseSlug;
+  let counter = 1;
+
+  while (true) {
+    const query = { slug };
+    if (excludeId) {
+      query._id = { $ne: excludeId };
+    }
+
+    const existing = await MovieModel.findOne(query);
+    if (!existing) {
+      return slug;
+    }
+
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+};
 
 /**
  * Movies Management
@@ -66,23 +94,67 @@ const getMovieById = async (id) => {
 
 /**
  * Create new movie
- * @param {Object} movieData - Movie data
+ * @param {Object} movieData - Movie data (already transformed from controller)
  * @returns {Promise<Object>} Created movie object
  */
 const createMovie = async (movieData) => {
-  // TODO: Implement - Create movie in database
-  return await MovieModel.create(movieData);
+  // Validate required fields
+  if (!movieData.name) {
+    throw new Error('Movie name is required');
+  }
+
+  // Ensure slug exists and is unique
+  if (!movieData.slug) {
+    throw new Error('Movie slug is required');
+  }
+  movieData.slug = await generateUniqueSlug(movieData.slug);
+
+  // Validate slug uniqueness (double check)
+  const existingMovie = await MovieModel.findOne({ slug: movieData.slug });
+  if (existingMovie) {
+    movieData.slug = await generateUniqueSlug(movieData.slug);
+  }
+
+  // Create movie
+  const movie = await MovieModel.create(movieData);
+
+  return movie;
 };
 
 /**
  * Update movie
  * @param {string|number} id - Movie ID
- * @param {Object} movieData - Updated movie data
+ * @param {Object} movieData - Updated movie data (already transformed from controller)
  * @returns {Promise<Object|null>} Updated movie object or null
  */
 const updateMovie = async (id, movieData) => {
-  // TODO: Implement - Update movie in database
-  return await MovieModel.findByIdAndUpdate(id, movieData, { new: true });
+  // Check if movie exists
+  const existingMovie = await MovieModel.findById(id);
+  if (!existingMovie) {
+    return null;
+  }
+
+  // Handle slug uniqueness if slug is being updated
+  if (movieData.slug && movieData.slug !== existingMovie.slug) {
+    // Slug is being updated, ensure uniqueness
+    movieData.slug = await generateUniqueSlug(movieData.slug, id);
+  }
+
+  // Remove undefined values to avoid overwriting with undefined
+  Object.keys(movieData).forEach((key) => {
+    if (movieData[key] === undefined) {
+      delete movieData[key];
+    }
+  });
+
+  // Update movie (only update provided fields)
+  const updatedMovie = await MovieModel.findByIdAndUpdate(
+    id,
+    { $set: movieData },
+    { new: true, runValidators: true },
+  );
+
+  return updatedMovie;
 };
 
 /**
@@ -222,34 +294,67 @@ const toggleUserStatus = async (id) => {
  */
 
 /**
- * Get dashboard statistics
- * @returns {Promise<Object>} Stats object
+ * Calculate percentage change between current and previous values.
+ * Returns a signed percentage (e.g., 25 or -10). If previous is 0,
+ * treat any current value as 100% growth, otherwise 0.
+ */
+const calculateTrend = (current, previous) => {
+  if (previous === 0) {
+    return current > 0 ? 100 : 0;
+  }
+  const change = ((current - previous) / previous) * 100;
+  return Number(change.toFixed(2));
+};
+
+/**
+ * Get dashboard statistics with week-over-week trends.
+ * Counts for "trending" compare the last 7 days vs. the 7 days before that.
+ * newUsers replaces activeUsers and reflects users created in the last week.
  */
 const getStats = async () => {
-  // TODO: Implement - Get statistics from database
-  // Lấy số liệu thực từ DB
-  const [totalMovies, totalUsers, totalViewsData] = await Promise.all([
+  const now = new Date();
+  const currentWeekStart = new Date(now);
+  currentWeekStart.setDate(now.getDate() - 7);
+
+  const previousWeekStart = new Date(currentWeekStart);
+  previousWeekStart.setDate(currentWeekStart.getDate() - 7);
+
+  const [
+    totalMovies,
+    totalUsers,
+    totalViewsData,
+    moviesThisWeek,
+    moviesPrevWeek,
+    usersThisWeek,
+    usersPrevWeek,
+    viewsThisWeek,
+    viewsPrevWeek,
+  ] = await Promise.all([
     MovieModel.countDocuments(),
     UserModel.countDocuments(),
     MovieModel.aggregate([{ $group: { _id: null, total: { $sum: '$viewCount' } } }]),
+    MovieModel.countDocuments({ createdAt: { $gte: currentWeekStart } }),
+    MovieModel.countDocuments({ createdAt: { $gte: previousWeekStart, $lt: currentWeekStart } }),
+    UserModel.countDocuments({ createdAt: { $gte: currentWeekStart } }),
+    UserModel.countDocuments({ createdAt: { $gte: previousWeekStart, $lt: currentWeekStart } }),
+    UserHistoryModel.countDocuments({ createdAt: { $gte: currentWeekStart } }),
+    UserHistoryModel.countDocuments({
+      createdAt: { $gte: previousWeekStart, $lt: currentWeekStart },
+    }),
   ]);
-  // Tính user mới trong tháng (Ví dụ đơn giản)
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  const newUsers = await UserModel.countDocuments({ createdAt: { $gte: startOfMonth } });
 
   const totalViews = totalViewsData.length > 0 ? totalViewsData[0].total : 0;
 
   return {
-    totalMovies: totalMovies,
-    totalUsers: totalUsers,
-    totalViews: totalViews,
-    activeUsers: newUsers,
+    totalMovies,
+    totalUsers,
+    totalViews,
+    newUsers: usersThisWeek,
     trends: {
-      movies: '10%', // hardcode tạm thời
-      users: '20%',
-      views: '30%',
-      active: '40%',
+      movies: calculateTrend(moviesThisWeek, moviesPrevWeek),
+      users: calculateTrend(usersThisWeek, usersPrevWeek),
+      views: calculateTrend(viewsThisWeek, viewsPrevWeek),
+      newUsers: calculateTrend(usersThisWeek, usersPrevWeek),
     },
   };
 };
@@ -260,19 +365,31 @@ const getStats = async () => {
  * @returns {Promise<Object>} Chart data object
  */
 const getChartData = async (type) => {
-  // TODO: Implement - Get chart data from database
-  // trả về dạng chuẩn để vẽ biểu đồ
-  if (type === 'top-movies' || !type) {
+  // Top 10 films with highest viewCount
+  if (type === 'views' || type === 'top-movies' || !type) {
     const topMovies = await MovieModel.find()
       .sort({ viewCount: -1 })
-      .limit(5)
-      .select('name viewCount'); //
+      .limit(10)
+      .select('name viewCount poster_url');
 
     return {
       labels: topMovies.map((m) => m.name),
       data: topMovies.map((m) => m.viewCount),
+      posters: topMovies.map((m) => m.poster_url || ''),
     };
   }
+
+  // Top 10 categories by total viewCount
+  if (type === 'genres') {
+    const topGenres = await MovieModel.aggregate([
+      { $unwind: '$categories' },
+      { $group: { _id: '$categories.name', totalViews: { $sum: '$viewCount' } } },
+      { $sort: { totalViews: -1 } },
+      { $limit: 10 },
+    ]);
+    return { labels: topGenres.map((g) => g._id), data: topGenres.map((g) => g.totalViews) };
+  }
+
   // Placeholder cho các loại chart khác
   return {
     labels: [],

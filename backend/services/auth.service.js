@@ -31,12 +31,21 @@ const generateAuthPayload = (user) => {
  */
 const register = async (userData) => {
   const { username, email, password } = userData;
-  console.log('here');
+
+  if (!username || !email || !password) {
+    throw new Error('Username, email and password are required');
+  }
 
   // Check if user exists by email (email is unique)
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     throw new Error('User with this email already exists');
+  }
+
+  // Check if username already exists
+  const existingUsername = await User.findOne({ username });
+  if (existingUsername) {
+    throw new Error('Username already exists');
   }
 
   // Register user with passport-local-mongoose
@@ -48,16 +57,24 @@ const register = async (userData) => {
   return new Promise((resolve, reject) => {
     User.register(user, password, async function (err, registeredUser) {
       if (err) {
-        console.log('Registration error:', err);
-        return reject(err);
+        // Handle different error types from passport-local-mongoose
+        if (err.name === 'UserExistsError') {
+          return reject(new Error('User already exists'));
+        }
+        return reject(new Error(err.message || 'Registration failed'));
       }
-      console.log('User registered:', registeredUser);
-      // Ensure avatar is set (in case it wasn't saved)
-      if (!registeredUser.avatar) {
-        registeredUser.avatar = randomAvatar;
-        await registeredUser.save();
+
+      try {
+        // Ensure avatar is set (in case it wasn't saved)
+        if (!registeredUser.avatar) {
+          registeredUser.avatar = randomAvatar;
+          await registeredUser.save();
+        }
+        const authPayload = generateAuthPayload(registeredUser);
+        resolve(authPayload);
+      } catch (error) {
+        reject(error);
       }
-      resolve(generateAuthPayload(registeredUser));
     });
   });
 };
@@ -77,24 +94,27 @@ const login = async (credentials) => {
   const normalizedEmail = email.toLowerCase().trim();
 
   // Authenticate using passport-local-mongoose (configured to use email)
-  const { user, error } = await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const authenticate = User.authenticate();
-    authenticate(normalizedEmail, password, (err, user, info) => {
-      if (err) return reject(err);
-      if (!user) return resolve({ error: info });
-      resolve({ user });
+    authenticate(normalizedEmail, password, async (err, user, info) => {
+      if (err) {
+        return reject(err);
+      }
+      if (!user) {
+        // Handle different error cases from passport-local-mongoose
+        const errorMessage = info?.message || 'Invalid credentials';
+        return reject(new Error(errorMessage));
+      }
+
+      try {
+        // Generate tokens and return auth payload
+        const authPayload = generateAuthPayload(user);
+        resolve(authPayload);
+      } catch (error) {
+        reject(error);
+      }
     });
   });
-
-  if (error || !user) {
-    throw new Error(error ? error.message : 'Invalid credentials');
-  }
-
-  // // Update last login
-  // user.lastLogin = Date.now();
-  // await user.save();
-
-  return generateAuthPayload(user);
 };
 
 /**

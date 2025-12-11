@@ -4,6 +4,7 @@ import MovieFormModal from "./MovieFormModal";
 import { BarSpinner } from "components/common/LoadingState";
 import OptimizedImage from "components/common/OptimizedImage";
 import Pagination from "components/common/Pagination";
+import ConfirmDialog from "components/common/ConfirmDialog";
 
 const MovieTable = () => {
   const [movies, setMovies] = useState([]);
@@ -12,6 +13,7 @@ const MovieTable = () => {
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -61,8 +63,7 @@ const MovieTable = () => {
   }, [searchTerm]);
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc muốn xóa phim này?")) return;
-
+    setIsDeleteModalOpen(false);
     setIsLoading(true);
     try {
       await movieAPI.delete(id);
@@ -81,9 +82,21 @@ const MovieTable = () => {
     }
   };
 
-  const handleEdit = (movie) => {
-    setSelectedMovie(movie);
-    setIsModalOpen(true);
+  const handleEdit = async (movie) => {
+    setIsLoading(true);
+    try {
+      // Fetch full movie data for editing (includes all fields like description, ageRating)
+      const fullMovie = await movieAPI.getById(movie.id);
+      setSelectedMovie(fullMovie);
+      setIsModalOpen(true);
+    } catch (err) {
+      setError("Không thể tải thông tin phim: " + err.message);
+      // Fallback to using the movie from table if API fails
+      setSelectedMovie(movie);
+      setIsModalOpen(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleAdd = () => {
@@ -109,7 +122,9 @@ const MovieTable = () => {
         loadMovies(pagination.currentPage, searchTerm);
       }
     } catch (err) {
-      setError(err.message);
+      const errorMessage =
+        err?.response?.data?.message || err?.message || "Có lỗi xảy ra khi lưu phim";
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
@@ -122,9 +137,6 @@ const MovieTable = () => {
 
   return (
     <div className="bg-bgColor3 rounded-xl border border-white/10 overflow-hidden">
-      {/* Loading state */}
-      {isLoading && movies.length === 0 && <BarSpinner className="p-6" />}
-
       {/* Header with search */}
       <div className="p-6 border-b border-white/10 flex items-center justify-between">
         <div className="relative flex-1 max-w-md">
@@ -145,6 +157,16 @@ const MovieTable = () => {
           Thêm Phim
         </button>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="mx-6 mb-6 bg-red-500/10 border border-red-500 rounded-lg p-4 text-red-500 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400">
+            <i className="fa-solid fa-times"></i>
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto">
@@ -202,11 +224,11 @@ const MovieTable = () => {
                     {movie.rating.toFixed(1)}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-300">
+                <td className="px-6 text-center py-4 text-sm text-gray-300">
                   {movie.views?.toLocaleString() || "N/A"}
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-2">
                     <button
                       onClick={() => handleEdit(movie)}
                       className="text-blue-400 hover:text-blue-300 transition-colors"
@@ -215,7 +237,10 @@ const MovieTable = () => {
                       <i className="fa-solid fa-edit"></i>
                     </button>
                     <button
-                      onClick={() => handleDelete(movie.id)}
+                      onClick={() => {
+                        setSelectedMovie(movie);
+                        setIsDeleteModalOpen(true);
+                      }}
                       className="text-red-400 hover:text-red-300 transition-colors"
                       title="Xóa"
                     >
@@ -228,6 +253,13 @@ const MovieTable = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Loading state */}
+      {isLoading && movies.length === 0 && (
+        <section className="  flex items-center justify-center p-6">
+          <BarSpinner />
+        </section>
+      )}
 
       {/* Pagination */}
       <div className="p-6 border-t border-white/10 flex items-center justify-between">
@@ -247,22 +279,23 @@ const MovieTable = () => {
         )}
       </div>
 
-      {/* Error message */}
-      {error && (
-        <div className="mx-6 mb-6 bg-red-500/10 border border-red-500 rounded-lg p-4 text-red-500 flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400">
-            <i className="fa-solid fa-times"></i>
-          </button>
-        </div>
-      )}
-
       {/* Modal */}
       <MovieFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         movie={selectedMovie}
         onSave={handleSave}
+      />
+
+      <ConfirmDialog
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => handleDelete(selectedMovie.id)}
+        title="Xóa Phim"
+        message="Bạn có chắc chắn muốn xóa phim này?"
+        confirmText="Xóa"
+        cancelText="Hủy"
+        isDanger={true}
       />
     </div>
   );

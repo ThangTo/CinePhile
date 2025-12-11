@@ -129,9 +129,6 @@ const UserTable = () => {
 
   return (
     <div className="bg-bgColor3 rounded-xl border border-white/10 overflow-hidden">
-      {/* Loading state */}
-      {isLoading && users.length === 0 && <BarSpinner className="p-6" />}
-
       {/* Header */}
       <div className="p-6 border-b border-white/10 flex items-center justify-between">
         <div className="relative flex-1 max-w-md">
@@ -248,6 +245,12 @@ const UserTable = () => {
           </tbody>
         </table>
       </div>
+      {/* Loading state */}
+      {isLoading && users.length === 0 && (
+        <section className="  flex items-center justify-center p-6">
+          <BarSpinner />
+        </section>
+      )}
 
       {/* Footer with Pagination */}
       <div className="p-6 border-t border-white/10 flex items-center justify-between">

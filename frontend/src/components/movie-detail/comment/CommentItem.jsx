@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
+import ConfirmDialog from "components/common/ConfirmDialog";
+import useToast from "hooks/useToast";
 
 const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, currentUserId }) => {
   // Kiểm tra xem comment có phải của user hiện tại không
@@ -7,6 +9,17 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
     (comment.userId === currentUserId ||
       comment.userId?._id === currentUserId ||
       comment.userId?.id === currentUserId);
+  const [isDeleteCommentModalOpen, setIsDeleteCommentModalOpen] = useState(false);
+  const { warning } = useToast();
+  const handleDelete = async (commentId) => {
+    setIsDeleteCommentModalOpen(false);
+    try {
+      onDelete && onDelete(commentId);
+    } catch (error) {
+      warning("Không thể xóa bình luận. Vui lòng thử lại!");
+      console.error("Error deleting comment:", error);
+    }
+  };
   return (
     <div className="bg-bgColor sm:p-2 py-2 rounded-lg hover:border-white/10 transition-colors">
       <div className="flex items-start gap-3">
@@ -113,7 +126,7 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
             {/* Hiển thị icon thùng rác nếu là comment của user hiện tại, ngược lại hiển thị icon ... */}
             {isOwner ? (
               <button
-                onClick={() => onDelete && onDelete(comment.id)}
+                onClick={() => setIsDeleteCommentModalOpen(true)}
                 className="flex items-center gap-1.5 px-2 py-1 rounded-md text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-all duration-200 group"
                 title="Xóa bình luận"
               >
@@ -133,6 +146,16 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={isDeleteCommentModalOpen}
+        onClose={() => setIsDeleteCommentModalOpen(false)}
+        onConfirm={() => handleDelete(comment.id)}
+        title="Xóa Bình Luận"
+        message="Bạn có chắc chắn muốn xóa bình luận này?"
+        confirmText="Xóa"
+        cancelText="Hủy"
+        isDanger={true}
+      />
     </div>
   );
 };

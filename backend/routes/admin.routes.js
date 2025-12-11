@@ -56,7 +56,6 @@ router.get('/stats', adminController.getStats);
 // GET /api/v1/admin/stats/charts/:type - Get chart data
 router.get('/stats/charts/:type', adminController.getChartData);
 
-
 // function isAdmin(req, res, next) {
 //   if (req.isAuthenticated() && (req.user.role === 'admin')) {
 //     return next();

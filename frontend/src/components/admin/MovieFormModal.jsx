@@ -12,7 +12,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     duration: "",
     ageRating: "",
     quality: "HD",
-    synopsis: "",
+    description: "",
     poster: "",
     backgroundImage: "",
   });
@@ -24,19 +24,19 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
   useEffect(() => {
     if (movie) {
       setFormData({
-        title: movie.title || "",
-        englishTitle: movie.englishTitle || "",
+        title: movie.title || movie.name || "",
+        englishTitle: movie.englishTitle || movie.original_name || "",
         year: movie.year || new Date().getFullYear(),
         rating: movie.rating || 0,
         imdb: movie.imdb || 0,
         country: movie.country || "",
         genres: Array.isArray(movie.genres) ? movie.genres.join(", ") : "",
-        duration: movie.duration || "",
-        ageRating: movie.ageRating || "",
+        duration: movie.duration || movie.time || "",
+        ageRating: movie.ageRating || movie.age_rating || "",
         quality: movie.quality || "HD",
-        synopsis: movie.synopsis || movie.description || "",
-        poster: movie.poster || "",
-        backgroundImage: movie.backgroundImage || "",
+        description: movie.description || movie.content || movie.synopsis || "",
+        poster: movie.poster || movie.poster_url || "",
+        backgroundImage: movie.backgroundImage || movie.thumb_url || "",
       });
     } else {
       // Reset form khi tạo mới
@@ -51,7 +51,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         duration: "",
         ageRating: "",
         quality: "HD",
-        synopsis: "",
+        description: "",
         poster: "",
         backgroundImage: "",
       });
@@ -106,7 +106,9 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
       onClose();
     } catch (error) {
       console.error("Error saving movie:", error);
-      setErrors({ submit: "Có lỗi xảy ra khi lưu phim" });
+      const errorMessage =
+        error?.response?.data?.message || error?.message || "Có lỗi xảy ra khi lưu phim";
+      setErrors({ submit: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
@@ -240,10 +242,9 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                 className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
               >
                 <option value="">Chọn...</option>
-                <option value="P">P - Mọi lứa tuổi</option>
-                <option value="T13">T13</option>
+                <option value="T12">T12</option>
                 <option value="T16">T16</option>
-                <option value="T18">T18</option>
+                <option value="18+">18+</option>
               </select>
             </div>
 
@@ -309,8 +310,8 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Mô Tả</label>
             <textarea
-              name="synopsis"
-              value={formData.synopsis}
+              name="description"
+              value={formData.description}
               onChange={handleChange}
               rows={4}
               className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor resize-none"

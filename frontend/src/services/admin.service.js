@@ -201,6 +201,6 @@ export const statsAPI = {
     const response = await apiRequest(`/admin/stats/charts/${type}`, {
       requiresAuth: true,
     });
-    return response.data || response;
+    return response;
   },
 };

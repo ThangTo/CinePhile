@@ -30,15 +30,60 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptors response
+// Interceptors response with auto refresh
+let refreshPromise = null;
+
 http.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
+    const originalRequest = err?.config || {};
+    const status = err?.response?.status;
+    const isAuthPath =
+      typeof originalRequest.url === "string" && originalRequest.url.includes("/auth/");
+
+    // Auto-refresh access token on 401 (once per request)
+    if (status === 401 && !originalRequest._retry && !originalRequest.__isRefreshCall) {
+      originalRequest._retry = true;
+
+      try {
+        // Deduplicate refresh calls
+        if (!refreshPromise) {
+          refreshPromise = http.post(
+            "/auth/refresh-token",
+            {},
+            { withCredentials: true, __isRefreshCall: true }
+          );
+        }
+
+        await refreshPromise;
+        refreshPromise = null;
+
+        // Retry the original request with credentials
+        return http({
+          ...originalRequest,
+          __isRefreshCall: false,
+          withCredentials: true,
+        });
+      } catch (refreshError) {
+        refreshPromise = null;
+        // Bubble up refresh failure
+        return Promise.reject({
+          status: refreshError?.response?.status || 0,
+          message:
+            refreshError?.response?.data?.message ||
+            refreshError?.message ||
+            "Không thể làm mới phiên đăng nhập",
+          raw: refreshError,
+        });
+      }
+    }
+
     const message = err?.response?.data?.message || err?.message || "Có lỗi khi kết nối máy chủ";
     return Promise.reject({
-      status: err?.response?.status || 0,
+      status: status || 0,
       message,
       raw: err,
+      isAuthPath,
     });
   }
 );
