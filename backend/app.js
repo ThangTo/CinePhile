@@ -62,19 +62,19 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 const movieRoutes = require('./routes/movie.routes');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
-const healthRoutes = require('./routes/health.routes');
 const adminRoutes = require('./routes/admin.routes');
 const crawlerRoutes = require('./routes/crawler.routes');
 const commentRoutes = require('./routes/comment.routes');
 const chatRoutes = require('./routes/chat.routes');
+const notificationRoutes = require('./routes/notification.routes');
 
 // API endpoints
 app.use('/api/v1/movies', movieRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/crawl', crawlerRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 // Debug: Log all requests to comments
 app.use('/api/v1/comments', (req, res, next) => {

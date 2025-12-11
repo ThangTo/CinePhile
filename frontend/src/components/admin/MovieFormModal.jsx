@@ -1,4 +1,101 @@
 import React, { useState, useEffect } from "react";
+// Import Icons
+import {
+  FiX,
+  FiSave,
+  FiFilm,
+  FiGlobe,
+  FiClock,
+  FiStar,
+  FiImage,
+  FiLayers,
+  FiAlertCircle,
+  FiType,
+  FiMonitor,
+  FiCalendar,
+  FiCheck,
+  FiLink, // Thêm icon Link và Check
+} from "react-icons/fi";
+
+// --- UI COMPONENTS ---
+
+const FormField = ({ label, name, type = "text", error, icon: Icon, children, ...props }) => (
+  <div className="space-y-1.5 w-full">
+    <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider flex items-center gap-1.5">
+      {Icon && <Icon className="text-primaryColor" />} {label}
+    </label>
+    {children ? (
+      children
+    ) : (
+      <input
+        type={type}
+        name={name}
+        className={`w-full bg-black/20 border ${
+          error
+            ? "border-red-500/50 focus:border-red-500"
+            : "border-white/5 focus:border-primaryColor"
+        } rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primaryColor/50 transition-all shadow-inner hover:bg-black/30`}
+        {...props}
+      />
+    )}
+    {error && (
+      <p className="text-red-400 text-xs flex items-center gap-1">
+        <FiAlertCircle /> {error}
+      </p>
+    )}
+  </div>
+);
+
+// Component mới: Selector dạng Chip/Button để lấp đầy không gian
+const ChipSelector = ({ label, icon: Icon, options, value, onChange, name }) => (
+  <div className="space-y-2">
+    <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider flex items-center gap-1.5">
+      {Icon && <Icon className="text-primaryColor" />} {label}
+    </label>
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange({ target: { name, value: opt.value } })}
+          className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
+            value === opt.value
+              ? "bg-primaryColor text-black border-primaryColor shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]" // Giả sử bạn có biến màu, hoặc dùng shadow-yellow-500/30
+              : "bg-black/20 text-gray-400 border-white/5 hover:border-white/20 hover:text-white"
+          }`}
+        >
+          {value === opt.value && <FiCheck size={12} />}
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+const ImagePreview = ({ url, label, aspectRatio = "aspect-[2/3]" }) => (
+  <div
+    className={`relative w-full ${aspectRatio} bg-black/20 rounded-lg border border-white/5 overflow-hidden group`}
+  >
+    {url ? (
+      <img
+        src={url}
+        alt="Preview"
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+        onError={(e) => (e.target.style.display = "none")}
+      />
+    ) : (
+      <div className="flex flex-col items-center justify-center h-full text-gray-600">
+        <FiImage size={24} />
+        <span className="text-[10px] mt-1 uppercase">No Image</span>
+      </div>
+    )}
+    <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm py-1 text-center">
+      <span className="text-[10px] text-gray-300 font-medium uppercase tracking-widest">
+        {label}
+      </span>
+    </div>
+  </div>
+);
 
 const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
   const [formData, setFormData] = useState({
@@ -16,12 +113,12 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     poster: "",
     backgroundImage: "",
   });
-
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [slugPreview, setSlugPreview] = useState("");
 
-  // Load dữ liệu khi edit
   useEffect(() => {
+    // Logic load data giữ nguyên...
     if (movie) {
       setFormData({
         title: movie.title || movie.name || "",
@@ -39,7 +136,6 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         backgroundImage: movie.backgroundImage || movie.thumb_url || "",
       });
     } else {
-      // Reset form khi tạo mới
       setFormData({
         title: "",
         englishTitle: "",
@@ -59,24 +155,32 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     setErrors({});
   }, [movie, isOpen]);
 
+  // Tạo slug tự động để hiển thị preview
+  useEffect(() => {
+    const slug = formData.title
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Bỏ dấu tiếng Việt
+      .replace(/[đĐ]/g, "d")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+    setSlugPreview(slug);
+  }, [formData.title]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error khi user nhập
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const validate = () => {
+    // Giữ nguyên logic validate cũ
     const newErrors = {};
     if (!formData.title.trim()) newErrors.title = "Tên phim không được để trống";
-    if (!formData.year || formData.year < 1900 || formData.year > 2100) {
+    if (!formData.year || formData.year < 1900 || formData.year > 2100)
       newErrors.year = "Năm không hợp lệ";
-    }
-    if (formData.rating < 0 || formData.rating > 10) {
-      newErrors.rating = "Rating từ 0-10";
-    }
+    if (formData.rating < 0 || formData.rating > 10) newErrors.rating = "Rating từ 0-10";
     return newErrors;
   };
 
@@ -87,10 +191,8 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
       setErrors(newErrors);
       return;
     }
-
     setIsSubmitting(true);
     try {
-      // Chuyển genres từ string sang array
       const movieData = {
         ...formData,
         genres: formData.genres
@@ -101,13 +203,10 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         imdb: parseFloat(formData.imdb),
         year: parseInt(formData.year),
       };
-
       await onSave(movieData);
       onClose();
     } catch (error) {
-      console.error("Error saving movie:", error);
-      const errorMessage =
-        error?.response?.data?.message || error?.message || "Có lỗi xảy ra khi lưu phim";
+      const errorMessage = error?.response?.data?.message || error?.message || "Có lỗi xảy ra";
       setErrors({ submit: errorMessage });
     } finally {
       setIsSubmitting(false);
@@ -117,243 +216,268 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-white/10">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+
+      <div className="relative w-full max-w-5xl h-[90vh] bg-bgColor3 rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden animate-fade-in-up">
         {/* Header */}
-        <div className="sticky top-0 bg-gray-900 border-b border-white/10 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">
-            {movie ? "Chỉnh Sửa Phim" : "Thêm Phim Mới"}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-            <i className="fa-solid fa-times text-2xl"></i>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/10 backdrop-blur-md sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <div
+              className={`p-2 rounded-lg ${
+                movie ? "bg-blue-500/20 text-blue-400" : "bg-primaryColor/20 text-primaryColor"
+              }`}
+            >
+              {movie ? <FiFilm size={24} /> : <FiLayers size={24} />}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                {movie ? "Cập Nhật Thông Tin Phim" : "Thêm Phim Mới Vào Kho"}
+              </h2>
+              <p className="text-xs text-gray-400">Điền đầy đủ thông tin bên dưới.</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+          >
+            <FiX size={24} />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Tên phim */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Tên Phim <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                className={`w-full bg-gray-800 border ${
-                  errors.title ? "border-red-500" : "border-white/10"
-                } rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor`}
-                placeholder="Nhập tên phim..."
-              />
-              {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+          <form id="movieForm" onSubmit={handleSubmit} className="space-y-8">
+            {errors.submit && (
+              <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 flex items-center gap-3 text-red-200">
+                <FiAlertCircle size={20} /> <span>{errors.submit}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* LEFT COLUMN */}
+              <div className="lg:col-span-2 flex flex-col gap-5">
+                {/* 1. Core Info */}
+                <div className="bg-black/10 rounded-xl p-5 border border-white/5 space-y-4">
+                  <h3 className="text-white font-bold flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
+                    <FiType className="text-primaryColor" /> Thông Tin Cơ Bản
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      label="Tên Phim (TV) *"
+                      name="title"
+                      value={formData.title}
+                      onChange={handleChange}
+                      error={errors.title}
+                      placeholder="Ví dụ: Đào, Phở và Piano"
+                    />
+                    <FormField
+                      label="Tên Tiếng Anh"
+                      name="englishTitle"
+                      value={formData.englishTitle}
+                      onChange={handleChange}
+                      placeholder="Ex: Peach, Pho and Piano"
+                    />
+                  </div>
+                  <FormField label="Mô Tả Nội Dung" icon={FiLayers}>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      rows={3}
+                      className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor/50 resize-none transition-all shadow-inner hover:bg-black/30"
+                      placeholder="Nhập tóm tắt nội dung phim..."
+                    ></textarea>
+                  </FormField>
+                </div>
+
+                {/* 2. Details & Stats (Phần bạn muốn làm đẹp) */}
+                <div className="bg-black/10 rounded-xl p-5 border border-white/5 space-y-5 flex-1 flex flex-col">
+                  <h3 className="text-white font-bold flex items-center gap-2 mb-2 border-b border-white/5 pb-2">
+                    <FiMonitor className="text-primaryColor" /> Chỉ Số & Phân Loại
+                  </h3>
+
+                  {/* Row 1: 4 cột */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <FormField
+                      label="Năm SX"
+                      name="year"
+                      type="number"
+                      icon={FiCalendar}
+                      value={formData.year}
+                      onChange={handleChange}
+                      error={errors.year}
+                    />
+                    <FormField
+                      label="Thời lượng"
+                      name="duration"
+                      icon={FiClock}
+                      value={formData.duration}
+                      onChange={handleChange}
+                      placeholder="90 min"
+                    />
+                    <FormField
+                      label="IMDb"
+                      name="imdb"
+                      type="number"
+                      step="0.5"
+                      icon={FiStar}
+                      value={formData.imdb}
+                      onChange={handleChange}
+                    />
+                    <FormField
+                      label="Rating App"
+                      name="rating"
+                      type="number"
+                      step="0.5"
+                      icon={FiStar}
+                      value={formData.rating}
+                      onChange={handleChange}
+                      error={errors.rating}
+                    />
+                  </div>
+
+                  {/* Row 2: 2 cột lớn hơn */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      label="Quốc gia"
+                      name="country"
+                      icon={FiGlobe}
+                      value={formData.country}
+                      onChange={handleChange}
+                    />
+                    <FormField
+                      label="Thể loại"
+                      name="genres"
+                      icon={FiLayers}
+                      value={formData.genres}
+                      onChange={handleChange}
+                      placeholder="Hành động, Hài..."
+                    />
+                  </div>
+
+                  <div className="border-t border-white/5 my-1"></div>
+
+                  {/* Row 3: Chip Selectors (THAY ĐỔI LỚN Ở ĐÂY) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <ChipSelector
+                      label="Độ Tuổi (Age Rating)"
+                      icon={FiLayers}
+                      name="ageRating"
+                      value={formData.ageRating}
+                      onChange={handleChange}
+                      options={[
+                        { value: "T12", label: "12+ (Teen)" },
+                        { value: "T16", label: "16+ (Mature)" },
+                        { value: "18+", label: "18+ (Adult)" },
+                      ]}
+                    />
+
+                    <ChipSelector
+                      label="Chất Lượng Video"
+                      icon={FiMonitor}
+                      name="quality"
+                      value={formData.quality}
+                      onChange={handleChange}
+                      options={[
+                        { value: "CAM", label: "CAM" },
+                        { value: "SD", label: "SD" },
+                        { value: "HD", label: "HD" },
+                        { value: "FHD", label: "FHD" },
+                        { value: "4K", label: "4K" },
+                      ]}
+                    />
+                  </div>
+
+                  {/* Row 4: SEO / Slug Preview (Lấp đầy khoảng trống cuối cùng) */}
+                  <div className="mt-auto pt-4">
+                    <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3 flex items-start gap-3">
+                      <FiLink className="text-blue-400 mt-1 shrink-0" />
+                      <div className="overflow-hidden">
+                        <p className="text-[10px] uppercase font-bold text-blue-400 mb-0.5">
+                          SEO Preview / Slug
+                        </p>
+                        <p className="text-sm text-gray-300 truncate font-mono">
+                          domain.com/phim/
+                          <span className="text-white font-semibold">
+                            {slugPreview || "ten-phim-se-hien-thi-o-day"}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div className="lg:col-span-1 flex flex-col gap-5">
+                <div className="bg-black/10 rounded-xl p-5 border border-white/5 h-full flex flex-col">
+                  <h3 className="text-white font-bold flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
+                    <FiImage className="text-primaryColor" /> Media & Hình Ảnh
+                  </h3>
+                  <div className="space-y-6 flex-1">
+                    <div className="space-y-3">
+                      <FormField
+                        label="Poster URL"
+                        name="poster"
+                        value={formData.poster}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                      />
+                      <ImagePreview
+                        url={formData.poster}
+                        label="Poster Preview"
+                        aspectRatio="aspect-[2/3]"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <FormField
+                        label="Backdrop URL"
+                        name="backgroundImage"
+                        value={formData.backgroundImage}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                      />
+                      <ImagePreview
+                        url={formData.backgroundImage}
+                        label="Backdrop Preview"
+                        aspectRatio="aspect-video"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
+          </form>
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Tên Tiếng Anh</label>
-              <input
-                type="text"
-                name="englishTitle"
-                value={formData.englishTitle}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-                placeholder="English title..."
-              />
-            </div>
-          </div>
-
-          {/* Năm, Rating, IMDb */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Năm</label>
-              <input
-                type="number"
-                name="year"
-                value={formData.year}
-                onChange={handleChange}
-                className={`w-full bg-gray-800 border ${
-                  errors.year ? "border-red-500" : "border-white/10"
-                } rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor`}
-              />
-              {errors.year && <p className="text-red-500 text-sm mt-1">{errors.year}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Rating</label>
-              <input
-                type="number"
-                step="0.1"
-                name="rating"
-                value={formData.rating}
-                onChange={handleChange}
-                className={`w-full bg-gray-800 border ${
-                  errors.rating ? "border-red-500" : "border-white/10"
-                } rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor`}
-              />
-              {errors.rating && <p className="text-red-500 text-sm mt-1">{errors.rating}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">IMDb</label>
-              <input
-                type="number"
-                step="0.1"
-                name="imdb"
-                value={formData.imdb}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-              />
-            </div>
-          </div>
-
-          {/* Quốc gia, Thời lượng, Độ tuổi, Chất lượng */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Quốc Gia</label>
-              <input
-                type="text"
-                name="country"
-                value={formData.country}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-                placeholder="Hàn Quốc"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Thời Lượng</label>
-              <input
-                type="text"
-                name="duration"
-                value={formData.duration}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-                placeholder="1h 30m"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Độ Tuổi</label>
-              <select
-                name="ageRating"
-                value={formData.ageRating}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-              >
-                <option value="">Chọn...</option>
-                <option value="T12">T12</option>
-                <option value="T16">T16</option>
-                <option value="18+">18+</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Chất Lượng</label>
-              <select
-                name="quality"
-                value={formData.quality}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-              >
-                <option value="HD">HD</option>
-                <option value="4K">4K</option>
-                <option value="CAM">CAM</option>
-                <option value="SD">SD</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Thể loại */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Thể Loại <span className="text-gray-500">(cách nhau bởi dấu phẩy)</span>
-            </label>
-            <input
-              type="text"
-              name="genres"
-              value={formData.genres}
-              onChange={handleChange}
-              className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-              placeholder="Hành Động, Tình Cảm, Hài"
-            />
-          </div>
-
-          {/* URLs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">URL Poster</label>
-              <input
-                type="url"
-                name="poster"
-                value={formData.poster}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">URL Backdrop</label>
-              <input
-                type="url"
-                name="backgroundImage"
-                value={formData.backgroundImage}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor"
-                placeholder="https://..."
-              />
-            </div>
-          </div>
-
-          {/* Mô tả */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Mô Tả</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows={4}
-              className="w-full bg-gray-800 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primaryColor resize-none"
-              placeholder="Nhập mô tả phim..."
-            ></textarea>
-          </div>
-
-          {/* Error message */}
-          {errors.submit && (
-            <div className="bg-red-500/10 border border-red-500 rounded-lg p-4 text-red-500">
-              {errors.submit}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-all"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-2.5 bg-primaryColor hover:bg-primaryColor/90 text-black font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <i className="fa-solid fa-spinner fa-spin"></i>
-                  Đang lưu...
-                </>
-              ) : (
-                <>
-                  <i className="fa-solid fa-save"></i>
-                  {movie ? "Cập Nhật" : "Thêm Phim"}
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+        {/* Footer */}
+        <div className="px-6 py-4 bg-black/20 border-t border-white/10 flex justify-end gap-3 z-10">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-6 py-3 rounded-xl text-gray-400 font-medium hover:bg-white/5 hover:text-white transition-all"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="submit"
+            form="movieForm"
+            disabled={isSubmitting}
+            className="px-8 py-3 rounded-xl bg-primaryColor text-black font-bold shadow-lg shadow-primaryColor/20 hover:shadow-primaryColor/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {isSubmitting ? (
+              "Đang xử lý..."
+            ) : (
+              <>
+                <FiSave size={20} /> <span>{movie ? "Lưu Thay Đổi" : "Tạo Phim Mới"}</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

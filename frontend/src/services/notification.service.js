@@ -68,6 +68,18 @@ const notificationService = {
       method: "DELETE",
       requiresAuth: true,
     }),
+
+  /**
+   * Create notification (admin / system broadcast / per user)
+   * @param {Object} data - { title, message, type, userId?, movieId?, targetUrl? }
+   * @returns {Promise<Object>} Created notification
+   */
+  create: (data) =>
+    apiRequest(`/notifications`, {
+      method: "POST",
+      data,
+      requiresAuth: true,
+    }),
 };
 
 export default notificationService;

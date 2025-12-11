@@ -8,6 +8,7 @@ export const ADMIN_TABS = {
   MOVIES: "movies",
   USERS: "users",
   COMMENTS: "comments",
+  NOTIFICATIONS: "notifications",
   SETTINGS: "settings",
 };
 
@@ -17,6 +18,7 @@ export const ADMIN_MENU_ITEMS = [
   { id: ADMIN_TABS.MOVIES, label: "Phim", icon: "fa-film" },
   { id: ADMIN_TABS.USERS, label: "Người Dùng", icon: "fa-users" },
   { id: ADMIN_TABS.COMMENTS, label: "Bình Luận", icon: "fa-comments" },
+  { id: ADMIN_TABS.NOTIFICATIONS, label: "Thông Báo", icon: "fa-bell" },
   { id: ADMIN_TABS.SETTINGS, label: "Cài Đặt", icon: "fa-cog" },
 ];
 
@@ -82,17 +84,17 @@ export const PERMISSIONS = {
   MOVIE_READ: "movie:read",
   MOVIE_UPDATE: "movie:update",
   MOVIE_DELETE: "movie:delete",
-  
+
   // Users
   USER_CREATE: "user:create",
   USER_READ: "user:read",
   USER_UPDATE: "user:update",
   USER_DELETE: "user:delete",
-  
+
   // Comments
   COMMENT_MODERATE: "comment:moderate",
   COMMENT_DELETE: "comment:delete",
-  
+
   // Settings
   SETTINGS_VIEW: "settings:view",
   SETTINGS_UPDATE: "settings:update",
@@ -108,8 +110,5 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.COMMENT_MODERATE,
     PERMISSIONS.COMMENT_DELETE,
   ],
-  user: [
-    PERMISSIONS.MOVIE_READ,
-  ],
+  user: [PERMISSIONS.MOVIE_READ],
 };
-
