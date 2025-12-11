@@ -6,6 +6,17 @@ import OptimizedImage from "components/common/OptimizedImage";
 import Pagination from "components/common/Pagination";
 import ConfirmDialog from "components/common/ConfirmDialog";
 
+import {
+  FiSearch,
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiEye,
+  FiStar,
+  FiFilm,
+  FiCalendar,
+} from "react-icons/fi";
+
 const MovieTable = () => {
   const [movies, setMovies] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -21,17 +32,14 @@ const MovieTable = () => {
     limit: 20,
   });
 
-  // Load movies from API with search and pagination
   const loadMovies = async (page = 1, search = "") => {
     setIsLoading(true);
     try {
       const response = await movieAPI.getAll({ page, limit: 20, search });
-      // Handle both paginated response { data: [], pagination: {} } and direct array
       if (response.data && response.pagination) {
         setMovies(Array.isArray(response.data) ? response.data : []);
         setPagination(response.pagination);
       } else {
-        // Fallback for direct array response
         const moviesData = Array.isArray(response) ? response : [];
         setMovies(moviesData);
         setPagination({
@@ -48,17 +56,14 @@ const MovieTable = () => {
     }
   };
 
-  // Load movies on mount
   useEffect(() => {
     loadMovies(1, "");
   }, []);
 
-  // Debounce search - reload when search term changes
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       loadMovies(1, searchTerm);
-    }, 500); // 500ms debounce
-
+    }, 500);
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
@@ -67,7 +72,6 @@ const MovieTable = () => {
     setIsLoading(true);
     try {
       await movieAPI.delete(id);
-      // Remove from local state instead of reloading all
       setMovies((prev) => prev.filter((movie) => movie.id !== id));
       setPagination((prev) => ({
         ...prev,
@@ -75,7 +79,6 @@ const MovieTable = () => {
       }));
     } catch (err) {
       setError("Không thể xóa phim: " + err.message);
-      // Reload on error to ensure consistency
       loadMovies(pagination.currentPage, searchTerm);
     } finally {
       setIsLoading(false);
@@ -85,13 +88,11 @@ const MovieTable = () => {
   const handleEdit = async (movie) => {
     setIsLoading(true);
     try {
-      // Fetch full movie data for editing (includes all fields like description, ageRating)
       const fullMovie = await movieAPI.getById(movie.id);
       setSelectedMovie(fullMovie);
       setIsModalOpen(true);
     } catch (err) {
       setError("Không thể tải thông tin phim: " + err.message);
-      // Fallback to using the movie from table if API fails
       setSelectedMovie(movie);
       setIsModalOpen(true);
     } finally {
@@ -109,16 +110,12 @@ const MovieTable = () => {
     setError(null);
     try {
       if (selectedMovie) {
-        // Update
         const updatedMovie = await movieAPI.update(selectedMovie.id, movieData);
-        // Update local state instead of reloading all
         setMovies((prev) =>
           prev.map((movie) => (movie.id === selectedMovie.id ? updatedMovie : movie))
         );
       } else {
-        // Create
         await movieAPI.create(movieData);
-        // Reload to get proper pagination
         loadMovies(pagination.currentPage, searchTerm);
       }
     } catch (err) {
@@ -136,150 +133,202 @@ const MovieTable = () => {
   };
 
   return (
-    <div className="bg-bgColor3 rounded-xl border border-white/10 overflow-hidden">
-      {/* Header with search */}
-      <div className="p-6 border-b border-white/10 flex items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-          <input
-            type="text"
-            placeholder="Tìm kiếm phim..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-bgColor border border-white/10 rounded-lg pl-12 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
-          />
+    <div className="w-full animate-fade-in space-y-6">
+      {/* 1. Control Header Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <FiFilm className="text-primaryColor" />
+            Danh Sách Phim
+          </h2>
+          <p className="text-gray-400 text-sm mt-1">
+            Quản lý kho phim, xếp hạng và thông tin chi tiết.
+          </p>
         </div>
-        <button
-          onClick={handleAdd}
-          className="ml-4 bg-primaryColor hover:bg-primaryColor/90 text-black font-semibold px-6 py-2.5 rounded-lg transition-all"
-        >
-          <i className="fa-solid fa-plus mr-2"></i>
-          Thêm Phim
-        </button>
+
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Search Box */}
+          <div className="relative group flex-1 md:w-80">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FiSearch className="text-gray-500 group-focus-within:text-primaryColor transition-colors" />
+            </div>
+            <input
+              type="text"
+              placeholder="Tìm kiếm theo tên, ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full bg-bgColor3 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor transition-all shadow-lg"
+            />
+          </div>
+
+          {/* Add Button */}
+          <button
+            onClick={handleAdd}
+            className="flex items-center gap-2 bg-primaryColor hover:bg-primaryColor/90 text-black font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-primaryColor/20 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap"
+          >
+            <FiPlus size={20} />
+            <span className="hidden sm:inline">Thêm Phim</span>
+          </button>
+        </div>
       </div>
 
-      {/* Error message */}
+      {/* 2. Error Message Area */}
       {error && (
-        <div className="mx-6 mb-6 bg-red-500/10 border border-red-500 rounded-lg p-4 text-red-500 flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400">
-            <i className="fa-solid fa-times"></i>
+        <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl flex items-center justify-between animate-pulse-soft">
+          <span className="flex items-center gap-2">⚠️ {error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="text-white/50 hover:text-white transition-colors"
+          >
+            ✕
           </button>
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-bgColor  border-b border-white/10">
-            <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                ID
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                Poster
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                Tên Phim
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                Năm
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                Rating
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                Lượt Xem
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                Hành Động
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {movies.map((movie, index) => (
-              <tr
-                key={movie.id}
-                className="border-b border-white/5 hover:bg-white/5 transition-colors"
-              >
-                <td className="px-6 py-4 text-sm text-gray-300">{index + 1}</td>
-                <td className="px-6 py-4">
-                  <OptimizedImage
-                    src={movie.poster}
-                    alt={movie.title}
-                    className="w-12 h-16 object-cover rounded"
-                    priority={true}
-                    lazy={false}
-                    preloadOnHover={false}
-                  />
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-white font-medium">{movie.title}</div>
-                  <div className="text-sm text-gray-400">{movie.englishTitle}</div>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-300">{movie.year}</td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex items-center gap-1 text-primaryColor font-semibold">
-                    <i className="fa-solid fa-star text-xs"></i>
-                    {movie.rating.toFixed(1)}
-                  </span>
-                </td>
-                <td className="px-6 text-center py-4 text-sm text-gray-300">
-                  {movie.views?.toLocaleString() || "N/A"}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => handleEdit(movie)}
-                      className="text-blue-400 hover:text-blue-300 transition-colors"
-                      title="Sửa"
-                    >
-                      <i className="fa-solid fa-edit"></i>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedMovie(movie);
-                        setIsDeleteModalOpen(true);
-                      }}
-                      className="text-red-400 hover:text-red-300 transition-colors"
-                      title="Xóa"
-                    >
-                      <i className="fa-solid fa-trash"></i>
-                    </button>
-                  </div>
-                </td>
+      {/* 3. Main Table Card */}
+      <div className="bg-bgColor3 border border-white/5 rounded-2xl shadow-xl overflow-hidden flex flex-col">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-black/20 text-gray-400 text-xs uppercase tracking-wider font-semibold">
+              <tr>
+                <th className="px-6 py-4">#</th>
+                <th className="px-6 py-4">Poster</th>
+                <th className="px-6 py-4">Thông tin phim</th>
+                <th className="px-6 py-4 text-center">Năm</th>
+                <th className="px-6 py-4 text-center">Rating</th>
+                <th className="px-6 py-4 text-right">Lượt xem</th>
+                <th className="px-6 py-4 text-center">Hành động</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
 
-      {/* Loading state */}
-      {isLoading && movies.length === 0 && (
-        <section className="  flex items-center justify-center p-6">
-          <BarSpinner />
-        </section>
-      )}
+            <tbody className="divide-y divide-white/5">
+              {movies.length > 0
+                ? movies.map((movie, index) => (
+                    <tr
+                      key={movie.id}
+                      className="group hover:bg-white/[0.02] transition-colors duration-200"
+                    >
+                      {/* Index */}
+                      <td className="px-6 py-4 text-sm text-gray-500 font-mono">
+                        {(pagination.currentPage - 1) * pagination.limit + index + 1}
+                      </td>
 
-      {/* Pagination */}
-      <div className="p-6 border-t border-white/10 flex items-center justify-between">
-        <span className="text-sm text-gray-400">
-          Hiển thị <span className="text-white font-semibold">{movies.length}</span> /{" "}
-          <span className="text-white font-semibold">{pagination.totalItems}</span> phim
-        </span>
-        {pagination.totalPages > 1 && (
-          <div className="flex justify-end items-center mt-[-32px]">
-            <Pagination
-              page={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              onPageChange={handlePageChange}
-              className="bg-bgColor3"
-            />
+                      {/* Poster */}
+                      <td className="px-6 py-4">
+                        <div className="relative w-12 h-16 rounded overflow-hidden shadow-lg shadow-black/50 group-hover:scale-110 transition-transform duration-300">
+                          <OptimizedImage
+                            src={movie.poster}
+                            alt={movie.title}
+                            className="w-full h-full object-cover"
+                            priority={index < 5}
+                          />
+                        </div>
+                      </td>
+
+                      {/* Movie Info */}
+                      <td className="px-6 py-4 max-w-xs">
+                        <div className="flex flex-col">
+                          <span className="text-white font-bold text-base truncate pr-4 group-hover:text-primaryColor transition-colors">
+                            {movie.title}
+                          </span>
+                          <span className="text-sm text-gray-500 italic truncate">
+                            {movie.englishTitle || "No English Title"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Year */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 text-gray-300 text-xs font-medium">
+                          <FiCalendar size={12} />
+                          {movie.year}
+                        </div>
+                      </td>
+
+                      {/* Rating */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1 text-yellow-500 font-bold">
+                          <FiStar className="fill-yellow-500" size={14} />
+                          <span>{movie.rating ? movie.rating.toFixed(1) : "N/A"}</span>
+                        </div>
+                      </td>
+
+                      {/* Views */}
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2 text-sm text-gray-300">
+                          <span className="font-mono">{movie.views?.toLocaleString() || 0}</span>
+                          <FiEye className="text-gray-600" size={14} />
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-3 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEdit(movie)}
+                            className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all"
+                            title="Chỉnh sửa"
+                          >
+                            <FiEdit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedMovie(movie);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
+                            title="Xóa phim"
+                          >
+                            <FiTrash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                : !isLoading && (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-2">
+                            <FiFilm className="text-gray-600 text-3xl" />
+                          </div>
+                          <p>Không tìm thấy bộ phim nào.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Loading State Overlay */}
+        {isLoading && (
+          <div className="flex items-center justify-center p-6">
+            <BarSpinner />
           </div>
         )}
+
+        {/* 4. Pagination Footer */}
+        <div className="border-t border-white/5 bg-black/10 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <span className="text-sm text-gray-500">
+            Đang xem <span className="text-white font-semibold">{movies.length}</span> /{" "}
+            <span className="text-white font-semibold">{pagination.totalItems}</span>
+          </span>
+
+          {pagination.totalPages > 1 && (
+            <div className="scale-90 sm:scale-100 origin-right">
+              <Pagination
+                page={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                onPageChange={handlePageChange}
+                className="bg-bgColor3"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Modal */}
+      {/* Modals */}
       <MovieFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -291,10 +340,10 @@ const MovieTable = () => {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={() => handleDelete(selectedMovie.id)}
-        title="Xóa Phim"
-        message="Bạn có chắc chắn muốn xóa phim này?"
-        confirmText="Xóa"
-        cancelText="Hủy"
+        title="Xác nhận xóa phim"
+        message={`Bạn có chắc chắn muốn xóa phim "${selectedMovie?.title}"? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa ngay"
+        cancelText="Giữ lại"
         isDanger={true}
       />
     </div>

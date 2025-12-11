@@ -247,7 +247,7 @@ const UserTable = () => {
       </div>
       {/* Loading state */}
       {isLoading && users.length === 0 && (
-        <section className="  flex items-center justify-center p-6">
+        <section className="flex items-center justify-center p-6">
           <BarSpinner />
         </section>
       )}

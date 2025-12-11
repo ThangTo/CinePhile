@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { formatTimeAgo } from "constants/notificationsMock";
+import { formatTimeAgo } from "utils/dateUtils";
 import { useNotifications } from "contexts/NotificationContext";
 
 const NotificationItem = ({ notification, isActive = false, onDelete }) => {
