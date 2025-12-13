@@ -4,33 +4,57 @@ import { DESKTOP_MENU_ITEMS, DESKTOP_MENU_ITEM_CLASS } from "./constants";
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationPanel from "components/notifications/NotificationPanel";
 
-const PremiumBanner = ({ username }) => (
-  <div className="bg-gradient-to-r from-primaryColor/20 to-hoverPrimaryColor/20 border border-primaryColor/30 rounded-lg p-2.5">
-    <div className="flex items-center justify-between mb-1.5">
-      <span className="text-primaryColor font-semibold text-sm flex items-center gap-1">
-        <i className="fa-solid fa-infinity" />
-        {username}
-      </span>
+const PremiumBanner = ({ username, isPremium }) => {
+  if (isPremium) {
+    return (
+      <div className="bg-gradient-to-r from-primaryColor/20 to-hoverPrimaryColor/20 border border-primaryColor/30 rounded-lg p-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-primaryColor font-semibold text-sm flex items-center gap-1">
+            <i className="fa-solid fa-crown" />
+            {username} - Premium
+          </span>
+        </div>
+        <p className="text-gray-300 text-xs">
+          Bạn đang sử dụng tài khoản Premium
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gradient-to-r from-primaryColor/20 to-hoverPrimaryColor/20 border border-primaryColor/30 rounded-lg p-2.5">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-primaryColor font-semibold text-sm flex items-center gap-1">
+          <i className="fa-solid fa-infinity" />
+          {username}
+        </span>
+      </div>
+      <p className="text-gray-300 text-xs mb-2">
+        Nâng cấp tài khoản Cinx để có trải nghiệm đẳng cấp hơn.
+      </p>
+      <Link
+        to="/premium"
+        className="block w-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor hover:from-hoverPrimaryColor hover:to-primaryColor text-primaryColorButtonText font-semibold text-sm py-1.5 rounded-md transition-all text-center"
+      >
+        Nâng cấp ngay <i className="fa-solid fa-arrow-up" />
+      </Link>
     </div>
-    <p className="text-gray-300 text-xs mb-2">
-      Nâng cấp tài khoản Cinx để có trải nghiệm đẳng cấp hơn.
-    </p>
-    <button className="w-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor hover:from-hoverPrimaryColor hover:to-primaryColor text-primaryColorButtonText font-semibold text-sm py-1.5 rounded-md transition-all">
-      Nâng cấp ngay <i className="fa-solid fa-arrow-up" />
-    </button>
-  </div>
-);
+  );
+};
 
 const UserStats = ({ coins }) => (
   <div className="flex items-center gap-4 mt-3 text-sm">
     <div className="flex items-center gap-2">
-      <i className="fa-solid fa-bookmark text-gray-400" />
-      <span className="text-white font-semibold">{coins}</span>
       <i className="fa-solid fa-coins text-yellow-400" />
+      <span className="text-white font-semibold">{coins?.toLocaleString() || 0}</span>
+      <span className="text-gray-400">coin</span>
     </div>
-    <button className="ml-auto bg-white/5 hover:bg-white/10 text-gray-200 px-3 py-1 rounded-md text-xs transition-colors">
+    <Link
+      to="/recharge"
+      className="ml-auto bg-white/5 hover:bg-white/10 text-gray-200 px-3 py-1 rounded-md text-xs transition-colors"
+    >
       + Nạp
-    </button>
+    </Link>
   </div>
 );
 
@@ -100,8 +124,8 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
                 </div>
               </div>
 
-              <PremiumBanner username={user.username} />
-              <UserStats coins={user.coins} />
+              <PremiumBanner username={user.username} isPremium={user.role === "premium"} />
+              <UserStats coins={user.coin} />
             </div>
 
             {/* Menu Items */}

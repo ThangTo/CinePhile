@@ -157,6 +157,30 @@ const userService = {
       data: progressData,
       requiresAuth: true,
     }),
+
+  /**
+   * Nâng cấp lên Premium bằng coin
+   * @param {string} plan - 'monthly' hoặc 'yearly'
+   * @returns {Promise<Object>} { message, user, remainingCoins }
+   */
+  upgradePremium: (plan) =>
+    apiRequest(`/users/upgrade-premium`, {
+      method: "POST",
+      data: { plan },
+      requiresAuth: true,
+    }),
+
+  /**
+   * Thêm coin vào tài khoản (for testing/admin)
+   * @param {number} amount - Số coin cần thêm
+   * @returns {Promise<Object>} { message, user, totalCoins }
+   */
+  addCoins: (amount) =>
+    apiRequest(`/users/add-coins`, {
+      method: "POST",
+      data: { amount },
+      requiresAuth: true,
+    }),
 };
 
 export default userService;

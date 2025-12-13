@@ -374,6 +374,98 @@ const deleteProgress = async (req, res) => {
   }
 };
 
+/**
+ * POST /users/upgrade-premium
+ * Upgrade to premium using coins (requires authentication)
+ * @param {Object} req.user - User object from auth middleware
+ * @param {Object} req.body - { plan: 'monthly' | 'yearly' }
+ * @returns {Object} Updated user object
+ */
+const upgradePremium = async (req, res) => {
+  try {
+    const userId = await getUserId(req);
+    const { plan = 'monthly' } = req.body;
+
+    // Premium pricing (in coins)
+    const PRICING = {
+      weekly: 30, // 30 coins for 1 week
+      monthly: 100, // 100 coins for 1 month
+      yearly: 1000, // 1000 coins for 1 year (better deal)
+    };
+
+    const requiredCoins = PRICING[plan];
+    if (!requiredCoins) {
+      return res.status(400).json({ message: 'Invalid plan. Use "weekly", "monthly" or "yearly"' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if already premium
+    if (user.role === 'premium') {
+      return res.status(400).json({ message: 'Bạn đã là thành viên Premium' });
+    }
+
+    // Check if user has enough coins
+    if (user.coin < requiredCoins) {
+      return res.status(400).json({
+        message: `Không đủ coin. Cần ${requiredCoins} coin nhưng bạn chỉ có ${user.coin} coin`,
+        required: requiredCoins,
+        current: user.coin,
+      });
+    }
+
+    // Deduct coins and upgrade to premium
+    user.coin -= requiredCoins;
+    user.role = 'premium';
+    await user.save();
+
+    res.status(200).json({
+      message: `Nâng cấp Premium thành công! Đã trừ ${requiredCoins} coin`,
+      user: user,
+      remainingCoins: user.coin,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /users/add-coins
+ * Add coins to user account (for testing/admin)
+ * @param {Object} req.user - User object from auth middleware
+ * @param {Object} req.body - { amount: number }
+ * @returns {Object} Updated user object
+ */
+const addCoins = async (req, res) => {
+  try {
+    const userId = await getUserId(req);
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: 'Số coin phải lớn hơn 0' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.coin = (user.coin || 0) + amount;
+    await user.save();
+
+    res.status(200).json({
+      message: `Đã thêm ${amount} coin vào tài khoản`,
+      user: user,
+      totalCoins: user.coin,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -388,4 +480,6 @@ module.exports = {
   getProgress,
   saveProgress,
   deleteProgress,
+  upgradePremium,
+  addCoins,
 };
