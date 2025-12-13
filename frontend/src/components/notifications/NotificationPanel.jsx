@@ -2,6 +2,13 @@ import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationItem from "./NotificationItem";
+import { 
+  FiBell, 
+  FiCheck, 
+  FiArrowRight, 
+  FiBellOff,
+  FiList 
+} from "react-icons/fi";
 
 const NotificationPanel = ({ onClose, triggerRef }) => {
   const panelRef = useRef(null);
@@ -14,32 +21,26 @@ const NotificationPanel = ({ onClose, triggerRef }) => {
     markPanelAsViewed,
   } = useNotifications();
 
-  // Get unread notifications (chỉ hiển thị chưa đọc trong panel)
+  // Get unread notifications
   const unreadNotifications = getUnreadNotifications();
 
-  // Mark panel as viewed when opened (số biến mất khi click bell)
+  // Mark panel as viewed when opened
   useEffect(() => {
     markPanelAsViewed();
   }, [markPanelAsViewed]);
 
-  // Close panel when clicking outside (but not on the trigger button)
+  // Close panel when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Check if click is inside panel
       if (panelRef.current && panelRef.current.contains(event.target)) {
         return;
       }
-
-      // Check if click is on the trigger button (bell icon)
       if (triggerRef?.current && triggerRef.current.contains(event.target)) {
         return;
       }
-
-      // Click is outside both panel and trigger button, close panel
       onClose();
     };
 
-    // Use a small delay to avoid immediate close when opening
     const timeoutId = setTimeout(() => {
       document.addEventListener("mousedown", handleClickOutside);
     }, 0);
@@ -58,26 +59,49 @@ const NotificationPanel = ({ onClose, triggerRef }) => {
   return (
     <div
       ref={panelRef}
-      className="absolute top-full right-0 mt-2 w-[380px] max-w-[calc(100vw-2rem)] bg-bgColor2 border border-white/10 rounded-xl shadow-2xl z-50 max-h-[600px] flex flex-col"
+      className="absolute top-full right-0 mt-3 w-[400px] max-w-[calc(100vw-1.5rem)] bg-bgColor3 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 z-50 flex flex-col overflow-hidden animate-fade-in origin-top-right ring-1 ring-white/5"
+      style={{ maxHeight: '600px' }}
     >
-      {/* Header */}
-      <div className="p-4 border-b border-white/10">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-bold text-white">THÔNG BÁO</h2>
+      {/* Background decoration (Glow effect) */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primaryColor/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+
+      {/* --- HEADER SECTION (ĐÃ SỬA) --- 
+          1. Đã xóa 'backdrop-blur-md'
+          2. Đổi 'bg-bgColor3' thành 'bg-[#1a1a1a]' (hoặc 'bg-gray-900') để tạo nền đặc.
+          Lưu ý: Bạn có thể đổi #1a1a1a thành mã màu hex trùng với nền web của bạn.
+      */}
+      <div className="relative p-5 border-b border-white/5 bg-[#1a1a1a] z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="bg-primaryColor/20 p-1.5 rounded-lg text-primaryColor">
+              <FiBell className="w-4 h-4" />
+            </span>
+            <h2 className="text-lg font-bold text-white tracking-wide">Thông báo</h2>
+            {unreadNotifications.length > 0 && (
+              <span className="ml-2 px-2 py-0.5 text-xs font-bold text-black bg-primaryColor rounded-full">
+                {unreadNotifications.length}
+              </span>
+            )}
+          </div>
+          
           <button
             onClick={handleViewAll}
-            className="text-primaryColor hover:text-hoverPrimaryColor text-sm font-medium transition-colors"
+            className="group flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-primaryColor transition-colors"
           >
-            Xem tất cả
+            Xem tất cả <FiArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
           </button>
         </div>
+
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-gray-300">Hoạt động gần đây</p>
+          <p className="text-xs font-medium text-gray-500 flex items-center gap-1">
+            <FiList className="w-3 h-3" /> Mới nhất
+          </p>
           {unreadNotifications.length > 0 && (
             <button
               onClick={markAllAsRead}
-              className="text-primaryColor hover:text-hoverPrimaryColor text-xs transition-colors"
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors hover:bg-white/10 px-2 py-1 rounded-md"
             >
+              <FiCheck className="w-3 h-3 text-primaryColor" />
               Đánh dấu đã đọc
             </button>
           )}
@@ -85,22 +109,40 @@ const NotificationPanel = ({ onClose, triggerRef }) => {
       </div>
 
       {/* Notifications List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="relative flex-1 overflow-y-auto custom-scrollbar bg-bgColor">
         {unreadNotifications.length === 0 ? (
-          <div className="p-8 text-center">
-            <i className="fa-solid fa-bell-slash text-4xl text-gray-500 mb-4"></i>
-            <p className="text-gray-400">Không có thông báo mới</p>
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 text-gray-600">
+              <FiBellOff size={28} />
+            </div>
+            <h3 className="text-white font-medium mb-1">Không có thông báo mới</h3>
+            <p className="text-sm text-gray-500 max-w-[200px]">
+              Bạn đã đọc hết tất cả thông báo gần đây.
+            </p>
           </div>
         ) : (
-          <div className="p-2">
+          <div className="divide-y divide-white/5">
             {unreadNotifications.slice(0, 5).map((notification) => (
-              <NotificationItem
-                key={notification.id}
-                notification={notification}
-                isActive={activeNotificationId === notification.id}
-                onDelete={deleteNotification}
-              />
+              <div 
+                key={notification.id} 
+                className="transition-colors hover:bg-white/[0.02]"
+              >
+                <NotificationItem
+                  notification={notification}
+                  isActive={activeNotificationId === notification.id}
+                  onDelete={deleteNotification}
+                />
+              </div>
             ))}
+            
+            {unreadNotifications.length > 5 && (
+              <button 
+                onClick={handleViewAll}
+                className="w-full py-3 text-xs text-gray-500 hover:text-primaryColor hover:bg-white/5 transition-all text-center border-t border-white/5"
+              >
+                Xem thêm {unreadNotifications.length - 5} thông báo khác
+              </button>
+            )}
           </div>
         )}
       </div>
