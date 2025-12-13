@@ -26,6 +26,8 @@ Hệ thống notification đã được tích hợp hoàn chỉnh với backend 
 ### 1. Test Tạo Thông Báo (Backend)
 
 #### Tạo thông báo hệ thống (cho tất cả user):
+**Lưu ý**: Khi tạo thông báo system (không truyền userId), hệ thống sẽ tự động tạo một bản copy cho MỖI user trong hệ thống. Mỗi user sẽ có thông báo riêng của mình, có thể xóa độc lập.
+
 ```bash
 POST http://localhost:5000/api/v1/notifications
 Headers: Authorization: Bearer <admin_token>
@@ -35,6 +37,15 @@ Body:
   "message": "Phim 'Avengers: Endgame' đã có sẵn để xem",
   "type": "movie_update",
   "movieId": "<movie_id>"
+  // Không truyền userId = tạo cho TẤT CẢ users
+}
+```
+
+**Response**: 
+```json
+{
+  "message": "System notification created for 150 users",
+  "count": 150
 }
 ```
 
@@ -188,10 +199,10 @@ Mở Developer Tools → Console để xem:
 
 ## Notes
 
-- System notifications (`userId: null`) hiển thị cho tất cả users
-- User notifications chỉ hiển thị cho user đó
-- Chỉ có thể xóa user's own notifications
-- Auto-refresh mỗi 30 giây khi đã đăng nhập
+- **System notifications**: Khi tạo thông báo system (không truyền userId), hệ thống sẽ tạo một bản copy riêng cho MỖI user. Mỗi user có thể xóa/thao tác với thông báo của mình mà không ảnh hưởng đến user khác.
+- **User notifications**: Thông báo cho user cụ thể (truyền userId) chỉ hiển thị cho user đó.
+- **Xóa thông báo**: Mỗi user chỉ có thể xóa thông báo của chính mình.
+- **Auto-refresh**: Mỗi 30 giây khi đã đăng nhập.
 
 
 
