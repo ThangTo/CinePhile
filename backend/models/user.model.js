@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'premium', 'admin'],
       default: 'user',
     },
+    coin: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     googleId: {
       type: String,
       unique: true,

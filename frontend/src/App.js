@@ -11,6 +11,8 @@ import CountryPage from "./pages/CountryPage";
 import SearchResults from "./pages/SearchResults";
 import MovieTypePage from "./pages/MovieTypePage";
 import AdminDashboard from "./pages/AdminDashboard";
+import PremiumPage from "./pages/PremiumPage";
+import RechargeCoinPage from "./pages/RechargeCoinPage";
 import ProtectedRoute from "./components/general/ProtectedRoute";
 import MainLayout from "layouts/MainLayout";
 import NotFoundPage from "./pages/NotFound";
@@ -33,6 +35,8 @@ function App() {
               <Route path="/search" element={<SearchResults />} />
               <Route path="/watch/:id" element={<WatchPage />} />
               <Route path="/account" element={<AccountPage />} />
+              <Route path="/premium" element={<PremiumPage />} />
+              <Route path="/recharge" element={<RechargeCoinPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
             <Route

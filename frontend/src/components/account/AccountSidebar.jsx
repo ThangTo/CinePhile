@@ -59,6 +59,19 @@ const AccountSidebar = ({ user, onLogout }) => {
         })}
       </div>
 
+      {/* Premium Link */}
+      <Link
+        to="/premium"
+        className={`flex items-center px-4 py-3 rounded-lg mb-2 font-medium no-underline transition-all ${
+          user.role === "premium"
+            ? "bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-white"
+            : "bg-primaryColor/20 text-primaryColor hover:bg-primaryColor/30 border border-primaryColor/50"
+        }`}
+      >
+        <i className={`fas ${user.role === "premium" ? "fa-crown" : "fa-star"} w-5 text-center mr-3`}></i>
+        {user.role === "premium" ? "Premium" : "Nâng Cấp Premium"}
+      </Link>
+
       <div className="mt-auto border-t border-account-border pt-5">
         <div className="md:flex items-center mb-4 hidden">
           <img
@@ -73,6 +86,12 @@ const AccountSidebar = ({ user, onLogout }) => {
             <div className="text-xs text-account-text-secondary whitespace-nowrap overflow-hidden text-ellipsis">
               {user.email.length > 15 ? user.email.substring(0, 15) + "..." : user.email}
             </div>
+            {user.coin !== undefined && (
+              <div className="text-xs text-primaryColor mt-1 flex items-center gap-1">
+                <i className="fa-solid fa-coins"></i>
+                {user.coin.toLocaleString()} coin
+              </div>
+            )}
           </div>
         </div>
         <button
