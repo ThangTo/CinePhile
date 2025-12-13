@@ -114,11 +114,23 @@ const deleteNotification = async (req, res) => {
 
 /**
  * POST /notifications (API tạo thủ công nếu cần)
+ * - Nếu userId được truyền: tạo thông báo cho user đó
+ * - Nếu userId không được truyền (null/undefined): tạo thông báo system cho TẤT CẢ users
  */
 const createNotificationApi = async (req, res) => {
   try {
-    const noti = await notificationService.createNotification(req.body);
-    res.status(201).json(noti);
+    const result = await notificationService.createNotification(req.body);
+    
+    // Nếu là system notification (tạo cho nhiều users), trả về thông tin tổng hợp
+    if (result.count !== undefined) {
+      return res.status(201).json({
+        message: result.message || 'System notification created successfully',
+        count: result.count,
+      });
+    }
+    
+    // Nếu là notification cho một user cụ thể, trả về notification đó
+    res.status(201).json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

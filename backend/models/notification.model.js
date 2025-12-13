@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema(
   {
-    // Bỏ required: true để cho phép thông báo hệ thống (không của riêng ai)
+    // userId: required cho thông báo mới
+    // Thông báo system sẽ được tạo riêng cho từng user (mỗi user có một bản copy)
+    // Giữ required: false để tương thích với dữ liệu cũ
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
