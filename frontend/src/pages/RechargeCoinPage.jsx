@@ -4,6 +4,20 @@ import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
 import { BarSpinner } from "components/common/LoadingState";
 
+// Import React Icons
+import { 
+  FiCheck, 
+  FiAlertCircle, 
+  FiCheckCircle, 
+  FiCreditCard,
+  FiGift,
+  FiZap,
+  FiShield,
+  FiTrendingUp,
+  FiPlus
+} from "react-icons/fi";
+import { FaCoins } from "react-icons/fa";
+
 const RechargeCoinPage = () => {
   const navigate = useNavigate();
   const { user, updateUser, isAuthenticated } = useAuth();
@@ -74,20 +88,16 @@ const RechargeCoinPage = () => {
       const result = await userService.addCoins(amount);
       setSuccess(`Đã nạp thành công ${amount.toLocaleString()} coin vào tài khoản!`);
       
-      // Update user in context
       if (result.user) {
         updateUser(result.user);
       } else {
-        // Refresh user data
         const updatedUser = await userService.getProfile();
         updateUser(updatedUser);
       }
 
-      // Reset form
       setSelectedAmount(null);
       setCustomAmount("");
 
-      // Show success message for 3 seconds
       setTimeout(() => {
         setSuccess(null);
       }, 3000);
@@ -100,7 +110,7 @@ const RechargeCoinPage = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-bgColor flex items-center justify-center">
+      <div className="min-h-screen bg-[#111] flex items-center justify-center">
         <BarSpinner />
       </div>
     );
@@ -112,230 +122,249 @@ const RechargeCoinPage = () => {
   const totalAfterRecharge = userCoins + finalAmount + (selectedPackage?.bonus || 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-bgColor via-bgColor2 to-bgColor py-12 px-4">
-      <div className="container mx-auto max-w-4xl">
-        {/* Header */}
+    <div className="min-h-screen bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
+      
+      {/* --- Background Effects --- */}
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primaryColor/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+
+      <div className="container mx-auto px-4 py-12 relative z-10 max-w-6xl">
+        
+        {/* --- Header Section --- */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Nạp <span className="text-primaryColor">Coin</span>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">
+            Nạp <span className="text-transparent bg-clip-text bg-gradient-to-r from-primaryColor to-yellow-200">Coin</span>
           </h1>
-          <p className="text-gray-300 text-lg">
-            Nạp coin để nâng cấp Premium và trải nghiệm dịch vụ tốt nhất
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            Nạp coin nhanh chóng, an toàn để nâng cấp Premium và mở khóa các tính năng độc quyền.
           </p>
           
-          {/* Current Coin Display */}
-          <div className="mt-6 inline-flex items-center gap-2 bg-bgColor2 px-6 py-3 rounded-full border border-primaryColor/30">
-            <i className="fa-solid fa-coins text-primaryColor text-xl"></i>
-            <span className="text-white font-semibold text-lg">
-              Coin hiện tại: <span className="text-primaryColor">{userCoins.toLocaleString()}</span>
-            </span>
+          {/* Current Coin Display Widget */}
+          <div className="mt-8 inline-flex items-center gap-4 bg-[#1a1a1a] border border-white/10 px-2 py-2 pr-6 rounded-full shadow-lg backdrop-blur-md">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-yellow-500/20">
+              <FaCoins className="text-black text-lg" />
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Số dư hiện tại</span>
+              <span className="text-lg font-bold text-white leading-none">
+                {userCoins.toLocaleString()} <span className="text-xs text-yellow-500">Coin</span>
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Error/Success Messages */}
-        {error && (
-          <div className="mb-6 mx-auto max-w-2xl bg-red-500/20 border border-red-500 text-red-200 px-6 py-4 rounded-lg">
-            <div className="flex items-center gap-2">
-              <i className="fa-solid fa-circle-exclamation"></i>
-              <span>{error}</span>
-            </div>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-6 mx-auto max-w-2xl bg-green-500/20 border border-green-500 text-green-200 px-6 py-4 rounded-lg">
-            <div className="flex items-center gap-2">
-              <i className="fa-solid fa-circle-check"></i>
-              <span>{success}</span>
-            </div>
-          </div>
-        )}
-
+        {/* --- Main Content Grid --- */}
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left: Coin Packages */}
-          <div className="lg:col-span-2">
-            <h2 className="text-2xl font-bold text-white mb-6">Chọn Gói Coin</h2>
+          
+          {/* LEFT COLUMN: Selection Area */}
+          <div className="lg:col-span-2 space-y-8">
             
-            {/* Predefined Packages */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-              {coinPackages.map((pkg) => {
-                const isSelected = selectedAmount === pkg.amount;
-                return (
-                  <button
-                    key={pkg.amount}
-                    onClick={() => handleSelectPackage(pkg.amount)}
-                    className={`relative p-6 rounded-xl border-2 transition-all text-left ${
-                      isSelected
-                        ? "border-primaryColor bg-primaryColor/20 shadow-lg shadow-primaryColor/20"
-                        : "border-white/10 bg-bgColor2 hover:border-primaryColor/50"
-                    } ${pkg.popular ? "ring-2 ring-primaryColor/30" : ""}`}
-                  >
-                    {pkg.popular && (
-                      <div className="absolute -top-2 -right-2 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-white px-3 py-1 rounded-full text-xs font-semibold">
-                        Phổ Biến
-                      </div>
-                    )}
-                    <div className="mb-2">
-                      <div className="text-2xl font-bold text-primaryColor mb-1">
-                        {pkg.label}
-                      </div>
-                      {pkg.bonus > 0 && (
-                        <div className="text-sm text-green-400 font-semibold">
-                          +{pkg.bonus} coin tặng kèm
+            {/* 1. Predefined Packages */}
+            <div>
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <FiZap className="text-primaryColor" /> Chọn gói nạp nhanh
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {coinPackages.map((pkg) => {
+                  const isSelected = selectedAmount === pkg.amount;
+                  return (
+                    <button
+                      key={pkg.amount}
+                      onClick={() => handleSelectPackage(pkg.amount)}
+                      className={`
+                        relative p-5 rounded-2xl border transition-all duration-300 group overflow-hidden
+                        ${isSelected
+                          ? "bg-primaryColor/10 border-primaryColor shadow-lg shadow-primaryColor/20 scale-[1.02]"
+                          : "bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20"
+                        }
+                      `}
+                    >
+                      {/* Popular Badge */}
+                      {pkg.popular && (
+                        <div className="absolute top-0 right-0 bg-primaryColor text-black text-[10px] font-bold px-2 py-1 rounded-bl-lg shadow-sm">
+                          HOT
                         </div>
                       )}
-                    </div>
-                    <div className="text-gray-400 text-sm">
-                      Tổng nhận: {(pkg.amount + pkg.bonus).toLocaleString()} coin
-                    </div>
-                  </button>
-                );
-              })}
+
+                      <div className="flex flex-col items-center text-center relative z-10">
+                        <span className={`text-2xl font-bold mb-1 ${isSelected ? "text-primaryColor" : "text-white group-hover:text-primaryColor transition-colors"}`}>
+                          {pkg.amount.toLocaleString()}
+                        </span>
+                        <span className="text-xs text-gray-500 uppercase font-medium tracking-wider">Coin</span>
+                        
+                        {/* Bonus Display */}
+                        {pkg.bonus > 0 ? (
+                          <div className="mt-3 py-1 px-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold flex items-center gap-1">
+                            <FiTrendingUp /> +{pkg.bonus.toLocaleString()}
+                          </div>
+                        ) : (
+                           <div className="mt-3 h-6 opacity-0">spacer</div> 
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Custom Amount */}
-            <div className="bg-bgColor2 rounded-xl p-6 border border-white/10">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                Hoặc nhập số coin tùy chỉnh
-              </h3>
-              <div className="flex gap-3">
+            {/* 2. Custom Amount Input */}
+            <div className="bg-[#1a1a1a]/50 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+              <h3 className="text-lg font-semibold text-white mb-4">Hoặc nhập số lượng tùy ý</h3>
+              <div className="relative">
                 <input
                   type="text"
                   value={customAmount}
                   onChange={handleCustomAmount}
-                  placeholder="Nhập số coin (tối thiểu 10)"
-                  className="flex-1 px-4 py-3 bg-bgColor border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
+                  placeholder="Nhập số coin (10 - 100,000)"
+                  className="w-full pl-12 pr-4 py-4 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor transition-all font-mono text-lg"
                 />
-                <button
-                  onClick={() => {
-                    const value = parseInt(customAmount);
-                    if (value && value >= 10 && value <= 100000) {
-                      handleRecharge();
-                    }
-                  }}
-                  disabled={!customAmount || parseInt(customAmount) < 10}
-                  className="px-6 py-3 bg-primaryColor text-white rounded-lg font-semibold hover:bg-hoverPrimaryColor transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Nạp
-                </button>
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+                   <FaCoins />
+                </div>
+                {customAmount && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-primaryColor font-bold text-sm">
+                        COIN
+                    </div>
+                )}
               </div>
-              <p className="text-gray-400 text-sm mt-2">
-                Số coin tối thiểu: 10 | Tối đa: 100,000
-              </p>
+              <div className="flex justify-between mt-3 text-xs text-gray-500 font-medium px-1">
+                <span>Tối thiểu: 10 Coin</span>
+                <span>Tối đa: 100,000 Coin</span>
+              </div>
             </div>
+            
+             {/* Messages Area (Mobile/Tablet position or just extra feedback) */}
+             {(error || success) && (
+                <div className={`p-4 rounded-xl flex items-center gap-3 animate-fade-in ${error ? "bg-red-500/10 border border-red-500/30 text-red-200" : "bg-green-500/10 border border-green-500/30 text-green-200"}`}>
+                    {error ? <FiAlertCircle className="w-5 h-5 flex-shrink-0" /> : <FiCheckCircle className="w-5 h-5 flex-shrink-0" />}
+                    <span>{error || success}</span>
+                </div>
+             )}
           </div>
 
-          {/* Right: Summary */}
+          {/* RIGHT COLUMN: Summary & Payment (Sticky) */}
           <div className="lg:col-span-1">
-            <div className="bg-bgColor2 rounded-xl p-6 border border-white/10 sticky top-4">
-              <h3 className="text-xl font-bold text-white mb-6">Tóm Tắt</h3>
-              
-              <div className="space-y-4 mb-6">
-                <div className="flex justify-between text-gray-300">
-                  <span>Coin hiện tại:</span>
-                  <span className="font-semibold text-white">{userCoins.toLocaleString()}</span>
-                </div>
+            <div className="sticky top-6">
+              <div className="bg-[#1a1a1a] rounded-3xl p-6 border border-white/10 shadow-2xl relative overflow-hidden">
+                {/* Decoration */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primaryColor/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2 relative z-10">
+                  <FiCreditCard className="text-primaryColor" /> Thông tin thanh toán
+                </h3>
                 
-                {finalAmount > 0 && (
-                  <>
-                    <div className="flex justify-between text-gray-300">
-                      <span>Số coin nạp:</span>
-                      <span className="font-semibold text-white">{finalAmount.toLocaleString()}</span>
-                    </div>
-                    
-                    {selectedPackage?.bonus > 0 && (
-                      <div className="flex justify-between text-green-400">
-                        <span>Coin tặng kèm:</span>
-                        <span className="font-semibold">+{selectedPackage.bonus.toLocaleString()}</span>
-                      </div>
-                    )}
-                    
-                    <div className="border-t border-white/10 pt-4">
-                      <div className="flex justify-between text-lg">
-                        <span className="text-white font-semibold">Tổng sau nạp:</span>
-                        <span className="font-bold text-primaryColor">
-                          {totalAfterRecharge.toLocaleString()} coin
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+                {/* Receipt Details */}
+                <div className="space-y-4 mb-8 relative z-10">
+                  <div className="flex justify-between items-center text-gray-400 text-sm">
+                    <span>Số coin nạp:</span>
+                    <span className="text-white font-medium">
+                      {finalAmount > 0 ? finalAmount.toLocaleString() : "0"}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-400">Khuyến mãi:</span>
+                    <span className="text-green-400 font-medium">
+                      {selectedPackage?.bonus ? `+${selectedPackage.bonus.toLocaleString()}` : "0"}
+                    </span>
+                  </div>
 
-              <button
-                onClick={handleRecharge}
-                disabled={!finalAmount || finalAmount < 10 || loading}
-                className={`w-full py-4 rounded-lg font-semibold text-lg transition-all ${
-                  finalAmount >= 10
-                    ? "bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-white hover:shadow-lg hover:shadow-primaryColor/50 hover:scale-105"
-                    : "bg-gray-600 text-gray-300 cursor-not-allowed"
-                } ${loading ? "opacity-50 cursor-wait" : ""}`}
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <i className="fa-solid fa-spinner fa-spin"></i>
-                    Đang xử lý...
-                  </span>
-                ) : (
-                  `Nạp ${finalAmount > 0 ? finalAmount.toLocaleString() : ""} Coin`
-                )}
-              </button>
+                  <div className="w-full h-px bg-white/10 border-t border-dashed border-gray-700 my-2" />
+                  
+                  <div className="flex justify-between items-end">
+                    <span className="text-gray-300 font-medium">Tổng nhận:</span>
+                    <div className="text-right">
+                      <span className="block text-2xl font-bold text-primaryColor leading-none">
+                        {(finalAmount > 0 ? finalAmount + (selectedPackage?.bonus || 0) : 0).toLocaleString()}
+                      </span>
+                      <span className="text-xs text-gray-500 uppercase font-bold">Coin</span>
+                    </div>
+                  </div>
 
-              {/* Info Box */}
-              <div className="mt-6 p-4 bg-primaryColor/10 border border-primaryColor/30 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <i className="fa-solid fa-info-circle text-primaryColor mt-1"></i>
-                  <div className="text-sm text-gray-300">
-                    <p className="font-semibold text-white mb-1">Lưu ý:</p>
-                    <ul className="space-y-1 text-xs">
-                      <li>• Coin được cộng ngay sau khi nạp</li>
-                      <li>• Coin không có thời hạn sử dụng</li>
-                      <li>• Có thể dùng coin để nâng cấp Premium</li>
-                    </ul>
+                   <div className="flex justify-between items-center text-xs text-gray-500 mt-2 bg-white/5 p-2 rounded-lg">
+                    <span>Số dư sau nạp:</span>
+                    <span className="text-white font-medium">
+                      {totalAfterRecharge.toLocaleString()} Coin
+                    </span>
                   </div>
                 </div>
+
+                {/* Action Button */}
+                <button
+                  onClick={handleRecharge}
+                  disabled={!finalAmount || finalAmount < 10 || loading}
+                  className={`
+                    w-full py-4 rounded-xl font-bold text-md tracking-wide transition-all duration-300
+                    flex items-center justify-center gap-2 shadow-lg relative z-10
+                    ${finalAmount >= 10 && !loading
+                      ? "bg-primaryColor hover:bg-hoverPrimaryColor text-black shadow-primaryColor/25 hover:shadow-primaryColor/40 hover:-translate-y-1"
+                      : "bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5"
+                    }
+                  `}
+                >
+                  {loading ? (
+                    <><BarSpinner className="w-5 h-5" /> Đang xử lý...</>
+                  ) : (
+                    <>
+                       Thanh toán ngay <FiZap className={finalAmount >= 10 ? "fill-black" : ""} />
+                    </>
+                  )}
+                </button>
+
+                {/* Secure Note */}
+                <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-gray-500">
+                    <FiShield className="text-green-500" /> Giao dịch được bảo mật an toàn
+                </div>
               </div>
+
+               {/* Info Note */}
+               <div className="mt-4 p-4 rounded-xl bg-blue-500/5 border border-blue-500/10 text-xs text-blue-200/70 leading-relaxed">
+                  <p className="font-bold text-blue-300 mb-1 flex items-center gap-1"><FiAlertCircle /> Lưu ý:</p>
+                  Coin không có hạn sử dụng và không thể quy đổi ngược lại thành tiền mặt.
+               </div>
             </div>
           </div>
         </div>
 
-        {/* Benefits Section */}
-        <div className="mt-12 bg-bgColor2 rounded-2xl p-8 border border-white/10">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center">
-            Bạn Có Thể Dùng Coin Để
+        {/* --- Benefits Footer Section --- */}
+        <div className="mt-20 border-t border-white/10 pt-10">
+          <h2 className="text-xl font-bold text-white mb-8 text-center">
+            Quyền lợi khi sở hữu Coin
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                icon: "fa-crown",
+                icon: <div className="text-yellow-400"><FiCheck /></div>,
                 title: "Nâng Cấp Premium",
-                description: "100 coin/tháng hoặc 1000 coin/năm để trải nghiệm Premium",
+                description: "Sử dụng coin để mua các gói Premium tuần, tháng hoặc năm với giá ưu đãi.",
               },
               {
-                icon: "fa-gift",
-                title: "Nhận Quà Tặng",
-                description: "Đổi coin lấy các phần quà và ưu đãi đặc biệt",
+                icon: <div className="text-pink-400"><FiGift /></div>,
+                title: "Tặng Quà (Donate)",
+                description: "Dùng coin để tặng quà cho các bộ phim hoặc người dùng khác trong cộng đồng.",
               },
               {
-                icon: "fa-star",
-                title: "Tính Năng Đặc Biệt",
-                description: "Mở khóa các tính năng cao cấp với coin",
+                icon: <div className="text-purple-400"><FiZap /></div>,
+                title: "Tính Năng VIP",
+                description: "Mở khóa các tính năng nâng cao như đổi tên màu, khung avatar đặc biệt.",
               },
             ].map((benefit, index) => (
-              <div key={index} className="text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-primaryColor/20 rounded-full flex items-center justify-center">
-                  <i className={`fa-solid ${benefit.icon} text-primaryColor text-2xl`}></i>
+              <div key={index} className="flex items-start gap-4 p-5 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-xl flex-shrink-0">
+                  {benefit.icon}
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2">{benefit.title}</h3>
-                <p className="text-gray-400 text-sm">{benefit.description}</p>
+                <div>
+                  <h3 className="text-white font-bold mb-1">{benefit.title}</h3>
+                  <p className="text-sm text-gray-500 leading-relaxed">{benefit.description}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
+
       </div>
     </div>
   );
 };
 
 export default RechargeCoinPage;
-
