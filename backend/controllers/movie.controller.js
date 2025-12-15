@@ -374,6 +374,36 @@ const deleteComment = async (req, res) => {
   }
 };
 
+
+/**
+ * GET /movies/:id/recommendations
+ * Get recommended movies based on a movie
+ * @param {string} req.params.id - Movie ID or slug
+ * @param {number} req.query.limit - Limit number of results (default: 10)
+ * @returns {Object} { data: Array }
+ */
+const getRecommendations = async (req, res) => {
+  try {
+    console.log('[Recommendations Controller] Request received:', {
+      id: req.params.id,
+      limit: req.query.limit,
+      url: req.url,
+      path: req.path,
+    });
+    const limit = Number(req.query.limit) || 10;
+    const result = await movieService.getRecommendations(req.params.id, limit);
+    console.log('[Recommendations Controller] Result:', {
+      moviesCount: result?.data?.length || 0,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[Recommendations Controller] Error:', error.message);
+    res.status(404).json({ message: error.message });
+  }
+};
+
+
+
 module.exports = {
   getAll,
   getById,
@@ -395,4 +425,5 @@ module.exports = {
   likeComment,
   dislikeComment,
   deleteComment,
+  getRecommendations,
 };

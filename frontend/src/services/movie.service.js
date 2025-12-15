@@ -156,6 +156,17 @@ const movieService = {
     }),
 
   /**
+   * Lấy danh sách phim gợi ý dựa trên một phim
+   * @param {string|number} id - Movie ID
+   * @param {number} limit - Số lượng phim gợi ý (default: 10)
+   * @returns {Promise<Object>} { data: [] }
+   */
+  getRecommendations: (id, limit = 10) =>
+    apiRequest(`/movies/${id}/recommendations`, {
+      params: { limit },
+    }),
+
+  /**
    * Like một comment (yêu cầu auth)
    * @param {string} commentId - Comment ID
    * @param {boolean} isCurrentlyLiked - Trạng thái like hiện tại

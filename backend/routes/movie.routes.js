@@ -48,6 +48,9 @@ router.post('/:id/comments', authMiddleware, movieController.postComment);
 // GET /api/v1/movies/:id/ratings - Get movie ratings (must be before /:id)
 router.get('/:id/ratings', movieController.getRatings);
 
+// GET /api/v1/movies/:id/recommendations - Get recommended movies (must be before /:id)
+router.get('/:id/recommendations', movieController.getRecommendations);
+
 // POST /api/v1/movies/:id/view - Increment view count (no auth required)
 router.post('/:id/view', movieController.incrementView);
 
@@ -56,5 +59,4 @@ router.post('/:id/rate', authMiddleware, movieController.rateMovie);
 
 // GET /api/v1/movies/:id - Get movie by ID (must be LAST to avoid conflicts)
 router.get('/:id', movieController.getById);
-
 module.exports = router;
