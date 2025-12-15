@@ -287,4 +287,62 @@ export const movieHandlers = [
       movieId: params.id,
     });
   }),
+
+  // GET /movies/:id/recommendations - Get recommended movies
+  http.get(`${API_BASE}/movies/:id/recommendations`, async ({ params, request }) => {
+    await delay(300);
+    const url = new URL(request.url);
+    const limit = Number(url.searchParams.get("limit")) || 10;
+
+    // Get current movie
+    const currentMovie = getMovieDetail(params.id);
+    if (!currentMovie) {
+      return HttpResponse.json(
+        { message: `Movie with ID ${params.id} not found` },
+        { status: 404 }
+      );
+    }
+
+    // Get all movies
+    let allMovies = [...mockTop10Movies];
+    if (mockSectionMovies.trending) allMovies.push(...mockSectionMovies.trending);
+    if (mockSectionMovies.newReleases) allMovies.push(...mockSectionMovies.newReleases);
+
+    // Filter out current movie
+    const currentMovieId = currentMovie.id;
+    allMovies = allMovies.filter((m) => m.id !== currentMovieId);
+
+    let recommendedMovies = [];
+
+    // Priority 1: Movies with same genre
+    if (currentMovie.genres && currentMovie.genres.length > 0) {
+      const firstGenre = currentMovie.genres[0];
+      const sameGenreMovies = allMovies.filter(
+        (m) => m.genres && m.genres.some((g) => g === firstGenre)
+      );
+      recommendedMovies = [...sameGenreMovies];
+    }
+
+    // Priority 2: If not enough, add trending movies
+    if (recommendedMovies.length < limit) {
+      const existingIds = new Set([currentMovieId, ...recommendedMovies.map((m) => m.id)]);
+      const trendingMovies = (mockSectionMovies.trending || []).filter(
+        (m) => !existingIds.has(m.id)
+      );
+      recommendedMovies = [...recommendedMovies, ...trendingMovies];
+    }
+
+    // Priority 3: If still not enough, add top rated movies
+    if (recommendedMovies.length < limit) {
+      const existingIds = new Set([currentMovieId, ...recommendedMovies.map((m) => m.id)]);
+      const topRatedMovies = [...mockTop10Movies]
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .filter((m) => !existingIds.has(m.id));
+      recommendedMovies = [...recommendedMovies, ...topRatedMovies];
+    }
+
+    return HttpResponse.json({
+      data: recommendedMovies.slice(0, limit),
+    });
+  }),
 ];

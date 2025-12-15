@@ -203,6 +203,120 @@ const getByType = async (type, pagination = {}) => {
 };
 
 /**
+ * Get recommended movies based on a movie
+ * Logic: Same genre -> Trending -> Top Rated
+ * @param {string} movieId - Movie ID or slug
+ * @param {number} limit - Maximum number of recommendations (default: 10)
+ * @returns {Object} { data: Array }
+ */
+const getRecommendations = async (movieId, limit = 10) => {
+  // Find the current movie
+  const currentMovie = await findMovie(movieId);
+  if (!currentMovie) {
+    throw new Error('Movie not found');
+  }
+
+  const currentMovieId = currentMovie._id;
+  const excludedIds = [currentMovieId]; // Array of ObjectIds for MongoDB queries
+  let recommendedMovies = [];
+
+  // Priority 1: Get movies with same genre/category
+  if (currentMovie.categories && Array.isArray(currentMovie.categories) && currentMovie.categories.length > 0) {
+    // Get first category/genre slug
+    const firstCategory = currentMovie.categories[0];
+    const genreSlug = typeof firstCategory === 'object' && firstCategory.slug 
+      ? firstCategory.slug 
+      : (typeof firstCategory === 'string' ? firstCategory : null);
+    
+    if (genreSlug) {
+      // Query movies with same genre, excluding current movie
+      const sameGenreMovies = await Movie.find({
+        'categories.slug': genreSlug,
+        _id: { $ne: currentMovieId },
+      })
+        .sort({ viewCount: -1, rating: -1 })
+        .limit(limit * 2) // Get more to have options
+        .lean();
+
+      if (sameGenreMovies && sameGenreMovies.length > 0) {
+        // Store ObjectIds before transformation
+        sameGenreMovies.forEach((movie) => {
+          if (movie._id) {
+            excludedIds.push(movie._id);
+          }
+        });
+
+        const transformed = transformMovies(sameGenreMovies);
+        recommendedMovies = [...transformed];
+      }
+    }
+  }
+
+  // Priority 2: If not enough, add trending movies (by viewCount)
+  if (recommendedMovies.length < limit) {
+    const needed = limit - recommendedMovies.length;
+    const trendingMovies = await Movie.find({
+      _id: { $nin: excludedIds },
+    })
+      .sort({ viewCount: -1, createdAt: -1 })
+      .limit(needed * 2)
+      .lean();
+
+    if (trendingMovies && trendingMovies.length > 0) {
+      // Store ObjectIds before transformation
+      trendingMovies.forEach((movie) => {
+        if (movie._id) {
+          excludedIds.push(movie._id);
+        }
+      });
+
+      const transformed = transformMovies(trendingMovies);
+      const additional = transformed.slice(0, needed);
+      recommendedMovies = [...recommendedMovies, ...additional];
+    }
+  }
+
+  // Priority 3: If still not enough, add top rated movies
+  if (recommendedMovies.length < limit) {
+    const needed = limit - recommendedMovies.length;
+    const topRatedMovies = await Movie.find({
+      _id: { $nin: excludedIds },
+    })
+      .sort({ rating: -1, totalRatings: -1, viewCount: -1 })
+      .limit(needed * 2)
+      .lean();
+
+    if (topRatedMovies && topRatedMovies.length > 0) {
+      const transformed = transformMovies(topRatedMovies);
+      const additional = transformed.slice(0, needed);
+      recommendedMovies = [...recommendedMovies, ...additional];
+    }
+  }
+
+  // Priority 4: If still not enough, add newest movies
+  if (recommendedMovies.length < limit) {
+    const needed = limit - recommendedMovies.length;
+    const newestMovies = await Movie.find({
+      _id: { $nin: excludedIds },
+    })
+      .sort({ createdAt: -1 })
+      .limit(needed)
+      .lean();
+
+    if (newestMovies && newestMovies.length > 0) {
+      const transformed = transformMovies(newestMovies);
+      const additional = transformed.slice(0, needed);
+      recommendedMovies = [...recommendedMovies, ...additional];
+    }
+  }
+
+  // Limit to requested number and return
+  return {
+    data: recommendedMovies.slice(0, limit),
+  };
+};
+
+/**
  * Get available filter options (genres & countries)
  */
 const getFilterOptions = async () => {
@@ -699,4 +813,5 @@ module.exports = {
   likeComment,
   dislikeComment,
   deleteComment,
+  getRecommendations,
 };

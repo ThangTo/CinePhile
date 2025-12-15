@@ -9,10 +9,8 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash';
 
-// Prompt hệ thống mặc định cho trợ lý AI của CinePhile
-// Có thể thay thế bằng prompt tuỳ chỉnh trong file .env nếu muốn
+
 const SYSTEM_PROMPT =
-  process.env.CHATBOT_SYSTEM_PROMPT ||
   `Bạn là trợ lý AI thân thiện của nền tảng xem phim CinePhile.
 
 MỤC TIÊU:

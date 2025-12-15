@@ -15,6 +15,7 @@ import ProtectedRoute from "./components/general/ProtectedRoute";
 import MainLayout from "layouts/MainLayout";
 import NotFoundPage from "./pages/NotFound";
 import GoogleAuthHandler from "pages/GoogleAuthHandler";
+import DemoPage from "./pages/DemoPage";
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
               <Route path="/search" element={<SearchResults />} />
               <Route path="/watch/:id" element={<WatchPage />} />
               <Route path="/account" element={<AccountPage />} />
+              <Route path="/demo" element={<DemoPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
             <Route
