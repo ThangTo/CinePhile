@@ -85,4 +85,47 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
+// Optional authentication - doesn't block if no token, just attaches user if available
+const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    let token = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+
+    if (!token) {
+      token = req.cookies?.accessToken || null;
+    }
+
+    if (!token) {
+      // No token, continue without user
+      req.user = null;
+      return next();
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.userId);
+
+      if (user) {
+        req.user = user;
+      } else {
+        req.user = null;
+      }
+    } catch (tokenError) {
+      // Token invalid, just set user to null
+      req.user = null;
+    }
+
+    return next();
+  } catch (error) {
+    // Any error, just continue without user
+    req.user = null;
+    return next();
+  }
+};
+
 module.exports = authMiddleware;
+module.exports.optionalAuth = optionalAuth;
