@@ -31,6 +31,19 @@ const Chatbot = () => {
 
   const chatHistoryRef = useRef([]);
   const initialInputHeightRef = useRef(null);
+  const sessionIdRef = useRef(null);
+
+  // Initialize sessionId for guest users
+  useEffect(() => {
+    // Tạo hoặc lấy sessionId từ localStorage
+    let sessionId = localStorage.getItem('chatbot_sessionId');
+    if (!sessionId) {
+      // Tạo sessionId mới dựa trên timestamp và random
+      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('chatbot_sessionId', sessionId);
+    }
+    sessionIdRef.current = sessionId;
+  }, []);
 
   // Initialize chat history with knowledge base (like in original code)
   useEffect(() => {
@@ -53,9 +66,18 @@ const Chatbot = () => {
   };
 
   const buildChatMetadata = () => {
-    return {
-      page: window.location.pathname,  
+    const pathname = window.location.pathname;
+    const metadata = {
+      page: pathname,
     };
+
+    // Extract movieId from URL patterns: /movie/:id or /watch/:id
+    const movieMatch = pathname.match(/\/(movie|watch)\/([a-f0-9]{24})/i);
+    if (movieMatch && movieMatch[2]) {
+      metadata.movieId = movieMatch[2];
+    }
+
+    return metadata;
   };
 
   // Generate bot response using API
@@ -71,11 +93,21 @@ const Chatbot = () => {
     });
 
     try {
+      // Convert history from Gemini format to backend format {role, content}
+      const historyForBackend = chatHistoryRef.current
+        .filter(msg => msg.role === 'user' || msg.role === 'model') // Chỉ lấy user và model messages
+        .map(msg => ({
+          role: msg.role === 'model' ? 'assistant' : 'user',
+          content: msg.parts?.[0]?.text || msg.content || '',
+        }))
+        .filter(msg => msg.content.trim().length > 0); // Loại bỏ messages rỗng
+
       // Build payload for API request
       const payload = {
         message: userDataRef.current.message,
-        history: chatHistoryRef.current,
+        history: historyForBackend,
         metadata: buildChatMetadata(),
+        sessionId: sessionIdRef.current,
       } 
       const res = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1"}/chat`, {
         method: "POST",
