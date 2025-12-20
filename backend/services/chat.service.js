@@ -4,10 +4,10 @@ const UserFavorite = require('../models/user_favorite.model');
 const Chat = require('../models/chat.model');
 const mongoose = require('mongoose');
 
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash';
+// ============================================
+// ENVIRONMENT VARIABLES - API Keys
+// ============================================
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 const SYSTEM_PROMPT =
   process.env.CHATBOT_SYSTEM_PROMPT ||
@@ -44,7 +44,13 @@ HƯỚNG DẪN TRẢ LỜI:
   1. Tên phim – Năm – Thể loại chính.
 - Nếu không chắc chắn, hãy nói rõ "Mình không có đủ dữ liệu trong hệ thống CinePhile để trả lời chính xác."`;
 
-// Phân loại intent cơ bản bằng keyword (fallback nếu Gemini lỗi)
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function detectIntentByKeyword(message = '') {
   const msg = message.toLowerCase();
   if (
@@ -69,138 +75,101 @@ function detectIntentByKeyword(message = '') {
   ) {
     return 'movie_info';
   }
-
-  // có thể thêm: 'account_help', 'general_help', ...
   return 'general';
 }
 
-// Phân loại intent bằng Gemini: movie_info | general + chi tiết kiểu truy vấn
-async function classifyIntentWithGemini(message) {
-  if (!GEMINI_API_KEY) {
-    return { intent: detectIntentByKeyword(message), queryType: 'other', genre: null, actor: null, keyword: null };
-  }
+function isRateLimitError(error) {
+  const errorMsg = error?.message?.toLowerCase() || '';
+  const errorStr = JSON.stringify(error).toLowerCase();
+  return (
+    errorMsg.includes('rate limit') ||
+    errorMsg.includes('quota') ||
+    errorMsg.includes('429') ||
+    errorStr.includes('rate_limit_exceeded') ||
+    errorStr.includes('quota_exceeded') ||
+    error?.status === 429 ||
+    error?.statusCode === 429
+  );
+}
 
+// ============================================
+// INTENT CLASSIFIER - OpenRouter
+// ============================================
+async function classifyIntentWithOpenRouter(message) {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY chưa được cấu hình');
+  }
 
   const classifierPrompt = `Bạn là bộ phân loại truy vấn cho trợ lý phim CinePhile.
-    Người dùng sẽ gửi câu hỏi bằng tiếng Việt hoặc tiếng Anh. Nhiệm vụ của bạn:
-    - Phân loại xem câu hỏi có liên quan tới phim trong hệ thống hay không (intent).
-    - Nếu liên quan tới phim (intent = "movie_info") thì phân loại chi tiết kiểu truy vấn:
-    + "top"    : hỏi top phim / phim hay nhất / trending / nổi tiếng
-    + "new"    : hỏi phim mới / phim mới cập nhật / phim mới ra mắt / phim vừa thêm
-    + "genre"  : hỏi theo thể loại (ví dụ: phim kinh dị, phim hành động Mỹ, ...)
-    + "actor"  : hỏi theo diễn viên / cast (ví dụ: phim có Tom Cruise, phim của Dwayne Johnson, ...)
-    + "search" : tìm kiếm phim theo tên / từ khóa cụ thể
-    + "other"  : vẫn là movie_info nhưng không rơi vào các loại trên
+Người dùng sẽ gửi câu hỏi bằng tiếng Việt hoặc tiếng Anh. Nhiệm vụ của bạn:
+- Phân loại xem câu hỏi có liên quan tới phim trong hệ thống hay không (intent).
+- Nếu liên quan tới phim (intent = "movie_info") thì phân loại chi tiết kiểu truy vấn:
+  + "top"    : hỏi top phim / phim hay nhất / trending / nổi tiếng
+  + "new"    : hỏi phim mới / phim mới cập nhật / phim mới ra mắt / phim vừa thêm
+  + "genre"  : hỏi theo thể loại (ví dụ: phim kinh dị, phim hành động Mỹ, ...)
+  + "actor"  : hỏi theo diễn viên / cast (ví dụ: phim có Tom Cruise, phim của Dwayne Johnson, ...)
+  + "search" : tìm kiếm phim theo tên / từ khóa cụ thể
+  + "other"  : vẫn là movie_info nhưng không rơi vào các loại trên
 
-    Bạn CHỈ được trả về JSON hợp lệ, không có giải thích thêm, KHÔNG dùng markdown.
+Bạn CHỈ được trả về JSON hợp lệ, không có giải thích thêm, KHÔNG dùng markdown.
 
-    Schema JSON:
-    {
-    "intent": "movie_info" | "general",
-    "queryType": "top" | "new" | "genre" | "actor" | "search" | "other",
-    "genre": string | null,
-    "actor": string | null,
-    "keyword": string | null
-    }
+Schema JSON:
+{
+  "intent": "movie_info" | "general",
+  "queryType": "top" | "new" | "genre" | "actor" | "search" | "other",
+  "genre": string | null,
+  "actor": string | null,
+  "keyword": string | null
+}
 
-    Quy tắc:
-    - intent = "movie_info" nếu câu hỏi liên quan tới phim/series/tập phim/thể loại/quốc gia/diễn viên/trailer/đánh giá/bình luận... trên một website xem phim.
-    - intent = "general" nếu câu hỏi không liên quan tới phim hoặc CinePhile.
-    - queryType:
-    * "top"   nếu câu hỏi nhấn mạnh top, hay nhất, nổi bật, trending...
-    * "genre" nếu câu hỏi nhấn mạnh thể loại (hành động, kinh dị, lãng mạn, ...).
-    * "actor" nếu câu hỏi nhấn mạnh diễn viên / cast.
-    * "search" nếu người dùng đưa tên/từ khóa phim cụ thể để tìm.
-    * "other" nếu không rõ ràng.
-    - genre: chuỗi tên thể loại chính (nếu có, ví dụ: "hành động", "kinh dị"), ngược lại null.
-    - actor: tên diễn viên nếu có, ngược lại null.
-    - keyword: từ khóa/tên phim chính để tìm kiếm nếu có, ngược lại null.
+Quy tắc:
+- intent = "movie_info" nếu câu hỏi liên quan tới phim/series/tập phim/thể loại/quốc gia/diễn viên/trailer/đánh giá/bình luận... trên một website xem phim.
+- intent = "general" nếu câu hỏi không liên quan tới phim hoặc CinePhile.
+- queryType: "top" nếu câu hỏi nhấn mạnh top, hay nhất, nổi bật, trending...
+- queryType: "genre" nếu câu hỏi nhấn mạnh thể loại (hành động, kinh dị, lãng mạn, ...).
+- queryType: "actor" nếu câu hỏi nhấn mạnh diễn viên / cast.
+- queryType: "search" nếu người dùng đưa tên/từ khóa phim cụ thể để tìm.
+- queryType: "other" nếu không rõ ràng.
+- genre: chuỗi tên thể loại chính (nếu có, ví dụ: "hành động", "kinh dị"), ngược lại null.
+- actor: tên diễn viên nếu có, ngược lại null.
+- keyword: từ khóa/tên phim chính để tìm kiếm nếu có, ngược lại null.
 
-    Ví dụ:
-    Input: "Cho mình top phim kinh dị Mỹ hay nhất"
-    Output:
-    {
-    "intent": "movie_info",
-    "queryType": "top",
-    "genre": "kinh dị",
-    "actor": null,
-    "keyword": null
-    }
-
-    Input: "Có phim nào của diễn viên Tom Cruise không?"
-    Output:
-    {
-    "intent": "movie_info",
-    "queryType": "actor",
-    "genre": null,
-    "actor": "Tom Cruise",
-    "keyword": null
-    }
-
-    Input: "Tìm phim Avengers phần mới nhất"
-    Output:
-    {
-    "intent": "movie_info",
-    "queryType": "search",
-    "genre": null,
-    "actor": null,
-    "keyword": "Avengers"
-    }
-
-    Input: "Cho mình xem phim mới cập nhật gần đây"
-    Output:
-    {
-    "intent": "movie_info",
-    "queryType": "new",
-    "genre": null,
-    "actor": null,
-    "keyword": null
-    }
-
-    Input: "Thời tiết hôm nay như thế nào?"
-    Output:
-    {
-    "intent": "general",
-    "queryType": "other",
-    "genre": null,
-    "actor": null,
-    "keyword": null
-    }
-
-    Câu hỏi của người dùng:
-    ${message}`;
-
-
-  const contents = [
-    {
-      role: 'user',
-      parts: [{ text: classifierPrompt }],
-    },
-  ];
-
-  const res = await fetch(`${GEMINI_URL}:generateContent?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents }),
-  });
-//   console.log('classifier fetch status =', res.status);
-
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error?.message || 'Gemini intent classifier error');
-  }
-
-//   console.log('classifier data =', data);
-
-  const rawText =
-    data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-    '{"intent":"general","queryType":"other","genre":null,"actor":null,"keyword":null}';
+Câu hỏi của người dùng:
+${message}`;
 
   try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        'HTTP-Referer': process.env.CLIENT_URL || 'https://cinephile.app',
+        'X-Title': 'CinePhile Chatbot',
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: classifierPrompt,
+          },
+        ],
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error?.message || 'OpenRouter API error');
+    }
+
+    const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
     const parsed = JSON.parse(rawText);
+
     if (!parsed || (parsed.intent !== 'movie_info' && parsed.intent !== 'general')) {
-      throw new Error('invalid intent');
+      throw new Error('Invalid intent from OpenRouter');
     }
 
     return {
@@ -210,24 +179,252 @@ async function classifyIntentWithGemini(message) {
       actor: typeof parsed.actor === 'string' ? parsed.actor : null,
       keyword: typeof parsed.keyword === 'string' ? parsed.keyword : null,
     };
-  } catch (e) {
-    // ignore parse error, fallback phía dưới
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      throw new Error(`OpenRouter rate limit: ${error.message}`);
+    }
+    throw error;
   }
-
-//   console.log("debug...");
-  return {
-    intent: detectIntentByKeyword(message),
-    queryType: 'other',
-    genre: null,
-    actor: null,
-    keyword: null,
-  };
 }
 
+// ============================================
+// LLM ADAPTER - OpenRouter (Multiple Models)
+// ============================================
 
+// OpenRouter Adapter - Try different models with fallback
+async function callOpenRouter({ userQuery, dbContext, history = [], model = null }) {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY chưa được cấu hình');
+  }
 
+  // Default model list to try (in order of preference)
+  const models = model
+    ? [model]
+    : [
+        'openai/gpt-4o-mini', // Fast and cheap
+        'anthropic/claude-3.5-sonnet', // High quality
+        'google/gemini-2.0-flash-exp', // Fast
+        'meta-llama/llama-3.1-70b-instruct', // Open source
+        'mistralai/mistral-large', // Good balance
+        'openai/gpt-3.5-turbo', // Fallback
+      ];
 
-// classifier: kết quả phân loại chi tiết từ Gemini (intent, queryType, genre, actor, keyword)
+  const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+
+  // Add history
+  if (history && history.length > 0) {
+    history.slice(-10).forEach((msg) => {
+      messages.push({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      });
+    });
+  }
+
+  // Add current query with context
+  messages.push({
+    role: 'user',
+    content: `[USER_QUERY]\n${userQuery}\n\n[DB_CONTEXT]\n${JSON.stringify(dbContext, null, 2)}`,
+  });
+
+  // Try each model until one succeeds
+  let lastError = null;
+  for (const modelName of models) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.CLIENT_URL || 'https://cinephile.app',
+          'X-Title': 'CinePhile Chatbot',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages,
+          temperature: 0.7,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // If rate limit, try next model
+        if (isRateLimitError({ message: data.error?.message, status: res.status })) {
+          console.log(`⚠️  ${modelName} rate limited, trying next model...`);
+          lastError = new Error(`Rate limit: ${data.error?.message}`);
+          continue;
+        }
+        throw new Error(data.error?.message || 'OpenRouter API error');
+      }
+
+      const rawText = data.choices?.[0]?.message?.content?.trim() || '';
+      console.log(`✅ OpenRouter succeeded with model: ${modelName}`);
+      return rawText.replace(/\*\*/g, '');
+    } catch (error) {
+      lastError = error;
+      // If rate limit, try next model
+      if (isRateLimitError(error) && models.indexOf(modelName) < models.length - 1) {
+        console.log(`⚠️  ${modelName} failed, trying next model...`);
+        continue;
+      }
+      // If not rate limit and not last model, try next
+      if (models.indexOf(modelName) < models.length - 1) {
+        continue;
+      }
+      // Last model failed, throw error
+      throw error;
+    }
+  }
+
+  throw lastError || new Error('All OpenRouter models failed');
+}
+
+// ============================================
+// MAIN LLM CALLER - OpenRouter with fallback
+// ============================================
+async function callLLMWithFallback({ userQuery, dbContext, history = [] }) {
+  // OpenRouter handles fallback internally between models
+  return callOpenRouter({ userQuery, dbContext, history });
+}
+
+// ============================================
+// FORMAT ANSWER WITH HTML AND MOVIE LINKS
+// ============================================
+function formatAnswerWithMovieLinks(answer, dbContext) {
+  if (!answer || !dbContext) return answer;
+
+  // Collect all movie titles and IDs from context
+  const movieMap = new Map();
+
+  // Add movies from various context sources
+  if (dbContext.currentMovie) {
+    movieMap.set(dbContext.currentMovie.title.toLowerCase(), {
+      id: dbContext.currentMovie.id,
+      title: dbContext.currentMovie.title,
+    });
+  }
+
+  if (dbContext.topMovies) {
+    dbContext.topMovies.forEach((movie) => {
+      movieMap.set(movie.title.toLowerCase(), {
+        id: movie.id,
+        title: movie.title,
+      });
+    });
+  }
+
+  if (dbContext.newMovies) {
+    dbContext.newMovies.forEach((movie) => {
+      movieMap.set(movie.title.toLowerCase(), {
+        id: movie.id,
+        title: movie.title,
+      });
+    });
+  }
+
+  if (dbContext.genreTopMovies) {
+    dbContext.genreTopMovies.forEach((movie) => {
+      movieMap.set(movie.title.toLowerCase(), {
+        id: movie.id,
+        title: movie.title,
+      });
+    });
+  }
+
+  if (dbContext.actorMovies) {
+    dbContext.actorMovies.forEach((movie) => {
+      movieMap.set(movie.title.toLowerCase(), {
+        id: movie.id,
+        title: movie.title,
+      });
+    });
+  }
+
+  if (dbContext.matchedMovies) {
+    dbContext.matchedMovies.forEach((movie) => {
+      movieMap.set(movie.title.toLowerCase(), {
+        id: movie.id,
+        title: movie.title,
+      });
+    });
+  }
+
+  // If no movies found, return original answer
+  if (movieMap.size === 0) {
+    return formatPlainTextToHTML(answer);
+  }
+
+  // Replace movie titles with HTML links
+  let formattedAnswer = answer;
+
+  // Sort by title length (longest first) to avoid partial matches
+  const sortedMovies = Array.from(movieMap.values()).sort((a, b) => b.title.length - a.title.length);
+
+  sortedMovies.forEach((movie) => {
+    const title = movie.title;
+    const movieId = movie.id;
+    
+    // Escape special regex characters in title
+    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Create regex to match the title (case-insensitive, word boundaries)
+    // Use word boundaries but allow Vietnamese characters
+    const regex = new RegExp(`(${escapedTitle})`, 'gi');
+    
+    // Replace with HTML link
+    formattedAnswer = formattedAnswer.replace(regex, (match) => {
+      // Check if already inside an HTML tag
+      const beforeMatch = formattedAnswer.substring(0, formattedAnswer.indexOf(match));
+      const lastTagIndex = beforeMatch.lastIndexOf('<');
+      const lastTagCloseIndex = beforeMatch.lastIndexOf('>');
+      
+      // If we're inside a tag (last < is after last >), don't replace
+      if (lastTagIndex > lastTagCloseIndex) {
+        return match;
+      }
+      
+      // Check if already a link
+      if (beforeMatch.includes(`href="/movie/${movieId}"`)) {
+        return match;
+      }
+      
+      return `<a href="/movie/${movieId}" class="chatbot-movie-link" style="color: #3b82f6; font-weight: 600; text-decoration: none; transition: all 0.2s;">${match}</a>`;
+    });
+  });
+
+  // Format plain text to HTML (line breaks, lists, etc.)
+  return formatPlainTextToHTML(formattedAnswer);
+}
+
+// Format plain text to HTML with basic styling
+function formatPlainTextToHTML(text) {
+  if (!text) return text;
+
+  // Replace line breaks
+  let html = text
+    .replace(/\n\n/g, '</p><p style="margin: 0.5rem 0;">')
+    .replace(/\n/g, '<br />');
+
+  // Wrap in paragraph if not already wrapped
+  if (!html.startsWith('<')) {
+    html = `<p style="margin: 0.5rem 0; line-height: 1.6;">${html}</p>`;
+  } else if (!html.startsWith('<p')) {
+    html = `<p style="margin: 0.5rem 0; line-height: 1.6;">${html}</p>`;
+  }
+
+  // Format numbered lists (1. 2. 3.)
+  html = html.replace(/(\d+)\.\s+([^\n<]+)/g, '<span style="display: block; margin: 0.25rem 0; padding-left: 1rem;">$1. $2</span>');
+
+  // Format bullet points (- or •)
+  html = html.replace(/^[-•]\s+([^\n<]+)/gm, '<span style="display: block; margin: 0.25rem 0; padding-left: 1rem;">• $1</span>');
+
+  return html;
+}
+
+// ============================================
+// BUILD DB CONTEXT
+// ============================================
 async function buildDbContextForMovieIntent({ userId, message, metadata, classifier }) {
   const context = {};
   const msg = message.toLowerCase();
@@ -236,14 +433,10 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
   const actorFromAi = classifier?.actor || null;
   const keywordFromAi = classifier?.keyword || null;
 
-  // 1. Nếu có movieId trong metadata → lấy chi tiết phim hiện tại
+  // 1. Current movie from metadata
   if (metadata?.movieId) {
     try {
-      // Convert string ID to ObjectId nếu cần
-      const movieId = mongoose.Types.ObjectId.isValid(metadata.movieId) 
-        ? metadata.movieId 
-        : null;
-      
+      const movieId = mongoose.Types.ObjectId.isValid(metadata.movieId) ? metadata.movieId : null;
       if (movieId) {
         const movie = await Movie.findById(movieId).lean();
         if (movie) {
@@ -265,15 +458,10 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
       }
     } catch (e) {
       console.error('Error fetching current movie:', e);
-      // Tiếp tục xử lý ngay cả khi không lấy được phim hiện tại
     }
   }
 
-
-
-  // 2. Gợi ý TOP phim toàn site
-  // - Nếu Gemini phân loại queryType = "top" thì luôn lấy topMovies
-  // - Nếu không, fallback heuristic từ keyword
+  // 2. Top movies
   const topWords = ['top', 'hay nhất', 'phim hot', 'phổ biến', 'phim trending', 'nổi tiếng'];
   if (queryType === 'top' || topWords.some((word) => msg.includes(word))) {
     const topMovies = await Movie.find()
@@ -293,53 +481,35 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
     }));
   }
 
-
-
-  // 2.1. Phim mới cập nhật / phim mới ra mắt
+  // 3. New movies
   const newWords = ['phim mới', 'mới cập nhật', 'mới ra mắt', 'vừa thêm', 'mới nhất', 'cập nhật gần đây'];
   if (queryType === 'new' || newWords.some((word) => msg.includes(word))) {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    
-    // Tìm phim mới: ưu tiên isNewRelease=true, sau đó là phim update trong 30 ngày
-    // Sử dụng aggregation để sort đúng cách (boolean sort trong MongoDB không hoạt động tốt)
     let newMovies = await Movie.find({
-      $or: [
-        { isNewRelease: true },
-        { updatedAt: { $gte: thirtyDaysAgo } },
-        { createdAt: { $gte: thirtyDaysAgo } }, // Cũng xét phim mới tạo
-      ],
+      $or: [{ isNewRelease: true }, { updatedAt: { $gte: thirtyDaysAgo } }, { createdAt: { $gte: thirtyDaysAgo } }],
     })
-      .sort({ updatedAt: -1, createdAt: -1 }) // Sort theo thời gian mới nhất
-      .limit(20) // Lấy nhiều hơn để filter sau
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(20)
       .lean();
 
-    // Nếu không có phim trong 30 ngày, fallback: lấy phim mới nhất (60 ngày)
     if (newMovies.length === 0) {
       const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
       newMovies = await Movie.find({
-        $or: [
-          { isNewRelease: true },
-          { updatedAt: { $gte: sixtyDaysAgo } },
-          { createdAt: { $gte: sixtyDaysAgo } },
-        ],
+        $or: [{ isNewRelease: true }, { updatedAt: { $gte: sixtyDaysAgo } }, { createdAt: { $gte: sixtyDaysAgo } }],
       })
         .sort({ updatedAt: -1, createdAt: -1 })
         .limit(15)
         .lean();
     }
 
-    // Ưu tiên phim có isNewRelease=true, sau đó sort lại theo updatedAt
     newMovies.sort((a, b) => {
-      // Ưu tiên isNewRelease=true
       if (a.isNewRelease && !b.isNewRelease) return -1;
       if (!a.isNewRelease && b.isNewRelease) return 1;
-      // Nếu cùng isNewRelease, sort theo updatedAt mới nhất
       const aTime = a.updatedAt || a.createdAt || 0;
       const bTime = b.updatedAt || b.createdAt || 0;
       return bTime - aTime;
     });
 
-    // Giới hạn lại 15 phim
     newMovies = newMovies.slice(0, 15);
 
     context.newMovies = newMovies.map((m) => ({
@@ -356,18 +526,13 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
     }));
   }
 
-
-
-  // 3. Tìm theo thể loại: "thể loại X", "genre X"
+  // 4. Genre search
   const genreWords = ['thể loại', 'genre', 'phim'];
   const shouldTryGenre = queryType === 'genre' || genreWords.some((word) => msg.includes(word));
   if (shouldTryGenre) {
     let genreKeyword = genreFromAi;
-
-    // Nếu Gemini chưa extract được genre, fallback regex
     if (!genreKeyword) {
-      const genreMatch =
-        message.match(/thể loại\s+([^\.,!?\n]+)/i) || message.match(/genre\s+([^\.,!?\n]+)/i);
+      const genreMatch = message.match(/thể loại\s+([^\.,!?\n]+)/i) || message.match(/genre\s+([^\.,!?\n]+)/i);
       if (genreMatch) {
         genreKeyword = genreMatch[1].trim();
       }
@@ -375,12 +540,8 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
 
     if (genreKeyword) {
       const genreRegex = new RegExp(genreKeyword, 'i');
-
       const genreMovies = await Movie.find({
-        $or: [
-          { 'categories.name': genreRegex },
-          { 'categories.slug': genreRegex },
-        ],
+        $or: [{ 'categories.name': genreRegex }, { 'categories.slug': genreRegex }],
       })
         .sort({ viewCount: -1 })
         .limit(10)
@@ -399,14 +560,10 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
     }
   }
 
-
-
-
-  // 4. Tìm theo diễn viên: "diễn viên X", "actor X", "cast X"
+  // 5. Actor search
   const shouldTryActor = queryType === 'actor';
   if (shouldTryActor) {
     let actorKeyword = actorFromAi;
-
     if (!actorKeyword) {
       const actorMatch =
         message.match(/diễn viên\s+([^\.,!?\n]+)/i) ||
@@ -419,9 +576,6 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
 
     if (actorKeyword) {
       const actorRegex = new RegExp(actorKeyword, 'i');
-
-      // Field "actor" là mảng string, dùng $elemMatch hoặc regex trực tiếp
-      // Mongoose tự động match regex với các phần tử trong mảng
       const actorMovies = await Movie.find({
         actor: { $regex: actorRegex },
       })
@@ -442,14 +596,10 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
     }
   }
 
-
-
-
-  // 5. Tìm phim theo tên/từ khóa chung (search theo tên / keyword)
+  // 6. Keyword search
   const shouldTrySearch = queryType === 'search' || queryType === 'other';
   if (shouldTrySearch) {
     let keyword = keywordFromAi;
-
     if (!keyword) {
       const keywordMatch = message.match(/phim\s+(.+)/i);
       if (keywordMatch) {
@@ -459,7 +609,6 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
 
     if (keyword) {
       const regex = new RegExp(keyword, 'i');
-
       const movies = await Movie.find({
         $or: [{ name: regex }, { original_name: regex }, { slug: regex }],
       })
@@ -481,10 +630,7 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
     }
   }
 
-
-
-
-  // 6. Nếu có userId → lấy lịch sử/xem gần đây/yêu thích
+  // 7. User history & favorites
   if (userId) {
     const history = await UserHistory.find({ userId }).sort({ createdAt: -1 }).limit(10).lean();
     context.recentHistory = history.map((h) => ({
@@ -499,98 +645,39 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
   return context;
 }
 
-async function callGemini({ userQuery, dbContext, history = [] }) {
-  const contents = [
-    { role: 'model', parts: [{ text: SYSTEM_PROMPT }] },
-  ];
-
-  // Thêm lịch sử hội thoại nếu có (tối đa 10 tin nhắn gần nhất)
-  if (history && history.length > 0) {
-    history.slice(-10).forEach((msg) => {
-      contents.push({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }],
-      });
-    });
-  }
-
-  // Thêm câu hỏi hiện tại với DB context
-  contents.push({
-    role: 'user',
-    parts: [
-      {
-        text:
-          `[USER_QUERY]\n${userQuery}\n\n` +
-          `[DB_CONTEXT]\n${JSON.stringify(dbContext, null, 2)}`,
-      },
-    ],
-  });
-
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY chưa được cấu hình trong biến môi trường');
-  }
-
-  const res = await fetch(`${GEMINI_URL}:generateContent?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents }),
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error?.message || 'Gemini API error');
-  }
-
-  const rawText =
-    data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-    'Xin lỗi, mình chưa có câu trả lời phù hợp từ dữ liệu hiện tại.';
-
-  // Loại bỏ toàn bộ ký tự ** để tránh định dạng đậm không mong muốn
-  const answerText = rawText.replace(/\*\*/g, '');
-
-  return answerText;
-}
-
+// ============================================
+// MAIN HANDLER
+// ============================================
 async function handleChat({ userId, message, history, metadata, sessionId }) {
-  // 1. Tìm hoặc tạo chat session trong database
+  // 1. Load or create chat session
   let chatSession = null;
   try {
     chatSession = await Chat.findOrCreateSession({ userId, sessionId });
-    
-    // Nếu có lịch sử từ database, ưu tiên dùng lịch sử đó thay vì từ request
-    // Lấy 10 tin nhắn gần nhất để làm context
     if (chatSession && chatSession.messages.length > 0) {
-      history = chatSession.messages.slice(-10).map(msg => ({
+      history = chatSession.messages.slice(-10).map((msg) => ({
         role: msg.role,
         content: msg.content,
       }));
     } else if (!history || history.length === 0) {
-      // Nếu không có history từ DB và không có từ request, khởi tạo mảng rỗng
       history = [];
     }
-    // Nếu có history từ request và không có trong DB, giữ nguyên history từ request
   } catch (e) {
     console.error('Error loading chat session:', e);
-    // Tiếp tục xử lý ngay cả khi không load được session
-    // Nếu không có history từ request, khởi tạo mảng rỗng
     if (!history || history.length === 0) {
       history = [];
     }
   }
 
-  // 2. Lưu tin nhắn của user vào database
+  // 2. Save user message
   try {
     if (chatSession) {
       await chatSession.addMessage('user', message);
-      // Cập nhật metadata nếu có
       if (metadata) {
         const updatedMetadata = { ...chatSession.metadata, ...metadata };
-        // Convert movieId string to ObjectId nếu hợp lệ
         if (updatedMetadata.movieId && typeof updatedMetadata.movieId === 'string') {
           if (mongoose.Types.ObjectId.isValid(updatedMetadata.movieId)) {
             updatedMetadata.movieId = new mongoose.Types.ObjectId(updatedMetadata.movieId);
           } else {
-            // Nếu không hợp lệ, xóa movieId
             delete updatedMetadata.movieId;
           }
         }
@@ -602,21 +689,32 @@ async function handleChat({ userId, message, history, metadata, sessionId }) {
     console.error('Error saving user message:', e);
   }
 
-  // 3. Gemini phân loại intent + kiểu truy vấn chi tiết
+  // 3. Classify intent using OpenAI
   let intent = 'general';
   let classifier = null;
-  try {
-    // console.log('calling classifyIntentWithGemini...')
-    const cls = await classifyIntentWithGemini(message);
-    // console.log('classifyIntentWithGemini result =', cls);
-    intent = cls.intent || 'general';
-    classifier = cls;
-  } catch (e) {
-    // Nếu Gemini lỗi, fallback sang keyword
-    // console.error('classifyIntentWithGemini error =', e);
-    intent = detectIntentByKeyword(message);
+
+  const keywordIntent = detectIntentByKeyword(message);
+  const needsClassifier = keywordIntent === 'movie_info' && (message.length > 30 || message.match(/\b(top|hay nhất|trending|mới|mới cập nhật|thể loại|diễn viên|cast)\b/i));
+
+  if (needsClassifier) {
+    try {
+      classifier = await classifyIntentWithOpenRouter(message);
+      intent = classifier.intent || keywordIntent;
+    } catch (e) {
+      console.warn('⚠️ OpenRouter classifier failed, using keyword detection:', e.message);
+      intent = keywordIntent;
+      classifier = {
+        intent: keywordIntent,
+        queryType: 'other',
+        genre: null,
+        actor: null,
+        keyword: null,
+      };
+    }
+  } else {
+    intent = keywordIntent;
     classifier = {
-      intent,
+      intent: keywordIntent,
       queryType: 'other',
       genre: null,
       actor: null,
@@ -624,28 +722,46 @@ async function handleChat({ userId, message, history, metadata, sessionId }) {
     };
   }
 
-  // 4. Xây dựng DB context dựa trên intent
+  // 4. Build DB context
   let dbContext = {};
   if (intent === 'movie_info') {
     dbContext = await buildDbContextForMovieIntent({ userId, message, metadata, classifier });
-    // console.log('dbContext: ', dbContext);
   } else {
-    // Intent general → có thể không cần DB hoặc chỉ lấy một chút thông tin user
     dbContext = { note: 'general question, no movie-specific DB context' };
   }
 
-  // 5. Gọi Gemini để sinh câu trả lời
-  const answer = await callGemini({ userQuery: message, dbContext, history });
-  
-  // 6. Lưu câu trả lời của assistant vào database
+  // 5. Generate response using fallback chain
+  let answer;
+  try {
+    answer = await callLLMWithFallback({ userQuery: message, dbContext, history });
+  } catch (error) {
+    console.error('All LLM providers failed:', error.message);
+    const fallbackPrefix = 'Hiện tại hệ thống trợ lý AI đang quá tải hoặc gặp sự cố tạm thời, nên mình không thể trả lời chi tiết bằng AI.';
+
+    if (intent === 'movie_info') {
+      answer = `${fallbackPrefix} Tuy nhiên, bạn có thể thử:
+- Sử dụng thanh tìm kiếm để tìm tên phim hoặc thể loại bạn quan tâm.
+- Vào trang chủ để xem phim mới cập nhật, top phim hoặc phim đang hot.
+- Mở trang chi tiết phim để xem mô tả, diễn viên, đánh giá và bình luận.`;
+    } else {
+      answer = `${fallbackPrefix} Bạn có thể thử lại sau ít phút, hoặc sử dụng menu và thanh tìm kiếm trên CinePhile để tự tra cứu thông tin.`;
+    }
+  }
+
+  // 5.1. Format answer with HTML and movie links
+  answer = formatAnswerWithMovieLinks(answer, dbContext);
+
+  // 6. Save assistant response (save plain text version, not HTML)
+  const plainTextAnswer = answer.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
   try {
     if (chatSession) {
-      await chatSession.addMessage('assistant', answer);
+      await chatSession.addMessage('assistant', plainTextAnswer);
     }
   } catch (e) {
     console.error('Error saving assistant message:', e);
   }
 
+  // Return HTML formatted answer for frontend display
   return answer;
 }
 
