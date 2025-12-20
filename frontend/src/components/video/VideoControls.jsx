@@ -99,9 +99,9 @@ const VideoControls = ({
             >
               <div className="relative">
                 <i className="fa-solid fa-rotate-left text-white text-xs md:text-sm lg:text-base" />
-                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] md:text-[9px] lg:text-[10px] text-white font-bold">
+                {/* <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] md:text-[9px] lg:text-[10px] text-white font-bold">
                   10
-                </span>
+                </span> */}
               </div>
             </button>
           </Tooltip>
@@ -113,9 +113,9 @@ const VideoControls = ({
             >
               <div className="relative">
                 <i className="fa-solid fa-rotate-right text-white text-xs md:text-sm lg:text-base" />
-                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] md:text-[9px] lg:text-[10px] text-white font-bold">
+                {/* <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] md:text-[9px] lg:text-[10px] text-white font-bold">
                   10
-                </span>
+                </span> */}
               </div>
             </button>
           </Tooltip>
@@ -135,7 +135,7 @@ const VideoControls = ({
                 />
               </button>
             </Tooltip>
-            <div className="relative w-0 group-hover/volume:w-16 md:group-hover/volume:w-20 lg:group-hover/volume:w-24 h-1 md:h-1.5 transition-all duration-300">
+            <div className="relative w-0 hidden group-hover/volume:block group-hover/volume:w-16 md:group-hover/volume:w-20 lg:group-hover/volume:w-24 h-1 md:h-1.5 transition-all duration-300">
               <div className="absolute inset-0 bg-white/30 rounded-lg" />
               <div
                 className="absolute inset-y-0 left-0 bg-white rounded-lg"
