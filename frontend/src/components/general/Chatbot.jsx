@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "styles/Chatbot.css";
 import { getSystemInstruction } from "constants/chatbotKnowledge";
 
 const Chatbot = () => {
+  const navigate = useNavigate();
   const chatBodyRef = useRef(null);
   const messageInputRef = useRef(null);
   const sendMessageButtonRef = useRef(null);
@@ -119,11 +121,36 @@ const Chatbot = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
 
-      const answerText = (data.answer || "").trim();  // Lấy phần text từ answer
-      messageElement.innerText = answerText;
+      const answerHTML = (data.answer || "").trim();  // Lấy phần HTML từ answer
+      
+      // Render HTML instead of plain text
+      messageElement.innerHTML = answerHTML;
+      
+      // Add click handlers for movie links
+      const movieLinks = messageElement.querySelectorAll('.chatbot-movie-link');
+      movieLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const href = link.getAttribute('href');
+          if (href) {
+            // Use React Router navigate to keep chatbot state
+            navigate(href);
+          }
+        });
+        // Add hover effect
+        link.addEventListener('mouseenter', () => {
+          link.style.color = '#2563eb';
+        });
+        link.addEventListener('mouseleave', () => {
+          link.style.color = '#3b82f6';
+        });
+      });
+      
+      // Store plain text version for history (remove HTML tags)
+      const plainText = messageElement.textContent || messageElement.innerText || '';
       chatHistoryRef.current.push({
         role: "model",
-        parts: [{ text: answerText }],
+        parts: [{ text: plainText }],
       });
    
     } catch (error) {
@@ -213,11 +240,27 @@ const Chatbot = () => {
 
     const handleInput = (e) => {
       if (messageInputRef.current) {
-        messageInputRef.current.style.height = `${initialInputHeightRef.current}px`;
-        messageInputRef.current.style.height = `${messageInputRef.current.scrollHeight}px`;
+        const textarea = messageInputRef.current;
+        const initialHeight = initialInputHeightRef.current;
+        
+        // Reset height to calculate scrollHeight
+        textarea.style.height = `${initialHeight}px`;
+        const newHeight = textarea.scrollHeight;
+        textarea.style.height = `${newHeight}px`;
+        
+        // Toggle scrollbar class based on whether content exceeds 1 line
+        const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 20;
+        const hasMultipleLines = newHeight > initialHeight + lineHeight / 2;
+        
+        if (hasMultipleLines) {
+          textarea.classList.add('has-scroll');
+        } else {
+          textarea.classList.remove('has-scroll');
+        }
+        
         if (chatFormRef.current) {
           chatFormRef.current.style.borderRadius =
-            messageInputRef.current.scrollHeight > initialInputHeightRef.current ? "15px" : "32px";
+            newHeight > initialHeight ? "15px" : "32px";
         }
       }
     };
