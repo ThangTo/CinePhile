@@ -285,14 +285,45 @@ body.show-chatbot .chatbot-popup {
   resize: none;
   border: none;
   max-height: 180px;
-  scrollbar-width: thin;
+  scrollbar-width: none; /* Hide scrollbar by default */
+  -ms-overflow-style: none; /* IE and Edge */
   border-radius: inherit;
   font-size: 0.95rem;
   padding: 14px 0 12px 20px;
-  scrollbar-color: rgba(255, 216, 117, 0.3) transparent;
   font-family: "Inter", sans-serif;
   background: transparent;
   color: #e0e0e0;
+  overflow-y: hidden; /* Hide scrollbar by default */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.chat-form .message-input::-webkit-scrollbar {
+  display: none;
+}
+
+/* Show scrollbar only when content exceeds 1 line */
+.chat-form .message-input.has-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 216, 117, 0.3) transparent;
+  overflow-y: auto;
+}
+
+.chat-form .message-input.has-scroll::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.chat-form .message-input.has-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-form .message-input.has-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 216, 117, 0.3);
+  border-radius: 3px;
+}
+
+.chat-form .message-input.has-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 216, 117, 0.5);
 }
 
 .chat-form .message-input::placeholder {
@@ -460,4 +491,45 @@ body.show-emoji-picker .chat-form em-emoji-picker {
   .chat-form .file-upload-wrapper.file-uploaded #file-cancel {
     opacity: 1;
   }
+}
+
+/* Movie Links Styling */
+.chatbot-movie-link {
+  color: #3b82f6 !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.chatbot-movie-link:hover {
+  color: #2563eb !important;
+  transform: translateY(-1px);
+}
+
+.chatbot-movie-link:active {
+  color: #1d4ed8 !important;
+}
+
+/* Message text styling for HTML content */
+.message-text {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.message-text p {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.message-text a {
+  color: #3b82f6;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.message-text a:hover {
+  color: #2563eb;
 }

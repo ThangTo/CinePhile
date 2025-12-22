@@ -1,15 +1,17 @@
 const chatService = require('../services/chat.service');
+const Chat = require('../models/chat.model');
 
 const handleChat = async (req, res) => {
     try{
         const userId = req.user?._id || null;
-        const {message, history, metadata} = req.body;
+        const {message, history, metadata, sessionId} = req.body;
 
         const answer = await chatService.handleChat({
             userId, 
             message,
             history,
             metadata,
+            sessionId,
         });
         
         res.json({answer});
@@ -21,4 +23,64 @@ const handleChat = async (req, res) => {
     }
 };
 
-module.exports = {handleChat};
+// Lấy lịch sử chat của user
+const getChatHistory = async (req, res) => {
+    try {
+        const userId = req.user?._id || null;
+        const { sessionId } = req.query;
+        const { limit = 10 } = req.query;
+
+        if (!userId && !sessionId) {
+            return res.status(400).json({ message: 'userId or sessionId is required' });
+        }
+
+        const query = {};
+        if (userId) {
+            query.userId = userId;
+        } else if (sessionId) {
+            query.sessionId = sessionId;
+        }
+
+        const chats = await Chat.find(query)
+            .sort({ updatedAt: -1 })
+            .limit(parseInt(limit))
+            .lean();
+
+        res.json({ chats });
+    } catch (error) {
+        console.error('Get chat history error: ', error);
+        res.status(500).json({ 
+            message: error.message || "Get chat history error",
+        });
+    }
+};
+
+// Xóa lịch sử chat
+const clearChatHistory = async (req, res) => {
+    try {
+        const userId = req.user?._id || null;
+        const { sessionId } = req.body;
+
+        if (!userId && !sessionId) {
+            return res.status(400).json({ message: 'userId or sessionId is required' });
+        }
+
+        const query = {};
+        if (userId) {
+            query.userId = userId;
+        } else if (sessionId) {
+            query.sessionId = sessionId;
+        }
+
+        await Chat.updateMany(query, { isActive: false });
+
+        res.json({ message: 'Chat history cleared successfully' });
+    } catch (error) {
+        console.error('Clear chat history error: ', error);
+        res.status(500).json({ 
+            message: error.message || "Clear chat history error",
+        });
+    }
+};
+
+module.exports = {handleChat, getChatHistory, clearChatHistory};

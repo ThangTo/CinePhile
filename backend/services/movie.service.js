@@ -13,6 +13,67 @@ const {
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
 /**
+ * Remove Vietnamese accents/diacritics from a string
+ * Example: "phim việt" -> "phim viet"
+ */
+function removeVietnameseAccents(str) {
+  if (!str) return '';
+  
+  // Map Vietnamese characters with accents to without accents
+  const accentsMap = {
+    'à': 'a', 'á': 'a', 'ạ': 'a', 'ả': 'a', 'ã': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ậ': 'a', 'ẩ': 'a', 'ẫ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ặ': 'a', 'ẳ': 'a', 'ẵ': 'a',
+    'è': 'e', 'é': 'e', 'ẹ': 'e', 'ẻ': 'e', 'ẽ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ệ': 'e', 'ể': 'e', 'ễ': 'e',
+    'ì': 'i', 'í': 'i', 'ị': 'i', 'ỉ': 'i', 'ĩ': 'i',
+    'ò': 'o', 'ó': 'o', 'ọ': 'o', 'ỏ': 'o', 'õ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ộ': 'o', 'ổ': 'o', 'ỗ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ợ': 'o', 'ở': 'o', 'ỡ': 'o',
+    'ù': 'u', 'ú': 'u', 'ụ': 'u', 'ủ': 'u', 'ũ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ự': 'u', 'ử': 'u', 'ữ': 'u',
+    'ỳ': 'y', 'ý': 'y', 'ỵ': 'y', 'ỷ': 'y', 'ỹ': 'y',
+    'đ': 'd',
+    'À': 'A', 'Á': 'A', 'Ạ': 'A', 'Ả': 'A', 'Ã': 'A',
+    'Â': 'A', 'Ầ': 'A', 'Ấ': 'A', 'Ậ': 'A', 'Ẩ': 'A', 'Ẫ': 'A',
+    'Ă': 'A', 'Ằ': 'A', 'Ắ': 'A', 'Ặ': 'A', 'Ẳ': 'A', 'Ẵ': 'A',
+    'È': 'E', 'É': 'E', 'Ẹ': 'E', 'Ẻ': 'E', 'Ẽ': 'E',
+    'Ê': 'E', 'Ề': 'E', 'Ế': 'E', 'Ệ': 'E', 'Ể': 'E', 'Ễ': 'E',
+    'Ì': 'I', 'Í': 'I', 'Ị': 'I', 'Ỉ': 'I', 'Ĩ': 'I',
+    'Ò': 'O', 'Ó': 'O', 'Ọ': 'O', 'Ỏ': 'O', 'Õ': 'O',
+    'Ô': 'O', 'Ồ': 'O', 'Ố': 'O', 'Ộ': 'O', 'Ổ': 'O', 'Ỗ': 'O',
+    'Ơ': 'O', 'Ờ': 'O', 'Ớ': 'O', 'Ợ': 'O', 'Ở': 'O', 'Ỡ': 'O',
+    'Ù': 'U', 'Ú': 'U', 'Ụ': 'U', 'Ủ': 'U', 'Ũ': 'U',
+    'Ư': 'U', 'Ừ': 'U', 'Ứ': 'U', 'Ự': 'U', 'Ử': 'U', 'Ữ': 'U',
+    'Ỳ': 'Y', 'Ý': 'Y', 'Ỵ': 'Y', 'Ỷ': 'Y', 'Ỹ': 'Y',
+    'Đ': 'D',
+  };
+  
+  return str
+    .split('')
+    .map(char => accentsMap[char] || char)
+    .join('');
+}
+
+/**
+ * Create regex pattern that matches both accented and non-accented Vietnamese text
+ * Example: "phim việt" -> /phim\s+vi[eệ]t/i (matches both "phim việt" and "phim viet")
+ */
+function createVietnameseRegex(pattern) {
+  if (!pattern) return null;
+  
+  // Normalize pattern to remove accents for regex building
+  const normalized = removeVietnameseAccents(pattern.toLowerCase());
+  
+  // Escape special regex characters
+  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
+  // Create regex that matches both accented and non-accented versions
+  // This is a simplified approach - for exact matching, we'll use $or with both versions
+  return new RegExp(escaped, 'i');
+}
+
+/**
  * Helper: convert mongoose document to plain object with string id
  */
 const toPlain = (doc) => {
@@ -69,8 +130,9 @@ const mapComment = (comment) => {
 
 /**
  * Helper: build Mongo filters from query params
+ * Uses MongoDB $text search (BM25-like) for better relevance scoring
  */
-const buildQuery = (filters = {}) => {
+const buildQuery = (filters = {}, useTextSearch = true) => {
   const query = {};
   if (filters.genre) {
     // Support both 'categories.slug' and 'genres' for backward compatibility
@@ -86,10 +148,40 @@ const buildQuery = (filters = {}) => {
     query.totalEpisodes = { $gt: 1 };
   }
   if (filters.year) query.year = Number(filters.year);
+  
   if (filters.q) {
-    const regex = new RegExp(filters.q, 'i');
-    // Search in DB fields: name (title), original_name (englishTitle), slug
-    query.$or = [{ name: regex }, { original_name: regex }, { slug: regex }];
+    const searchQuery = filters.q.trim();
+    if (searchQuery) {
+      // Normalize Vietnamese accents for accent-insensitive search
+      const normalizedQuery = removeVietnameseAccents(searchQuery);
+      const hasAccents = normalizedQuery.toLowerCase() !== searchQuery.toLowerCase();
+      
+      // Escape special regex characters
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      if (useTextSearch) {
+        // MongoDB $text search doesn't handle Vietnamese accents well
+        // We need to use aggregation with $facet to combine $text search with regex
+        // But for simplicity, we'll use normalized query for $text search
+        // and add regex fallback in the search function itself
+        query.$text = { $search: normalizedQuery };
+      } else {
+        // Regex search - support both accented and non-accented Vietnamese
+        // Create regex patterns for both original and normalized queries
+        const regexOriginal = new RegExp(escapeRegex(searchQuery), 'i');
+        const regexNormalized = new RegExp(escapeRegex(normalizedQuery), 'i');
+        
+        // Always search with both versions to match both accented and non-accented text in DB
+        query.$or = [
+          { name: regexOriginal },
+          { name: regexNormalized },
+          { original_name: regexOriginal },
+          { original_name: regexNormalized },
+          { slug: regexOriginal },
+          { slug: regexNormalized }
+        ];
+      }
+    }
   }
   return query;
 };
@@ -244,12 +336,185 @@ const getFilterOptions = async () => {
 };
 
 /**
- * Search movies
+ * Search movies using MongoDB $text search (BM25) for relevance scoring
+ * Combines BM25 scoring with accent-insensitive regex matching
+ * Falls back to regex search if text index is not available
  */
 const search = async (q, pagination = {}) => {
-  const builder = Movie.find(buildQuery({ q })).sort({ createdAt: -1 });
-  const result = await paginate(builder, pagination);
-  return transformPaginatedResult(result);
+  const searchQuery = (q || '').trim();
+  if (!searchQuery) {
+    // Empty query: return all movies sorted by createdAt
+    const builder = Movie.find(buildQuery({ q: '' }, false)).sort({ createdAt: -1 });
+    const result = await paginate(builder, pagination);
+    return transformPaginatedResult(result);
+  }
+
+  const { page = 1, limit = 12 } = pagination;
+  const currentPage = Math.max(parseInt(page, 10) || 1, 1);
+  const perPage = Math.max(parseInt(limit, 10) || 12, 1);
+  const skip = (currentPage - 1) * perPage;
+
+  // Normalize query for accent-insensitive search
+  const normalizedQuery = removeVietnameseAccents(searchQuery);
+  
+  // Build base query (filters without search)
+  const baseQuery = buildQuery({ q: '' }, false);
+  
+  // Escape regex special characters
+  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regexOriginal = new RegExp(escapeRegex(searchQuery), 'i');
+  const regexNormalized = new RegExp(escapeRegex(normalizedQuery), 'i');
+
+  // Try to use BM25 ($text search) with accent-insensitive support
+  // Since $text search doesn't handle accents well, we'll search with both original and normalized
+  try {
+    // Try BM25 search with both original query (có dấu) and normalized query (không dấu)
+    // This ensures we match both accented and non-accented text in DB
+    const textQueries = [];
+    
+    // If query has accents, try both versions
+    if (normalizedQuery.toLowerCase() !== searchQuery.toLowerCase()) {
+      // Query has accents - try both original and normalized
+      textQueries.push(
+        { ...baseQuery, $text: { $search: searchQuery } },      // Original (có dấu)
+        { ...baseQuery, $text: { $search: normalizedQuery } }   // Normalized (không dấu)
+      );
+    } else {
+      // No accents - just use normalized
+      textQueries.push({ ...baseQuery, $text: { $search: normalizedQuery } });
+    }
+
+    // Get BM25 results from all text queries
+    const allTextResults = [];
+    const allTextIds = new Set();
+    
+    for (const textQuery of textQueries) {
+      try {
+        const textPipeline = [
+          {
+            $match: textQuery
+          },
+          {
+            $addFields: {
+              textScore: { $meta: 'textScore' }
+            }
+          },
+          {
+            $sort: {
+              textScore: -1,
+              createdAt: -1
+            }
+          },
+          {
+            $limit: perPage * 2
+          }
+        ];
+
+        const results = await Movie.aggregate(textPipeline);
+        results.forEach(movie => {
+          const id = movie._id.toString();
+          if (!allTextIds.has(id)) {
+            allTextIds.add(id);
+            allTextResults.push({
+              ...movie,
+              relevanceScore: 100 + (movie.textScore || 0) * 10,
+              matchType: 'bm25'
+            });
+          } else {
+            // Update if this result has higher score
+            const existing = allTextResults.find(r => r._id.toString() === id);
+            if (existing && (movie.textScore || 0) > (existing.textScore || 0)) {
+              existing.textScore = movie.textScore;
+              existing.relevanceScore = 100 + (movie.textScore || 0) * 10;
+            }
+          }
+        });
+      } catch (textError) {
+        // Continue with next query if this one fails
+        console.warn(`Text search failed for query: ${textError.message}`);
+      }
+    }
+
+    // Sort BM25 results by score
+    allTextResults.sort((a, b) => {
+      if (b.relevanceScore !== a.relevanceScore) {
+        return b.relevanceScore - a.relevanceScore;
+      }
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    // Get regex results for accent-insensitive matching (excluding BM25 matches)
+    const regexQuery = {
+      ...baseQuery,
+      $or: [
+        { name: regexOriginal },
+        { name: regexNormalized },
+        { original_name: regexOriginal },
+        { original_name: regexNormalized },
+        { slug: regexOriginal },
+        { slug: regexNormalized }
+      ],
+      _id: { $nin: Array.from(allTextIds).map(id => new mongoose.Types.ObjectId(id)) }
+    };
+
+    const regexResults = await Movie.find(regexQuery)
+      .sort({ createdAt: -1 })
+      .limit(perPage)
+      .lean();
+
+    // Combine and score results
+    const allResults = [...allTextResults];
+
+    // Add regex matches with lower score
+    regexResults.forEach(movie => {
+      allResults.push({
+        ...movie,
+        relevanceScore: 10, // Lower score for regex matches
+        matchType: 'regex'
+      });
+    });
+
+    // Sort by relevance score
+    const sortedResults = allResults.sort((a, b) => {
+      if (b.relevanceScore !== a.relevanceScore) {
+        return b.relevanceScore - a.relevanceScore;
+      }
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    // Paginate
+    const paginatedResults = sortedResults.slice(skip, skip + perPage);
+    
+    // Count total
+    const [textCount, regexCount] = await Promise.all([
+      Promise.all(textQueries.map(q => Movie.countDocuments(q))).then(counts => 
+        counts.reduce((sum, count) => sum + count, 0)
+      ),
+      Movie.countDocuments(regexQuery)
+    ]);
+    
+    // Approximate total (may have some overlap between text queries)
+    const total = Math.max(textCount, allTextIds.size) + regexCount;
+
+    return {
+      data: transformMovies(paginatedResults),
+      pagination: {
+        page: currentPage,
+        limit: perPage,
+        total,
+        totalPages: Math.max(Math.ceil(total / perPage), 1),
+      },
+    };
+
+  } catch (error) {
+    // Fallback to regex search if $text search fails (e.g., no text index)
+    console.warn('BM25 search failed, falling back to regex:', error.message);
+    
+    const fallbackQuery = buildQuery({ q }, false);
+    const builder = Movie.find(fallbackQuery).sort({ createdAt: -1 });
+    const result = await paginate(builder, pagination);
+    return transformPaginatedResult(result);
+  }
 };
 
 /**

@@ -6,7 +6,7 @@ import { groupSeriesMovies } from "utils/seriesGrouping";
 import OptimizedImage from "components/common/OptimizedImage";
 
 const MIN_QUERY_LENGTH = 2;
-const DEBOUNCE_DELAY = 400;
+const DEBOUNCE_DELAY = 300;
 
 const SearchBar = ({ className = "", placeholder = "Tìm kiếm phim, diễn viên..." }) => {
   const navigate = useNavigate();

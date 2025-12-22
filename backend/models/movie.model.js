@@ -64,7 +64,16 @@ const movieSchema = new mongoose.Schema({
     timestamps: true 
 });
 
-movieSchema.index({ name: 'text', original_name: 'text' });
+// Text index for full-text search (BM25 relevance scoring)
+// Weight: name (Vietnamese) = 20, original_name (English) = 5, slug = 1
+// This prioritizes Vietnamese titles over English titles in search results
+movieSchema.index(
+  { name: 'text', original_name: 'text', slug: 'text' },
+  { 
+    weights: { name: 20, original_name: 5, slug: 1 },
+    name: 'movie_text_index'
+  }
+);
 movieSchema.index({ "categories.slug": 1 });
 
 const Movie = mongoose.model('Movie', movieSchema);
