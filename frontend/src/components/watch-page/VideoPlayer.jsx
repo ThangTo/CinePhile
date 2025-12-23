@@ -4,6 +4,9 @@ import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
 import VideoOverlays from "../video/VideoOverlays";
 import VideoControls from "../video/VideoControls";
+import useToast from "hooks/useToast";
+import ToastContainer from "../common/ToastContainer";
+import PremiumRequiredModal from "../common/PremiumRequiredModal";
 
 const VideoPlayer = ({
   movie,
@@ -33,13 +36,17 @@ const VideoPlayer = ({
   const [currentActualQuality, setCurrentActualQuality] = useState(null); // Chất lượng thực tế đang phát
   const [bufferedPercentage, setBufferedPercentage] = useState(0); // Phần trăm video đã buffered
   const [hasAutoPlayed, setHasAutoPlayed] = useState(false); // Đánh dấu đã auto-play chưa
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   // Check user role and premium status
   const { user } = useAuth();
   const isPremium =
     user?.isPremium === true || user?.premium === true || user?.subscription === "premium";
   const isAdmin = user?.role === "admin";
-  const isRegularUser = user && !isPremium && !isAdmin;
+  const isRegularUser = !isPremium && !isAdmin;
+  
+  const { toasts, showToast, removeToast } = useToast();
+
 
   const videoRef = useRef(null);
   const containerRef = useRef(null);
@@ -765,46 +772,52 @@ const VideoPlayer = ({
   // Helper: Get maximum allowed quality based on user role
   const getMaxAllowedQuality = useCallback(() => {
     if (!availableLevels || availableLevels.length === 0) return null;
-    
+
     // Sort levels by height descending
-    const sortedLevels = [...availableLevels]
-      .map(l => l?.height)
-      .filter(Boolean)
-      .sort((a, b) => b - a);
-    
+    // const sortedLevels = [...availableLevels]
+    //   .map((l) => l?.height)
+    //   .filter(Boolean)
+    //   .sort((a, b) => b - a);
+    const sortedLevels = [1080, 720, 480, 360];
+
     if (sortedLevels.length === 0) return null;
-    
+
     const highestQuality = sortedLevels[0];
-    
+
     // Premium và Admin: có thể xem chất lượng cao nhất
     if (isPremium || isAdmin) {
       return highestQuality;
     }
-    
+
     // User thường: chỉ xem được chất lượng thấp hơn 1 bậc
     if (isRegularUser && sortedLevels.length > 1) {
       return sortedLevels[1]; // Bậc thứ 2 (thấp hơn cao nhất 1 bậc)
     }
-    
+
     // Fallback: nếu chỉ có 1 level, user thường vẫn xem được
     return sortedLevels[0];
   }, [availableLevels, isPremium, isAdmin, isRegularUser]);
 
   // Helper: Check if quality requires premium
-  const isQualityPremium = useCallback((qualityStr) => {
-    if (qualityStr === "Auto") return false;
-    const height = parseInt(qualityStr.replace("p", ""), 10);
-    if (isNaN(height)) return false;
-    
-    const maxAllowed = getMaxAllowedQuality();
-    if (!maxAllowed) return false;
-    
-    // Premium và Admin: có thể xem tất cả
-    if (isPremium || isAdmin) return false;
-    
-    // User thường: chỉ xem được chất lượng <= maxAllowed
-    return height > maxAllowed;
-  }, [getMaxAllowedQuality, isPremium, isAdmin]);
+  const isQualityPremium = useCallback(
+    (qualityStr) => {
+      if (qualityStr === "Auto") return false;
+      const height = parseInt(qualityStr.replace("p", ""), 10);
+      if (isNaN(height)) return false;
+
+      const maxAllowed = getMaxAllowedQuality();
+      if (!maxAllowed) return false;
+
+      // console.log(isAdmin + " " + isPremium + " " + maxAllowed + " " + height);
+
+      // Premium và Admin: có thể xem tất cả
+      if (isPremium || isAdmin) return false;
+
+      // User thường: chỉ xem được chất lượng <= maxAllowed
+      return height > maxAllowed;
+    },
+    [getMaxAllowedQuality, isPremium, isAdmin]
+  );
 
   // Apply quality level to HLS instance
   const applyQualityLevel = useCallback((hls, qualityStr) => {
@@ -822,7 +835,7 @@ const VideoPlayer = ({
     if (qualityStr === "Auto") {
       // Auto mode logic based on user role
       const maxAllowed = getMaxAllowedQuality();
-      
+
       if (isAdmin) {
         // Admin: chất lượng cao nhất
         hls.currentLevel = -1; // Auto (HLS sẽ chọn cao nhất)
@@ -831,7 +844,7 @@ const VideoPlayer = ({
         hls.currentLevel = -1; // Auto
       } else if (isRegularUser && maxAllowed) {
         // User thường: chất lượng cao nhất có thể nhưng thấp hơn premium 1 bậc
-        const levelIndex = hls.levels.findIndex(l => l?.height === maxAllowed);
+        const levelIndex = hls.levels.findIndex((l) => l?.height === maxAllowed);
         if (levelIndex >= 0) {
           hls.currentLevel = levelIndex;
         } else {
@@ -841,7 +854,7 @@ const VideoPlayer = ({
         // Fallback: auto
         hls.currentLevel = -1;
       }
-      
+
       // Force reload để áp dụng ngay
       if (hls.media && hls.media.readyState >= 2) {
         hls.startLoad();
@@ -853,12 +866,14 @@ const VideoPlayer = ({
     if (levelIndex >= 0 && levelIndex < hls.levels.length) {
       const selectedLevel = hls.levels[levelIndex];
       const selectedHeight = selectedLevel?.height;
-      
+
       // Validate: User thường không được xem chất lượng cao hơn maxAllowed
       if (isRegularUser && maxAllowed && selectedHeight > maxAllowed) {
-        console.warn(`⚠️ User thường không thể xem chất lượng ${selectedHeight}p, giới hạn là ${maxAllowed}p`);
+        console.warn(
+          `⚠️ User thường không thể xem chất lượng ${selectedHeight}p, giới hạn là ${maxAllowed}p`
+        );
         // Tìm level phù hợp với maxAllowed
-        const allowedLevelIndex = hls.levels.findIndex(l => l?.height === maxAllowed);
+        const allowedLevelIndex = hls.levels.findIndex((l) => l?.height === maxAllowed);
         if (allowedLevelIndex >= 0) {
           hls.currentLevel = allowedLevelIndex;
         } else {
@@ -871,7 +886,7 @@ const VideoPlayer = ({
           hls.currentLevel = levelIndex;
         }
       }
-      
+
       // Force reload để áp dụng quality mới ngay lập tức
       if (hls.media && hls.media.readyState >= 2) {
         hls.startLoad();
@@ -891,7 +906,9 @@ const VideoPlayer = ({
   const handleQualityChange = (newQuality) => {
     // Check premium requirement
     if (isQualityPremium(newQuality) && !isPremium) {
-      console.warn("⚠️ Chất lượng này yêu cầu tài khoản Premium");
+      setShowPremiumModal(true);
+      setShowQualityMenu(false);
+      setShowMoreMenu(false);
       return;
     }
 
@@ -1163,6 +1180,11 @@ const VideoPlayer = ({
         showMoreMenu={showMoreMenu}
         onToggleMoreMenu={() => setShowMoreMenu(!showMoreMenu)}
         setShowMoreMenu={setShowMoreMenu}
+      />
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <PremiumRequiredModal 
+        isOpen={showPremiumModal} 
+        onClose={() => setShowPremiumModal(false)} 
       />
     </div>
   );
