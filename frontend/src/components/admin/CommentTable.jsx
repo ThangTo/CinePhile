@@ -14,69 +14,24 @@ const CommentTable = () => {
     limit: 10,
   });
 
-  // Mock data to match the screenshot
-  const MOCK_COMMENTS = [
-    {
-      id: 1,
-      content: "Cảnh quay đẹp mắt, âm nhạc du dương, nội dung hấp dẫn. Đáng...",
-      fullContent: "Cảnh quay đẹp mắt, âm nhạc du dương, nội dung hấp dẫn. Đáng xem!",
-      flag: "spoiler",
-      user: { name: "Nguyễn Văn A", role: "Minh Anh" }, // "Bởi: Minh Anh" interpretation
-      reason: "Tiết lộ nội dung phim (spoiler)",
-      status: "pending",
-      createdAt: "15:30:00 10/1/2025",
-    },
-    {
-      id: 2,
-      content: "phim hay nhất của năm, xem xong rồi lụy phim quá :(( phải lưu một c...",
-      fullContent: "phim hay nhất của năm, xem xong rồi lụy phim quá :(( phải lưu một cái ảnh làm kỷ niệm.",
-      flag: "toxic",
-      user: { name: "ngocahri11", role: "Bao Ha" },
-      reason: "Ngôn từ độc hại / xúc phạm",
-      status: "banned",
-      createdAt: "17:15:00 12/1/2025",
-    },
-    {
-      id: 3,
-      content: "Cảnh đánh võ đỉnh cao, biên đạo võ thuật xuất sắc!",
-      fullContent: "Cảnh đánh võ đỉnh cao, biên đạo võ thuật xuất sắc!",
-      flag: "spam",
-      user: { name: "Hải Yến", role: "Admin" },
-      reason: "Spam / Quảng cáo",
-      status: "dismissed",
-      createdAt: "16:00:00 13/1/2025",
-    },
-  ];
+
 
   const loadComments = async (page = 1, status = "all") => {
     setIsLoading(true);
     try {
-      // Try to fetch from API
-      // const response = await commentAPI.getAll({ page, limit: 10, status: status !== 'all' ? status : undefined });
-      // if (response.data) {
-      //   setComments(response.data);
-      //   setPagination(response.pagination);
-      // }
-      
-      // FOR DEMO: Use MOCK_COMMENTS if API fails or logic requires demo first
-      // Simulating API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      let filtered = [...MOCK_COMMENTS];
-      if (status !== "all") {
-        filtered = filtered.filter(c => c.status === status);
+      const response = await commentAPI.getAll({ page, limit: 10, status: status !== 'all' ? status : undefined });
+      if (response && response.data) {
+        setComments(response.data);
+        setPagination({
+          currentPage: response.pagination.page,
+          totalPages: response.pagination.totalPages,
+          totalItems: response.pagination.totalItems,
+          limit: response.pagination.limit
+        });
       }
-      setComments(filtered);
-      setPagination({
-        currentPage: 1,
-        totalPages: 1,
-        totalItems: filtered.length,
-        limit: 10,
-      });
-
     } catch (err) {
-      console.error("API Error, using mock data", err);
-      // Fallback to mock data on error is handled above basically by just using mock data directly
+      console.error("API Error", err);
+      setError("Không thể tải danh sách bình luận");
     } finally {
       setIsLoading(false);
     }
@@ -89,8 +44,8 @@ const CommentTable = () => {
   const handleStatusUpdate = async (id, newStatus) => {
     setIsLoading(true);
     try {
-      // await commentAPI.updateStatus(id, newStatus);
-      // Update local state
+      await commentAPI.updateStatus(id, newStatus);
+      // Update local state to reflect change immediately or reload
       setComments(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
     } catch (err) {
       setError("Không thể cập nhật trạng thái: " + err.message);
@@ -103,7 +58,7 @@ const CommentTable = () => {
     if (!window.confirm("Bạn có chắc muốn xóa bình luận này vĩnh viễn?")) return;
     setIsLoading(true);
     try {
-      // await commentAPI.delete(id);
+      await commentAPI.delete(id);
       setComments(prev => prev.filter(c => c.id !== id));
     } catch (err) {
       setError("Không thể xóa bình luận: " + err.message);

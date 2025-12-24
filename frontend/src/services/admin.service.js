@@ -193,7 +193,7 @@ export const commentAPI = {
       params,
       requiresAuth: true,
     });
-    return Array.isArray(response) ? response : response.data || response;
+    return response; // Return full response to get pagination
   },
 
   /**

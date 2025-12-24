@@ -652,6 +652,13 @@ const getComments = async (identifier, filters = {}) => {
 /**
  * Create new comment (requires auth)
  */
+const moderationService = require('./moderation.service');
+
+// ...
+
+/**
+ * Create new comment (requires auth)
+ */
 const postComment = async (identifier, userId, data = {}) => {
   if (!userId) {
     throw new Error('Authentication required');
@@ -663,14 +670,34 @@ const postComment = async (identifier, userId, data = {}) => {
   if (!movieDoc) {
     throw new Error('Movie not found');
   }
+
+  // AI Moderation Check
+  let moderationResult = { flag: null, reason: null };
+  let status = 'allowed';
+
+  try {
+    moderationResult = await moderationService.checkComment(data.content);
+    if (moderationResult.flag) {
+      status = 'pending';
+    }
+  } catch (e) {
+    console.error('Moderation check failed, proceeding as allowed', e);
+  }
+
   const comment = await Comment.create({
     movieId: movieDoc._id,
     userId,
     content: data.content,
     episodeId: data.episodeId || null,
+    flag: moderationResult.flag,
+    flagReason: moderationResult.reason,
+    status: status
   });
   const populated = await comment.populate('userId', 'username avatar');
-  return mapComment(populated);
+  
+  // Only map if allowed (technically frontend should handle hiding pending, but API usually returns created object)
+  // We return it, frontend will see status=pending and might show "Pending approval" message
+  return mapComment({ ...populated.toObject(), status }); 
 };
 
 /**

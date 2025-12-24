@@ -31,6 +31,20 @@ const commentSchema = new mongoose.Schema({
     type: Number, 
     default: 0 
   },
+  // AI Moderation fields
+  flag: {
+    type: String, // e.g., 'spam', 'toxic', 'spoiler'
+    default: null
+  },
+  flagReason: {
+    type: String,
+    default: null
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'allowed', 'banned', 'dismissed'],
+    default: 'allowed'
+  },
 }, { 
   timestamps: true // Tự động thêm createdAt và updatedAt
 });
