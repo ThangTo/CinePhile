@@ -118,12 +118,7 @@ const CommentTable = () => {
         >
           Chờ duyệt
         </button>
-        <button 
-           onClick={() => setFilterStatus("banned")}
-           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterStatus === "banned" ? "bg-red-500/20 text-red-500" : "text-gray-400 hover:text-red-500"}`}
-        >
-          Đã chặn
-        </button>
+
       </div>
 
       {/* Table */}
@@ -192,7 +187,7 @@ const CommentTable = () => {
                       Cho phép
                     </button>
                     <button
-                      onClick={() => handleStatusUpdate(comment.id, "banned")}
+                      onClick={() => handleDelete(comment.id)}
                       className="px-3 py-1.5 rounded bg-red-500/20 text-red-500 hover:bg-red-500/30 text-xs font-semibold transition-colors"
                     >
                       Khoá
