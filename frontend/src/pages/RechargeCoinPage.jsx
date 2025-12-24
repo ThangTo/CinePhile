@@ -94,7 +94,7 @@ const RechargeCoinPage = () => {
       setError(null);
       
       // Call Backend to Create Payment Link
-      const response = await fetch("http://localhost:5000/api/v1/create-payment-link", {
+      const response = await fetch("https://cinephine-server.up.railway.app/api/v1/create-payment-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
