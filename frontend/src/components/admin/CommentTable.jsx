@@ -71,28 +71,28 @@ const CommentTable = () => {
     switch (status) {
       case "pending":
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-500">
+          <span className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-500 min-w-[100px]">
             <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
             pending
           </span>
         );
       case "banned":
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-500">
+          <span className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-500 min-w-[100px]">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             banned
           </span>
         );
       case "dismissed":
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-400">
+          <span className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-400 min-w-[100px]">
             <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
             dismissed
           </span>
         );
       case "allowed": // 'Accepted' in spec, maybe 'active' or 'allowed'
          return (
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-500">
+          <span className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-500 min-w-[100px]">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
             allowed
           </span>
@@ -182,21 +182,21 @@ const CommentTable = () => {
                   <div className="flex items-center justify-end gap-2">
                     <button
                       onClick={() => handleStatusUpdate(comment.id, "allowed")}
-                      className="px-3 py-1.5 rounded bg-green-500/20 text-green-500 hover:bg-green-500/30 text-xs font-semibold transition-colors"
+                      className="px-3 py-1.5 rounded bg-green-500/20 text-green-500 hover:bg-green-500/30 text-xs font-semibold transition-colors min-w-[80px] justify-center"
                     >
                       Cho phép
                     </button>
                     <button
                       onClick={() => handleDelete(comment.id)}
-                      className="px-3 py-1.5 rounded bg-red-500/20 text-red-500 hover:bg-red-500/30 text-xs font-semibold transition-colors"
+                      className="px-3 py-1.5 rounded bg-red-500/20 text-red-500 hover:bg-red-500/30 text-xs font-semibold transition-colors min-w-[80px] justify-center"
                     >
                       Khoá
                     </button>
                     <button
                        onClick={() => handleStatusUpdate(comment.id, "dismissed")}
-                       className="px-3 py-1.5 rounded bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 text-xs font-semibold transition-colors"
+                       className="px-3 py-1.5 rounded bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 text-xs font-semibold transition-colors min-w-[80px] justify-center"
                     >
-                      Bỏ qua
+                      Ẩn
                     </button>
 
 

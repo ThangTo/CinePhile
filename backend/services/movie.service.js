@@ -629,13 +629,13 @@ const getComments = async (identifier, filters = {}) => {
   const skip = (currentPage - 1) * perPage;
 
   const [rows, total] = await Promise.all([
-    Comment.find({ movieId: movieDoc._id })
+    Comment.find({ movieId: movieDoc._id, status: 'allowed' })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(perPage)
       .populate('userId', 'username avatar')
       .lean(),
-    Comment.countDocuments({ movieId: movieDoc._id }),
+    Comment.countDocuments({ movieId: movieDoc._id, status: 'allowed' }),
   ]);
 
   return {
