@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import MovieTable from "components/admin/MovieTable";
 import UserTable from "components/admin/UserTable";
+import CommentTable from "components/admin/CommentTable";
 import AdminSidebar from "components/admin/AdminSidebar";
 import AdminOverviewTab from "components/admin/AdminOverviewTab";
 import AdminNotificationTab from "components/admin/AdminNotificationTab";
@@ -25,6 +26,13 @@ const AdminDashboard = () => {
           <div className="animate-fade-in">
             <h1 className="text-2xl font-bold text-white mb-6">Quản Lý Người Dùng</h1>
             <UserTable />
+          </div>
+        );
+      case ADMIN_TABS.COMMENTS:
+        return (
+          <div className="animate-fade-in">
+            <h1 className="text-2xl font-bold text-white mb-6">Quản Lý Bình Luận</h1>
+            <CommentTable />
           </div>
         );
       case ADMIN_TABS.NOTIFICATIONS:

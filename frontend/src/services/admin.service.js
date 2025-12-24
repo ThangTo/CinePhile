@@ -177,10 +177,59 @@ export const userAPI = {
   },
 };
 
+// ... (previous code)
+
+/**
+ * Comments API
+ */
+export const commentAPI = {
+  /**
+   * Get all comments with pagination and filters
+   * @param {Object} params - { page?, limit?, search?, status? }
+   * @returns {Promise<Array>} Array of comments
+   */
+  getAll: async (params = {}) => {
+    const response = await apiRequest("/admin/comments", {
+      params,
+      requiresAuth: true,
+    });
+    return response; // Return full response to get pagination
+  },
+
+  /**
+   * Delete comment
+   * @param {string|number} id - Comment ID
+   * @returns {Promise<Object>} { success: true }
+   */
+  delete: async (id) => {
+    const response = await apiRequest(`/admin/comments/${id}`, {
+      method: "DELETE",
+      requiresAuth: true,
+    });
+    return response.data || response || { success: true };
+  },
+
+  /**
+   * Update comment status (allow, ban, dismiss)
+   * @param {string|number} id - Comment ID
+   * @param {string} status - New status
+   * @returns {Promise<Object>} Updated comment object
+   */
+  updateStatus: async (id, status) => {
+    const response = await apiRequest(`/admin/comments/${id}/status`, {
+      method: "PATCH",
+      data: { status },
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+};
+
 /**
  * Stats API
  */
 export const statsAPI = {
+// ... (rest of the file)
   /**
    * Get dashboard statistics
    * @returns {Promise<Object>} Stats object
