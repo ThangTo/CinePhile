@@ -1,5 +1,5 @@
-const { PayOS } = require("@payos/node");
-const User = require("../models/user.model");
+const { PayOS } = require('@payos/node');
+const User = require('../models/user.model');
 
 const payOS = new PayOS({
   clientId: process.env.PAYOS_CLIENT_ID,
@@ -14,7 +14,7 @@ const createPaymentLink = async (userId, amount) => {
   const YOUR_DOMAIN = process.env.CLIENT_URL || 'https://decent-normally-bedbug.ngrok-free.app';
 
   if (!userId || !amount) {
-    throw new Error("Missing userId or amount");
+    throw new Error('Missing userId or amount');
   }
 
   const orderCode = Number(String(Date.now()).slice(-6));
@@ -23,21 +23,21 @@ const createPaymentLink = async (userId, amount) => {
   const body = {
     orderCode: orderCode,
     amount: money,
-    description: "Thanh toan don hang",
+    description: 'Thanh toan don hang',
     returnUrl: `${YOUR_DOMAIN}`,
     cancelUrl: `${YOUR_DOMAIN}`,
   };
 
   const user = await User.findById(userId);
   if (!user) {
-    throw new Error("User not found");
+    throw new Error('User not found');
   }
 
   // 1. Store request in memory instead of updating coins immediately
   pendingRequests.set(orderCode, {
     userId: userId,
     amount: parseInt(amount), // Original coin amount
-    status: 'PENDING'
+    status: 'PENDING',
   });
   // console.log(`[Payment] Created pending request for Order ${orderCode}, User ${userId}, Amount ${amount}`);
 
@@ -51,10 +51,10 @@ const createPaymentLink = async (userId, amount) => {
 
 const handleWebhook = async (webhookData) => {
   // console.log("[Webhook] Received webhook data");
+  console.log('webhookData', webhookData);
 
-  
   // 2. Check if succeed
-  if (webhookData.code === "00" && webhookData.success === true) {
+  if (webhookData.code === '00' && webhookData.success === true) {
     const { orderCode } = webhookData.data;
     console.log(`[Webhook] Processing success payment for Order ${orderCode}`);
 
@@ -74,11 +74,13 @@ const handleWebhook = async (webhookData) => {
       // 5. Cleanup
       pendingRequests.delete(orderCode);
     } else {
-      console.warn(`[Webhook] Order ${orderCode} not found in pending requests (may have restarted or expired)`);
+      console.warn(
+        `[Webhook] Order ${orderCode} not found in pending requests (may have restarted or expired)`,
+      );
     }
   }
 
-  return { success: true, message: "Webhook processed" };
+  return { success: true, message: 'Webhook processed' };
 };
 
 module.exports = {
