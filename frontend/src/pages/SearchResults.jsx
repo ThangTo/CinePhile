@@ -8,7 +8,7 @@ import ErrorState from "components/common/ErrorState";
 import movieService from "services/movie.service";
 import { groupSeriesMovies } from "utils/seriesGrouping";
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 25;
 
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
@@ -137,7 +137,7 @@ const SearchResults = () => {
           />
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {movies.map((movie) => (
                 <MovieCard
                   key={movie.id}
