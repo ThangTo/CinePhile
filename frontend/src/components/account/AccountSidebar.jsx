@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
+import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 
 const DEFAULT_TAB = "profile";
 
@@ -62,14 +63,21 @@ const AccountSidebar = ({ user, onLogout }) => {
       {/* Premium Link */}
       <Link
         to="/premium"
-        className={`flex items-center px-4 py-3 rounded-lg mb-2 font-medium no-underline transition-all ${
-          user.role === "premium"
+        className={`flex flex-col px-4 py-3 rounded-lg mb-2 font-medium no-underline transition-all ${
+          isPremiumActive(user)
             ? "bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-white"
             : "bg-primaryColor/20 text-primaryColor hover:bg-primaryColor/30 border border-primaryColor/50"
         }`}
       >
-        <i className={`fas ${user.role === "premium" ? "fa-crown" : "fa-star"} w-5 text-center mr-3`}></i>
-        {user.role === "premium" ? "Premium" : "Nâng Cấp Premium"}
+        <div className="flex items-center">
+          <i className={`fas ${isPremiumActive(user) ? "fa-crown" : "fa-star"} w-5 text-center mr-3`}></i>
+          <span>{isPremiumActive(user) ? "Premium" : "Nâng Cấp Premium"}</span>
+        </div>
+        {isPremiumActive(user) && (
+          <span className="text-xs mt-1 ml-8 opacity-90">
+            {getPremiumStatusText(user)}
+          </span>
+        )}
       </Link>
 
       <div className="mt-auto border-t border-account-border pt-5">

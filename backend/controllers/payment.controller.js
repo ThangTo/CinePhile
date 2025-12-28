@@ -2,8 +2,8 @@ const paymentService = require("../services/payment.service");
 
 const createPaymentLink = async (req, res) => {
   try {
-    const { userId, amount } = req.body;
-    const result = await paymentService.createPaymentLink(userId, amount);
+    const { userId, amount, bonus = 0 } = req.body;
+    const result = await paymentService.createPaymentLink(userId, amount, bonus);
     res.json(result);
   } catch (error) {
     console.error("Error creating payment link:", error);

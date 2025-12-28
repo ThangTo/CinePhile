@@ -7,6 +7,7 @@ import VideoControls from "../video/VideoControls";
 import useToast from "hooks/useToast";
 import ToastContainer from "../common/ToastContainer";
 import PremiumRequiredModal from "../common/PremiumRequiredModal";
+import { isPremiumActive } from "utils/premiumUtils";
 
 const VideoPlayer = ({
   movie,
@@ -40,8 +41,7 @@ const VideoPlayer = ({
 
   // Check user role and premium status
   const { user } = useAuth();
-  const isPremium =
-    user?.isPremium === true || user?.premium === true || user?.subscription === "premium";
+  const isPremium = isPremiumActive(user);
   const isAdmin = user?.role === "admin";
   const isRegularUser = !isPremium && !isAdmin;
   
@@ -773,25 +773,32 @@ const VideoPlayer = ({
   const getMaxAllowedQuality = useCallback(() => {
     if (!availableLevels || availableLevels.length === 0) return null;
 
-    // Sort levels by height descending
-    // const sortedLevels = [...availableLevels]
-    //   .map((l) => l?.height)
-    //   .filter(Boolean)
-    //   .sort((a, b) => b - a);
-    const sortedLevels = [1080, 720, 480, 360];
+    // Get actual available heights from HLS levels
+    const heightsFromLevels = [...availableLevels]
+      .map((l) => l?.height)
+      .filter(Boolean)
+      .sort((a, b) => b - a);
+
+    // Fallback to standard qualities if no levels available
+    const sortedLevels = heightsFromLevels.length > 0 
+      ? heightsFromLevels 
+      : [1080, 720, 480, 360];
 
     if (sortedLevels.length === 0) return null;
 
     const highestQuality = sortedLevels[0];
 
-    // Premium và Admin: có thể xem chất lượng cao nhất
+    // Premium và Admin: có thể xem chất lượng cao nhất (1080p, 4K, etc.)
     if (isPremium || isAdmin) {
-      return highestQuality;
+      return highestQuality; // Unlock tất cả chất lượng
     }
 
-    // User thường: chỉ xem được chất lượng thấp hơn 1 bậc
+    // User thường: chỉ xem được chất lượng thấp hơn 1 bậc (720p max)
     if (isRegularUser && sortedLevels.length > 1) {
-      return sortedLevels[1]; // Bậc thứ 2 (thấp hơn cao nhất 1 bậc)
+      // Tìm chất lượng cao nhất không phải premium (thường là 720p)
+      // Nếu có 1080p thì chỉ cho xem 720p, nếu có 720p thì cho xem 480p
+      const maxRegularQuality = sortedLevels.find(h => h <= 720) || sortedLevels[1];
+      return maxRegularQuality;
     }
 
     // Fallback: nếu chỉ có 1 level, user thường vẫn xem được
@@ -805,18 +812,14 @@ const VideoPlayer = ({
       const height = parseInt(qualityStr.replace("p", ""), 10);
       if (isNaN(height)) return false;
 
-      const maxAllowed = getMaxAllowedQuality();
-      if (!maxAllowed) return false;
-
-      // console.log(isAdmin + " " + isPremium + " " + maxAllowed + " " + height);
-
-      // Premium và Admin: có thể xem tất cả
+      // Premium và Admin: có thể xem tất cả chất lượng (không cần premium)
       if (isPremium || isAdmin) return false;
 
-      // User thường: chỉ xem được chất lượng <= maxAllowed
-      return height > maxAllowed;
+      // User thường: chỉ xem được chất lượng <= 720p
+      // Chất lượng > 720p (như 1080p, 4K) yêu cầu premium
+      return height > 720;
     },
-    [getMaxAllowedQuality, isPremium, isAdmin]
+    [isPremium, isAdmin]
   );
 
   // Apply quality level to HLS instance
@@ -834,21 +837,17 @@ const VideoPlayer = ({
 
     if (qualityStr === "Auto") {
       // Auto mode logic based on user role
-      const maxAllowed = getMaxAllowedQuality();
-
-      if (isAdmin) {
-        // Admin: chất lượng cao nhất
+      if (isAdmin || isPremium) {
+        // Admin và Premium: chất lượng cao nhất (unlock tất cả)
         hls.currentLevel = -1; // Auto (HLS sẽ chọn cao nhất)
-      } else if (isPremium) {
-        // Premium: chất lượng cao nhất
-        hls.currentLevel = -1; // Auto
-      } else if (isRegularUser && maxAllowed) {
-        // User thường: chất lượng cao nhất có thể nhưng thấp hơn premium 1 bậc
-        const levelIndex = hls.levels.findIndex((l) => l?.height === maxAllowed);
-        if (levelIndex >= 0) {
-          hls.currentLevel = levelIndex;
+      } else if (isRegularUser) {
+        // User thường: chỉ xem được 720p trở xuống
+        const level720Index = hls.levels.findIndex((l) => l?.height && l.height <= 720);
+        if (level720Index >= 0) {
+          hls.currentLevel = level720Index;
         } else {
-          hls.currentLevel = -1; // Fallback to auto
+          // Nếu không có 720p, chọn level thấp nhất
+          hls.currentLevel = hls.levels.length > 0 ? hls.levels.length - 1 : -1;
         }
       } else {
         // Fallback: auto
@@ -867,17 +866,18 @@ const VideoPlayer = ({
       const selectedLevel = hls.levels[levelIndex];
       const selectedHeight = selectedLevel?.height;
 
-      // Validate: User thường không được xem chất lượng cao hơn maxAllowed
-      if (isRegularUser && maxAllowed && selectedHeight > maxAllowed) {
+      // Validate: User thường không được xem chất lượng cao hơn 720p
+      if (isRegularUser && selectedHeight > 720) {
         console.warn(
-          `⚠️ User thường không thể xem chất lượng ${selectedHeight}p, giới hạn là ${maxAllowed}p`
+          `⚠️ User thường không thể xem chất lượng ${selectedHeight}p, giới hạn là 720p. Vui lòng nâng cấp Premium.`
         );
-        // Tìm level phù hợp với maxAllowed
-        const allowedLevelIndex = hls.levels.findIndex((l) => l?.height === maxAllowed);
+        // Tìm level 720p hoặc thấp hơn
+        const allowedLevelIndex = hls.levels.findIndex((l) => l?.height && l.height <= 720);
         if (allowedLevelIndex >= 0) {
           hls.currentLevel = allowedLevelIndex;
         } else {
-          hls.currentLevel = -1; // Fallback to auto
+          // Nếu không có 720p, chọn level thấp nhất
+          hls.currentLevel = hls.levels.length - 1;
         }
       } else {
         const previousLevel = hls.currentLevel;

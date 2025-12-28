@@ -143,7 +143,7 @@ const OptimizedImage = ({
       {/* Actual image */}
       {imageSrc && (
         <img
-          src={`https://images.weserv.nl/?url=${imageSrc}&w=${size}&q=${quality}`}
+          src={`https://images.weserv.nl/?url=${imageSrc}&w=${size}&q=${quality}&output=webp`}
           alt={alt}
           className={`${isLoaded ? "opacity-100" : "opacity-0"} ${className}`}
           draggable="false"

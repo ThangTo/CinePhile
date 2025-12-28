@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useToast from "hooks/useToast";
 import useAuth from "hooks/useAuth";
@@ -10,7 +10,29 @@ import userService from "services/user.service";
 const ActionButtons = ({ movie, audioType }) => {
   const navigate = useNavigate();
   const { toasts, removeToast, success, info, warning } = useToast();
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { isAuthenticated, openAuthModal, user } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Fetch favorites list when authenticated
+  useEffect(() => {
+    if (isAuthenticated && user && movie?.id) {
+      const fetchFavorites = async () => {
+        try {
+          const response = await userService.getFavorites({ limit: 1000 });
+          const favorites = response?.data || [];
+          const favoriteIds = favorites.map(
+            (fav) => fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
+          );
+          setIsFavorite(favoriteIds.includes(movie.id));
+        } catch (error) {
+          console.error("Error fetching favorites:", error);
+        }
+      };
+      fetchFavorites();
+    } else {
+      setIsFavorite(false);
+    }
+  }, [isAuthenticated, user, movie?.id]);
   const {
     isModalOpen,
     openRatingModal,
@@ -18,26 +40,39 @@ const ActionButtons = ({ movie, audioType }) => {
     rateMovie: rateMovieWithHook,
   } = useMovieRating(movie);
 
-  const handleAddFavorite = async () => {
+  const handleToggleFavorite = async () => {
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
     }
     try {
-      await userService.addToFavorites(movie.id);
-      success("Đã thêm vào danh sách yêu thích!");
+      if (isFavorite) {
+        await userService.removeFromFavorites(movie.id);
+        setIsFavorite(false);
+        success("Đã xóa khỏi danh sách yêu thích!");
+      } else {
+        await userService.addToFavorites(movie.id);
+        setIsFavorite(true);
+        success("Đã thêm vào danh sách yêu thích!");
+      }
     } catch (error) {
-      warning(error.message || "Không thể thêm vào yêu thích. Vui lòng thử lại!");
-      console.error("Error adding to favorites:", error);
+      warning(error.message || "Không thể cập nhật yêu thích. Vui lòng thử lại!");
+      console.error("Error toggling favorite:", error);
     }
   };
 
-  const handleAddToList = () => {
+  const handleAddToList = async () => {
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
     }
-    success("Đã thêm vào danh sách!");
+    try {
+      await userService.addToWatchlist(movie.id);
+      success("Đã thêm vào danh sách!");
+    } catch (error) {
+      warning(error.message || "Không thể thêm vào danh sách. Vui lòng thử lại!");
+      console.error("Error adding to watchlist:", error);
+    }
   };
 
   const handleShare = () => {
@@ -88,10 +123,12 @@ const ActionButtons = ({ movie, audioType }) => {
 
           {/* Action Buttons */}
           <button
-            onClick={handleAddFavorite}
-            className="flex flex-col items-center gap-1 hover:text-primaryColor transition-colors text-white"
+            onClick={handleToggleFavorite}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              isFavorite ? "text-red-400 hover:text-red-300" : "text-white hover:text-primaryColor"
+            }`}
           >
-            <i className="fa-solid fa-heart text-2xl" />
+            <i className={`fa-solid fa-heart text-2xl ${isFavorite ? "text-red-400" : ""}`} />
             <span className="text-xs">Yêu thích</span>
           </button>
 

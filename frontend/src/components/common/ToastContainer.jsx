@@ -2,6 +2,10 @@ import React from "react";
 import Toast from "./Toast";
 
 const ToastContainer = ({ toasts, removeToast }) => {
+  if (!toasts || toasts.length === 0) {
+    return null;
+  }
+  
   return (
     <div className="toast-container">
       {toasts.map((toast) => (

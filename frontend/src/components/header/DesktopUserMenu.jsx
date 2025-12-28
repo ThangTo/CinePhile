@@ -3,9 +3,13 @@ import { Link } from "react-router-dom";
 import { DESKTOP_MENU_ITEMS, DESKTOP_MENU_ITEM_CLASS } from "./constants";
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationPanel from "components/notifications/NotificationPanel";
+import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 
-const PremiumBanner = ({ username, isPremium }) => {
+const PremiumBanner = ({ username, user }) => {
+  const isPremium = isPremiumActive(user);
+  
   if (isPremium) {
+    const statusText = getPremiumStatusText(user);
     return (
       <div className="bg-gradient-to-r from-primaryColor/20 to-hoverPrimaryColor/20 border border-primaryColor/30 rounded-lg p-2.5">
         <div className="flex items-center justify-between mb-1.5">
@@ -15,7 +19,7 @@ const PremiumBanner = ({ username, isPremium }) => {
           </span>
         </div>
         <p className="text-gray-300 text-xs">
-          Bạn đang sử dụng tài khoản Premium
+          {statusText}
         </p>
       </div>
     );
@@ -124,7 +128,7 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
                 </div>
               </div>
 
-              <PremiumBanner username={user.username} isPremium={user.role === "premium"} />
+              <PremiumBanner username={user.username} user={user} />
               <UserStats coins={user.coin} />
             </div>
 

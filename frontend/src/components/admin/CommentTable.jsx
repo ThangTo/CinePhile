@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { commentAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
+// Import Icons
+import { 
+  FiCheck, 
+  FiTrash2, 
+  FiEyeOff, 
+  FiAlertCircle, 
+  FiMessageSquare,
+  FiUser,
+  FiClock,
+  FiFilter,
+  FiChevronLeft,
+  FiChevronRight
+} from "react-icons/fi";
 
 const CommentTable = () => {
   const [comments, setComments] = useState([]);
@@ -14,12 +27,14 @@ const CommentTable = () => {
     limit: 10,
   });
 
-
-
   const loadComments = async (page = 1, status = "all") => {
     setIsLoading(true);
     try {
-      const response = await commentAPI.getAll({ page, limit: 10, status: status !== 'all' ? status : undefined });
+      const response = await commentAPI.getAll({ 
+        page, 
+        limit: 10, 
+        status: status !== 'all' ? status : undefined 
+      });
       if (response && response.data) {
         setComments(response.data);
         setPagination({
@@ -45,7 +60,6 @@ const CommentTable = () => {
     setIsLoading(true);
     try {
       await commentAPI.updateStatus(id, newStatus);
-      // Update local state to reflect change immediately or reload
       setComments(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
     } catch (err) {
       setError("Không thể cập nhật trạng thái: " + err.message);
@@ -67,170 +81,243 @@ const CommentTable = () => {
     }
   };
 
+  // Helper: Tạo avatar từ tên user
+  const getInitials = (name) => {
+    return name ? name.charAt(0).toUpperCase() : "?";
+  };
+
   const getStatusBadge = (status) => {
-    switch (status) {
-      case "pending":
-        return (
-          <span className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-500 min-w-[100px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
-            pending
-          </span>
-        );
-      case "banned":
-        return (
-          <span className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-500 min-w-[100px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-            banned
-          </span>
-        );
-      case "dismissed":
-        return (
-          <span className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-400 min-w-[100px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-            dismissed
-          </span>
-        );
-      case "allowed": // 'Accepted' in spec, maybe 'active' or 'allowed'
-         return (
-          <span className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-500 min-w-[100px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-            allowed
-          </span>
-        );
-      default:
-        return null;
-    }
+    const styles = {
+      pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+      banned: "bg-red-500/10 text-red-500 border-red-500/20",
+      dismissed: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+      allowed: "bg-green-500/10 text-green-500 border-green-500/20",
+    };
+
+    const labels = {
+      pending: "Chờ duyệt",
+      banned: "Đã chặn",
+      dismissed: "Đã ẩn",
+      allowed: "Hoạt động",
+    };
+
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${styles[status] || styles.dismissed}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${status === 'allowed' ? 'bg-green-500' : status === 'pending' ? 'bg-yellow-500' : 'bg-current'}`}></span>
+        {labels[status] || status}
+      </span>
+    );
   };
 
   return (
-    <div className="bg-bgColor3 rounded-xl border border-white/10 overflow-hidden">
-      {/* Filters */}
-      <div className="p-6 border-b border-white/10 flex items-center gap-4">
-        <button 
-          onClick={() => setFilterStatus("all")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterStatus === "all" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
-        >
-          Tất cả
-        </button>
-        <button 
-          onClick={() => setFilterStatus("pending")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterStatus === "pending" ? "bg-yellow-500/20 text-yellow-500" : "text-gray-400 hover:text-yellow-500"}`}
-        >
-          Chờ duyệt
-        </button>
-
+    <div className="bg-[#1a1a1a] rounded-2xl border border-white/5 shadow-xl flex flex-col h-full">
+      
+      {/* --- HEADER & FILTERS --- */}
+      <div className="p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <FiMessageSquare className="text-primaryColor" />
+          Quản lý Bình luận
+        </h2>
+        
+        <div className="flex bg-black/20 p-1 rounded-lg border border-white/5">
+          {[
+            { id: "all", label: "Tất cả" },
+            { id: "pending", label: "Chờ duyệt" },
+            { id: "allowed", label: "Đã duyệt" }, // Thêm tab nếu muốn
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterStatus(tab.id)}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
+                filterStatus === tab.id
+                  ? "bg-white/10 text-white shadow-sm"
+                  : "text-gray-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-bgColor border-b border-white/10">
+      {/* --- ERROR MESSAGE --- */}
+      {error && (
+        <div className="mx-5 mt-5 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm flex items-center justify-between animate-fade-in">
+          <div className="flex items-center gap-2">
+            <FiAlertCircle />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError(null)} className="hover:text-white transition-colors">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* --- TABLE CONTENT --- */}
+      <div className="flex-1 overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-white/[0.02] border-b border-white/5">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase w-1/3">
-                BÌNH LUẬN
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                NGƯỜI DÙNG
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                LÝ DO
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                TRẠNG THÁI
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
-                NGÀY TẠO
-              </th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase">
-                HÀNH ĐỘNG
-              </th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nội dung / Lý do</th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Người dùng</th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Trạng thái</th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Thời gian</th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Hành động</th>
             </tr>
           </thead>
-          <tbody>
-            {comments.map((comment) => (
-              <tr
-                key={comment.id}
-                className="border-b border-white/5 hover:bg-white/5 transition-colors"
-              >
-                <td className="px-6 py-4">
-                  <div className="flex flex-col gap-1">
-                    <p className="text-white text-sm line-clamp-2" title={comment.fullContent}>{comment.content}</p>
-                    {comment.flag && (
-                      <span className="text-red-500 text-xs font-medium">Flag: {comment.flag}</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col">
-                    <span className="text-white font-bold text-sm">{comment.user.name}</span>
-                    <span className="text-gray-500 text-xs">Bởi: {comment.user.role}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-gray-300 text-sm">{comment.reason}</span>
-                </td>
-                <td className="px-6 py-4">
-                  {getStatusBadge(comment.status)}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col text-xs text-gray-300">
-                    <span>{comment.createdAt.split(" ")[0]}</span>
-                    <span>{comment.createdAt.split(" ")[1]}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => handleStatusUpdate(comment.id, "allowed")}
-                      className="px-3 py-1.5 rounded bg-green-500/20 text-green-500 hover:bg-green-500/30 text-xs font-semibold transition-colors min-w-[80px] justify-center"
-                    >
-                      Cho phép
-                    </button>
-                    <button
-                      onClick={() => handleDelete(comment.id)}
-                      className="px-3 py-1.5 rounded bg-red-500/20 text-red-500 hover:bg-red-500/30 text-xs font-semibold transition-colors min-w-[80px] justify-center"
-                    >
-                      Khoá
-                    </button>
-                    <button
-                       onClick={() => handleStatusUpdate(comment.id, "dismissed")}
-                       className="px-3 py-1.5 rounded bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 text-xs font-semibold transition-colors min-w-[80px] justify-center"
-                    >
-                      Ẩn
-                    </button>
-
-
-                  </div>
+          
+          <tbody className="divide-y divide-white/5">
+            {isLoading && comments.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="py-20 text-center">
+                  <BarSpinner />
                 </td>
               </tr>
-            ))}
-            {comments.length === 0 && !isLoading && (
+            ) : comments.length === 0 ? (
               <tr>
-                <td colSpan="6" className="text-center py-8 text-gray-500">
+                <td colSpan="5" className="py-16 text-center text-gray-500 flex flex-col items-center justify-center">
+                  <FiMessageSquare className="text-4xl mb-3 opacity-20" />
                   Không có dữ liệu
                 </td>
               </tr>
+            ) : (
+              comments.map((comment) => (
+                <tr key={comment.id} className="group hover:bg-white/[0.02] transition-colors">
+                  
+                  {/* Cột Nội Dung */}
+                  <td className="px-6 py-4 max-w-sm">
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-sm text-gray-200 line-clamp-2 leading-relaxed" title={comment.fullContent}>
+                        {comment.content}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {comment.flag && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">
+                            <FiAlertCircle className="w-3 h-3" /> Flag: {comment.flag}
+                          </span>
+                        )}
+                        {comment.reason && (
+                          <span className="text-xs text-gray-500 italic flex items-center gap-1">
+                             • Lý do: {comment.reason}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Cột Người Dùng */}
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border border-white/10 text-xs font-bold text-white">
+                        {getInitials(comment.user.name)}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-white">{comment.user.name}</span>
+                        <span className="text-[10px] text-gray-500 uppercase flex items-center gap-1">
+                          <FiUser className="w-2.5 h-2.5" /> {comment.user.role}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Cột Trạng Thái */}
+                  <td className="px-6 py-4">
+                    {getStatusBadge(comment.status)}
+                  </td>
+
+                  {/* Cột Thời Gian */}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col text-xs text-gray-400">
+                      <span className="text-gray-300 font-medium">{comment.createdAt.split(" ")[0]}</span>
+                      <span className="flex items-center gap-1 mt-0.5">
+                        <FiClock className="w-3 h-3" /> {comment.createdAt.split(" ")[1]}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* Cột Hành Động (Icons) */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                      
+                      <button
+                        onClick={() => handleStatusUpdate(comment.id, "allowed")}
+                        title="Chấp nhận"
+                        className="p-2 rounded-lg text-green-500 hover:bg-green-500/10 hover:scale-110 transition-all"
+                      >
+                        <FiCheck size={18} />
+                      </button>
+
+                      <button
+                        onClick={() => handleStatusUpdate(comment.id, "dismissed")}
+                        title="Ẩn bình luận"
+                        className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 hover:scale-110 transition-all"
+                      >
+                        <FiEyeOff size={18} />
+                      </button>
+
+                      <div className="w-px h-4 bg-white/10 mx-1"></div>
+
+                      <button
+                        onClick={() => handleDelete(comment.id)}
+                        title="Xóa vĩnh viễn / Chặn"
+                        className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 hover:scale-110 transition-all"
+                      >
+                        <FiTrash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-       {/* Loading state */}
-       {isLoading && (
-        <section className="flex items-center justify-center p-6">
-          <BarSpinner />
-        </section>
-      )}
+      {/* --- FOOTER / PAGINATION --- */}
+      <div className="p-4 border-t border-white/5 flex items-center justify-between bg-white/[0.01]">
+        <div className="text-xs text-gray-500">
+          Hiển thị <span className="text-white font-bold">{comments.length}</span> trên tổng <span className="text-white font-bold">{pagination.totalItems}</span> bình luận
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => loadComments(pagination.currentPage - 1, filterStatus)}
+            disabled={pagination.currentPage === 1}
+            className="p-1.5 rounded-md hover:bg-white/5 text-gray-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          >
+            <FiChevronLeft size={16} />
+          </button>
+          
+          <div className="flex items-center gap-1">
+             {/* Giả lập pagination logic đơn giản */}
+             {Array.from({ length: pagination.totalPages > 5 ? 5 : pagination.totalPages }, (_, i) => {
+               const pageNum = i + 1; // Logic thực tế cần complex hơn
+               return (
+                 <button
+                   key={pageNum}
+                   onClick={() => loadComments(pageNum, filterStatus)}
+                   className={`w-7 h-7 rounded-md text-xs font-medium transition-colors ${
+                     pagination.currentPage === pageNum
+                       ? "bg-primaryColor text-white shadow-sm"
+                       : "text-gray-400 hover:bg-white/5 hover:text-white"
+                   }`}
+                 >
+                   {pageNum}
+                 </button>
+               )
+             })}
+          </div>
 
-       {/* Error message */}
-       {error && (
-        <div className="mx-6 mb-6 mt-4 bg-red-500/10 border border-red-500 rounded-lg p-4 text-red-500 flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400">
-            <i className="fa-solid fa-times"></i>
+          <button 
+            onClick={() => loadComments(pagination.currentPage + 1, filterStatus)}
+            disabled={pagination.currentPage === pagination.totalPages}
+            className="p-1.5 rounded-md hover:bg-white/5 text-gray-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          >
+            <FiChevronRight size={16} />
           </button>
         </div>
-      )}
+      </div>
+
     </div>
   );
 };

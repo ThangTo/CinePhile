@@ -30,9 +30,9 @@ const login = async (req, res) => {
   try {
     const result = await authService.login(req.body);
     attachAuthCookies(res, result);
-    res.json({ 
-      user: result.user, 
-      accessToken: result.token
+    res.json({
+      user: result.user,
+      accessToken: result.token,
     });
   } catch (error) {
     res.status(401).json({ message: error.message });
