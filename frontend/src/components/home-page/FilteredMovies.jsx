@@ -56,13 +56,13 @@ const FilteredMovies = ({ pageType = "genre" }) => {
         } else if (pageType === "country") {
           endpoint = "getByCountry";
           key = requestedKey;
-        } else if (pageType === "type") {
-          const typeMeta = TYPE_FILTERS[requestedKey];
-          if (!typeMeta) {
-            throw new Error("Loại phim không hợp lệ");
-          }
+          } else if (pageType === "type") {
+            const typeMeta = TYPE_FILTERS[requestedKey];
+            if (!typeMeta) {
+              throw new Error("Loại phim không hợp lệ");
+            }
           endpoint = "getByType";
-          effectiveKey = typeMeta.api;
+            effectiveKey = typeMeta.api;
           key = effectiveKey;
         } else {
           endpoint = "getAll";
@@ -337,26 +337,26 @@ const FilteredMovies = ({ pageType = "genre" }) => {
           <EmptyState title={emptyText} iconClassName="fa-film" />
         ) : (
           <LazySection rootMargin="100px" minHeight="400px">
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-                {movies.map((movie) => (
-                  <MovieCard
-                    key={movie.id}
-                    movie={movie}
-                    hoverVisibleAt="md"
-                    hoverCardClass="w-[300px] max-h-[360px] overflow-hidden"
-                    compact
-                  />
-                ))}
-              </div>
-              {pagination.totalPages > 1 && (
-                <Pagination
-                  page={pagination.page}
-                  totalPages={pagination.totalPages}
-                  onPageChange={handlePageChange}
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+              {movies.map((movie) => (
+                <MovieCard
+                  key={movie.id}
+                  movie={movie}
+                  hoverVisibleAt="md"
+                  hoverCardClass="w-[300px] max-h-[360px] overflow-hidden"
+                  compact
                 />
-              )}
-            </>
+              ))}
+            </div>
+            {pagination.totalPages > 1 && (
+              <Pagination
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                onPageChange={handlePageChange}
+              />
+            )}
+          </>
           </LazySection>
         )}
       </main>

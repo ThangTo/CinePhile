@@ -4,9 +4,16 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api
 
 console.log(API_BASE_URL);
 
+// Increase timeout for production (Railway can be slower due to cold starts, network latency)
+// Use environment variable or default to 30s for production, 10s for development
+const isProduction = process.env.NODE_ENV === "production";
+const TIMEOUT = process.env.REACT_APP_API_TIMEOUT 
+  ? parseInt(process.env.REACT_APP_API_TIMEOUT, 10) 
+  : isProduction ? 30000 : 10000; // 30s for production, 10s for development
+
 const http = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000, // timeout 10s
+  timeout: TIMEOUT,
   withCredentials: true,
 });
 

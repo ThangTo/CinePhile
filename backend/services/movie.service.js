@@ -18,40 +18,148 @@ const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
  */
 function removeVietnameseAccents(str) {
   if (!str) return '';
-  
+
   // Map Vietnamese characters with accents to without accents
   const accentsMap = {
-    'à': 'a', 'á': 'a', 'ạ': 'a', 'ả': 'a', 'ã': 'a',
-    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ậ': 'a', 'ẩ': 'a', 'ẫ': 'a',
-    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ặ': 'a', 'ẳ': 'a', 'ẵ': 'a',
-    'è': 'e', 'é': 'e', 'ẹ': 'e', 'ẻ': 'e', 'ẽ': 'e',
-    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ệ': 'e', 'ể': 'e', 'ễ': 'e',
-    'ì': 'i', 'í': 'i', 'ị': 'i', 'ỉ': 'i', 'ĩ': 'i',
-    'ò': 'o', 'ó': 'o', 'ọ': 'o', 'ỏ': 'o', 'õ': 'o',
-    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ộ': 'o', 'ổ': 'o', 'ỗ': 'o',
-    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ợ': 'o', 'ở': 'o', 'ỡ': 'o',
-    'ù': 'u', 'ú': 'u', 'ụ': 'u', 'ủ': 'u', 'ũ': 'u',
-    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ự': 'u', 'ử': 'u', 'ữ': 'u',
-    'ỳ': 'y', 'ý': 'y', 'ỵ': 'y', 'ỷ': 'y', 'ỹ': 'y',
-    'đ': 'd',
-    'À': 'A', 'Á': 'A', 'Ạ': 'A', 'Ả': 'A', 'Ã': 'A',
-    'Â': 'A', 'Ầ': 'A', 'Ấ': 'A', 'Ậ': 'A', 'Ẩ': 'A', 'Ẫ': 'A',
-    'Ă': 'A', 'Ằ': 'A', 'Ắ': 'A', 'Ặ': 'A', 'Ẳ': 'A', 'Ẵ': 'A',
-    'È': 'E', 'É': 'E', 'Ẹ': 'E', 'Ẻ': 'E', 'Ẽ': 'E',
-    'Ê': 'E', 'Ề': 'E', 'Ế': 'E', 'Ệ': 'E', 'Ể': 'E', 'Ễ': 'E',
-    'Ì': 'I', 'Í': 'I', 'Ị': 'I', 'Ỉ': 'I', 'Ĩ': 'I',
-    'Ò': 'O', 'Ó': 'O', 'Ọ': 'O', 'Ỏ': 'O', 'Õ': 'O',
-    'Ô': 'O', 'Ồ': 'O', 'Ố': 'O', 'Ộ': 'O', 'Ổ': 'O', 'Ỗ': 'O',
-    'Ơ': 'O', 'Ờ': 'O', 'Ớ': 'O', 'Ợ': 'O', 'Ở': 'O', 'Ỡ': 'O',
-    'Ù': 'U', 'Ú': 'U', 'Ụ': 'U', 'Ủ': 'U', 'Ũ': 'U',
-    'Ư': 'U', 'Ừ': 'U', 'Ứ': 'U', 'Ự': 'U', 'Ử': 'U', 'Ữ': 'U',
-    'Ỳ': 'Y', 'Ý': 'Y', 'Ỵ': 'Y', 'Ỷ': 'Y', 'Ỹ': 'Y',
-    'Đ': 'D',
+    à: 'a',
+    á: 'a',
+    ạ: 'a',
+    ả: 'a',
+    ã: 'a',
+    â: 'a',
+    ầ: 'a',
+    ấ: 'a',
+    ậ: 'a',
+    ẩ: 'a',
+    ẫ: 'a',
+    ă: 'a',
+    ằ: 'a',
+    ắ: 'a',
+    ặ: 'a',
+    ẳ: 'a',
+    ẵ: 'a',
+    è: 'e',
+    é: 'e',
+    ẹ: 'e',
+    ẻ: 'e',
+    ẽ: 'e',
+    ê: 'e',
+    ề: 'e',
+    ế: 'e',
+    ệ: 'e',
+    ể: 'e',
+    ễ: 'e',
+    ì: 'i',
+    í: 'i',
+    ị: 'i',
+    ỉ: 'i',
+    ĩ: 'i',
+    ò: 'o',
+    ó: 'o',
+    ọ: 'o',
+    ỏ: 'o',
+    õ: 'o',
+    ô: 'o',
+    ồ: 'o',
+    ố: 'o',
+    ộ: 'o',
+    ổ: 'o',
+    ỗ: 'o',
+    ơ: 'o',
+    ờ: 'o',
+    ớ: 'o',
+    ợ: 'o',
+    ở: 'o',
+    ỡ: 'o',
+    ù: 'u',
+    ú: 'u',
+    ụ: 'u',
+    ủ: 'u',
+    ũ: 'u',
+    ư: 'u',
+    ừ: 'u',
+    ứ: 'u',
+    ự: 'u',
+    ử: 'u',
+    ữ: 'u',
+    ỳ: 'y',
+    ý: 'y',
+    ỵ: 'y',
+    ỷ: 'y',
+    ỹ: 'y',
+    đ: 'd',
+    À: 'A',
+    Á: 'A',
+    Ạ: 'A',
+    Ả: 'A',
+    Ã: 'A',
+    Â: 'A',
+    Ầ: 'A',
+    Ấ: 'A',
+    Ậ: 'A',
+    Ẩ: 'A',
+    Ẫ: 'A',
+    Ă: 'A',
+    Ằ: 'A',
+    Ắ: 'A',
+    Ặ: 'A',
+    Ẳ: 'A',
+    Ẵ: 'A',
+    È: 'E',
+    É: 'E',
+    Ẹ: 'E',
+    Ẻ: 'E',
+    Ẽ: 'E',
+    Ê: 'E',
+    Ề: 'E',
+    Ế: 'E',
+    Ệ: 'E',
+    Ể: 'E',
+    Ễ: 'E',
+    Ì: 'I',
+    Í: 'I',
+    Ị: 'I',
+    Ỉ: 'I',
+    Ĩ: 'I',
+    Ò: 'O',
+    Ó: 'O',
+    Ọ: 'O',
+    Ỏ: 'O',
+    Õ: 'O',
+    Ô: 'O',
+    Ồ: 'O',
+    Ố: 'O',
+    Ộ: 'O',
+    Ổ: 'O',
+    Ỗ: 'O',
+    Ơ: 'O',
+    Ờ: 'O',
+    Ớ: 'O',
+    Ợ: 'O',
+    Ở: 'O',
+    Ỡ: 'O',
+    Ù: 'U',
+    Ú: 'U',
+    Ụ: 'U',
+    Ủ: 'U',
+    Ũ: 'U',
+    Ư: 'U',
+    Ừ: 'U',
+    Ứ: 'U',
+    Ự: 'U',
+    Ử: 'U',
+    Ữ: 'U',
+    Ỳ: 'Y',
+    Ý: 'Y',
+    Ỵ: 'Y',
+    Ỷ: 'Y',
+    Ỹ: 'Y',
+    Đ: 'D',
   };
-  
+
   return str
     .split('')
-    .map(char => accentsMap[char] || char)
+    .map((char) => accentsMap[char] || char)
     .join('');
 }
 
@@ -61,13 +169,13 @@ function removeVietnameseAccents(str) {
  */
 function createVietnameseRegex(pattern) {
   if (!pattern) return null;
-  
+
   // Normalize pattern to remove accents for regex building
   const normalized = removeVietnameseAccents(pattern.toLowerCase());
-  
+
   // Escape special regex characters
   const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
+
   // Create regex that matches both accented and non-accented versions
   // This is a simplified approach - for exact matching, we'll use $or with both versions
   return new RegExp(escaped, 'i');
@@ -148,17 +256,17 @@ const buildQuery = (filters = {}, useTextSearch = true) => {
     query.totalEpisodes = { $gt: 1 };
   }
   if (filters.year) query.year = Number(filters.year);
-  
+
   if (filters.q) {
     const searchQuery = filters.q.trim();
     if (searchQuery) {
       // Normalize Vietnamese accents for accent-insensitive search
       const normalizedQuery = removeVietnameseAccents(searchQuery);
       const hasAccents = normalizedQuery.toLowerCase() !== searchQuery.toLowerCase();
-      
+
       // Escape special regex characters
       const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      
+
       if (useTextSearch) {
         // MongoDB $text search doesn't handle Vietnamese accents well
         // We need to use aggregation with $facet to combine $text search with regex
@@ -170,7 +278,7 @@ const buildQuery = (filters = {}, useTextSearch = true) => {
         // Create regex patterns for both original and normalized queries
         const regexOriginal = new RegExp(escapeRegex(searchQuery), 'i');
         const regexNormalized = new RegExp(escapeRegex(normalizedQuery), 'i');
-        
+
         // Always search with both versions to match both accented and non-accented text in DB
         query.$or = [
           { name: regexOriginal },
@@ -178,7 +286,7 @@ const buildQuery = (filters = {}, useTextSearch = true) => {
           { original_name: regexOriginal },
           { original_name: regexNormalized },
           { slug: regexOriginal },
-          { slug: regexNormalized }
+          { slug: regexNormalized },
         ];
       }
     }
@@ -356,10 +464,10 @@ const search = async (q, pagination = {}) => {
 
   // Normalize query for accent-insensitive search
   const normalizedQuery = removeVietnameseAccents(searchQuery);
-  
+
   // Build base query (filters without search)
   const baseQuery = buildQuery({ q: '' }, false);
-  
+
   // Escape regex special characters
   const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regexOriginal = new RegExp(escapeRegex(searchQuery), 'i');
@@ -371,13 +479,13 @@ const search = async (q, pagination = {}) => {
     // Try BM25 search with both original query (có dấu) and normalized query (không dấu)
     // This ensures we match both accented and non-accented text in DB
     const textQueries = [];
-    
+
     // If query has accents, try both versions
     if (normalizedQuery.toLowerCase() !== searchQuery.toLowerCase()) {
       // Query has accents - try both original and normalized
       textQueries.push(
-        { ...baseQuery, $text: { $search: searchQuery } },      // Original (có dấu)
-        { ...baseQuery, $text: { $search: normalizedQuery } }   // Normalized (không dấu)
+        { ...baseQuery, $text: { $search: searchQuery } }, // Original (có dấu)
+        { ...baseQuery, $text: { $search: normalizedQuery } }, // Normalized (không dấu)
       );
     } else {
       // No accents - just use normalized
@@ -387,42 +495,42 @@ const search = async (q, pagination = {}) => {
     // Get BM25 results from all text queries
     const allTextResults = [];
     const allTextIds = new Set();
-    
+
     for (const textQuery of textQueries) {
       try {
         const textPipeline = [
           {
-            $match: textQuery
+            $match: textQuery,
           },
           {
             $addFields: {
-              textScore: { $meta: 'textScore' }
-            }
+              textScore: { $meta: 'textScore' },
+            },
           },
           {
             $sort: {
               textScore: -1,
-              createdAt: -1
-            }
+              createdAt: -1,
+            },
           },
           {
-            $limit: perPage * 2
-          }
+            $limit: skip + perPage + 50, // Fetch enough for requested page + buffer
+          },
         ];
 
         const results = await Movie.aggregate(textPipeline);
-        results.forEach(movie => {
+        results.forEach((movie) => {
           const id = movie._id.toString();
           if (!allTextIds.has(id)) {
             allTextIds.add(id);
             allTextResults.push({
               ...movie,
               relevanceScore: 100 + (movie.textScore || 0) * 10,
-              matchType: 'bm25'
+              matchType: 'bm25',
             });
           } else {
             // Update if this result has higher score
-            const existing = allTextResults.find(r => r._id.toString() === id);
+            const existing = allTextResults.find((r) => r._id.toString() === id);
             if (existing && (movie.textScore || 0) > (existing.textScore || 0)) {
               existing.textScore = movie.textScore;
               existing.relevanceScore = 100 + (movie.textScore || 0) * 10;
@@ -452,25 +560,25 @@ const search = async (q, pagination = {}) => {
         { original_name: regexOriginal },
         { original_name: regexNormalized },
         { slug: regexOriginal },
-        { slug: regexNormalized }
+        { slug: regexNormalized },
       ],
-      _id: { $nin: Array.from(allTextIds).map(id => new mongoose.Types.ObjectId(id)) }
+      _id: { $nin: Array.from(allTextIds).map((id) => new mongoose.Types.ObjectId(id)) },
     };
 
     const regexResults = await Movie.find(regexQuery)
       .sort({ createdAt: -1 })
-      .limit(perPage)
+      .limit(skip + perPage + 50) // Fetch enough for requested page + buffer
       .lean();
 
     // Combine and score results
     const allResults = [...allTextResults];
 
     // Add regex matches with lower score
-    regexResults.forEach(movie => {
+    regexResults.forEach((movie) => {
       allResults.push({
         ...movie,
         relevanceScore: 10, // Lower score for regex matches
-        matchType: 'regex'
+        matchType: 'regex',
       });
     });
 
@@ -484,15 +592,15 @@ const search = async (q, pagination = {}) => {
 
     // Paginate
     const paginatedResults = sortedResults.slice(skip, skip + perPage);
-    
+
     // Count total
     const [textCount, regexCount] = await Promise.all([
-      Promise.all(textQueries.map(q => Movie.countDocuments(q))).then(counts => 
-        counts.reduce((sum, count) => sum + count, 0)
+      Promise.all(textQueries.map((q) => Movie.countDocuments(q))).then((counts) =>
+        counts.reduce((sum, count) => sum + count, 0),
       ),
-      Movie.countDocuments(regexQuery)
+      Movie.countDocuments(regexQuery),
     ]);
-    
+
     // Approximate total (may have some overlap between text queries)
     const total = Math.max(textCount, allTextIds.size) + regexCount;
 
@@ -505,11 +613,10 @@ const search = async (q, pagination = {}) => {
         totalPages: Math.max(Math.ceil(total / perPage), 1),
       },
     };
-
   } catch (error) {
     // Fallback to regex search if $text search fails (e.g., no text index)
     console.warn('BM25 search failed, falling back to regex:', error.message);
-    
+
     const fallbackQuery = buildQuery({ q }, false);
     const builder = Movie.find(fallbackQuery).sort({ createdAt: -1 });
     const result = await paginate(builder, pagination);
@@ -691,13 +798,13 @@ const postComment = async (identifier, userId, data = {}) => {
     episodeId: data.episodeId || null,
     flag: moderationResult.flag,
     flagReason: moderationResult.reason,
-    status: status
+    status: status,
   });
   const populated = await comment.populate('userId', 'username avatar');
-  
+
   // Only map if allowed (technically frontend should handle hiding pending, but API usually returns created object)
   // We return it, frontend will see status=pending and might show "Pending approval" message
-  return mapComment({ ...populated.toObject(), status }); 
+  return mapComment({ ...populated.toObject(), status });
 };
 
 /**
@@ -970,7 +1077,6 @@ const dislikeComment = async (
   return result;
 };
 
-
 /**
  * Get recommended movies based on a movie
  * Logic: Same genre -> Trending -> Top Rated
@@ -990,13 +1096,20 @@ const getRecommendations = async (movieId, limit = 10) => {
   let recommendedMovies = [];
 
   // Priority 1: Get movies with same genre/category
-  if (currentMovie.categories && Array.isArray(currentMovie.categories) && currentMovie.categories.length > 0) {
+  if (
+    currentMovie.categories &&
+    Array.isArray(currentMovie.categories) &&
+    currentMovie.categories.length > 0
+  ) {
     // Get first category/genre slug
     const firstCategory = currentMovie.categories[0];
-    const genreSlug = typeof firstCategory === 'object' && firstCategory.slug 
-      ? firstCategory.slug 
-      : (typeof firstCategory === 'string' ? firstCategory : null);
-    
+    const genreSlug =
+      typeof firstCategory === 'object' && firstCategory.slug
+        ? firstCategory.slug
+        : typeof firstCategory === 'string'
+        ? firstCategory
+        : null;
+
     if (genreSlug) {
       // Query movies with same genre, excluding current movie
       const sameGenreMovies = await Movie.find({
@@ -1084,7 +1197,6 @@ const getRecommendations = async (movieId, limit = 10) => {
     data: recommendedMovies.slice(0, limit),
   };
 };
-
 
 module.exports = {
   getAll,

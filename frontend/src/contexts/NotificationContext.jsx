@@ -122,7 +122,7 @@ export const NotificationProvider = ({ children }) => {
     return () => {
       if (interval) {
         clearInterval(interval);
-      }
+    }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
