@@ -17,6 +17,7 @@ const ActionButtons = ({ buttons }) => (
         size={button.size}
         onClick={button.onClick}
         ariaLabel={button.ariaLabel}
+        isFavorite={button.isFavorite}
       />
     ))}
   </div>

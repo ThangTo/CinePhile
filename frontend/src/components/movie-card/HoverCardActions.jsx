@@ -2,14 +2,16 @@ import React from "react";
 import ActionButton from "components/banner/ActionButton";
 
 /**
- * Hover Card Actions Component - Watch, Like, Info buttons
+ * Hover Card Actions Component - Watch, Like, Add to List, Info buttons
  * Reuses ActionButton from BannerHome with custom primary button styling
  * @param {Object} props
  * @param {Function} props.onWatch - Watch button click handler
  * @param {Function} props.onLike - Like button click handler
+ * @param {Function} props.onAddToList - Add to watchlist button click handler (optional)
  * @param {Function} props.onInfo - Info button click handler
+ * @param {boolean} props.isFavorite - Whether the movie is favorited
  */
-const HoverCardActions = ({ onWatch, onLike, onInfo, compact = false }) => (
+const HoverCardActions = ({ onWatch, onLike, onAddToList, onInfo, compact = false, isFavorite = false }) => (
   <div className="flex gap-2">
     {/* Watch Now Button - Custom gradient style */}
     <button
@@ -27,11 +29,25 @@ const HoverCardActions = ({ onWatch, onLike, onInfo, compact = false }) => (
       <ActionButton
         icon="fa-heart"
         onClick={onLike}
-        variant="default"
+        variant={isFavorite ? "favorite" : "default"}
         size={compact ? "sm" : "md"}
-        ariaLabel="Thích"
+        ariaLabel={isFavorite ? "Bỏ yêu thích" : "Yêu thích"}
+        isFavorite={isFavorite}
       />
     </div>
+
+    {/* Add to List Button - Reuse ActionButton (if handler provided) */}
+    {onAddToList && (
+      <div className="flex items-center">
+        <ActionButton
+          icon="fa-plus"
+          onClick={onAddToList}
+          variant="default"
+          size={compact ? "sm" : "md"}
+          ariaLabel="Thêm vào danh sách"
+        />
+      </div>
+    )}
 
     {/* Info Button - Reuse ActionButton */}
     <div className="flex items-center">

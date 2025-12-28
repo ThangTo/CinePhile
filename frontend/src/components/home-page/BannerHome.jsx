@@ -4,6 +4,8 @@ import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
 import { preloadMovieImages } from "utils/imagePreloader";
 import OptimizedImage from "components/common/OptimizedImage";
+import useToast from "hooks/useToast";
+import ToastContainer from "components/common/ToastContainer";
 
 /**
  * Banner Home Component - Main hero banner for homepage
@@ -15,6 +17,7 @@ const BannerHome = ({ movie }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(!movie);
   const timerRef = useRef(null);
+  const { toasts, removeToast, success, warning } = useToast();
 
   useEffect(() => {
     // If no movie prop provided, fetch up to 5 trending movies
@@ -79,7 +82,7 @@ const BannerHome = ({ movie }) => {
   // Generate configuration using custom hook - MUST be called before any early returns
   // Use fallback empty object to ensure hooks are always called
   const currentMovie = movies[currentIndex] || null;
-  const { infoBadges, actionButtons } = useBannerConfig(currentMovie || {});
+  const { infoBadges, actionButtons } = useBannerConfig(currentMovie || {}, success, warning);
 
   // Show loading state if no movie data
   if (loading || !currentMovie) {
@@ -134,6 +137,7 @@ const BannerHome = ({ movie }) => {
           })}
         </div>
       )}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </section>
   );
 };

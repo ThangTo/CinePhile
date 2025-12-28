@@ -19,7 +19,7 @@ router.delete('/favorites/:movieId', authMiddleware, userController.removeFromFa
 router.get('/favorites', authMiddleware, userController.getFavorites);
 
 // POST /api/v1/users/watchlist - Add to watchlist
-router.post('watchlist', authMiddleware, userController.addToWatchlist);
+router.post('/watchlist', authMiddleware, userController.addToWatchlist);
 
 // DELETE /api/v1/users/watchlist/:movieId - Remove from watchlist
 router.delete('/watchlist/:movieId', authMiddleware, userController.removeFromWatchlist);

@@ -10,6 +10,8 @@ import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
 import { BarSpinner } from "components/common/LoadingState";
 import ContinueWatchingSection from "components/account/ContinueWatchingSection";
+import FavoritesSection from "components/account/FavoritesSection";
+import WatchlistSection from "components/account/WatchlistSection";
 
 const DEFAULT_TAB = "profile";
 
@@ -75,10 +77,20 @@ const AccountPage = () => {
   }
 
   const isContinueWatchingPage = activeTab === "continue-watching";
+  const isFavoritesPage = activeTab === "favorites";
+  const isWatchlistPage = activeTab === "watchlist";
 
   const renderMainContent = () => {
     if (isContinueWatchingPage) {
       return <ContinueWatchingSection user={user} />;
+    }
+
+    if (isFavoritesPage) {
+      return <FavoritesSection user={user} />;
+    }
+
+    if (isWatchlistPage) {
+      return <WatchlistSection user={user} />;
     }
 
     if (activeTab === "notifications") {
