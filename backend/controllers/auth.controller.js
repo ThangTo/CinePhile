@@ -66,7 +66,7 @@ const refreshToken = async (req, res) => {
     const incomingRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     if (!incomingRefreshToken) {
-      return res.status(401).json({ message: 'Refresh token is required' });
+      return res.status(401).json({ message: 'Unauthorized' });
     }
 
     const tokens = await authService.refreshToken(incomingRefreshToken);
