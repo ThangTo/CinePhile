@@ -57,27 +57,36 @@ const CommentTable = () => {
   }, [filterStatus]);
 
   const handleStatusUpdate = async (id, newStatus) => {
-    setIsLoading(true);
+    // Optimistic UI Update
+    if (filterStatus === "pending") {
+      setComments((prev) => prev.filter((c) => c.id !== id));
+    } else {
+      setComments((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+      );
+    }
+
     try {
       await commentAPI.updateStatus(id, newStatus);
-      setComments(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
     } catch (err) {
       setError("Không thể cập nhật trạng thái: " + err.message);
-    } finally {
-      setIsLoading(false);
+      // Revert on error by reloading to ensure data consistency
+      loadComments(pagination.currentPage, filterStatus);
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Bạn có chắc muốn xóa bình luận này vĩnh viễn?")) return;
-    setIsLoading(true);
+
+    // Optimistic UI Update
+    setComments((prev) => prev.filter((c) => c.id !== id));
+
     try {
       await commentAPI.delete(id);
-      setComments(prev => prev.filter(c => c.id !== id));
     } catch (err) {
       setError("Không thể xóa bình luận: " + err.message);
-    } finally {
-      setIsLoading(false);
+      // Revert on error
+      loadComments(pagination.currentPage, filterStatus);
     }
   };
 
@@ -123,7 +132,7 @@ const CommentTable = () => {
           {[
             { id: "all", label: "Tất cả" },
             { id: "pending", label: "Chờ duyệt" },
-            { id: "allowed", label: "Đã duyệt" }, // Thêm tab nếu muốn
+            // { id: "allowed", label: "Đã duyệt" }, // Hidden per requirement
           ].map((tab) => (
             <button
               key={tab.id}
@@ -175,9 +184,11 @@ const CommentTable = () => {
               </tr>
             ) : comments.length === 0 ? (
               <tr>
-                <td colSpan="5" className="py-16 text-center text-gray-500 flex flex-col items-center justify-center">
-                  <FiMessageSquare className="text-4xl mb-3 opacity-20" />
-                  Không có dữ liệu
+                <td colSpan="5" className="py-16 text-center text-gray-500">
+                  <div className="flex flex-col items-center justify-center w-full h-full">
+                    <FiMessageSquare className="text-4xl mb-3 opacity-20" />
+                    Không có dữ liệu
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -259,7 +270,7 @@ const CommentTable = () => {
 
                       <button
                         onClick={() => handleDelete(comment.id)}
-                        title="Xóa vĩnh viễn / Chặn"
+                        title="Xóa vĩnh viễn"
                         className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 hover:scale-110 transition-all"
                       >
                         <FiTrash2 size={18} />

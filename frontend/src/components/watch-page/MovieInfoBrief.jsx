@@ -10,13 +10,15 @@ const MovieInfoBrief = ({ movie, activeEp }) => {
       <div className="mt-6 grid gap-6 lg:grid-cols-8">
         {/* Poster */}
         <div className="lg:col-span-1">
-          <OptimizedImage
-            src={movie.poster}
-            alt={movie.title}
-            className="w-full aspect-[2/3] object-cover rounded-lg shadow-lg"
-            priority={true}
-            size="150"
-          />
+          <Link to={`/movie/${movie.id}`}>
+            <OptimizedImage
+              src={movie.poster}
+              alt={movie.title}
+              className="w-full aspect-[2/3] object-cover rounded-lg shadow-lg hover:opacity-90 transition-opacity"
+              priority={true}
+              size="150"
+            />
+          </Link>
         </div>
 
         <div className="lg:col-span-4">

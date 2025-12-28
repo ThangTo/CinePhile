@@ -2,7 +2,13 @@ import React from "react";
 import { ADMIN_MENU_ITEMS } from "constants/admin";
 import { Link } from "react-router-dom";
 
-const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
+const AdminSidebar = ({
+  activeTab,
+  setActiveTab,
+  isOpen,
+  setIsOpen,
+  menuItems = ADMIN_MENU_ITEMS,
+}) => {
   return (
     <aside
       className={`fixed left-0 top-0 h-screen bg-bgColor4 border-r border-white/10 transition-all duration-300 z-20 ${
@@ -25,7 +31,7 @@ const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
 
       {/* Menu Items */}
       <nav className="p-2 space-y-2">
-        {ADMIN_MENU_ITEMS.map((item) => (
+        {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}

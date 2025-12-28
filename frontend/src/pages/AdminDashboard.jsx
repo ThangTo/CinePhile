@@ -5,7 +5,7 @@ import CommentTable from "components/admin/CommentTable";
 import AdminSidebar from "components/admin/AdminSidebar";
 import AdminOverviewTab from "components/admin/AdminOverviewTab";
 import AdminNotificationTab from "components/admin/AdminNotificationTab";
-import { ADMIN_TABS } from "constants/admin";
+import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState(ADMIN_TABS.OVERVIEW);
@@ -59,6 +59,10 @@ const AdminDashboard = () => {
         setActiveTab={setActiveTab}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
+        menuItems={ADMIN_MENU_ITEMS.filter(
+          (item) =>
+            item.id !== ADMIN_TABS.USERS && item.id !== ADMIN_TABS.SETTINGS
+        )}
       />
 
       <div
@@ -79,14 +83,14 @@ const AdminDashboard = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-5">
+          {/* <div className="flex items-center gap-5">
             <button className="relative text-gray-400 hover:text-white transition-colors">
               <i className="fa-regular fa-bell text-xl"></i>
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
                 3
               </span>
             </button>
-          </div>
+          </div> */}
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 lg:p-8 bg-gradient-to-b from-bgColor to-[#0f1014]">

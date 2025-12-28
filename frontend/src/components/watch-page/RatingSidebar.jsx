@@ -18,10 +18,10 @@ const RatingSidebar = ({ movie }) => {
               <i className="fa-solid fa-star" />
               <span className="text-sm">Đánh giá</span>
             </button>
-            <button className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors">
+            {/* <button className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors">
               <i className="fa-solid fa-comment" />
               <span className="text-sm">Bình luận</span>
-            </button>
+            </button> */}
           </div>
 
           <button
