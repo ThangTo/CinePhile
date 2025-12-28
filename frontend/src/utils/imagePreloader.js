@@ -3,21 +3,42 @@
  * Preloads images to improve user experience and reduce loading delays
  */
 
+import imageCache from "./imageCache";
+
 /**
  * Preload a single image
  * @param {string} src - Image URL
+ * @param {boolean} markInCache - Whether to mark image in cache (default: true)
  * @returns {Promise} - Resolves when image is loaded
  */
-export const preloadImage = (src) => {
+export const preloadImage = (src, markInCache = true) => {
   return new Promise((resolve, reject) => {
     if (!src) {
       reject(new Error("Image source is required"));
       return;
     }
 
+    // Check if already cached
+    if (markInCache && imageCache.isCached(src)) {
+      resolve(new Image());
+      return;
+    }
+
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+    img.onload = () => {
+      // Mark as loaded in cache
+      if (markInCache) {
+        imageCache.markAsLoaded(src);
+      }
+      resolve(img);
+    };
+    img.onerror = () => {
+      // Mark as failed in cache
+      if (markInCache) {
+        imageCache.markAsFailed(src);
+      }
+      reject(new Error(`Failed to load image: ${src}`));
+    };
     img.src = src;
   });
 };

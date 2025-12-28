@@ -85,15 +85,46 @@ export const NotificationProvider = ({ children }) => {
   }, [notifications, lastViewedAt]);
 
   // Fetch unread count from API periodically and refresh notifications
+  // Only poll when page is visible (not in background tab)
   useEffect(() => {
-    if (isAuthenticated) {
-      // Refresh notifications every 30 seconds
-      const interval = setInterval(() => {
-        loadNotifications();
-      }, 30000); // Check every 30 seconds
+    if (!isAuthenticated) return;
 
-      return () => clearInterval(interval);
+    let interval;
+    
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden, clear interval
+        if (interval) {
+          clearInterval(interval);
+          interval = null;
+        }
+      } else {
+        // Page is visible, start polling
+        if (!interval) {
+          loadNotifications(); // Load immediately when page becomes visible
+          interval = setInterval(() => {
+            loadNotifications();
+          }, 30000); // Check every 30 seconds
+        }
+      }
+    };
+
+    // Start polling if page is visible
+    if (!document.hidden) {
+      interval = setInterval(() => {
+        loadNotifications();
+      }, 30000);
     }
+
+    // Listen for visibility changes
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 

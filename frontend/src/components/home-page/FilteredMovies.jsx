@@ -10,6 +10,10 @@ import useFilterOptions from "hooks/useFilterOptions";
 import EmptyState from "components/common/EmptyState";
 import ErrorState from "components/common/ErrorState";
 import { groupSeriesMovies } from "utils/seriesGrouping";
+import LazySection from "components/common/LazySection";
+import { preloadImages } from "utils/imagePreloader";
+import imageCache from "utils/imageCache";
+import apiCache from "utils/apiCache";
 
 const PAGE_SIZE = 32;
 const TYPE_FILTERS = {
@@ -41,24 +45,82 @@ const FilteredMovies = ({ pageType = "genre" }) => {
       setError(null);
       try {
         const params = { page, limit: PAGE_SIZE };
-        let response;
+        let endpoint;
+        let key = requestedKey;
         let effectiveKey = requestedKey;
 
+        // Determine endpoint and key
         if (pageType === "genre") {
-          response = await movieService.getByGenre(requestedKey, params);
-        } else {
-          if (pageType === "country") {
-            response = await movieService.getByCountry(requestedKey, params);
-          } else if (pageType === "type") {
-            const typeMeta = TYPE_FILTERS[requestedKey];
-            if (!typeMeta) {
-              throw new Error("Loại phim không hợp lệ");
-            }
-            effectiveKey = typeMeta.api;
-            response = await movieService.getByType(effectiveKey, params);
-          } else {
-            response = await movieService.getAll({ ...params, [pageType]: requestedKey });
+          endpoint = "getByGenre";
+          key = requestedKey;
+        } else if (pageType === "country") {
+          endpoint = "getByCountry";
+          key = requestedKey;
+        } else if (pageType === "type") {
+          const typeMeta = TYPE_FILTERS[requestedKey];
+          if (!typeMeta) {
+            throw new Error("Loại phim không hợp lệ");
           }
+          endpoint = "getByType";
+          effectiveKey = typeMeta.api;
+          key = effectiveKey;
+        } else {
+          endpoint = "getAll";
+          key = `${pageType}:${requestedKey}`;
+        }
+
+        // Generate cache key
+        const cacheKey = apiCache.generateKey(endpoint, key, params);
+
+        // Check cache first
+        let response = apiCache.get(cacheKey);
+        if (response) {
+          // Use cached data
+          let moviesData = response?.data || [];
+          const paginationData = response?.pagination ||
+            response?.data?.pagination || {
+              page,
+              totalPages: 1,
+              total: moviesData.length,
+              limit: PAGE_SIZE,
+            };
+
+          moviesData = groupSeriesMovies(moviesData);
+
+          setMovies(moviesData);
+          setPagination({
+            page: paginationData.page || page,
+            totalPages: paginationData.totalPages || 1,
+            total: paginationData.total || moviesData.length,
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Check if request is pending
+        const pendingRequest = apiCache.getPending(cacheKey);
+        if (pendingRequest) {
+          // Wait for pending request
+          response = await pendingRequest;
+        } else {
+          // Make new request
+          let requestPromise;
+          if (pageType === "genre") {
+            requestPromise = movieService.getByGenre(requestedKey, params);
+          } else if (pageType === "country") {
+            requestPromise = movieService.getByCountry(requestedKey, params);
+          } else if (pageType === "type") {
+            requestPromise = movieService.getByType(effectiveKey, params);
+          } else {
+            requestPromise = movieService.getAll({ ...params, [pageType]: requestedKey });
+          }
+
+          // Store pending request
+          apiCache.setPending(cacheKey, requestPromise);
+          response = await requestPromise;
+
+          // Cache the response
+          apiCache.set(cacheKey, response);
         }
 
         let moviesData = response?.data || [];
@@ -91,6 +153,122 @@ const FilteredMovies = ({ pageType = "genre" }) => {
 
     fetchFilteredMovies();
   }, [requestedKey, pageType, page]);
+
+  // Preload images for next page after current page is loaded
+  useEffect(() => {
+    if (loading || !movies.length || !pagination.totalPages || pagination.page >= pagination.totalPages) {
+      return;
+    }
+
+    const preloadNextPage = async () => {
+      try {
+        const nextPage = pagination.page + 1;
+        const params = { page: nextPage, limit: PAGE_SIZE };
+        let endpoint;
+        let key = requestedKey;
+        let effectiveKey = requestedKey;
+
+        // Determine endpoint and key
+        if (pageType === "genre") {
+          endpoint = "getByGenre";
+          key = requestedKey;
+        } else if (pageType === "country") {
+          endpoint = "getByCountry";
+          key = requestedKey;
+        } else if (pageType === "type") {
+          const typeMeta = TYPE_FILTERS[requestedKey];
+          if (!typeMeta) return;
+          endpoint = "getByType";
+          effectiveKey = typeMeta.api;
+          key = effectiveKey;
+        } else {
+          endpoint = "getAll";
+          key = `${pageType}:${requestedKey}`;
+        }
+
+        // Generate cache key
+        const cacheKey = apiCache.generateKey(endpoint, key, params);
+
+        // Check cache first
+        let response = apiCache.get(cacheKey);
+        if (response) {
+          // Use cached data
+          const nextPageMovies = response?.data || [];
+          if (nextPageMovies.length === 0) return;
+
+          // Generate optimized poster URLs for next page movies
+          const posterUrls = nextPageMovies
+            .map((movie) => {
+              if (!movie.poster) return null;
+              return `https://images.weserv.nl/?url=${movie.poster}&w=160&q=85&output=webp`;
+            })
+            .filter((url) => url && !imageCache.isCached(url));
+
+          if (posterUrls.length > 0) {
+            await preloadImages(posterUrls, { batchSize: 5 });
+          }
+          return;
+        }
+
+        // Check if request is pending
+        const pendingRequest = apiCache.getPending(cacheKey);
+        if (pendingRequest) {
+          // Wait for pending request
+          response = await pendingRequest;
+        } else {
+          // Make new request
+          let requestPromise;
+          if (pageType === "genre") {
+            requestPromise = movieService.getByGenre(requestedKey, params);
+          } else if (pageType === "country") {
+            requestPromise = movieService.getByCountry(requestedKey, params);
+          } else if (pageType === "type") {
+            requestPromise = movieService.getByType(effectiveKey, params);
+          } else {
+            requestPromise = movieService.getAll({ ...params, [pageType]: requestedKey });
+          }
+
+          // Store pending request
+          apiCache.setPending(cacheKey, requestPromise);
+          response = await requestPromise;
+
+          // Cache the response
+          apiCache.set(cacheKey, response);
+        }
+
+        const nextPageMovies = response?.data || [];
+        if (nextPageMovies.length === 0) return;
+
+        // Generate optimized poster URLs for next page movies
+        // Preload with the same size and quality as MovieCard uses
+        // MovieCard uses size="160" (compact) or size="250" (non-compact) with quality=100 (default)
+        // Since FilteredMovies uses compact=true, we preload with size=160 and quality=100
+        const posterUrls = nextPageMovies
+          .map((movie) => {
+            if (!movie.poster) return null;
+            // Match the URL format used by OptimizedImage in MovieCard (compact mode)
+            return `https://images.weserv.nl/?url=${movie.poster}&w=160&q=100&output=webp`;
+          })
+          .filter((url) => url && !imageCache.isCached(url)); // Only preload if not cached
+
+        if (posterUrls.length > 0) {
+          // Preload in batches to avoid overwhelming the browser
+          // Images will be automatically marked in cache by preloadImage
+          await preloadImages(posterUrls, { batchSize: 5 });
+        }
+      } catch (err) {
+        // Silently fail - preloading is optional
+        console.debug("Failed to preload next page images:", err);
+      }
+    };
+
+    // Wait a bit before preloading to ensure current page images are prioritized
+    const timeoutId = setTimeout(() => {
+      preloadNextPage();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [loading, movies, pagination, requestedKey, pageType]);
 
   const headerLabelMap = React.useMemo(() => {
     return {
@@ -158,26 +336,28 @@ const FilteredMovies = ({ pageType = "genre" }) => {
         ) : movies.length === 0 ? (
           <EmptyState title={emptyText} iconClassName="fa-film" />
         ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-              {movies.map((movie) => (
-                <MovieCard
-                  key={movie.id}
-                  movie={movie}
-                  hoverVisibleAt="md"
-                  hoverCardClass="w-[300px] max-h-[360px] overflow-hidden"
-                  compact
+          <LazySection rootMargin="100px" minHeight="400px">
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                {movies.map((movie) => (
+                  <MovieCard
+                    key={movie.id}
+                    movie={movie}
+                    hoverVisibleAt="md"
+                    hoverCardClass="w-[300px] max-h-[360px] overflow-hidden"
+                    compact
+                  />
+                ))}
+              </div>
+              {pagination.totalPages > 1 && (
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
                 />
-              ))}
-            </div>
-            {pagination.totalPages > 1 && (
-              <Pagination
-                page={pagination.page}
-                totalPages={pagination.totalPages}
-                onPageChange={handlePageChange}
-              />
-            )}
-          </>
+              )}
+            </>
+          </LazySection>
         )}
       </main>
     </div>

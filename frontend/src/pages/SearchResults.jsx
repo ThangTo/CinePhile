@@ -38,21 +38,38 @@ const SearchResults = () => {
 
       setLoading(true);
       setError(null);
+      // Don't clear movies here - keep previous data while loading new page
 
       try {
         const params = { page, limit: PAGE_SIZE };
         const response = await movieService.search(query, params);
-        let moviesData = response?.data || [];
-        const paginationData = response?.pagination ||
-          response?.data?.pagination || {
-            page,
-            totalPages: 1,
-            total: moviesData.length,
-            limit: PAGE_SIZE,
-          };
+
+        // Validate response format
+        if (!response || typeof response !== "object") {
+          throw new Error("Invalid response format");
+        }
+
+        let moviesData = response?.data;
+
+        // Ensure moviesData is an array
+        if (!Array.isArray(moviesData)) {
+          moviesData = [];
+        }
+
+        const paginationData = response?.pagination || {
+          page,
+          totalPages: 1,
+          total: moviesData.length,
+          limit: PAGE_SIZE,
+        };
 
         // Group multi-part series into single card with parts metadata
         moviesData = groupSeriesMovies(moviesData);
+
+        // Ensure groupSeriesMovies returns an array
+        if (!Array.isArray(moviesData)) {
+          moviesData = [];
+        }
 
         setMovies(moviesData);
         setPagination({
@@ -61,10 +78,12 @@ const SearchResults = () => {
           total: paginationData.total || moviesData.length,
         });
       } catch (err) {
-        console.error("Error fetching search results:", err);
         setError("Không thể tải kết quả tìm kiếm. Vui lòng thử lại sau.");
-        setMovies([]);
-        setPagination({ page: 1, totalPages: 1, total: 0 });
+        // Only clear movies on error if we're on page 1
+        if (page === 1) {
+          setMovies([]);
+          setPagination({ page: 1, totalPages: 1, total: 0 });
+        }
       } finally {
         setLoading(false);
       }
@@ -104,10 +123,16 @@ const SearchResults = () => {
 
         {error ? (
           <ErrorState message={error} />
-        ) : movies.length === 0 ? (
+        ) : movies.length === 0 && !loading && page === 1 ? (
           <EmptyState
             title="Không tìm thấy kết quả phù hợp"
             message={`Chúng mình không tìm thấy phim nào khớp với từ khóa "${query}". Hãy thử dùng từ khóa khác ngắn gọn hơn, hoặc kiểm tra lại chính tả nhé.`}
+            iconClassName="fa-film"
+          />
+        ) : movies.length === 0 && !loading && page > 1 ? (
+          <EmptyState
+            title="Không có dữ liệu"
+            message="Trang này không có dữ liệu. Vui lòng quay lại trang trước."
             iconClassName="fa-film"
           />
         ) : (
