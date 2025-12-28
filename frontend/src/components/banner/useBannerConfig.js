@@ -1,7 +1,8 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
+import favoritesCache from "utils/favoritesCache";
 
 /**
  * Custom hook to generate banner configuration
@@ -16,29 +17,49 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
   const { isAuthenticated, openAuthModal, user } = useAuth();
   const [favoritesList, setFavoritesList] = useState([]);
   const [isFavorite, setIsFavorite] = useState(false);
+  const hasFetchedRef = useRef(false);
 
-  // Fetch favorites list when authenticated
+  // Fetch favorites list when authenticated (with cache)
   useEffect(() => {
-    if (isAuthenticated && user) {
-      const fetchFavorites = async () => {
-        try {
-          const response = await userService.getFavorites({ limit: 1000 });
-          const favorites = response?.data || [];
-          const favoriteIds = favorites.map((fav) => 
-            fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
-          );
-          setFavoritesList(favoriteIds);
-          setIsFavorite(favoriteIds.includes(movieData.id));
-        } catch (error) {
-          console.error("Error fetching favorites:", error);
-        }
-      };
-      fetchFavorites();
-    } else {
+    if (!isAuthenticated || !user?.id || !movieData?.id) {
       setFavoritesList([]);
       setIsFavorite(false);
+      return;
     }
-  }, [isAuthenticated, user, movieData.id]);
+
+    // Use cache to avoid repeated API calls
+    const fetchFavorites = async () => {
+      try {
+        const favoriteIds = await favoritesCache.getOrFetch(async () => {
+          const response = await userService.getFavorites({ limit: 1000 });
+          const favorites = response?.data || [];
+          return favorites.map((fav) => 
+            fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
+          );
+        });
+        
+        setFavoritesList(favoriteIds);
+        setIsFavorite(favoriteIds.includes(movieData.id));
+      } catch (error) {
+        console.error("Error fetching favorites:", error);
+        setFavoritesList([]);
+        setIsFavorite(false);
+      }
+    };
+
+    // Only fetch once per component mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchFavorites();
+    } else {
+      // If already fetched, check cache
+      const cached = favoritesCache.get();
+      if (cached) {
+        setFavoritesList(cached);
+        setIsFavorite(cached.includes(movieData.id));
+      }
+    }
+  }, [isAuthenticated, user?.id, movieData?.id]);
 
   // Info badges configuration
   const infoBadges = useMemo(
@@ -64,11 +85,15 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
         await userService.removeFromFavorites(movieData.id);
         setIsFavorite(false);
         setFavoritesList((prev) => prev.filter((id) => id !== movieData.id));
+        // Clear cache to force refresh on next fetch
+        favoritesCache.clear();
         if (successToast) successToast("Đã xóa khỏi danh sách yêu thích!");
       } else {
         await userService.addToFavorites(movieData.id);
         setIsFavorite(true);
         setFavoritesList((prev) => [...prev, movieData.id]);
+        // Clear cache to force refresh on next fetch
+        favoritesCache.clear();
         if (successToast) successToast("Đã thêm vào danh sách yêu thích!");
       }
     } catch (error) {

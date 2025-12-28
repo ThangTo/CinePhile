@@ -4,6 +4,7 @@ import CategoryChips from "components/home-page/CategoryChips";
 import SectionRow from "components/home-page/SectionRow";
 import Top10Movie from "components/home-page/Top10Movie";
 import ContinueWatching from "components/home-page/ContinueWatching";
+import LazySection from "components/common/LazySection";
 // import QuickAdminLogin from "components/general/QuickAdminLogin";
 
 /**
@@ -18,29 +19,47 @@ const HomePage = () => {
         <CategoryChips />
 
         {/* Continue Watching Section - Only shows when user is authenticated */}
-        <ContinueWatching />
+        <LazySection rootMargin="150px">
+          <ContinueWatching />
+        </LazySection>
 
         {/* Trending Section - Uses mock data */}
-        <SectionRow title="Phim Đang Thịnh Hành" sectionType="trending" linkHref="/trending" />
+        <LazySection rootMargin="200px">
+          <SectionRow title="Phim Đang Thịnh Hành" sectionType="trending" linkHref="/trending" />
+        </LazySection>
 
         {/* New Releases Section - Uses mock data */}
-        <SectionRow title="Phim Mới Cập Nhật" sectionType="newReleases" linkHref="/new-releases" />
+        <LazySection rootMargin="200px">
+          <SectionRow
+            title="Phim Mới Cập Nhật"
+            sectionType="newReleases"
+            linkHref="/new-releases"
+          />
+        </LazySection>
 
         {/* Top 10 Phim Bộ Hôm Nay */}
-        <Top10Movie title="Top 10 Phim Bộ Hôm Nay" linkHref="/top10" type="series" />
+        <LazySection rootMargin="200px">
+          <Top10Movie title="Top 10 Phim Bộ Hôm Nay" linkHref="/top10" type="series" />
+        </LazySection>
 
         {/* Another Trending Section */}
-        <SectionRow
-          title="Mãn Nhãn Với Phim Chiếu Rạp"
-          sectionType="trending"
-          typeMovies="single"
-          linkHref="/cinema"
-        />
+        <LazySection rootMargin="200px">
+          <SectionRow
+            title="Mãn Nhãn Với Phim Chiếu Rạp"
+            sectionType="trending"
+            typeMovies="single"
+            linkHref="/cinema"
+          />
+        </LazySection>
 
-        <SectionRow title="Gia Đình Là Số 1" linkHref="/family" genre="Gia Đình" />
+        <LazySection rootMargin="200px">
+          <SectionRow title="Gia Đình Là Số 1" linkHref="/family" genre="Gia Đình" />
+        </LazySection>
 
         {/* Top 10 Phim Lẻ Hôm Nay */}
-        <Top10Movie title="Top 10 Phim Lẻ Hôm Nay" linkHref="/top10" type="single" />
+        <LazySection rootMargin="200px">
+          <Top10Movie title="Top 10 Phim Lẻ Hôm Nay" linkHref="/top10" type="single" />
+        </LazySection>
       </div>
 
       {/* Quick Admin Login - Development Tool */}

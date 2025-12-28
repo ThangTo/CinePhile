@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useToast from "hooks/useToast";
 import useAuth from "hooks/useAuth";
@@ -6,33 +6,52 @@ import useMovieRating from "hooks/useMovieRating";
 import ToastContainer from "components/common/ToastContainer";
 import RatingModal from "components/watch-page/RatingModal";
 import userService from "services/user.service";
+import favoritesCache from "utils/favoritesCache";
 
 const ActionButtons = ({ movie, audioType }) => {
   const navigate = useNavigate();
   const { toasts, removeToast, success, info, warning } = useToast();
   const { isAuthenticated, openAuthModal, user } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
+  const hasFetchedRef = useRef(false);
 
-  // Fetch favorites list when authenticated
+  // Fetch favorites list when authenticated (with cache)
   useEffect(() => {
-    if (isAuthenticated && user && movie?.id) {
-      const fetchFavorites = async () => {
-        try {
+    if (!isAuthenticated || !user?.id || !movie?.id) {
+      setIsFavorite(false);
+      return;
+    }
+
+    // Use cache to avoid repeated API calls
+    const fetchFavorites = async () => {
+      try {
+        const favoriteIds = await favoritesCache.getOrFetch(async () => {
           const response = await userService.getFavorites({ limit: 1000 });
           const favorites = response?.data || [];
-          const favoriteIds = favorites.map(
+          return favorites.map(
             (fav) => fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
           );
-          setIsFavorite(favoriteIds.includes(movie.id));
-        } catch (error) {
-          console.error("Error fetching favorites:", error);
-        }
-      };
+        });
+
+        setIsFavorite(favoriteIds.includes(movie.id));
+      } catch (error) {
+        console.error("Error fetching favorites:", error);
+        setIsFavorite(false);
+      }
+    };
+
+    // Only fetch once per component mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       fetchFavorites();
     } else {
-      setIsFavorite(false);
+      // If already fetched, check cache
+      const cached = favoritesCache.get();
+      if (cached) {
+        setIsFavorite(cached.includes(movie.id));
+      }
     }
-  }, [isAuthenticated, user, movie?.id]);
+  }, [isAuthenticated, user?.id, movie?.id]);
   const {
     isModalOpen,
     openRatingModal,
@@ -49,10 +68,14 @@ const ActionButtons = ({ movie, audioType }) => {
       if (isFavorite) {
         await userService.removeFromFavorites(movie.id);
         setIsFavorite(false);
+        // Clear cache to force refresh on next fetch
+        favoritesCache.clear();
         success("Đã xóa khỏi danh sách yêu thích!");
       } else {
         await userService.addToFavorites(movie.id);
         setIsFavorite(true);
+        // Clear cache to force refresh on next fetch
+        favoritesCache.clear();
         success("Đã thêm vào danh sách yêu thích!");
       }
     } catch (error) {

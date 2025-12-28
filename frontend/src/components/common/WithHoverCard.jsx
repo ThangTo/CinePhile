@@ -9,7 +9,7 @@ const WithHoverCard = ({
   className = "relative flex-shrink-0",
   hoverPosition = "-left-20 -top-4",
   showDelay = 500,
-  hideDelay = 50,
+  hideDelay = 0,
   viewportPaddingLeft = 16,
   viewportPaddingRight = 34,
   onClick,
@@ -111,7 +111,6 @@ const WithHoverCard = ({
 
   const onEnter = (e) => {
     isPointerInsideRef.current = true;
-    handleMouseEnter(e);
 
     // Preload hover card background image immediately on hover
     // This ensures the image is ready when the hover card appears (after delay)
@@ -123,9 +122,29 @@ const WithHoverCard = ({
         });
       }
     }
+
+    handleMouseEnter(e);
   };
+
   const onLeave = (e) => {
     isPointerInsideRef.current = false;
+    // Check if mouse is moving to hover card itself
+    const relatedTarget = e.relatedTarget;
+    // Ensure relatedTarget is a valid Node before calling contains
+    if (
+      relatedTarget &&
+      relatedTarget instanceof Node &&
+      hoverShellRef.current &&
+      wrapperRef.current
+    ) {
+      if (
+        hoverShellRef.current.contains(relatedTarget) ||
+        wrapperRef.current.contains(relatedTarget)
+      ) {
+        // Mouse is moving to hover card, don't hide
+        return;
+      }
+    }
     handleMouseLeave(e);
   };
 
@@ -151,8 +170,23 @@ const WithHoverCard = ({
             transform: `translate(${offset.x}px, ${offset.y}px)`,
             transformOrigin: "center center",
           }}
-          onMouseEnter={onEnter}
-          onMouseLeave={onLeave}
+          onMouseEnter={(e) => {
+            isPointerInsideRef.current = true;
+            // Don't call handleMouseEnter again, just mark as inside
+          }}
+          onMouseLeave={(e) => {
+            isPointerInsideRef.current = false;
+            const relatedTarget = e.relatedTarget;
+            // Only hide if mouse is not moving to wrapper
+            // Ensure relatedTarget is a valid Node before calling contains
+            if (
+              !relatedTarget ||
+              !(relatedTarget instanceof Node) ||
+              !wrapperRef.current?.contains(relatedTarget)
+            ) {
+              handleMouseLeave(e);
+            }
+          }}
         >
           <div className={isAnimating ? "animate-pop-up" : "opacity-0"}>
             <MovieHoverCard movie={movie} hoverClass={hoverCardClass} compact={compact} />

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useToast from "hooks/useToast";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
 import ToastContainer from "components/common/ToastContainer";
+import { preloadImage } from "utils/imagePreloader";
+import favoritesCache from "utils/favoritesCache";
 import HoverCardHeader from "./HoverCardHeader";
 import HoverCardActions from "./HoverCardActions";
 import HoverCardInfo from "./HoverCardInfo";
@@ -20,27 +22,61 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
   const { toasts, removeToast, success, warning } = useToast();
   const { isAuthenticated, openAuthModal, user } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
+  const hasFetchedRef = useRef(false);
 
-  // Fetch favorites list when authenticated
+  // Preload detail page images when hover card is shown
   useEffect(() => {
-    if (isAuthenticated && user && movie?.id) {
-      const fetchFavorites = async () => {
-        try {
+    if (!movie) return;
+
+    // Preload background and poster for detail page
+    const bgImage = movie.bgImage || movie.backgroundImage || movie.poster;
+    if (bgImage) {
+      const optimizedBg = `https://images.weserv.nl/?url=${bgImage}&w=1400&q=85&output=webp`;
+      preloadImage(optimizedBg).catch(() => {});
+    }
+    if (movie.poster) {
+      const optimizedPoster = `https://images.weserv.nl/?url=${movie.poster}&w=400&q=90&output=webp`;
+      preloadImage(optimizedPoster).catch(() => {});
+    }
+  }, [movie]);
+
+  // Fetch favorites list when authenticated (with cache)
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || !movie?.id) {
+      setIsFavorite(false);
+      return;
+    }
+
+    // Use cache to avoid repeated API calls
+    const fetchFavorites = async () => {
+      try {
+        const favoriteIds = await favoritesCache.getOrFetch(async () => {
           const response = await userService.getFavorites({ limit: 1000 });
           const favorites = response?.data || [];
-          const favoriteIds = favorites.map((fav) => 
+          return favorites.map((fav) => 
             fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
           );
-          setIsFavorite(favoriteIds.includes(movie.id));
-        } catch (error) {
-          console.error("Error fetching favorites:", error);
-        }
-      };
+        });
+        
+        setIsFavorite(favoriteIds.includes(movie.id));
+      } catch (error) {
+        console.error("Error fetching favorites:", error);
+        setIsFavorite(false);
+      }
+    };
+
+    // Only fetch once per component mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       fetchFavorites();
     } else {
-      setIsFavorite(false);
+      // If already fetched, check cache
+      const cached = favoritesCache.get();
+      if (cached) {
+        setIsFavorite(cached.includes(movie.id));
+      }
     }
-  }, [isAuthenticated, user, movie?.id]);
+  }, [isAuthenticated, user?.id, movie?.id]);
 
   // Handler functions
   const handleWatch = (e) => {
@@ -58,10 +94,14 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
       if (isFavorite) {
         await userService.removeFromFavorites(movie.id);
         setIsFavorite(false);
+        // Clear cache to force refresh on next fetch
+        favoritesCache.clear();
         success("Đã xóa khỏi danh sách yêu thích!");
       } else {
         await userService.addToFavorites(movie.id);
         setIsFavorite(true);
+        // Clear cache to force refresh on next fetch
+        favoritesCache.clear();
         success("Đã thêm vào danh sách yêu thích!");
       }
     } catch (error) {

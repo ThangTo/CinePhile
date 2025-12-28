@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import WithHoverCard from "components/common/WithHoverCard";
 import OptimizedImage from "components/common/OptimizedImage";
+import { preloadImage } from "utils/imagePreloader";
 
 const MovieCard = ({
   movie,
@@ -16,6 +17,33 @@ const MovieCard = ({
     navigate(`/movie/${movie.id}`);
   };
 
+  // Preload detail page images when hovering over card
+  useEffect(() => {
+    if (!movie) return;
+
+    const cardElement = document.querySelector(`[data-movie-id="${movie.id}"]`);
+    if (!cardElement) return;
+
+    const handleMouseEnter = () => {
+      // Preload background and poster for detail page
+      const bgImage = movie.bgImage || movie.backgroundImage || movie.poster;
+      if (bgImage) {
+        // Preload with optimized size
+        const optimizedBg = `https://images.weserv.nl/?url=${bgImage}&w=1400&q=85&output=webp`;
+        preloadImage(optimizedBg).catch(() => {});
+      }
+      if (movie.poster) {
+        const optimizedPoster = `https://images.weserv.nl/?url=${movie.poster}&w=400&q=90&output=webp`;
+        preloadImage(optimizedPoster).catch(() => {});
+      }
+    };
+
+    cardElement.addEventListener("mouseenter", handleMouseEnter);
+    return () => {
+      cardElement.removeEventListener("mouseenter", handleMouseEnter);
+    };
+  }, [movie]);
+
   return (
     <WithHoverCard
       movie={movie}
@@ -27,6 +55,7 @@ const MovieCard = ({
       compact={compact}
     >
       <div
+        data-movie-id={movie.id}
         className={`group bg-bgColor4 rounded-2xl ${
           compact ? "p-2" : "p-4"
         } shadow-lg border border-white/5 cursor-pointer transition-all duration-300 hover:border-primaryColor/60`}
@@ -38,7 +67,8 @@ const MovieCard = ({
             alt={movie.title}
             className="w-full aspect-[2/3] object-cover transition-transform duration-300 group-hover:scale-105 pointer-events-none"
             preloadOnHover={true}
-            priority={true}
+            lazy={true}
+            priority={false}
             size={compact ? "160" : "250"}
           />
           <div className="absolute left-2 top-1 z-10">
