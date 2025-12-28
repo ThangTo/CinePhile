@@ -25,7 +25,7 @@ const UserInfoCard = ({ user }) => {
           <p className="text-gray-300 text-xs">
             {isPremium
               ? "Bạn đang sử dụng tài khoản Premium"
-              : "Nâng cấp tài khoản Cinx để có trải nghiệm đẳng cấp hơn."}
+              : "Nâng cấp tài khoản để có trải nghiệm đẳng cấp hơn."}
           </p>
         </div>
       </div>
