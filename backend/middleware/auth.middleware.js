@@ -29,6 +29,17 @@ const authMiddleware = async (req, res, next) => {
           const decoded = jwt.verify(newTokens.token, process.env.JWT_SECRET);
           const user = await User.findById(decoded.userId);
           if (user) {
+            // Check if premium subscription has expired and downgrade if needed
+            if (user.role === 'premium' && user.premiumExpiresAt) {
+              const now = new Date();
+              const expiresAt = new Date(user.premiumExpiresAt);
+              if (expiresAt <= now) {
+                user.role = 'user';
+                user.premiumPlan = null;
+                user.premiumExpiresAt = null;
+                await user.save();
+              }
+            }
             req.user = user;
             return next();
           }
@@ -50,6 +61,18 @@ const authMiddleware = async (req, res, next) => {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
+      // Check if premium subscription has expired and downgrade if needed
+      if (user.role === 'premium' && user.premiumExpiresAt) {
+        const now = new Date();
+        const expiresAt = new Date(user.premiumExpiresAt);
+        if (expiresAt <= now) {
+          user.role = 'user';
+          user.premiumPlan = null;
+          user.premiumExpiresAt = null;
+          await user.save();
+        }
+      }
+
       req.user = user;
       return next();
     } catch (tokenError) {
@@ -64,6 +87,17 @@ const authMiddleware = async (req, res, next) => {
             const decoded = jwt.verify(newTokens.token, process.env.JWT_SECRET);
             const user = await User.findById(decoded.userId);
             if (user) {
+              // Check if premium subscription has expired and downgrade if needed
+              if (user.role === 'premium' && user.premiumExpiresAt) {
+                const now = new Date();
+                const expiresAt = new Date(user.premiumExpiresAt);
+                if (expiresAt <= now) {
+                  user.role = 'user';
+                  user.premiumPlan = null;
+                  user.premiumExpiresAt = null;
+                  await user.save();
+                }
+              }
               req.user = user;
               return next();
             }
@@ -110,6 +144,17 @@ const optionalAuth = async (req, res, next) => {
       const user = await User.findById(decoded.userId);
 
       if (user) {
+        // Check if premium subscription has expired and downgrade if needed
+        if (user.role === 'premium' && user.premiumExpiresAt) {
+          const now = new Date();
+          const expiresAt = new Date(user.premiumExpiresAt);
+          if (expiresAt <= now) {
+            user.role = 'user';
+            user.premiumPlan = null;
+            user.premiumExpiresAt = null;
+            await user.save();
+          }
+        }
         req.user = user;
       } else {
         req.user = null;

@@ -1,9 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { USER_MENU_ITEMS, MOBILE_MENU_ITEM_CLASS } from "./constants";
+import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 
 const UserInfoCard = ({ user }) => {
-  const isPremium = user.role === "premium";
+  const isPremium = isPremiumActive(user);
   
   return (
     <div className="bg-gradient-to-br from-[#4a5a7f] to-[#3b4d6f] rounded-xl p-4 mb-4">
@@ -24,7 +25,7 @@ const UserInfoCard = ({ user }) => {
           </div>
           <p className="text-gray-300 text-xs">
             {isPremium
-              ? "Bạn đang sử dụng tài khoản Premium"
+              ? getPremiumStatusText(user)
               : "Nâng cấp tài khoản Cinx để có trải nghiệm đẳng cấp hơn."}
           </p>
         </div>

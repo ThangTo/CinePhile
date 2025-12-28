@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
 import { BarSpinner } from "components/common/LoadingState";
+import { isPremiumActive, getRemainingDays } from "utils/premiumUtils";
 
 // Import Icons
 import { 
@@ -24,6 +25,7 @@ const PremiumPage = () => {
   const navigate = useNavigate();
   const { user, updateUser, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [loadingPlanId, setLoadingPlanId] = useState(null); // Track which plan is being processed
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -96,6 +98,7 @@ const PremiumPage = () => {
     }
 
     setLoading(true);
+    setLoadingPlanId(planId); // Set the plan being processed
     setError(null);
     setSuccess(null);
 
@@ -119,6 +122,7 @@ const PremiumPage = () => {
       setError(err.message || "Có lỗi xảy ra khi nâng cấp");
     } finally {
       setLoading(false);
+      setLoadingPlanId(null); // Clear the loading plan ID
     }
   };
 
@@ -131,8 +135,11 @@ const PremiumPage = () => {
     );
   }
 
-  const isPremium = user.role === "premium";
+  // Check if user is premium and subscription is still valid
+  const isPremium = isPremiumActive(user);
   const userCoins = user.coin || 0;
+  const currentPlan = user.premiumPlan;
+  const remainingDays = getRemainingDays(user);
 
   return (
     <div className="min-h-screen bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
@@ -202,7 +209,9 @@ const PremiumPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
             {plans.map((plan) => {
               const canAfford = userCoins >= plan.price;
-              const isDisabled = isPremium || !canAfford || loading;
+              const isCurrentPlan = isPremium && currentPlan === plan.id;
+              const isProcessing = loadingPlanId === plan.id; // Check if this specific plan is being processed
+              const isDisabled = (isPremium && !isCurrentPlan) || !canAfford || loading;
               const isPopular = plan.popular;
 
               return (
@@ -239,6 +248,14 @@ const PremiumPage = () => {
                       </span>
                       <span className="text-gray-500 font-medium mt-auto mb-2">Coin</span>
                     </div>
+
+                    {/* Premium Status Badge */}
+                    {isCurrentPlan && (
+                      <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primaryColor/20 border border-primaryColor/30 text-primaryColor text-xs font-bold">
+                        <FiCheckCircle className="w-3 h-3" />
+                        Premium {remainingDays} ngày
+                      </div>
+                    )}
                     
                     {/* Khu vực giá gốc (Dùng Spacer nếu không có giảm giá) */}
                     <div className="h-6 mt-2 flex items-center justify-center gap-2">
@@ -292,9 +309,9 @@ const PremiumPage = () => {
                         }
                       `}
                     >
-                      {loading ? (
+                      {isProcessing ? (
                         <><BarSpinner className="w-4 h-4" /> Đang xử lý...</>
-                      ) : isPremium ? (
+                      ) : isCurrentPlan ? (
                         <><FiCheckCircle className="w-4 h-4" /> Đang sử dụng</>
                       ) : !canAfford ? (
                         `Thiếu ${(plan.price - userCoins).toLocaleString()}`

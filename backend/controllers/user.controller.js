@@ -403,9 +403,14 @@ const upgradePremium = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if already premium
-    if (user.role === 'premium') {
-      return res.status(400).json({ message: 'Bạn đã là thành viên Premium' });
+    // Check if already premium and still valid
+    const now = new Date();
+    if (user.role === 'premium' && user.premiumExpiresAt && user.premiumExpiresAt > now) {
+      return res.status(400).json({
+        message: `Bạn đã là thành viên Premium ${
+          user.premiumPlan || ''
+        }. Gói còn hiệu lực đến ${user.premiumExpiresAt.toLocaleDateString('vi-VN')}`,
+      });
     }
 
     // Check if user has enough coins
@@ -417,9 +422,21 @@ const upgradePremium = async (req, res) => {
       });
     }
 
+    // Calculate expiry date based on plan
+    const expiryDate = new Date();
+    if (plan === 'weekly') {
+      expiryDate.setDate(expiryDate.getDate() + 7);
+    } else if (plan === 'monthly') {
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
+    } else if (plan === 'yearly') {
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    }
+
     // Deduct coins and upgrade to premium
     user.coin -= requiredCoins;
     user.role = 'premium';
+    user.premiumPlan = plan;
+    user.premiumExpiresAt = expiryDate;
     await user.save();
 
     res.status(200).json({

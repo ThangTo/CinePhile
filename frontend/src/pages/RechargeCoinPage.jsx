@@ -88,15 +88,23 @@ const RechargeCoinPage = () => {
       setIsCreatingLink(true);
       setError(null);
 
+      // Get bonus from selected package
+      const selectedPackage = coinPackages.find((pkg) => pkg.amount === selectedAmount);
+      const bonus = selectedPackage?.bonus || 0;
+
       // Call Backend to Create Payment Link
-      const response = await fetch("https://cinephine-server.up.railway.app/api/v1/create-payment-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user._id,
-          amount: amount,
-        }),
-      });
+      const response = await fetch(
+        "https://cinephine-server.up.railway.app/api/v1/create-payment-link",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user._id,
+            amount: amount,
+            bonus: bonus, // Send bonus to backend
+          }),
+        }
+      );
 
       const result = await response.json();
 
@@ -219,7 +227,7 @@ const RechargeCoinPage = () => {
                         {pkg.label}
                       </span>
                       <span className="text-sm text-gray-400 font-medium tracking-wider">
-                        {pkg.amount.toLocaleString()} VNĐ
+                        {(pkg.amount * 10).toLocaleString()} VNĐ
                       </span>
 
                       {/* Bonus Display */}
@@ -307,6 +315,17 @@ const RechargeCoinPage = () => {
                     Bạn đã chọn mua gói{" "}
                     <strong className="text-white">
                       {finalAmount > 0 ? finalAmount.toLocaleString() : "0"} Coin
+                    </strong>
+                    {selectedPackage?.bonus > 0 && (
+                      <span className="text-green-400 ml-2">
+                        + {selectedPackage.bonus.toLocaleString()} Bonus
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-gray-400">
+                    Tổng coin nhận được:{" "}
+                    <strong className="text-white text-xl">
+                      {(finalAmount + (selectedPackage?.bonus || 0)).toLocaleString()} Coin
                     </strong>
                   </p>
                   <p className="text-gray-400">

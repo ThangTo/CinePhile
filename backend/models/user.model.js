@@ -36,6 +36,15 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'premium', 'admin'],
       default: 'user',
     },
+    premiumPlan: {
+      type: String,
+      enum: ['weekly', 'monthly', 'yearly'],
+      default: null,
+    },
+    premiumExpiresAt: {
+      type: Date,
+      default: null,
+    },
     coin: {
       type: Number,
       default: 0,
