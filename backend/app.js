@@ -14,10 +14,13 @@ const authService = require('./services/auth.service');
 const { getGoogleCallbackUrl } = require('./utils/authUtils');
 
 // Middleware
-const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.CLIENT_URL_LOCAL || 'http://localhost:5001',
+];
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
