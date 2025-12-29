@@ -23,7 +23,17 @@ router.get('/movies', adminController.getAllMovies);
 // GET /api/v1/admin/movies/search - Search movies
 router.get('/movies/search', adminController.searchMovies);
 
-// GET /api/v1/admin/movies/:id - Get movie by ID
+// ===== ADMIN MOVIES CRAWL (Must be before /movies/:id to avoid route conflict) =====
+// POST /api/v1/admin/movies/crawl/by-page - Crawl movies by page range
+router.post('/movies/crawl/by-page', adminController.crawlMoviesByPage);
+
+// POST /api/v1/admin/movies/crawl/search - Search movies for crawling
+router.post('/movies/crawl/search', adminController.searchMoviesForCrawl);
+
+// POST /api/v1/admin/movies/crawl/by-slug - Crawl a single movie by slug
+router.post('/movies/crawl/by-slug', adminController.crawlMovieBySlug);
+
+// GET /api/v1/admin/movies/:id - Get movie by ID (Must be after /movies/crawl routes)
 router.get('/movies/:id', adminController.getMovieById);
 
 // POST /api/v1/admin/movies - Create movie

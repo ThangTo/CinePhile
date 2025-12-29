@@ -128,9 +128,22 @@ const transformMovieData = (movieData, isUpdate = false) => {
 
   // Apply field mappings
   Object.keys(fieldMappings).forEach((frontendField) => {
-    if (movieData[frontendField] !== undefined) {
-      const dbField = fieldMappings[frontendField];
-      transformed[dbField] = movieData[frontendField];
+    // For URL fields (poster, backgroundImage, trailer), include empty strings
+    // For other fields, skip undefined and null
+    const isUrlField = frontendField === 'poster' || frontendField === 'backgroundImage' || frontendField === 'trailer';
+    
+    if (isUrlField) {
+      // URL fields: include if not undefined (empty string is valid)
+      if (movieData[frontendField] !== undefined) {
+        const dbField = fieldMappings[frontendField];
+        transformed[dbField] = movieData[frontendField] || '';
+      }
+    } else {
+      // Other fields: skip undefined and null
+      if (movieData[frontendField] !== undefined && movieData[frontendField] !== null) {
+        const dbField = fieldMappings[frontendField];
+        transformed[dbField] = movieData[frontendField];
+      }
     }
   });
 

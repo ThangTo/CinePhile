@@ -20,7 +20,8 @@ const WatchPage = () => {
   const [searchParams] = useSearchParams();
   const episodeParam = parseInt(searchParams.get("ep") || "1", 10);
   const audioParam = searchParams.get("audio") || null;
-  const resumeTime = location.state?.resumeTime || null;
+  const resumeTime = location.state?.resumeTime !== undefined ? location.state.resumeTime : null;
+  const startFromBeginning = location.state?.startFromBeginning || false;
 
   const [movie, setMovie] = useState(null);
   const [episodes, setEpisodes] = useState([]);
@@ -148,7 +149,7 @@ const WatchPage = () => {
               totalEpisodes={filteredEpisodes.length}
               audioType={audioType}
               onAudioTypeChange={setAudioType}
-              resumeTime={resumeTime}
+              resumeTime={startFromBeginning ? 0 : resumeTime}
             />
 
             {/* Action Bar - Only favorite and add buttons */}

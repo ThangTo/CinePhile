@@ -125,19 +125,21 @@ const SearchResults = () => {
           <ErrorState message={error} />
         ) : movies.length === 0 && !loading && page === 1 ? (
           <EmptyState
+            className="min-h-[500px]"
             title="Không tìm thấy kết quả phù hợp"
             message={`Chúng mình không tìm thấy phim nào khớp với từ khóa "${query}". Hãy thử dùng từ khóa khác ngắn gọn hơn, hoặc kiểm tra lại chính tả nhé.`}
             iconClassName="fa-film"
           />
         ) : movies.length === 0 && !loading && page > 1 ? (
           <EmptyState
+            className="min-h-[500px]"
             title="Không có dữ liệu"
             message="Trang này không có dữ liệu. Vui lòng quay lại trang trước."
             iconClassName="fa-film"
           />
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
               {movies.map((movie) => (
                 <MovieCard
                   key={movie.id}

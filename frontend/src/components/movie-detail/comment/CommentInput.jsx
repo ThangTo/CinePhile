@@ -9,6 +9,7 @@ const CommentInput = ({
   onSubmit,
   isAuthenticated,
   onOpenAuth,
+  isSubmitting = false,
 }) => {
   const { user } = useAuth();
 
@@ -81,10 +82,24 @@ const CommentInput = ({
           <div className="flex items-center gap-3">
             <button
               onClick={onSubmit}
-              className="bg-primaryColor hover:bg-primaryColor/90 text-black font-medium px-5 py-2 rounded-lg flex items-center gap-2 transition-all hover:scale-105"
+              disabled={isSubmitting || !commentText.trim()}
+              className={`font-medium px-5 py-2 rounded-lg flex items-center gap-2 transition-all ${
+                isSubmitting || !commentText.trim()
+                  ? "bg-gray-600 text-gray-400 cursor-not-allowed"
+                  : "bg-primaryColor hover:bg-primaryColor/90 text-black hover:scale-105"
+              }`}
             >
-              <span>Gửi</span>
-              <i className="fa-solid fa-paper-plane text-sm" />
+              {isSubmitting ? (
+                <>
+                  <span>Đang gửi...</span>
+                  <i className="fa-solid fa-spinner fa-spin text-sm" />
+                </>
+              ) : (
+                <>
+                  <span>Gửi</span>
+                  <i className="fa-solid fa-paper-plane text-sm" />
+                </>
+              )}
             </button>
           </div>
         </div>

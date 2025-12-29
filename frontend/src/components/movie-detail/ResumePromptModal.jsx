@@ -41,7 +41,10 @@ const ResumePromptModal = ({ isOpen, onClose, savedProgress, movie, audioType })
     const savedAudioType = episode.audioType || audioType;
     const audioQuery = savedAudioType ? `&audio=${encodeURIComponent(savedAudioType)}` : "";
 
-    navigate(`/watch/${movieId}?ep=${episodeNumber}${audioQuery}`);
+    // Truyền resumeTime: 0 để báo cho VideoPlayer biết phải bắt đầu từ đầu
+    navigate(`/watch/${movieId}?ep=${episodeNumber}${audioQuery}`, {
+      state: { resumeTime: 0, startFromBeginning: true },
+    });
     onClose();
   };
 

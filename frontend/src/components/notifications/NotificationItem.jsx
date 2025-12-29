@@ -81,7 +81,7 @@ const NotificationItem = ({ notification, isActive = false, onDelete }) => {
           </div>
 
           {/* Message Body */}
-          <p className={`text-sm leading-relaxed line-clamp-2 ${
+          <p className={`text-sm leading-relaxed ${
              !isRead ? "text-gray-300" : "text-gray-500"
           }`}>
             {notification.message}

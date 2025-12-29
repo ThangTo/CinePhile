@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { commentAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
+import ConfirmDialog from "components/common/ConfirmDialog";
 // Import Icons
 import { 
   FiCheck, 
@@ -20,6 +21,8 @@ const CommentTable = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedCommentId, setSelectedCommentId] = useState(null);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -75,18 +78,27 @@ const CommentTable = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc muốn xóa bình luận này vĩnh viễn?")) return;
+  const handleDeleteClick = (id) => {
+    setSelectedCommentId(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedCommentId) return;
+
+    setIsDeleteModalOpen(false);
 
     // Optimistic UI Update
-    setComments((prev) => prev.filter((c) => c.id !== id));
+    setComments((prev) => prev.filter((c) => c.id !== selectedCommentId));
 
     try {
-      await commentAPI.delete(id);
+      await commentAPI.delete(selectedCommentId);
+      setSelectedCommentId(null);
     } catch (err) {
       setError("Không thể xóa bình luận: " + err.message);
       // Revert on error
       loadComments(pagination.currentPage, filterStatus);
+      setSelectedCommentId(null);
     }
   };
 
@@ -269,7 +281,7 @@ const CommentTable = () => {
                       <div className="w-px h-4 bg-white/10 mx-1"></div>
 
                       <button
-                        onClick={() => handleDelete(comment.id)}
+                        onClick={() => handleDeleteClick(comment.id)}
                         title="Xóa vĩnh viễn"
                         className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 hover:scale-110 transition-all"
                       >
@@ -309,7 +321,7 @@ const CommentTable = () => {
                    onClick={() => loadComments(pageNum, filterStatus)}
                    className={`w-7 h-7 rounded-md text-xs font-medium transition-colors ${
                      pagination.currentPage === pageNum
-                       ? "bg-primaryColor text-white shadow-sm"
+                       ? "bg-primaryColor text-black shadow-sm"
                        : "text-gray-400 hover:bg-white/5 hover:text-white"
                    }`}
                  >
@@ -328,6 +340,21 @@ const CommentTable = () => {
           </button>
         </div>
       </div>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setSelectedCommentId(null);
+        }}
+        onConfirm={handleDelete}
+        title="Xóa Bình Luận"
+        message="Bạn có chắc chắn muốn xóa bình luận này vĩnh viễn? Hành động này không thể hoàn tác."
+        confirmText="Xóa ngay"
+        cancelText="Hủy bỏ"
+        isDanger={true}
+      />
 
     </div>
   );

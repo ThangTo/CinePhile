@@ -254,6 +254,104 @@ const getChartData = async (req, res) => {
   }
 };
 
+/**
+ * POST /admin/movies/crawl/by-page
+ * Crawl movies by page range with Server-Sent Events for real-time logs
+ */
+const crawlMoviesByPage = async (req, res) => {
+  try {
+    const { startPage = 1, endPage = null } = req.body;
+    const { runPageRange } = require('../services/crawler.service');
+
+    if (!startPage || startPage < 1) {
+      return res.status(400).json({ message: 'Invalid start page' });
+    }
+
+    if (endPage && (endPage < 1 || startPage > endPage)) {
+      return res.status(400).json({ message: 'Invalid page range' });
+    }
+
+    // Set up Server-Sent Events
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Progress callback to send logs
+    const onProgress = (data) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Run crawl in background
+    runPageRange(parseInt(startPage), endPage ? parseInt(endPage) : null, onProgress)
+      .then((result) => {
+        res.write(`data: ${JSON.stringify({ type: 'complete', ...result })}\n\n`);
+        res.end();
+      })
+      .catch((error) => {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+        res.end();
+      });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/movies/crawl/search
+ * Search movies by name
+ */
+const searchMoviesForCrawl = async (req, res) => {
+  try {
+    const { movieName } = req.body;
+    const { searchMovies } = require('../services/crawler.service');
+
+    if (!movieName || !movieName.trim()) {
+      return res.status(400).json({ message: 'Movie name is required' });
+    }
+
+    const movies = await searchMovies(movieName.trim());
+    res.json({ movies });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/movies/crawl/by-slug
+ * Crawl a single movie by slug
+ */
+const crawlMovieBySlug = async (req, res) => {
+  try {
+    const { slug } = req.body;
+    const { crawlMovieBySlug } = require('../services/crawler.service');
+    const { transformMovie } = require('../utils/movieTransformer');
+
+    if (!slug || !slug.trim()) {
+      return res.status(400).json({ message: 'Movie slug is required' });
+    }
+
+    const result = await crawlMovieBySlug(slug.trim());
+    
+    if (!result.success) {
+      return res.status(400).json({ message: result.message || 'Failed to crawl movie' });
+    }
+
+    // Transform movie data to frontend format
+    const transformedMovie = result.movieData ? transformMovie(result.movieData) : null;
+
+    res.json({
+      success: true,
+      message: `Successfully ${result.isUpdate ? 'updated' : 'created'} movie: ${result.movie}`,
+      movie: transformedMovie,
+      episodes: result.episodes,
+      isUpdate: result.isUpdate,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   // Movies
   getAllMovies,
@@ -262,6 +360,10 @@ module.exports = {
   updateMovie,
   deleteMovie,
   searchMovies,
+  // Crawl
+  crawlMoviesByPage,
+  searchMoviesForCrawl,
+  crawlMovieBySlug,
   // Users
   getAllUsers,
   getUserById,

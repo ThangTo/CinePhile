@@ -198,11 +198,18 @@ const VideoPlayer = ({
     const loadProgressAndSeek = async () => {
       try {
         // Ưu tiên resumeTime từ location.state (từ ContinueWatching)
-        if (resumeTime && resumeTime > 0) {
+        // Nếu resumeTime === 0, không seek và không load progress từ backend (bắt đầu từ đầu)
+        if (resumeTime === 0) {
+          shouldSeek = false; // Không seek, bắt đầu từ đầu
+          seekTime = 0;
+          // Không load progress từ backend khi bắt đầu từ đầu
+          return;
+        } else if (resumeTime !== null && resumeTime > 0) {
+          // Có resumeTime từ location.state và > 0
           shouldSeek = true;
           seekTime = Math.max(0, resumeTime - 3); // Seek về trước 3 giây
         } else {
-          // Nếu không có từ location.state, load từ backend
+          // Nếu không có từ location.state (resumeTime === null), load từ backend
           const response = await userService.getProgress(movieId);
           if (response?.success && response?.data) {
             const progress = response.data;
@@ -235,10 +242,15 @@ const VideoPlayer = ({
       // Load progress trước
       await loadProgressAndSeek();
 
-      // Auto-seek nếu cần
+      // Auto-seek nếu cần (và không phải bắt đầu từ đầu)
       if (shouldSeek && !hasAutoSeekedRef.current) {
         video.currentTime = seekTime;
         setCurrentTime(seekTime);
+        hasAutoSeekedRef.current = true;
+      } else if (resumeTime === 0 && !hasAutoSeekedRef.current) {
+        // Đảm bảo video bắt đầu từ 0 khi resumeTime === 0
+        video.currentTime = 0;
+        setCurrentTime(0);
         hasAutoSeekedRef.current = true;
       }
 

@@ -46,10 +46,16 @@ const transformMovie = (movieDoc) => {
 
   // Apply transformations - add frontend fields while keeping original fields
   Object.keys(fieldMappings).forEach((dbField) => {
+    // Include empty strings for URL fields (poster_url, thumb_url, trailer_url)
+    // Empty string means user wants to clear the URL
     if (transformed[dbField] !== undefined) {
       const frontendField = fieldMappings[dbField];
       // Add frontend field name, keep original for backward compatibility
       transformed[frontendField] = transformed[dbField];
+    } else if ((dbField === 'poster_url' || dbField === 'thumb_url' || dbField === 'trailer_url') && transformed[dbField] === '') {
+      // Handle empty string explicitly for URL fields
+      const frontendField = fieldMappings[dbField];
+      transformed[frontendField] = '';
     }
   });
 

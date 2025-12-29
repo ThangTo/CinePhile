@@ -73,7 +73,11 @@ const AccountPage = () => {
   };
 
   if (isLoading || !user) {
-    return <BarSpinner />;
+    return (
+      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+        <BarSpinner />
+      </div>
+    );
   }
 
   const isContinueWatchingPage = activeTab === "continue-watching";

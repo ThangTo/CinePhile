@@ -18,6 +18,7 @@ const Chatbot = () => {
   const [showChatbot, setShowChatbot] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [picker, setPicker] = useState(null);
+  const [isSending, setIsSending] = useState(false);
 
   // Api setup
   const API_KEY = process.env.REACT_APP_API_KEY_GEMINI || "";
@@ -164,13 +165,32 @@ const Chatbot = () => {
       if (chatBodyRef.current) {
         chatBodyRef.current.scrollTo({ behavior: "smooth", top: chatBodyRef.current.scrollHeight }); // scroll to bottom of chat body
       }
+      // Reset sending state to allow new messages
+      setIsSending(false);
     }
   };
 
   // Handle outgoing user message
   const handleOutgoingMessage = (e) => {
     e.preventDefault();
-    userDataRef.current.message = messageInputRef.current.value.trim();
+
+    // Prevent spam: disable if already sending
+    if (isSending) {
+      return;
+    }
+
+    // Get and validate message
+    const message = messageInputRef.current.value.trim();
+    
+    // Prevent sending empty message
+    if (!message || message.length === 0) {
+      return;
+    }
+
+    // Set sending state to prevent multiple submissions
+    setIsSending(true);
+
+    userDataRef.current.message = message;
     messageInputRef.current.value = "";
     if (fileUploadWrapperRef.current) {
       fileUploadWrapperRef.current.classList.remove("file-uploaded");
@@ -235,7 +255,8 @@ const Chatbot = () => {
     // Handle Enter key press for sending messages
     const handleKeyDown = (e) => {
       const userMessage = e.target.value.trim();
-      if (e.key === "Enter" && userMessage && !e.shiftKey && window.innerWidth > 768) {
+      // Prevent sending if already sending or message is empty
+      if (e.key === "Enter" && userMessage && !e.shiftKey && window.innerWidth > 768 && !isSending) {
         handleOutgoingMessage(e);
       }
     };
@@ -275,7 +296,7 @@ const Chatbot = () => {
         messageInputRef.current.removeEventListener("input", handleInput);
       }
     };
-  }, []);
+  }, [isSending]);
 
   useEffect(() => {
     if (!fileInputRef.current) return;
@@ -348,12 +369,24 @@ const Chatbot = () => {
 
     sendMessageButtonRef.current.addEventListener("click", handleSend);
 
+    // Update button disabled state
+    if (sendMessageButtonRef.current) {
+      sendMessageButtonRef.current.disabled = isSending;
+      if (isSending) {
+        sendMessageButtonRef.current.style.opacity = "0.5";
+        sendMessageButtonRef.current.style.cursor = "not-allowed";
+      } else {
+        sendMessageButtonRef.current.style.opacity = "1";
+        sendMessageButtonRef.current.style.cursor = "pointer";
+      }
+    }
+
     return () => {
       if (sendMessageButtonRef.current) {
         sendMessageButtonRef.current.removeEventListener("click", handleSend);
       }
     };
-  }, []);
+  }, [isSending]);
 
   useEffect(() => {
     if (!chatbotTogglerRef.current) return;
@@ -575,6 +608,7 @@ const Chatbot = () => {
               className="message-input"
               ref={messageInputRef}
               required
+              disabled={isSending}
             ></textarea>
             <div className="chat-controls">
               <button

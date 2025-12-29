@@ -202,6 +202,9 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         rating: parseFloat(formData.rating),
         imdb: parseFloat(formData.imdb),
         year: parseInt(formData.year),
+        // Ensure poster and backgroundImage are included even if empty
+        poster: formData.poster || "",
+        backgroundImage: formData.backgroundImage || "",
       };
       await onSave(movieData);
       onClose();

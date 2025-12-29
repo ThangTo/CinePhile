@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { movieAPI } from "services/admin.service";
 import MovieFormModal from "./MovieFormModal";
+import MovieCrawlModal from "./MovieCrawlModal";
 import { BarSpinner } from "components/common/LoadingState";
 import OptimizedImage from "components/common/OptimizedImage";
 import Pagination from "components/common/Pagination";
@@ -15,12 +16,14 @@ import {
   FiStar,
   FiFilm,
   FiCalendar,
+  FiDownload,
 } from "react-icons/fi";
 
 const MovieTable = () => {
   const [movies, setMovies] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCrawlModalOpen, setIsCrawlModalOpen] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -161,13 +164,13 @@ const MovieTable = () => {
             />
           </div>
 
-          {/* Add Button */}
+          {/* Crawl Button - Replaced Add Button */}
           <button
-            onClick={handleAdd}
+            onClick={() => setIsCrawlModalOpen(true)}
             className="flex items-center gap-2 bg-primaryColor hover:bg-primaryColor/90 text-black font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-primaryColor/20 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap"
           >
-            <FiPlus size={20} />
-            <span className="hidden sm:inline">Thêm Phim</span>
+            <FiDownload size={20} />
+            <span className="hidden sm:inline">Crawl Phim</span>
           </button>
         </div>
       </div>
@@ -217,7 +220,7 @@ const MovieTable = () => {
                       <td className="px-6 py-4">
                         <div className="relative w-12 h-16 rounded overflow-hidden shadow-lg shadow-black/50 group-hover:scale-110 transition-transform duration-300">
                           <OptimizedImage
-                            src={movie.poster}
+                            src={movie.poster || movie.poster_url || ""}
                             alt={movie.title}
                             className="w-full h-full object-cover"
                             priority={index < 5}
@@ -334,6 +337,14 @@ const MovieTable = () => {
         onClose={() => setIsModalOpen(false)}
         movie={selectedMovie}
         onSave={handleSave}
+      />
+
+      <MovieCrawlModal
+        isOpen={isCrawlModalOpen}
+        onClose={() => setIsCrawlModalOpen(false)}
+        onCrawlSuccess={() => {
+          loadMovies(pagination.currentPage, searchTerm);
+        }}
       />
 
       <ConfirmDialog

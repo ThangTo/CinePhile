@@ -100,6 +100,7 @@ const CommentsSection = ({ movie, className = "" }) => {
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(!movie?.comments);
   const [loadingRatings, setLoadingRatings] = useState(false);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const { toasts, removeToast, success, warning } = useToast();
   const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, user } =
     useAuth();
@@ -146,6 +147,11 @@ const CommentsSection = ({ movie, className = "" }) => {
   }, [movie?.id, activeView]);
 
   const handleSubmitComment = async () => {
+    // Prevent spam: disable if already submitting
+    if (isSubmittingComment) {
+      return;
+    }
+
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
@@ -154,6 +160,10 @@ const CommentsSection = ({ movie, className = "" }) => {
       warning("Vui lòng nhập nội dung bình luận!");
       return;
     }
+
+    // Set submitting state to prevent multiple submissions
+    setIsSubmittingComment(true);
+
     try {
       const response = await movieService.postComment(movie.id, {
         content: commentText,
@@ -168,6 +178,9 @@ const CommentsSection = ({ movie, className = "" }) => {
     } catch (error) {
       warning(error.message || "Không thể gửi bình luận. Vui lòng thử lại!");
       console.error("Error posting comment:", error);
+    } finally {
+      // Always reset submitting state
+      setIsSubmittingComment(false);
     }
   };
 
@@ -322,11 +335,8 @@ const CommentsSection = ({ movie, className = "" }) => {
       return;
     }
 
-    // Xác nhận trước khi xóa
-    if (!window.confirm("Bạn có chắc chắn muốn xóa bình luận này?")) {
-      return;
-    }
-
+    // ConfirmDialog đã được xử lý trong CommentItem component
+    // Không cần window.confirm() ở đây nữa
     try {
       await movieService.deleteComment(commentId);
       // Xóa comment khỏi state
@@ -417,6 +427,7 @@ const CommentsSection = ({ movie, className = "" }) => {
             onSubmit={handleSubmitComment}
             isAuthenticated={isAuthenticated}
             onOpenAuth={openAuthModal}
+            isSubmitting={isSubmittingComment}
           />
         )}
 

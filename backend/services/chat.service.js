@@ -101,41 +101,41 @@ async function classifyIntentWithOpenRouter(message) {
   }
 
   const classifierPrompt = `Bạn là bộ phân loại truy vấn cho trợ lý phim CinePhile.
-Người dùng sẽ gửi câu hỏi bằng tiếng Việt hoặc tiếng Anh. Nhiệm vụ của bạn:
-- Phân loại xem câu hỏi có liên quan tới phim trong hệ thống hay không (intent).
-- Nếu liên quan tới phim (intent = "movie_info") thì phân loại chi tiết kiểu truy vấn:
-  + "top"    : hỏi top phim / phim hay nhất / trending / nổi tiếng
+    Người dùng sẽ gửi câu hỏi bằng tiếng Việt hoặc tiếng Anh. Nhiệm vụ của bạn:
+    - Phân loại xem câu hỏi có liên quan tới phim trong hệ thống hay không (intent).
+    - Nếu liên quan tới phim (intent = "movie_info") thì phân loại chi tiết kiểu truy vấn:
+    + "top"    : hỏi top phim / phim hay nhất / trending / nổi tiếng
   + "new"    : hỏi phim mới / phim mới cập nhật / phim mới ra mắt / phim vừa thêm
-  + "genre"  : hỏi theo thể loại (ví dụ: phim kinh dị, phim hành động Mỹ, ...)
-  + "actor"  : hỏi theo diễn viên / cast (ví dụ: phim có Tom Cruise, phim của Dwayne Johnson, ...)
-  + "search" : tìm kiếm phim theo tên / từ khóa cụ thể
+    + "genre"  : hỏi theo thể loại (ví dụ: phim kinh dị, phim hành động Mỹ, ...)
+    + "actor"  : hỏi theo diễn viên / cast (ví dụ: phim có Tom Cruise, phim của Dwayne Johnson, ...)
+    + "search" : tìm kiếm phim theo tên / từ khóa cụ thể
   + "other"  : vẫn là movie_info nhưng không rơi vào các loại trên
 
-Bạn CHỈ được trả về JSON hợp lệ, không có giải thích thêm, KHÔNG dùng markdown.
+    Bạn CHỈ được trả về JSON hợp lệ, không có giải thích thêm, KHÔNG dùng markdown.
 
-Schema JSON:
-{
-  "intent": "movie_info" | "general",
+    Schema JSON:
+    {
+    "intent": "movie_info" | "general",
   "queryType": "top" | "new" | "genre" | "actor" | "search" | "other",
-  "genre": string | null,
-  "actor": string | null,
-  "keyword": string | null
-}
+    "genre": string | null,
+    "actor": string | null,
+    "keyword": string | null
+    }
 
-Quy tắc:
-- intent = "movie_info" nếu câu hỏi liên quan tới phim/series/tập phim/thể loại/quốc gia/diễn viên/trailer/đánh giá/bình luận... trên một website xem phim.
-- intent = "general" nếu câu hỏi không liên quan tới phim hoặc CinePhile.
+    Quy tắc:
+    - intent = "movie_info" nếu câu hỏi liên quan tới phim/series/tập phim/thể loại/quốc gia/diễn viên/trailer/đánh giá/bình luận... trên một website xem phim.
+    - intent = "general" nếu câu hỏi không liên quan tới phim hoặc CinePhile.
 - queryType: "top" nếu câu hỏi nhấn mạnh top, hay nhất, nổi bật, trending...
 - queryType: "genre" nếu câu hỏi nhấn mạnh thể loại (hành động, kinh dị, lãng mạn, ...).
 - queryType: "actor" nếu câu hỏi nhấn mạnh diễn viên / cast.
 - queryType: "search" nếu người dùng đưa tên/từ khóa phim cụ thể để tìm.
 - queryType: "other" nếu không rõ ràng.
-- genre: chuỗi tên thể loại chính (nếu có, ví dụ: "hành động", "kinh dị"), ngược lại null.
-- actor: tên diễn viên nếu có, ngược lại null.
-- keyword: từ khóa/tên phim chính để tìm kiếm nếu có, ngược lại null.
+    - genre: chuỗi tên thể loại chính (nếu có, ví dụ: "hành động", "kinh dị"), ngược lại null.
+    - actor: tên diễn viên nếu có, ngược lại null.
+    - keyword: từ khóa/tên phim chính để tìm kiếm nếu có, ngược lại null.
 
-Câu hỏi của người dùng:
-${message}`;
+    Câu hỏi của người dùng:
+    ${message}`;
 
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -149,21 +149,21 @@ ${message}`;
       body: JSON.stringify({
         model: 'openai/gpt-4o-mini',
         messages: [
-          {
-            role: 'user',
+    {
+      role: 'user',
             content: classifierPrompt,
-          },
+    },
         ],
         temperature: 0.3,
         response_format: { type: 'json_object' },
       }),
-    });
+  });
 
-    const data = await res.json();
+  const data = await res.json();
 
-    if (!res.ok) {
+  if (!res.ok) {
       throw new Error(data.error?.message || 'OpenRouter API error');
-    }
+  }
 
     const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
     const parsed = JSON.parse(rawText);
@@ -303,7 +303,7 @@ function formatAnswerWithMovieLinks(answer, dbContext) {
       id: dbContext.currentMovie.id,
       title: dbContext.currentMovie.title,
     });
-  }
+}
 
   if (dbContext.topMovies) {
     dbContext.topMovies.forEach((movie) => {
@@ -439,22 +439,22 @@ async function buildDbContextForMovieIntent({ userId, message, metadata, classif
       const movieId = mongoose.Types.ObjectId.isValid(metadata.movieId) ? metadata.movieId : null;
       if (movieId) {
         const movie = await Movie.findById(movieId).lean();
-        if (movie) {
-          context.currentMovie = {
-            id: movie._id.toString(),
-            title: movie.name,
-            original_name: movie.original_name,
-            slug: movie.slug,
-            year: movie.year,
-            genres: movie.categories,
-            country: movie.country,
-            description: movie.content,
-            rating: movie.rating,
-            totalRatings: movie.totalRatings,
-            viewCount: movie.viewCount,
-            type: movie.type,
-          };
-        }
+    if (movie) {
+      context.currentMovie = {
+        id: movie._id.toString(),
+        title: movie.name,
+        original_name: movie.original_name,
+        slug: movie.slug,
+        year: movie.year,
+        genres: movie.categories,
+        country: movie.country,
+        description: movie.content,
+        rating: movie.rating,
+        totalRatings: movie.totalRatings,
+        viewCount: movie.viewCount,
+        type: movie.type,
+      };
+    }
       }
     } catch (e) {
       console.error('Error fetching current movie:', e);
@@ -683,7 +683,7 @@ async function handleChat({ userId, message, history, metadata, sessionId }) {
         }
         chatSession.metadata = updatedMetadata;
         await chatSession.save();
-      }
+}
     }
   } catch (e) {
     console.error('Error saving user message:', e);
@@ -700,7 +700,7 @@ async function handleChat({ userId, message, history, metadata, sessionId }) {
     try {
       classifier = await classifyIntentWithOpenRouter(message);
       intent = classifier.intent || keywordIntent;
-    } catch (e) {
+  } catch (e) {
       console.warn('⚠️ OpenRouter classifier failed, using keyword detection:', e.message);
       intent = keywordIntent;
       classifier = {

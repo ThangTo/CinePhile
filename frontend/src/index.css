@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-[#191b24] text-white font-sans;
+    @apply bg-[#000000] text-white font-sans;
   }
 
   /* Custom scrollbar – áp dụng toàn site */

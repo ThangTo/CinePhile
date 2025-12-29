@@ -312,8 +312,8 @@ const AdminOverviewTab = () => {
             Dashboard
           </h1>
           <p className="text-gray-400 mt-2 text-sm max-w-lg">
-            Tổng quan hiệu suất vận hành của hệ thống CinePhine. Dữ liệu được cập nhật theo thời
-            gian thực.
+            {/* Tổng quan hiệu suất vận hành của hệ thống CinePhine. Dữ liệu được cập nhật theo thời
+            gian thực. */}
           </p>
         </div>
         <div className="flex items-center gap-3 bg-[#ffffff05] border border-white/10 px-4 py-2 rounded-full shadow-lg">

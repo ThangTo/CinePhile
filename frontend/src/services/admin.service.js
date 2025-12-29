@@ -90,6 +90,118 @@ export const movieAPI = {
     });
     return Array.isArray(response) ? response : response.data || response;
   },
+
+  /**
+   * Crawl movies by page range with Server-Sent Events
+   * @param {Object} params - { startPage, endPage? }
+   * @param {Function} onProgress - Callback for progress updates
+   * @returns {Promise<Object>} Final result
+   */
+  crawlByPage: async (params, onProgress) => {
+    // Import axios để lấy baseURL
+    const http = (await import("lib/axios")).default;
+    const baseURL = http.defaults.baseURL || process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+    
+    // Lấy token từ auth-storage
+    let token = null;
+    try {
+      const authStorage = require("lib/auth-storage");
+      token = authStorage.getToken();
+    } catch (e) {
+      token = localStorage.getItem('token');
+    }
+    
+    const url = `${baseURL}/admin/movies/crawl/by-page`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(params),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    return new Promise((resolve, reject) => {
+      const processStream = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (onProgress) {
+                    onProgress(data);
+                  }
+                  if (data.type === 'complete') {
+                    resolve(data);
+                    return;
+                  } else if (data.type === 'error') {
+                    reject(new Error(data.message));
+                    return;
+                  }
+                } catch (err) {
+                  console.error('Error parsing SSE data:', err);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      processStream();
+    });
+  },
+
+  /**
+   * Search movies for crawling
+   * @param {string} movieName - Movie name to search
+   * @returns {Promise<Array>} Array of search results
+   */
+  searchForCrawl: async (movieName) => {
+    const response = await apiRequest("/admin/movies/crawl/search", {
+      method: "POST",
+      data: { movieName },
+      requiresAuth: true,
+    });
+    return response.movies || [];
+  },
+
+  /**
+   * Crawl a single movie by slug
+   * @param {string} slug - Movie slug
+   * @returns {Promise<Object>} Crawled movie data
+   */
+  crawlBySlug: async (slug) => {
+    const response = await apiRequest("/admin/movies/crawl/by-slug", {
+      method: "POST",
+      data: { slug },
+      requiresAuth: true,
+    });
+    return response;
+  },
 };
 
 /**
