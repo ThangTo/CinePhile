@@ -6,10 +6,9 @@ const Comment = require('../models/comment.model');
  */
 const getAll = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const status = req.query.status;
-    const search = req.query.search;
+    const { page = 1, limit = 10, status, search } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
 
     const query = {};
     if (status && status !== 'all') {
@@ -20,33 +19,33 @@ const getAll = async (req, res) => {
       query.content = { $regex: search, $options: 'i' };
     }
 
-    const skip = (page - 1) * limit;
+    const skip = (pageNum - 1) * limitNum;
 
     const [comments, total] = await Promise.all([
       Comment.find(query)
-        .populate('userId', 'username email avatar role') // Corrected fields
+        .select('content flag flagReason status createdAt userId movieId') // Only fetch needed fields
+        .populate('userId', 'username role') // Skip avatar, email
         .populate('movieId', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit)
+        .limit(limitNum)
         .lean(),
       Comment.countDocuments(query)
     ]);
 
-    // Map to frontend expected format if needed, but standard return is fine
-    // Frontend expects: { id, content, user: { name }, ... }
+    // Map to frontend expected format
     const formattedComments = comments.map(c => ({
       id: c._id,
       content: c.content,
-      fullContent: c.content, // Frontend uses fullContent for tooltip
+      fullContent: c.content,
       flag: c.flag,
       reason: c.flagReason,
-      status: c.status || 'allowed', // Default to allowed for legacy data
-      createdAt: new Date(c.createdAt).toLocaleString('vi-VN'), // Simple format
+      status: c.status || 'allowed',
+      createdAt: c.createdAt, 
       user: {
-        name: c.userId?.username || 'Unknown', // Changed from name to username
-        role: c.userId?.role || 'User', // If role exists
-        avatar: c.userId?.avatar
+        name: c.userId?.username || 'Unknown',
+        role: c.userId?.role || 'User',
+        // avatar skipped as requested
       },
       movieName: c.movieId?.name
     }));
@@ -54,10 +53,10 @@ const getAll = async (req, res) => {
     res.json({
       data: formattedComments,
       pagination: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         totalItems: total,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limitNum)
       }
     });
 
@@ -93,9 +92,17 @@ const updateStatus = async (req, res) => {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
+    const updateData = { status };
+
+    // If allowing the comment, clear flags as they are resolved
+    if (status === 'allowed') {
+        updateData.flag = null;
+        updateData.flagReason = null;
+    }
+
     const comment = await Comment.findByIdAndUpdate(
       id, 
-      { status }, 
+      updateData, 
       { new: true }
     );
 

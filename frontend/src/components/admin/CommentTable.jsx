@@ -65,7 +65,14 @@ const CommentTable = () => {
       setComments((prev) => prev.filter((c) => c.id !== id));
     } else {
       setComments((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+        prev.map((c) => {
+          if (c.id !== id) return c;
+          
+          if (newStatus === 'allowed') {
+            return { ...c, status: newStatus, flag: null, reason: null };
+          }
+          return { ...c, status: newStatus };
+        })
       );
     }
 
@@ -105,6 +112,33 @@ const CommentTable = () => {
   // Helper: Tạo avatar từ tên user
   const getInitials = (name) => {
     return name ? name.charAt(0).toUpperCase() : "?";
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return { date: "N/A", time: "N/A" };
+    
+    const date = new Date(dateString);
+    
+    // Format to UTC+7 (Asia/Ho_Chi_Minh)
+    const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+
+    const timeFormatter = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit', 
+      minute: '2-digit',
+      // second: '2-digit', // Optional, maybe keep it simple or match previous
+      hour12: false
+    });
+
+    return {
+      date: dateFormatter.format(date),
+      time: timeFormatter.format(date)
+    };
   };
 
   const getStatusBadge = (status) => {
@@ -251,9 +285,9 @@ const CommentTable = () => {
                   {/* Cột Thời Gian */}
                   <td className="px-6 py-4">
                     <div className="flex flex-col text-xs text-gray-400">
-                      <span className="text-gray-300 font-medium">{comment.createdAt.split(" ")[0]}</span>
+                      <span className="text-gray-300 font-medium">{formatDateTime(comment.createdAt).date}</span>
                       <span className="flex items-center gap-1 mt-0.5">
-                        <FiClock className="w-3 h-3" /> {comment.createdAt.split(" ")[1]}
+                        <FiClock className="w-3 h-3" /> {formatDateTime(comment.createdAt).time}
                       </span>
                     </div>
                   </td>

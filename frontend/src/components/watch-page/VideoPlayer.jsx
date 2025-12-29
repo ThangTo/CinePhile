@@ -164,6 +164,14 @@ const VideoPlayer = ({
     video.addEventListener("waiting", handleWaiting);
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("progress", handleProgress);
+    
+    // Handle PiP return (Back to tab)
+    const handleLeavePiP = () => {
+      if (containerRef.current) {
+        containerRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    };
+    video.addEventListener("leavepictureinpicture", handleLeavePiP);
 
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate);
@@ -173,6 +181,7 @@ const VideoPlayer = ({
       video.removeEventListener("waiting", handleWaiting);
       video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("progress", handleProgress);
+      video.removeEventListener("leavepictureinpicture", handleLeavePiP);
     };
   }, [hasNativePlayer, episode, duration]);
 
