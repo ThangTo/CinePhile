@@ -323,9 +323,7 @@ const CommentsSection = ({ movie, className = "" }) => {
     }
 
     // Xác nhận trước khi xóa
-    if (!window.confirm("Bạn có chắc chắn muốn xóa bình luận này?")) {
-      return;
-    }
+    // Browser confirm removed as requested (keep 1 of app only)
 
     try {
       await movieService.deleteComment(commentId);

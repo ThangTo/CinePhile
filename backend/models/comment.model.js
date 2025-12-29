@@ -53,5 +53,8 @@ const commentSchema = new mongoose.Schema({
 commentSchema.index({ movieId: 1 });
 commentSchema.index({ userId: 1 });
 commentSchema.index({ createdAt: -1 });
+commentSchema.index({ status: 1 });
+commentSchema.index({ status: 1, createdAt: -1 });
+
 
 module.exports = mongoose.model("Comment", commentSchema);
