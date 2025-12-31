@@ -335,14 +335,8 @@ const CommentsSection = ({ movie, className = "" }) => {
       return;
     }
 
-<<<<<<< HEAD
     // ConfirmDialog đã được xử lý trong CommentItem component
     // Không cần window.confirm() ở đây nữa
-=======
-    // Xác nhận trước khi xóa
-    // Browser confirm removed as requested (keep 1 of app only)
-
->>>>>>> 49a67b42175bbb452b9123e0d296d3971fe1d1fb
     try {
       await movieService.deleteComment(commentId);
       // Xóa comment khỏi state
