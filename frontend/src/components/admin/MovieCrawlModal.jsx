@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   FiX,
   FiFilm,
@@ -9,19 +9,25 @@ import {
   FiAlertCircle,
   FiDownload,
   FiList,
+  FiSquare,
 } from "react-icons/fi";
 import { movieAPI } from "services/admin.service";
 
 const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
-  const [activeTab, setActiveTab] = useState("name"); // "page" or "name" - default to "name"
+  const [activeTab, setActiveTab] = useState("page"); // "page" or "name" - default to "page"
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  // AbortController để hủy crawl
+  const abortControllerRef = useRef(null);
+  const isCancelledRef = useRef(false);
 
   // Tab 1: Crawl by Page
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState("");
   const [crawlUntilEnd, setCrawlUntilEnd] = useState(false);
+  const [skipExisting, setSkipExisting] = useState(false);
   const [crawlProgress, setCrawlProgress] = useState(null);
   const [crawlLogs, setCrawlLogs] = useState([]);
 
@@ -35,10 +41,18 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
   // Reset state when modal opens/closes
   React.useEffect(() => {
     if (!isOpen) {
-      setActiveTab("name");
+      // Hủy crawl nếu đang chạy
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      isCancelledRef.current = false;
+
+      setActiveTab("page");
       setStartPage(1);
       setEndPage("");
       setCrawlUntilEnd(false);
+      setSkipExisting(false);
       setSearchQuery("");
       setSearchResults([]);
       setSelectedMovies(new Set());
@@ -47,8 +61,25 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
       setSuccess(null);
       setCrawlProgress(null);
       setCrawlLogs([]);
+      setIsLoading(false);
     }
   }, [isOpen]);
+
+  // Hàm hủy crawl
+  const handleCancelCrawl = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      isCancelledRef.current = true;
+      setIsLoading(false);
+      setCrawlProgress(null);
+      setError("Crawl đã bị hủy bởi người dùng");
+      setCrawlLogs((prev) => [
+        ...prev,
+        { type: "error", message: "❌ Crawl đã bị hủy", timestamp: new Date() },
+      ]);
+    }
+  };
 
   // Tab 1: Handle crawl by page
   const handleCrawlByPage = async () => {
@@ -62,6 +93,10 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
       return;
     }
 
+    // Tạo AbortController mới
+    abortControllerRef.current = new AbortController();
+    isCancelledRef.current = false;
+
     setIsLoading(true);
     setError(null);
     setSuccess(null);
@@ -72,28 +107,57 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
       const params = {
         startPage: parseInt(startPage),
         endPage: crawlUntilEnd ? null : parseInt(endPage),
+        skipExisting: skipExisting,
       };
 
-      await movieAPI.crawlByPage(params, (data) => {
-        if (data.type === 'log') {
-          setCrawlLogs((prev) => [...prev, { type: 'log', message: data.message, timestamp: new Date() }]);
-        } else if (data.type === 'error') {
-          setCrawlLogs((prev) => [...prev, { type: 'error', message: data.message, timestamp: new Date() }]);
-        } else if (data.type === 'complete') {
-          setSuccess(`Đã crawl thành công ${data.movies_count || 0} phim từ trang ${startPage}${crawlUntilEnd ? ' đến hết' : ` đến ${endPage}`}`);
-          setCrawlProgress(null);
-          if (onCrawlSuccess) {
-            onCrawlSuccess();
+      await movieAPI.crawlByPage(
+        params,
+        (data) => {
+          // Kiểm tra nếu đã bị hủy
+          if (isCancelledRef.current) {
+            return;
           }
-          setIsLoading(false);
-        } else if (data.page) {
-          setCrawlProgress({ current: data.page, total: crawlUntilEnd ? null : parseInt(endPage) });
-        }
-      });
+
+          if (data.type === "log") {
+            setCrawlLogs((prev) => [
+              ...prev,
+              { type: "log", message: data.message, timestamp: new Date() },
+            ]);
+          } else if (data.type === "error") {
+            setCrawlLogs((prev) => [
+              ...prev,
+              { type: "error", message: data.message, timestamp: new Date() },
+            ]);
+          } else if (data.type === "complete") {
+            setSuccess(
+              `Đã crawl thành công ${data.movies_count || 0} phim từ trang ${startPage}${
+                crawlUntilEnd ? " đến hết" : ` đến ${endPage}`
+              }`
+            );
+            setCrawlProgress(null);
+            if (onCrawlSuccess) {
+              onCrawlSuccess();
+            }
+            setIsLoading(false);
+            abortControllerRef.current = null;
+          } else if (data.page) {
+            setCrawlProgress({
+              current: data.page,
+              total: crawlUntilEnd ? null : parseInt(endPage),
+            });
+          }
+        },
+        abortControllerRef.current
+      );
     } catch (err) {
+      if (isCancelledRef.current) {
+        // Đã bị hủy, không cần set error nữa
+        return;
+      }
       setError(err?.message || "Có lỗi xảy ra khi crawl");
       setCrawlProgress(null);
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -140,6 +204,10 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
       return;
     }
 
+    // Tạo AbortController mới
+    abortControllerRef.current = new AbortController();
+    isCancelledRef.current = false;
+
     setIsLoading(true);
     setError(null);
     setSuccess(null);
@@ -147,31 +215,72 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
 
     let successCount = 0;
     let failCount = 0;
+    const moviesArray = Array.from(selectedMovies);
 
     try {
-      for (const slug of selectedMovies) {
+      for (let i = 0; i < moviesArray.length; i++) {
+        // Kiểm tra nếu đã bị hủy
+        if (isCancelledRef.current) {
+          break;
+        }
+
+        const slug = moviesArray[i];
         try {
           await movieAPI.crawlBySlug(slug);
           successCount++;
+
+          // Cập nhật crawlingMovies để loại bỏ phim đã crawl xong
+          setCrawlingMovies((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(slug);
+            return newSet;
+          });
         } catch (err) {
           failCount++;
           console.error(`Failed to crawl ${slug}:`, err);
+
+          // Cập nhật crawlingMovies để loại bỏ phim lỗi
+          setCrawlingMovies((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(slug);
+            return newSet;
+          });
         }
-        // Delay between requests
-        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Delay between requests (chỉ nếu chưa bị hủy)
+        if (!isCancelledRef.current && i < moviesArray.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
       }
 
-      setSuccess(`Đã crawl thành công ${successCount} phim${failCount > 0 ? `, thất bại ${failCount} phim` : ""}`);
+      if (isCancelledRef.current) {
+        setError("Crawl đã bị hủy bởi người dùng");
+        setSuccess(
+          `Đã crawl ${successCount} phim trước khi hủy${
+            failCount > 0 ? `, thất bại ${failCount} phim` : ""
+          }`
+        );
+      } else {
+        setSuccess(
+          `Đã crawl thành công ${successCount} phim${
+            failCount > 0 ? `, thất bại ${failCount} phim` : ""
+          }`
+        );
+      }
+
       setCrawlingMovies(new Set());
       setSelectedMovies(new Set());
-      
-      if (onCrawlSuccess) {
+
+      if (onCrawlSuccess && !isCancelledRef.current) {
         onCrawlSuccess();
       }
     } catch (err) {
-      setError(err?.message || "Có lỗi xảy ra khi crawl");
+      if (!isCancelledRef.current) {
+        setError(err?.message || "Có lỗi xảy ra khi crawl");
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -204,8 +313,37 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
           </button>
         </div>
 
-        {/* Tabs - Only show "Crawl Theo Tên" tab */}
-        {/* Tab navigation hidden - only showing crawl by name */}
+        {/* Tabs Navigation */}
+        <div className="px-6 pt-4 border-b border-white/10">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab("page")}
+              className={`px-4 py-2 rounded-t-lg font-medium transition-all ${
+                activeTab === "page"
+                  ? "bg-bgColor3 text-primaryColor border-t-2 border-primaryColor"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FiList size={18} />
+                <span>Crawl Theo Trang</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("name")}
+              className={`px-4 py-2 rounded-t-lg font-medium transition-all ${
+                activeTab === "name"
+                  ? "bg-bgColor3 text-primaryColor border-t-2 border-primaryColor"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FiSearch size={18} />
+                <span>Crawl Theo Tên</span>
+              </div>
+            </button>
+          </div>
+        </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
@@ -224,8 +362,8 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
             </div>
           )}
 
-          {/* Tab 1: Crawl by Page - HIDDEN */}
-          {false && activeTab === "page" && (
+          {/* Tab 1: Crawl by Page */}
+          {activeTab === "page" && (
             <div className="space-y-6">
               <div className="bg-black/10 rounded-xl p-5 border border-white/5">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2">
@@ -233,7 +371,8 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                   Crawl Phim Theo Trang
                 </h3>
                 <p className="text-gray-400 text-sm mb-6">
-                  Crawl phim từ trang bắt đầu đến trang kết thúc. Mỗi trang thường có khoảng 10 phim.
+                  Crawl phim từ trang bắt đầu đến trang kết thúc. Mỗi trang thường có khoảng 10
+                  phim.
                 </p>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -257,9 +396,37 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                       type="number"
                       min="1"
                       value={endPage}
-                      onChange={(e) => setEndPage(parseInt(e.target.value) || 1)}
-                      className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primaryColor"
+                      onChange={(e) => setEndPage(e.target.value ? parseInt(e.target.value) : "")}
+                      disabled={crawlUntilEnd}
+                      className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primaryColor disabled:opacity-50 disabled:cursor-not-allowed"
                     />
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="crawlUntilEnd"
+                      checked={crawlUntilEnd}
+                      onChange={(e) => setCrawlUntilEnd(e.target.checked)}
+                      className="w-4 h-4 rounded bg-black/20 border-white/5 text-primaryColor focus:ring-primaryColor focus:ring-2"
+                    />
+                    <label htmlFor="crawlUntilEnd" className="text-sm text-gray-300 cursor-pointer">
+                      Crawl đến hết (bỏ qua trang kết thúc)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="skipExisting"
+                      checked={skipExisting}
+                      onChange={(e) => setSkipExisting(e.target.checked)}
+                      className="w-4 h-4 rounded bg-black/20 border-white/5 text-primaryColor focus:ring-primaryColor focus:ring-2"
+                    />
+                    <label htmlFor="skipExisting" className="text-sm text-gray-300 cursor-pointer">
+                      Bỏ qua phim đã tồn tại
+                    </label>
                   </div>
                 </div>
 
@@ -268,7 +435,8 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-blue-200 text-sm">Đang crawl...</span>
                       <span className="text-blue-200 text-sm">
-                        Trang {crawlProgress.current}{crawlProgress.total ? ` / ${crawlProgress.total}` : " (đến hết)"}
+                        Trang {crawlProgress.current}
+                        {crawlProgress.total ? ` / ${crawlProgress.total}` : " (đến hết)"}
                       </span>
                     </div>
                     {crawlProgress.total && (
@@ -296,7 +464,7 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                         <div
                           key={index}
                           className={`${
-                            log.type === 'error' ? 'text-red-400' : 'text-gray-300'
+                            log.type === "error" ? "text-red-400" : "text-gray-300"
                           } whitespace-pre-wrap`}
                         >
                           {log.message}
@@ -306,23 +474,26 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                   </div>
                 )}
 
-                <button
-                  onClick={handleCrawlByPage}
-                  disabled={isLoading}
-                  className="mt-6 w-full px-6 py-3 rounded-xl bg-primaryColor text-black font-bold shadow-lg shadow-primaryColor/20 hover:shadow-primaryColor/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
+                <div className="mt-6 flex gap-3">
                   {isLoading ? (
-                    <>
-                      <FiLoader className="animate-spin" size={20} />
-                      <span>Đang crawl...</span>
-                    </>
+                    <button
+                      onClick={handleCancelCrawl}
+                      className="flex-1 px-6 py-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-200 font-bold hover:bg-red-500/30 hover:border-red-500/70 transition-all flex items-center justify-center gap-2"
+                    >
+                      <FiSquare size={20} />
+                      <span>Hủy Crawl</span>
+                    </button>
                   ) : (
-                    <>
+                    <button
+                      onClick={handleCrawlByPage}
+                      disabled={isLoading}
+                      className="w-full px-6 py-3 rounded-xl bg-primaryColor text-black font-bold shadow-lg shadow-primaryColor/20 hover:shadow-primaryColor/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
                       <FiPlay size={20} />
                       <span>Bắt Đầu Crawl</span>
-                    </>
+                    </button>
                   )}
-                </button>
+                </div>
               </div>
             </div>
           )}
@@ -371,20 +542,27 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                       <FiFilm className="text-primaryColor" />
                       Kết Quả Tìm Kiếm ({searchResults.length})
                     </h3>
-                    {selectedMovies.size > 0 && (
-                      <button
-                        onClick={handleCrawlSelected}
-                        disabled={isLoading}
-                        className="px-4 py-2 rounded-lg bg-primaryColor text-black font-bold text-sm hover:bg-primaryColor/90 transition-all disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {isLoading ? (
-                          <FiLoader className="animate-spin" size={16} />
-                        ) : (
+                    <div className="flex items-center gap-2">
+                      {isLoading && (
+                        <button
+                          onClick={handleCancelCrawl}
+                          className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/50 text-red-200 font-bold text-sm hover:bg-red-500/30 transition-all flex items-center gap-2"
+                        >
+                          <FiSquare size={16} />
+                          <span>Hủy</span>
+                        </button>
+                      )}
+                      {selectedMovies.size > 0 && !isLoading && (
+                        <button
+                          onClick={handleCrawlSelected}
+                          disabled={isLoading}
+                          className="px-4 py-2 rounded-lg bg-primaryColor text-black font-bold text-sm hover:bg-primaryColor/90 transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
                           <FiDownload size={16} />
-                        )}
-                        <span>Crawl {selectedMovies.size} Phim</span>
-                      </button>
-                    )}
+                          <span>Crawl {selectedMovies.size} Phim</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto custom-scrollbar">
@@ -460,4 +638,3 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
 };
 
 export default MovieCrawlModal;
-

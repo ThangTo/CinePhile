@@ -95,12 +95,14 @@ export const movieAPI = {
    * Crawl movies by page range with Server-Sent Events
    * @param {Object} params - { startPage, endPage? }
    * @param {Function} onProgress - Callback for progress updates
+   * @param {AbortController} abortController - Optional AbortController to cancel the request
    * @returns {Promise<Object>} Final result
    */
-  crawlByPage: async (params, onProgress) => {
+  crawlByPage: async (params, onProgress, abortController = null) => {
     // Import axios để lấy baseURL
     const http = (await import("lib/axios")).default;
-    const baseURL = http.defaults.baseURL || process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+    const baseURL =
+      http.defaults.baseURL || process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
     
     // Lấy token từ auth-storage
     let token = null;
@@ -108,19 +110,20 @@ export const movieAPI = {
       const authStorage = require("lib/auth-storage");
       token = authStorage.getToken();
     } catch (e) {
-      token = localStorage.getItem('token');
+      token = localStorage.getItem("token");
     }
     
     const url = `${baseURL}/admin/movies/crawl/by-page`;
     
     const response = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(params),
-      credentials: 'include',
+      credentials: "include",
+      signal: abortController?.signal,
     });
 
     if (!response.ok) {
@@ -130,12 +133,19 @@ export const movieAPI = {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
+    let buffer = "";
 
     return new Promise((resolve, reject) => {
       const processStream = async () => {
         try {
           while (true) {
+            // Kiểm tra nếu đã bị hủy
+            if (abortController?.signal.aborted) {
+              reader.cancel();
+              reject(new Error("Crawl đã bị hủy bởi người dùng"));
+              return;
+            }
+
             const { done, value } = await reader.read();
             
             if (done) {
@@ -143,30 +153,34 @@ export const movieAPI = {
             }
 
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
 
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
+              if (line.startsWith("data: ")) {
                 try {
                   const data = JSON.parse(line.slice(6));
                   if (onProgress) {
                     onProgress(data);
                   }
-                  if (data.type === 'complete') {
+                  if (data.type === "complete") {
                     resolve(data);
                     return;
-                  } else if (data.type === 'error') {
+                  } else if (data.type === "error") {
                     reject(new Error(data.message));
                     return;
                   }
                 } catch (err) {
-                  console.error('Error parsing SSE data:', err);
+                  console.error("Error parsing SSE data:", err);
                 }
               }
             }
           }
         } catch (error) {
+          // Nếu lỗi do abort, không reject nữa vì đã reject ở trên
+          if (error.name === "AbortError" || abortController?.signal.aborted) {
+            return;
+          }
           reject(error);
         }
       };
@@ -211,14 +225,36 @@ export const userAPI = {
   /**
    * Get all users with pagination and filters
    * @param {Object} params - { page?, limit?, search? }
-   * @returns {Promise<Array>} Array of users
+   * @returns {Promise<Object>} { data: [], pagination: {} } or { data: [], pagination: {} }
    */
   getAll: async (params = {}) => {
     const response = await apiRequest("/admin/users", {
       params,
       requiresAuth: true,
     });
-    return Array.isArray(response) ? response : response.data || response;
+    // Handle both paginated response { data: [], pagination: {} } and direct array
+    if (response.data && response.pagination) {
+      return {
+        data: Array.isArray(response.data) ? response.data : [],
+        pagination: {
+          currentPage: response.pagination.page || 1,
+          totalPages: response.pagination.totalPages || 1,
+          totalItems: response.pagination.total || 0,
+          limit: response.pagination.limit || 20,
+        },
+      };
+    }
+    // Fallback for direct array response
+    const usersData = Array.isArray(response) ? response : [];
+    return {
+      data: usersData,
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: usersData.length,
+        limit: 20,
+      },
+    };
   },
 
   /**

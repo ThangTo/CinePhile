@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import MovieCard from "components/home-page/MovieCard";
 import Pagination from "components/common/Pagination";
+import MovieFilter from "components/common/MovieFilter";
 import movieService from "services/movie.service";
 import { buildSlugMap, slugify } from "utils/slugify";
 import { GENRE_CATEGORIES, COUNTRY_CATEGORIES } from "components/header/constants";
@@ -31,11 +32,13 @@ const FilteredMovies = ({ pageType = "genre" }) => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({});
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [error, setError] = useState(null);
 
   useEffect(() => {
     setPage(1);
+    setFilters({}); // Reset filters when route changes
   }, [requestedKey]);
 
   useEffect(() => {
@@ -44,7 +47,24 @@ const FilteredMovies = ({ pageType = "genre" }) => {
       setLoading(true);
       setError(null);
       try {
-        const params = { page, limit: PAGE_SIZE };
+        // Build params with filters
+        const params = {
+          page,
+          limit: PAGE_SIZE,
+          ...(filters.genres?.length && { genres: filters.genres.join(",") }),
+          ...(filters.countries?.length && { countries: filters.countries.join(",") }),
+          ...(filters.year && { year: filters.year }),
+          ...(filters.yearFrom && { yearFrom: filters.yearFrom }),
+          ...(filters.yearTo && { yearTo: filters.yearTo }),
+          ...(filters.quality && { quality: filters.quality }),
+          ...(filters.type && { type: filters.type }),
+          ...(filters.ageRating && { ageRating: filters.ageRating }),
+          ...(filters.status && { status: filters.status }),
+          ...(filters.ratingMin && { ratingMin: filters.ratingMin }),
+          ...(filters.ratingMax && { ratingMax: filters.ratingMax }),
+          ...(filters.sort && { sort: filters.sort }),
+          ...(filters.lang && { lang: filters.lang }),
+        };
         let endpoint;
         let key = requestedKey;
         let effectiveKey = requestedKey;
@@ -56,13 +76,13 @@ const FilteredMovies = ({ pageType = "genre" }) => {
         } else if (pageType === "country") {
           endpoint = "getByCountry";
           key = requestedKey;
-          } else if (pageType === "type") {
-            const typeMeta = TYPE_FILTERS[requestedKey];
-            if (!typeMeta) {
-              throw new Error("Loại phim không hợp lệ");
-            }
+        } else if (pageType === "type") {
+          const typeMeta = TYPE_FILTERS[requestedKey];
+          if (!typeMeta) {
+            throw new Error("Loại phim không hợp lệ");
+          }
           endpoint = "getByType";
-            effectiveKey = typeMeta.api;
+          effectiveKey = typeMeta.api;
           key = effectiveKey;
         } else {
           endpoint = "getAll";
@@ -152,11 +172,16 @@ const FilteredMovies = ({ pageType = "genre" }) => {
     };
 
     fetchFilteredMovies();
-  }, [requestedKey, pageType, page]);
+  }, [requestedKey, pageType, page, filters]);
 
   // Preload images for next page after current page is loaded
   useEffect(() => {
-    if (loading || !movies.length || !pagination.totalPages || pagination.page >= pagination.totalPages) {
+    if (
+      loading ||
+      !movies.length ||
+      !pagination.totalPages ||
+      pagination.page >= pagination.totalPages
+    ) {
       return;
     }
 
@@ -328,8 +353,34 @@ const FilteredMovies = ({ pageType = "genre" }) => {
     <div className="bg-bgColor">
       <main className="w-full mx-auto px-4 py-20">
         <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6 pl-4">
-          {pageType === "type" ? `Tổng hợp ${displayLabel}` : `Phim ${displayLabel}`}
+          {(() => {
+            if (pageType === "type") {
+              // Check filter type to determine title
+              if (filters.type === "series") return "Tổng hợp phim bộ";
+              if (filters.type === "single") return "Tổng hợp phim lẻ";
+              return `Tổng hợp ${displayLabel}`;
+            }
+            return `Phim ${displayLabel}`;
+          })()}
         </h1>
+
+        {/* Movie Filter */}
+        <div className="mb-6">
+          <MovieFilter
+            filters={filters}
+            onFilterChange={(newFilters) => {
+              setFilters(newFilters);
+              setPage(1); // Reset to page 1 when filters change
+            }}
+            options={{
+              showAdvanced: true,
+              compact: false,
+              pageType,
+              slug: requestedKey,
+              navigateOnApply: true,
+            }}
+          />
+        </div>
 
         {error ? (
           <ErrorState message={error} />
@@ -337,26 +388,26 @@ const FilteredMovies = ({ pageType = "genre" }) => {
           <EmptyState title={emptyText} iconClassName="fa-film" />
         ) : (
           <LazySection rootMargin="100px" minHeight="400px">
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-              {movies.map((movie) => (
-                <MovieCard
-                  key={movie.id}
-                  movie={movie}
-                  hoverVisibleAt="md"
-                  hoverCardClass="w-[300px] max-h-[360px] overflow-hidden"
-                  compact
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                {movies.map((movie) => (
+                  <MovieCard
+                    key={movie.id}
+                    movie={movie}
+                    hoverVisibleAt="md"
+                    hoverCardClass="w-[300px] max-h-[360px] overflow-hidden"
+                    compact
+                  />
+                ))}
+              </div>
+              {pagination.totalPages > 1 && (
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
                 />
-              ))}
-            </div>
-            {pagination.totalPages > 1 && (
-              <Pagination
-                page={pagination.page}
-                totalPages={pagination.totalPages}
-                onPageChange={handlePageChange}
-              />
-            )}
-          </>
+              )}
+            </>
           </LazySection>
         )}
       </main>

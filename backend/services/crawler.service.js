@@ -11,8 +11,10 @@ const API_BASE_URL = 'https://phimapi.com';
 /**
  * Hàm chính: Crawl phim từ trang phim mới cập nhật
  * @param {number} page - Trang cần crawl (mặc định trang 1)
+ * @param {Function} onProgress - Callback để gửi log real-time (optional)
+ * @param {boolean} skipExisting - Bỏ qua phim đã tồn tại (mặc định false)
  */
-const crawlMovies = async (page = 1, onProgress = null) => {
+const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) => {
   try {
     const log = (message) => {
       if (onProgress) {
@@ -38,14 +40,26 @@ const crawlMovies = async (page = 1, onProgress = null) => {
       { timeout: 0 }, // Không timeout
     );
     const moviesList = listResponse.data.items || [];
+    const totalMoviesInPage = moviesList.length;
 
     let count = 0;
+    let skippedCount = 0;
 
     // 2. Lặp qua từng phim trong danh sách
     for (const movieItem of moviesList) {
       const slug = movieItem.slug;
 
       try {
+        // Nếu skipExisting = true, kiểm tra phim đã tồn tại chưa trước khi crawl
+        if (skipExisting) {
+          const existingMovie = await MovieModel.findOne({ slug: slug });
+          if (existingMovie) {
+            log(`⏭️  Bỏ qua phim đã tồn tại: ${slug}`);
+            skippedCount++;
+            continue; // Bỏ qua phim này
+          }
+        }
+
         // --- Gọi API chi tiết ---
         const detailResponse = await axios.get(`${API_BASE_URL}/phim/${slug}`, {
           timeout: 0, // Không timeout
@@ -102,28 +116,30 @@ const crawlMovies = async (page = 1, onProgress = null) => {
           age_rating: randomAge, // <--- Đã thêm vào đây
         };
 
-        // 3. LƯU MOVIE (Upsert)
+        // 3. KIỂM TRA PHIM ĐÃ TỒN TẠI CHƯA
+        const existingMovie = await MovieModel.findOne({ slug: slug });
+        const isUpdate = !!existingMovie;
+
+        // 4. LƯU MOVIE (Upsert)
         const savedMovie = await MovieModel.findOneAndUpdate({ slug: slug }, moviePayload, {
           upsert: true,
           new: true,
         });
-        
+
         // --- [THÊM MỚI] GỬI THÔNG BÁO ---
         // Logic: Gửi thông báo khi phim được cập nhật/thêm mới
         try {
-            await createNotification({
-                title: 'Cập nhật phim',
-                message: `Phim ${moviePayload.name} (${moviePayload.currentEpisode}) vừa được cập nhật.`,
-                type: 'movie_update',
-                movieId: savedMovie._id
-            });
+          await createNotification({
+            title: 'Cập nhật phim',
+            message: `Phim ${moviePayload.name} (${moviePayload.currentEpisode}) vừa được cập nhật.`,
+            type: 'movie_update',
+            movieId: savedMovie._id,
+          });
         } catch (notiError) {
-            console.error(`⚠️ Lỗi gửi thông báo phim ${slug}:`, notiError.message);
+          console.error(`⚠️ Lỗi gửi thông báo phim ${slug}:`, notiError.message);
         }
 
-
-
-        // 3b. ĐẢM BẢO CAST (diễn viên/đạo diễn) ĐƯỢC LƯU TRONG COLLECTION CAST (TMDb)
+        // 5. ĐẢM BẢO CAST (diễn viên/đạo diễn) ĐƯỢC LƯU TRONG COLLECTION CAST (TMDb)
         // Không block nếu TMDb lỗi; chỉ log và tiếp tục crawl.
         try {
           if (Array.isArray(actors) && actors.length) {
@@ -137,7 +153,7 @@ const crawlMovies = async (page = 1, onProgress = null) => {
           console.error('⚠️  Lỗi khi đồng bộ cast từ TMDb:', castError.message);
         }
 
-        // 4. LƯU EPISODES (Vào collection riêng) - có phân server/audioType
+        // 6. LƯU EPISODES (Vào collection riêng) - có phân server/audioType
         if (episodesData && episodesData.length > 0) {
           for (const server of episodesData) {
             const serverData = server.server_data || [];
@@ -170,7 +186,7 @@ const crawlMovies = async (page = 1, onProgress = null) => {
           }
         }
 
-        const action = existingMovie ? 'cập nhật' : 'tạo mới';
+        const action = isUpdate ? 'cập nhật' : 'tạo mới';
         log(`✅ [${randomAge}] Đã ${action}: ${moviePayload.name}`);
         count++;
       } catch (err) {
@@ -178,8 +194,13 @@ const crawlMovies = async (page = 1, onProgress = null) => {
       }
     }
 
-    // Trả về movies_count để khớp với hàm runPageRange
-    return { status: 'success', movies_count: count };
+    // Trả về movies_count và thông tin về trang để khớp với hàm runPageRange
+    return {
+      status: 'success',
+      movies_count: count,
+      total_movies_in_page: totalMoviesInPage,
+      skipped_count: skippedCount,
+    };
   } catch (error) {
     console.error('❌ Lỗi Crawl System:', error.message);
     throw error;
@@ -211,8 +232,9 @@ const detectAudioType = (serverName = '') => {
  * @param {number} startPage - Trang bắt đầu
  * @param {number} endPage - Trang kết thúc (null = crawl đến hết)
  * @param {Function} onProgress - Callback để gửi log real-time (optional)
+ * @param {boolean} skipExisting - Bỏ qua phim đã tồn tại (mặc định false)
  */
-const runPageRange = async (startPage, endPage = null, onProgress = null) => {
+const runPageRange = async (startPage, endPage = null, onProgress = null, skipExisting = false) => {
   let totalMovies = 0;
   let currentPage = startPage;
   let hasMorePages = true;
@@ -239,17 +261,27 @@ const runPageRange = async (startPage, endPage = null, onProgress = null) => {
       log(`➡️ ĐANG XỬ LÝ TRANG ${currentPage}${endPage ? ` / ${endPage}` : ''}`);
       log(`================================`);
 
-      const result = await crawlMovies(currentPage, onProgress);
+      const result = await crawlMovies(currentPage, onProgress, skipExisting);
 
       // Cộng dồn kết quả
       const moviesCount = result.movies_count || 0;
+      const totalMoviesInPage = result.total_movies_in_page || 0;
+      const skippedCount = result.skipped_count || 0;
       totalMovies += moviesCount;
 
-      // Nếu không có phim nào trong trang này, dừng lại
-      if (moviesCount === 0) {
-        log(`⚠️ Trang ${currentPage} không có phim nào. Dừng crawl.`);
+      // Chỉ dừng lại khi trang thực sự trống (không có phim nào từ API)
+      // Không dừng khi skipExisting = true và tất cả phim đã tồn tại (vì vẫn có phim trong trang, chỉ là bị skip)
+      if (totalMoviesInPage === 0) {
+        log(`⚠️ Trang ${currentPage} không có phim nào từ API. Dừng crawl.`);
         hasMorePages = false;
         break;
+      }
+
+      // Log thông tin về phim đã skip (nếu có)
+      if (skipExisting && skippedCount > 0) {
+        log(
+          `ℹ️  Trang ${currentPage}: Đã bỏ qua ${skippedCount} phim đã tồn tại, crawl ${moviesCount} phim mới`,
+        );
       }
 
       // Nếu đã đến trang kết thúc (nếu có), dừng lại

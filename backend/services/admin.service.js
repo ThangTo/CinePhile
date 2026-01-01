@@ -10,6 +10,87 @@ const { transformMovies } = require('../utils/movieTransformer');
  */
 
 /**
+ * Helper: Build MongoDB query for admin movie filtering
+ * @param {Object} filters - Filter parameters
+ * @returns {Object} MongoDB query object
+ */
+const buildAdminQuery = (filters = {}) => {
+  const {
+    search,
+    genres,
+    countries,
+    year,
+    yearFrom,
+    yearTo,
+    quality,
+    type,
+    ageRating,
+    status,
+    ratingMin,
+    ratingMax,
+  } = filters;
+
+  const query = {};
+
+  // Text search
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { slug: { $regex: search, $options: 'i' } },
+      { original_name: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  // Filter by genres (multiple) - categories is an array of objects with slug
+  if (genres && Array.isArray(genres) && genres.length > 0) {
+    query['categories.slug'] = { $in: genres };
+  }
+
+  // Filter by countries (multiple) - country is an array of objects with slug
+  if (countries && Array.isArray(countries) && countries.length > 0) {
+    query['country.slug'] = { $in: countries };
+  }
+
+  // Filter by year (exact or range)
+  if (year) {
+    query.year = parseInt(year);
+  } else if (yearFrom || yearTo) {
+    query.year = {};
+    if (yearFrom) query.year.$gte = parseInt(yearFrom);
+    if (yearTo) query.year.$lte = parseInt(yearTo);
+  }
+
+  // Filter by quality
+  if (quality) {
+    query.quality = quality;
+  }
+
+  // Filter by type
+  if (type) {
+    query.type = type;
+  }
+
+  // Filter by age rating
+  if (ageRating) {
+    query.age_rating = ageRating;
+  }
+
+  // Filter by status
+  if (status) {
+    query.status = status;
+  }
+
+  // Filter by rating range
+  if (ratingMin || ratingMax) {
+    query.rating = {};
+    if (ratingMin) query.rating.$gte = parseFloat(ratingMin);
+    if (ratingMax) query.rating.$lte = parseFloat(ratingMax);
+  }
+
+  return query;
+};
+
+/**
  * Helper: Generate unique slug by appending number if exists
  * @param {string} baseSlug - Base slug
  * @param {string} excludeId - Movie ID to exclude from uniqueness check
@@ -41,25 +122,44 @@ const generateUniqueSlug = async (baseSlug, excludeId = null) => {
 
 /**
  * Get all movies with pagination and filters
- * @param {Object} options - { page, limit, search }
+ * @param {Object} options - { page, limit, search, genres, countries, year, yearFrom, yearTo, quality, type, ageRating, status, ratingMin, ratingMax }
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
-const getAllMovies = async ({ page, limit, search }) => {
+const getAllMovies = async ({
+  page,
+  limit,
+  search,
+  genres,
+  countries,
+  year,
+  yearFrom,
+  yearTo,
+  quality,
+  type,
+  ageRating,
+  status,
+  ratingMin,
+  ratingMax,
+}) => {
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 20;
   const skip = (pageNum - 1) * limitNum;
 
-  // Xây dựng bộ lọc tìm kiếm (Search Query)
-  let query = {};
-  if (search) {
-    query = {
-      $or: [
-        { name: { $regex: search, $options: 'i' } },
-        { slug: { $regex: search, $options: 'i' } },
-        { original_name: { $regex: search, $options: 'i' } },
-      ],
-    };
-  }
+  // Build query filters
+  const query = buildAdminQuery({
+    search,
+    genres,
+    countries,
+    year,
+    yearFrom,
+    yearTo,
+    quality,
+    type,
+    ageRating,
+    status,
+    ratingMin,
+    ratingMax,
+  });
 
   // Gọi Database
   const movies = await MovieModel.find(query)

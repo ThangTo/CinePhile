@@ -1,6 +1,41 @@
 const movieService = require('../services/movie.service');
 
 /**
+ * Helper: Parse array query parameters (genres, countries)
+ * @param {string|string[]} param - Query parameter value
+ * @returns {string[]|undefined} Parsed array or undefined
+ */
+const parseArrayParam = (param) => {
+  if (!param) return undefined;
+  return Array.isArray(param) ? param : param.split(',').filter(Boolean);
+};
+
+/**
+ * Helper: Build filters object from request query
+ * @param {Object} req.query - Request query object
+ * @returns {Object} Filters object
+ */
+const buildFiltersFromQuery = (query) => {
+  const parsedGenres = parseArrayParam(query.genres);
+  const parsedCountries = parseArrayParam(query.countries);
+
+  return {
+    ...(parsedGenres && { genres: parsedGenres }),
+    ...(parsedCountries && { countries: parsedCountries }),
+    ...(query.year && { year: query.year }),
+    ...(query.yearFrom && { yearFrom: query.yearFrom }),
+    ...(query.yearTo && { yearTo: query.yearTo }),
+    ...(query.quality && { quality: query.quality }),
+    ...(query.type && { type: query.type }),
+    ...(query.ageRating && { ageRating: query.ageRating }),
+    ...(query.status && { status: query.status }),
+    ...(query.ratingMin && { ratingMin: query.ratingMin }),
+    ...(query.ratingMax && { ratingMax: query.ratingMax }),
+    ...(query.lang && { lang: query.lang }),
+  };
+};
+
+/**
  * GET /movies
  * Get all movies with filters and pagination
  * @param {Object} req.query - { page?, limit?, genre?, country?, year?, sort? }
@@ -8,9 +43,12 @@ const movieService = require('../services/movie.service');
  */
 const getAll = async (req, res) => {
   try {
-    const result = await movieService.getAll(req.query, {
+    const filters = buildFiltersFromQuery(req.query);
+
+    const result = await movieService.getAll(filters, {
       page: req.query.page,
       limit: req.query.limit,
+      sort: req.query.sort || 'newest',
     });
     res.json(result);
   } catch (error) {
@@ -82,13 +120,19 @@ const getNewReleases = async (req, res) => {
  * GET /movies/genre/:genre
  * Get movies filtered by genre
  * @param {string} req.params.genre - Genre
- * @param {Object} req.query - { page?, limit? }
+ * @param {Object} req.query - { page?, limit?, genres?, countries?, year?, yearFrom?, yearTo?, quality?, type?, ageRating?, status?, ratingMin?, ratingMax? }
  */
 const getByGenre = async (req, res) => {
   try {
+    const filters = {
+      genre: req.params.genre,
+      ...buildFiltersFromQuery(req.query),
+    };
     const result = await movieService.getByGenre(req.params.genre, {
       page: req.query.page,
       limit: req.query.limit,
+      sort: req.query.sort || 'newest',
+      ...filters,
     });
     res.json(result);
   } catch (error) {
@@ -113,12 +157,19 @@ const getFilters = async (_req, res) => {
  * GET /movies/country/:country
  * Get movies filtered by country
  * @param {string} req.params.country - country slug
+ * @param {Object} req.query - { page?, limit?, genres?, countries?, year?, yearFrom?, yearTo?, quality?, type?, ageRating?, status?, ratingMin?, ratingMax? }
  */
 const getByCountry = async (req, res) => {
   try {
+    const filters = {
+      country: req.params.country,
+      ...buildFiltersFromQuery(req.query),
+    };
     const result = await movieService.getByCountry(req.params.country, {
       page: req.query.page,
       limit: req.query.limit,
+      sort: req.query.sort || 'newest',
+      ...filters,
     });
     res.json(result);
   } catch (error) {
@@ -129,15 +180,22 @@ const getByCountry = async (req, res) => {
 /**
  * GET /movies/type/:type
  * Filter movies by type (single/series)
+ * @param {Object} req.query - { page?, limit?, genres?, countries?, year?, yearFrom?, yearTo?, quality?, ageRating?, status?, ratingMin?, ratingMax? }
  */
 const getByType = async (req, res) => {
   try {
     if (!['single', 'series'].includes(req.params.type)) {
       throw new Error('Invalid movie type. Use "single" or "series"');
     }
+    const filters = {
+      type: req.params.type,
+      ...buildFiltersFromQuery(req.query),
+    };
     const result = await movieService.getByType(req.params.type, {
       page: req.query.page,
       limit: req.query.limit,
+      sort: req.query.sort || 'newest',
+      ...filters,
     });
     res.json(result);
   } catch (error) {
@@ -154,9 +212,13 @@ const getByType = async (req, res) => {
  */
 const search = async (req, res) => {
   try {
+    const filters = buildFiltersFromQuery(req.query);
+
     const result = await movieService.search(req.query.q || '', {
       page: req.query.page,
       limit: req.query.limit,
+      sort: req.query.sort || 'newest',
+      ...filters,
     });
     res.json(result);
   } catch (error) {
@@ -374,7 +436,6 @@ const deleteComment = async (req, res) => {
   }
 };
 
-
 /**
  * GET /movies/:id/recommendations
  * Get recommended movies based on a movie
@@ -401,8 +462,6 @@ const getRecommendations = async (req, res) => {
     res.status(404).json({ message: error.message });
   }
 };
-
-
 
 module.exports = {
   getAll,

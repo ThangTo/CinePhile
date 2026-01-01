@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { movieAPI } from "services/admin.service";
 import MovieFormModal from "./MovieFormModal";
 import MovieCrawlModal from "./MovieCrawlModal";
+import MovieFilter from "components/common/MovieFilter";
 import { BarSpinner } from "components/common/LoadingState";
 import OptimizedImage from "components/common/OptimizedImage";
 import Pagination from "components/common/Pagination";
@@ -9,7 +10,6 @@ import ConfirmDialog from "components/common/ConfirmDialog";
 
 import {
   FiSearch,
-  FiPlus,
   FiEdit2,
   FiTrash2,
   FiEye,
@@ -22,6 +22,7 @@ import {
 const MovieTable = () => {
   const [movies, setMovies] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filters, setFilters] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCrawlModalOpen, setIsCrawlModalOpen] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState(null);
@@ -35,10 +36,28 @@ const MovieTable = () => {
     limit: 20,
   });
 
-  const loadMovies = async (page = 1, search = "") => {
+  const loadMovies = async (page = 1, search = "", filterParams = {}) => {
     setIsLoading(true);
     try {
-      const response = await movieAPI.getAll({ page, limit: 20, search });
+      // Build params object with filters
+      const params = {
+        page,
+        limit: 20,
+        ...(search && { search }),
+        ...(filterParams.genres?.length && { genres: filterParams.genres.join(",") }),
+        ...(filterParams.countries?.length && { countries: filterParams.countries.join(",") }),
+        ...(filterParams.year && { year: filterParams.year }),
+        ...(filterParams.yearFrom && { yearFrom: filterParams.yearFrom }),
+        ...(filterParams.yearTo && { yearTo: filterParams.yearTo }),
+        ...(filterParams.quality && { quality: filterParams.quality }),
+        ...(filterParams.type && { type: filterParams.type }),
+        ...(filterParams.ageRating && { ageRating: filterParams.ageRating }),
+        ...(filterParams.status && { status: filterParams.status }),
+        ...(filterParams.ratingMin && { ratingMin: filterParams.ratingMin }),
+        ...(filterParams.ratingMax && { ratingMax: filterParams.ratingMax }),
+      };
+
+      const response = await movieAPI.getAll(params);
       if (response.data && response.pagination) {
         setMovies(Array.isArray(response.data) ? response.data : []);
         setPagination(response.pagination);
@@ -60,15 +79,16 @@ const MovieTable = () => {
   };
 
   useEffect(() => {
-    loadMovies(1, "");
+    loadMovies(1, "", filters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      loadMovies(1, searchTerm);
+      loadMovies(1, searchTerm, filters);
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  }, [searchTerm, filters]);
 
   const handleDelete = async (id) => {
     setIsDeleteModalOpen(false);
@@ -103,11 +123,6 @@ const MovieTable = () => {
     }
   };
 
-  const handleAdd = () => {
-    setSelectedMovie(null);
-    setIsModalOpen(true);
-  };
-
   const handleSave = async (movieData) => {
     setIsLoading(true);
     setError(null);
@@ -132,7 +147,13 @@ const MovieTable = () => {
   };
 
   const handlePageChange = (newPage) => {
-    loadMovies(newPage, searchTerm);
+    loadMovies(newPage, searchTerm, filters);
+  };
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    // Reset to page 1 when filters change
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
   };
 
   return (
@@ -187,6 +208,13 @@ const MovieTable = () => {
           </button>
         </div>
       )}
+
+      {/* 2.5. Filter Section */}
+      <MovieFilter
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        options={{ showAdvanced: true, compact: false, defaultCollapsed: true }}
+      />
 
       {/* 3. Main Table Card */}
       <div className="bg-bgColor3 border border-white/5 rounded-2xl shadow-xl overflow-hidden flex flex-col">
@@ -319,7 +347,7 @@ const MovieTable = () => {
           </span>
 
           {pagination.totalPages > 1 && (
-            <div className="scale-90 sm:scale-100 origin-right">
+            <div className="scale-90 sm:scale-100 origin-right mt-[-32px]">
               <Pagination
                 page={pagination.currentPage}
                 totalPages={pagination.totalPages}

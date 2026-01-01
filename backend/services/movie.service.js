@@ -242,20 +242,73 @@ const mapComment = (comment) => {
  */
 const buildQuery = (filters = {}, useTextSearch = true) => {
   const query = {};
+
+  // Genre filter (single or array)
   if (filters.genre) {
-    // Support both 'categories.slug' and 'genres' for backward compatibility
     query['categories.slug'] = filters.genre;
+  } else if (filters.genres && Array.isArray(filters.genres) && filters.genres.length > 0) {
+    query['categories.slug'] = { $in: filters.genres };
   }
+
+  // Country filter (single or array)
   if (filters.country) {
-    // Countries are stored as [{ name, slug }]
     query['country.slug'] = filters.country;
+  } else if (
+    filters.countries &&
+    Array.isArray(filters.countries) &&
+    filters.countries.length > 0
+  ) {
+    query['country.slug'] = { $in: filters.countries };
   }
-  if (filters.type === 'single') {
+
+  // Type filter
+  if (filters.type === 'single' || filters.type === 'movie') {
     query.totalEpisodes = 1;
-  } else if (filters.type === 'series') {
+  } else if (filters.type === 'series' || filters.type === 'tv') {
     query.totalEpisodes = { $gt: 1 };
   }
-  if (filters.year) query.year = Number(filters.year);
+
+  // Year filter (exact or range)
+  if (filters.year) {
+    query.year = Number(filters.year);
+  } else if (filters.yearFrom || filters.yearTo) {
+    query.year = {};
+    if (filters.yearFrom) query.year.$gte = Number(filters.yearFrom);
+    if (filters.yearTo) query.year.$lte = Number(filters.yearTo);
+  }
+
+  // Quality filter
+  if (filters.quality) {
+    query.quality = filters.quality;
+  }
+
+  // Age rating filter
+  if (filters.ageRating) {
+    query.age_rating = filters.ageRating;
+  }
+
+  // Status filter
+  if (filters.status) {
+    query.status = filters.status;
+  }
+
+  // Rating range filter
+  if (filters.ratingMin || filters.ratingMax) {
+    query.rating = {};
+    if (filters.ratingMin) query.rating.$gte = Number(filters.ratingMin);
+    if (filters.ratingMax) query.rating.$lte = Number(filters.ratingMax);
+  }
+
+  // Language/Version filter (subtitle, dubbed, etc.)
+  // Note: audioType is stored in Episode model, not Movie model
+  // This filter will be handled separately in getAll function using aggregation
+  // Map frontend values to database values:
+  // "subtitle" -> ["vietsub", "thuyet-minh"] (phụ đề)
+  // "dubbed" -> ["long-tieng"] (lồng tiếng)
+  if (filters.lang) {
+    // Store the filter for later processing in getAll function
+    query._audioTypeFilter = filters.lang;
+  }
 
   if (filters.q) {
     const searchQuery = filters.q.trim();
@@ -295,15 +348,78 @@ const buildQuery = (filters = {}, useTextSearch = true) => {
 };
 
 /**
+ * Helper: get sort options
+ */
+const getSortOptions = (sort = 'newest') => {
+  switch (sort) {
+    case 'newest':
+      return { createdAt: -1 };
+    case 'updated':
+      return { updatedAt: -1, createdAt: -1 };
+    case 'imdb':
+      return { rating: -1, totalRatings: -1 };
+    case 'views':
+      return { viewCount: -1 };
+    default:
+      return { createdAt: -1 };
+  }
+};
+
+/**
+ * Helper: Map frontend audioType filter values to database values
+ * @param {string} audioTypeFilter - Frontend filter value ('subtitle', 'thuyet-minh', 'dubbed')
+ * @returns {string[]} Array of database audioType values
+ */
+const mapAudioTypeFilter = (audioTypeFilter) => {
+  if (audioTypeFilter === 'subtitle') {
+    return ['vietsub'];
+  } else if (audioTypeFilter === 'thuyet-minh') {
+    return ['thuyet-minh'];
+  } else if (audioTypeFilter === 'dubbed') {
+    return ['long-tieng'];
+  } else {
+    // If it's already a database value, use it directly
+    return [audioTypeFilter];
+  }
+};
+
+/**
+ * Helper: Create aggregation pipeline to filter movies by audioType
+ * @param {Object} baseQuery - Base MongoDB query
+ * @param {string[]} audioTypes - Array of audioType values to filter
+ * @returns {Array} MongoDB aggregation pipeline
+ */
+const createAudioTypeFilterPipeline = (baseQuery, audioTypes) => {
+  return [
+    { $match: baseQuery },
+    {
+      $lookup: {
+        from: 'episodes',
+        localField: '_id',
+        foreignField: 'movieId',
+        as: 'episodes',
+      },
+    },
+    {
+      $match: {
+        'episodes.audioType': { $in: audioTypes },
+      },
+    },
+  ];
+};
+
+/**
  * Helper: paginate a query builder
  */
-const paginate = async (builder, { page = 1, limit = 12 } = {}) => {
+const paginate = async (builder, { page = 1, limit = 12, sort } = {}) => {
   const currentPage = Math.max(parseInt(page, 10) || 1, 1);
   const perPage = Math.max(parseInt(limit, 10) || 12, 1);
   const skip = (currentPage - 1) * perPage;
+  const sortOptions = getSortOptions(sort);
 
   const [rows, total] = await Promise.all([
     builder
+      .sort(sortOptions)
       .skip(skip)
       .limit(perPage)
       .lean()
@@ -326,9 +442,65 @@ const paginate = async (builder, { page = 1, limit = 12 } = {}) => {
  * Get all movies
  */
 const getAll = async (filters = {}, pagination = {}) => {
-  const builder = Movie.find(buildQuery(filters)).sort({ createdAt: -1 });
-  const result = await paginate(builder, pagination);
-  return transformPaginatedResult(result);
+  const { sort, ...paginationParams } = pagination;
+
+  // Handle audioType filter separately since it's in Episode model, not Movie
+  const audioTypeFilter = filters.lang;
+  const queryFilters = { ...filters };
+  if (audioTypeFilter) {
+    // Remove lang from filters to avoid adding it to buildQuery
+    delete queryFilters.lang;
+  }
+
+  const baseQuery = buildQuery(queryFilters);
+  // Remove _audioTypeFilter if it was added by buildQuery
+  if (baseQuery._audioTypeFilter) {
+    delete baseQuery._audioTypeFilter;
+  }
+
+  // If audioType filter is present, use aggregation to filter by episodes
+  if (audioTypeFilter) {
+    // Map frontend values to database values
+    const audioTypes = mapAudioTypeFilter(audioTypeFilter);
+
+    // Use aggregation to find movies with episodes matching audioType
+    const currentPage = Math.max(parseInt(paginationParams.page, 10) || 1, 1);
+    const perPage = Math.max(parseInt(paginationParams.limit, 10) || 12, 1);
+    const skip = (currentPage - 1) * perPage;
+    const sortOptions = getSortOptions(sort);
+
+    const pipeline = [
+      ...createAudioTypeFilterPipeline(baseQuery, audioTypes),
+      // Sort
+      { $sort: sortOptions },
+      // Count total before pagination
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: perPage }],
+          total: [{ $count: 'count' }],
+        },
+      },
+    ];
+
+    const [result] = await Movie.aggregate(pipeline);
+    const movies = result?.data || [];
+    const total = result?.total[0]?.count || 0;
+
+    return {
+      data: transformMovies(movies),
+      pagination: {
+        page: currentPage,
+        limit: perPage,
+        total,
+        totalPages: Math.max(Math.ceil(total / perPage), 1),
+      },
+    };
+  } else {
+    // No audioType filter, use normal query
+    const builder = Movie.find(baseQuery);
+    const result = await paginate(builder, { ...paginationParams, sort });
+    return transformPaginatedResult(result);
+  }
 };
 
 /**
@@ -378,8 +550,11 @@ const getNewReleases = async (limit = 10) => {
 /**
  * Get movies by genre
  */
-const getByGenre = async (genre, pagination = {}) => {
-  const builder = Movie.find(buildQuery({ genre })).sort({ createdAt: -1 });
+const getByGenre = async (genre, options = {}) => {
+  const { page, limit, sort, ...filters } = options;
+  const pagination = { page, limit, sort };
+  const queryFilters = { genre, ...filters };
+  const builder = Movie.find(buildQuery(queryFilters));
   const result = await paginate(builder, pagination);
   return transformPaginatedResult(result);
 };
@@ -387,8 +562,11 @@ const getByGenre = async (genre, pagination = {}) => {
 /**
  * Get movies by country
  */
-const getByCountry = async (country, pagination = {}) => {
-  const builder = Movie.find(buildQuery({ country })).sort({ createdAt: -1 });
+const getByCountry = async (country, options = {}) => {
+  const { page, limit, sort, ...filters } = options;
+  const pagination = { page, limit, sort };
+  const queryFilters = { country, ...filters };
+  const builder = Movie.find(buildQuery(queryFilters));
   const result = await paginate(builder, pagination);
   return transformPaginatedResult(result);
 };
@@ -396,8 +574,11 @@ const getByCountry = async (country, pagination = {}) => {
 /**
  * Get movies by type (single vs series)
  */
-const getByType = async (type, pagination = {}) => {
-  const builder = Movie.find(buildQuery({ type })).sort({ createdAt: -1 });
+const getByType = async (type, options = {}) => {
+  const { page, limit, sort, ...filters } = options;
+  const pagination = { page, limit, sort };
+  const queryFilters = { type, ...filters };
+  const builder = Movie.find(buildQuery(queryFilters));
   const result = await paginate(builder, pagination);
   return transformPaginatedResult(result);
 };
@@ -447,17 +628,20 @@ const getFilterOptions = async () => {
  * Search movies using MongoDB $text search (BM25) for relevance scoring
  * Combines BM25 scoring with accent-insensitive regex matching
  * Falls back to regex search if text index is not available
+ * Priority: Search first, then apply filters to search results
  */
-const search = async (q, pagination = {}) => {
+const search = async (q, options = {}) => {
+  const { page, limit, sort, ...filters } = options;
+  const pagination = { page, limit, sort };
   const searchQuery = (q || '').trim();
   if (!searchQuery) {
-    // Empty query: return all movies sorted by createdAt
-    const builder = Movie.find(buildQuery({ q: '' }, false)).sort({ createdAt: -1 });
+    // Empty query: return all movies with filters, sorted
+    const queryFilters = { q: '', ...filters };
+    const builder = Movie.find(buildQuery(queryFilters, false));
     const result = await paginate(builder, pagination);
     return transformPaginatedResult(result);
   }
 
-  const { page = 1, limit = 12 } = pagination;
   const currentPage = Math.max(parseInt(page, 10) || 1, 1);
   const perPage = Math.max(parseInt(limit, 10) || 12, 1);
   const skip = (currentPage - 1) * perPage;
@@ -465,10 +649,8 @@ const search = async (q, pagination = {}) => {
   // Normalize query for accent-insensitive search
   const normalizedQuery = removeVietnameseAccents(searchQuery);
 
-  // Build base query (filters without search)
-  const baseQuery = buildQuery({ q: '' }, false);
-
-  // Escape regex special characters
+  // STEP 1: Search first (without filters) to get matching movie IDs
+  // This ensures search results are prioritized, then filters are applied to those results
   const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regexOriginal = new RegExp(escapeRegex(searchQuery), 'i');
   const regexNormalized = new RegExp(escapeRegex(normalizedQuery), 'i');
@@ -476,25 +658,24 @@ const search = async (q, pagination = {}) => {
   // Try to use BM25 ($text search) with accent-insensitive support
   // Since $text search doesn't handle accents well, we'll search with both original and normalized
   try {
-    // Try BM25 search with both original query (có dấu) and normalized query (không dấu)
-    // This ensures we match both accented and non-accented text in DB
+    // STEP 1A: Search without filters to get all matching movie IDs
     const textQueries = [];
 
     // If query has accents, try both versions
     if (normalizedQuery.toLowerCase() !== searchQuery.toLowerCase()) {
       // Query has accents - try both original and normalized
       textQueries.push(
-        { ...baseQuery, $text: { $search: searchQuery } }, // Original (có dấu)
-        { ...baseQuery, $text: { $search: normalizedQuery } }, // Normalized (không dấu)
+        { $text: { $search: searchQuery } }, // Original (có dấu)
+        { $text: { $search: normalizedQuery } }, // Normalized (không dấu)
       );
     } else {
       // No accents - just use normalized
-      textQueries.push({ ...baseQuery, $text: { $search: normalizedQuery } });
+      textQueries.push({ $text: { $search: normalizedQuery } });
     }
 
-    // Get BM25 results from all text queries
-    const allTextResults = [];
+    // STEP 1B: Get all matching movie IDs from search (without filters)
     const allTextIds = new Set();
+    const allTextResults = [];
 
     for (const textQuery of textQueries) {
       try {
@@ -508,13 +689,11 @@ const search = async (q, pagination = {}) => {
             },
           },
           {
-            $sort: {
-              textScore: -1,
-              createdAt: -1,
+            $project: {
+              _id: 1,
+              textScore: 1,
+              createdAt: 1,
             },
-          },
-          {
-            $limit: skip + perPage + 50, // Fetch enough for requested page + buffer
           },
         ];
 
@@ -524,9 +703,10 @@ const search = async (q, pagination = {}) => {
           if (!allTextIds.has(id)) {
             allTextIds.add(id);
             allTextResults.push({
-              ...movie,
+              _id: movie._id,
+              textScore: movie.textScore || 0,
+              createdAt: movie.createdAt,
               relevanceScore: 100 + (movie.textScore || 0) * 10,
-              matchType: 'bm25',
             });
           } else {
             // Update if this result has higher score
@@ -543,17 +723,8 @@ const search = async (q, pagination = {}) => {
       }
     }
 
-    // Sort BM25 results by score
-    allTextResults.sort((a, b) => {
-      if (b.relevanceScore !== a.relevanceScore) {
-        return b.relevanceScore - a.relevanceScore;
-      }
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
-
     // Get regex results for accent-insensitive matching (excluding BM25 matches)
-    const regexQuery = {
-      ...baseQuery,
+    const regexSearchQuery = {
       $or: [
         { name: regexOriginal },
         { name: regexNormalized },
@@ -565,62 +736,194 @@ const search = async (q, pagination = {}) => {
       _id: { $nin: Array.from(allTextIds).map((id) => new mongoose.Types.ObjectId(id)) },
     };
 
-    const regexResults = await Movie.find(regexQuery)
-      .sort({ createdAt: -1 })
-      .limit(skip + perPage + 50) // Fetch enough for requested page + buffer
+    const regexResults = await Movie.find(regexSearchQuery)
+      .select('_id createdAt')
+      .limit(1000) // Limit to avoid too many results
       .lean();
 
-    // Combine and score results
-    const allResults = [...allTextResults];
-
-    // Add regex matches with lower score
+    // Add regex IDs to the set
     regexResults.forEach((movie) => {
-      allResults.push({
-        ...movie,
-        relevanceScore: 10, // Lower score for regex matches
-        matchType: 'regex',
-      });
+      const id = movie._id.toString();
+      if (!allTextIds.has(id)) {
+        allTextIds.add(id);
+        allTextResults.push({
+          _id: movie._id,
+          textScore: 0,
+          createdAt: movie.createdAt,
+          relevanceScore: 10, // Lower score for regex matches
+        });
+      }
     });
 
-    // Sort by relevance score
-    const sortedResults = allResults.sort((a, b) => {
+    // STEP 2: Now apply filters to the search results
+    // Build filter query (without search and without lang filter)
+    const queryFilters = { ...filters };
+    const audioTypeFilter = filters.lang;
+    if (audioTypeFilter) {
+      delete queryFilters.lang;
+    }
+    const filterQuery = buildQuery({ q: '', ...queryFilters }, false);
+    // Remove _audioTypeFilter if it was added
+    if (filterQuery._audioTypeFilter) {
+      delete filterQuery._audioTypeFilter;
+    }
+
+    // Combine: search results + filters
+    const baseQuery = {
+      ...filterQuery,
+      _id: { $in: Array.from(allTextIds).map((id) => new mongoose.Types.ObjectId(id)) },
+    };
+
+    // STEP 3: Get full movie documents with filters applied
+    // If audioType filter is present, use aggregation to filter by episodes
+    let movies;
+    if (audioTypeFilter) {
+      // Map frontend values to database values
+      const audioTypes = mapAudioTypeFilter(audioTypeFilter);
+
+      // Use aggregation to filter by audioType
+      const aggregationPipeline = createAudioTypeFilterPipeline(baseQuery, audioTypes);
+
+      movies = await Movie.aggregate(aggregationPipeline);
+    } else {
+      // No audioType filter, use normal query
+      movies = await Movie.find(baseQuery).lean();
+    }
+
+    // STEP 4: Sort by relevance score (from search) first, then by sort option
+    const moviesWithScores = movies.map((movie) => {
+      const id = movie._id.toString();
+      const searchResult = allTextResults.find((r) => r._id.toString() === id);
+      return {
+        ...movie,
+        relevanceScore: searchResult ? searchResult.relevanceScore : 0,
+      };
+    });
+
+    // Sort: first by relevance score, then by sort option
+    moviesWithScores.sort((a, b) => {
+      // First priority: relevance score from search
       if (b.relevanceScore !== a.relevanceScore) {
         return b.relevanceScore - a.relevanceScore;
+      }
+      // Second priority: sort option
+      if (sort === 'newest') {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      } else if (sort === 'updated') {
+        return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+      } else if (sort === 'imdb') {
+        const ratingDiff = (b.rating || 0) - (a.rating || 0);
+        if (ratingDiff !== 0) return ratingDiff;
+        return (b.totalRatings || 0) - (a.totalRatings || 0);
+      } else if (sort === 'views') {
+        return (b.viewCount || 0) - (a.viewCount || 0);
       }
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
 
-    // Paginate
-    const paginatedResults = sortedResults.slice(skip, skip + perPage);
-
-    // Count total
-    const [textCount, regexCount] = await Promise.all([
-      Promise.all(textQueries.map((q) => Movie.countDocuments(q))).then((counts) =>
-        counts.reduce((sum, count) => sum + count, 0),
-      ),
-      Movie.countDocuments(regexQuery),
-    ]);
-
-    // Approximate total (may have some overlap between text queries)
-    const total = Math.max(textCount, allTextIds.size) + regexCount;
+    // STEP 5: Paginate
+    const paginatedResults = moviesWithScores.slice(skip, skip + perPage);
 
     return {
       data: transformMovies(paginatedResults),
       pagination: {
         page: currentPage,
         limit: perPage,
-        total,
-        totalPages: Math.max(Math.ceil(total / perPage), 1),
+        total: moviesWithScores.length,
+        totalPages: Math.max(Math.ceil(moviesWithScores.length / perPage), 1),
       },
     };
   } catch (error) {
     // Fallback to regex search if $text search fails (e.g., no text index)
     console.warn('BM25 search failed, falling back to regex:', error.message);
 
-    const fallbackQuery = buildQuery({ q }, false);
-    const builder = Movie.find(fallbackQuery).sort({ createdAt: -1 });
-    const result = await paginate(builder, pagination);
-    return transformPaginatedResult(result);
+    // Fallback: Search with regex first, then apply filters
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regexOriginal = new RegExp(escapeRegex(searchQuery), 'i');
+    const normalizedQuery = removeVietnameseAccents(searchQuery);
+    const regexNormalized = new RegExp(escapeRegex(normalizedQuery), 'i');
+
+    // Search first (without filters)
+    const searchQueryOnly = {
+      $or: [
+        { name: regexOriginal },
+        { name: regexNormalized },
+        { original_name: regexOriginal },
+        { original_name: regexNormalized },
+        { slug: regexOriginal },
+        { slug: regexNormalized },
+      ],
+    };
+
+    const searchResults = await Movie.find(searchQueryOnly).select('_id').lean();
+    const searchIds = searchResults.map((m) => m._id);
+
+    // Apply filters to search results
+    const queryFilters = { ...filters };
+    const audioTypeFilter = filters.lang;
+    if (audioTypeFilter) {
+      delete queryFilters.lang;
+    }
+    const filterQuery = buildQuery({ q: '', ...queryFilters }, false);
+    // Remove _audioTypeFilter if it was added
+    if (filterQuery._audioTypeFilter) {
+      delete filterQuery._audioTypeFilter;
+    }
+
+    const baseQuery = {
+      ...filterQuery,
+      _id: { $in: searchIds },
+    };
+
+    // Get all matching movies with filters
+    // If audioType filter is present, use aggregation
+    let movies;
+    if (audioTypeFilter) {
+      // Map frontend values to database values
+      const audioTypes = mapAudioTypeFilter(audioTypeFilter);
+
+      const aggregationPipeline = createAudioTypeFilterPipeline(baseQuery, audioTypes);
+
+      movies = await Movie.aggregate(aggregationPipeline);
+    } else {
+      movies = await Movie.find(baseQuery).lean();
+    }
+
+    // Sort by relevance (all have same relevance in fallback) and then by sort option
+    const sortOptions = getSortOptions(sort);
+    const moviesWithScores = movies.map((movie) => ({
+      ...movie,
+      relevanceScore: 10, // Same relevance for all in fallback
+    }));
+
+    // Sort: first by sort option (since all have same relevance)
+    moviesWithScores.sort((a, b) => {
+      if (sort === 'newest') {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      } else if (sort === 'updated') {
+        return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+      } else if (sort === 'imdb') {
+        const ratingDiff = (b.rating || 0) - (a.rating || 0);
+        if (ratingDiff !== 0) return ratingDiff;
+        return (b.totalRatings || 0) - (a.totalRatings || 0);
+      } else if (sort === 'views') {
+        return (b.viewCount || 0) - (a.viewCount || 0);
+      }
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    // Paginate
+    const paginatedResults = moviesWithScores.slice(skip, skip + perPage);
+
+    return {
+      data: transformMovies(paginatedResults),
+      pagination: {
+        page: currentPage,
+        limit: perPage,
+        total: moviesWithScores.length,
+        totalPages: Math.max(Math.ceil(moviesWithScores.length / perPage), 1),
+      },
+    };
   }
 };
 

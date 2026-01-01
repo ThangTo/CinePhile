@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import MovieCard from "components/home-page/MovieCard";
 import Pagination from "components/common/Pagination";
+import MovieFilter from "components/common/MovieFilter";
 import { BarSpinner } from "components/common/LoadingState";
 import EmptyState from "components/common/EmptyState";
 import ErrorState from "components/common/ErrorState";
@@ -17,6 +18,7 @@ const SearchResults = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({});
   const [pagination, setPagination] = useState({
     page: 1,
     totalPages: 1,
@@ -26,6 +28,7 @@ const SearchResults = () => {
 
   useEffect(() => {
     setPage(1);
+    setFilters({}); // Reset filters when query changes
   }, [query]);
 
   useEffect(() => {
@@ -41,7 +44,24 @@ const SearchResults = () => {
       // Don't clear movies here - keep previous data while loading new page
 
       try {
-        const params = { page, limit: PAGE_SIZE };
+        // Build params with filters
+        const params = {
+          page,
+          limit: PAGE_SIZE,
+          ...(filters.genres?.length && { genres: filters.genres.join(",") }),
+          ...(filters.countries?.length && { countries: filters.countries.join(",") }),
+          ...(filters.year && { year: filters.year }),
+          ...(filters.yearFrom && { yearFrom: filters.yearFrom }),
+          ...(filters.yearTo && { yearTo: filters.yearTo }),
+          ...(filters.quality && { quality: filters.quality }),
+          ...(filters.type && { type: filters.type }),
+          ...(filters.ageRating && { ageRating: filters.ageRating }),
+          ...(filters.status && { status: filters.status }),
+          ...(filters.ratingMin && { ratingMin: filters.ratingMin }),
+          ...(filters.ratingMax && { ratingMax: filters.ratingMax }),
+          ...(filters.sort && { sort: filters.sort }),
+          ...(filters.lang && { lang: filters.lang }),
+        };
         const response = await movieService.search(query, params);
 
         // Validate response format
@@ -90,7 +110,7 @@ const SearchResults = () => {
     };
 
     fetchResults();
-  }, [query, page]);
+  }, [query, page, filters]);
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
@@ -120,6 +140,25 @@ const SearchResults = () => {
         <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6 pl-4">
           Toàn bộ kết quả cho từ khóa <span className="text-primaryColor">&quot;{query}&quot;</span>
         </h1>
+
+        {/* Movie Filter */}
+        <div className="mb-6">
+          <MovieFilter
+            filters={filters}
+            onFilterChange={(newFilters) => {
+              setFilters(newFilters);
+              setPage(1); // Reset to page 1 when filters change
+            }}
+            options={{
+              showAdvanced: true,
+              compact: false,
+              pageType: "search",
+              navigateOnApply: true,
+              searchQuery: query,
+              defaultCollapsed: true,
+            }}
+          />
+        </div>
 
         {error ? (
           <ErrorState message={error} />

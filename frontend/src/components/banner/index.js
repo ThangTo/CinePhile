@@ -17,5 +17,3 @@ export { default as ActionButtons } from "./ActionButtons";
 
 // Custom hook
 export { useBannerConfig } from "./useBannerConfig";
-
-// Note: defaultBannerMovie is now exported from src/data/mockData.js for centralization

@@ -355,7 +355,7 @@ const AdminNotificationTab = () => {
         </div>
 
         {/* Cột phải: Thông tin bổ sung (Metadata) - Hidden per requirement */}
-        {/* <div className="lg:col-span-1">
+        <div className="lg:col-span-1">
           <div className="bg-bgColor3 border border-white/5 rounded-2xl p-6 shadow-lg sticky top-6">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <FiLink className="text-primaryColor" />
@@ -395,7 +395,7 @@ const AdminNotificationTab = () => {
               </div>
             </div>
           </div>
-        </div> */}
+        </div>
       </div>
     </div>
   );

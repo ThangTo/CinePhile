@@ -10,6 +10,7 @@ import GenrePage from "./pages/GenrePage";
 import CountryPage from "./pages/CountryPage";
 import SearchResults from "./pages/SearchResults";
 import MovieTypePage from "./pages/MovieTypePage";
+import BrowsePage from "./pages/BrowsePage";
 import AdminDashboard from "./pages/AdminDashboard";
 import PremiumPage from "./pages/PremiumPage";
 import RechargeCoinPage from "./pages/RechargeCoinPage";
@@ -33,6 +34,7 @@ function App() {
               <Route path="/country/:slug" element={<CountryPage />} />
               <Route path="/type/:slug" element={<MovieTypePage />} />
               <Route path="/search" element={<SearchResults />} />
+              <Route path="/filter" element={<BrowsePage />} />
               <Route path="/watch/:id" element={<WatchPage />} />
               <Route path="/account" element={<AccountPage />} />
               <Route path="/premium" element={<PremiumPage />} />

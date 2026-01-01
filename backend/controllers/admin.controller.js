@@ -3,6 +3,16 @@ const { transformMovieData, slugify } = require('../utils/movieAdminUtils');
 const { transformMovie } = require('../utils/movieTransformer');
 
 /**
+ * Helper: Parse array query parameters (genres, countries)
+ * @param {string|string[]} param - Query parameter value
+ * @returns {string[]|undefined} Parsed array or undefined
+ */
+const parseArrayParam = (param) => {
+  if (!param) return undefined;
+  return Array.isArray(param) ? param : param.split(',').filter(Boolean);
+};
+
+/**
  * Admin Movies Controllers
  */
 
@@ -12,8 +22,43 @@ const { transformMovie } = require('../utils/movieTransformer');
  */
 const getAllMovies = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search } = req.query;
-    const result = await adminService.getAllMovies({ page, limit, search });
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      genres,
+      countries,
+      year,
+      yearFrom,
+      yearTo,
+      quality,
+      type,
+      ageRating,
+      status,
+      ratingMin,
+      ratingMax,
+    } = req.query;
+
+    // Parse array params (genres, countries)
+    const parsedGenres = parseArrayParam(genres);
+    const parsedCountries = parseArrayParam(countries);
+
+    const result = await adminService.getAllMovies({
+      page,
+      limit,
+      search,
+      genres: parsedGenres,
+      countries: parsedCountries,
+      year,
+      yearFrom,
+      yearTo,
+      quality,
+      type,
+      ageRating,
+      status,
+      ratingMin,
+      ratingMax,
+    });
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -260,7 +305,7 @@ const getChartData = async (req, res) => {
  */
 const crawlMoviesByPage = async (req, res) => {
   try {
-    const { startPage = 1, endPage = null } = req.body;
+    const { startPage = 1, endPage = null, skipExisting = false } = req.body;
     const { runPageRange } = require('../services/crawler.service');
 
     if (!startPage || startPage < 1) {
@@ -283,7 +328,12 @@ const crawlMoviesByPage = async (req, res) => {
     };
 
     // Run crawl in background
-    runPageRange(parseInt(startPage), endPage ? parseInt(endPage) : null, onProgress)
+    runPageRange(
+      parseInt(startPage),
+      endPage ? parseInt(endPage) : null,
+      onProgress,
+      skipExisting === true,
+    )
       .then((result) => {
         res.write(`data: ${JSON.stringify({ type: 'complete', ...result })}\n\n`);
         res.end();
@@ -332,7 +382,7 @@ const crawlMovieBySlug = async (req, res) => {
     }
 
     const result = await crawlMovieBySlug(slug.trim());
-    
+
     if (!result.success) {
       return res.status(400).json({ message: result.message || 'Failed to crawl movie' });
     }

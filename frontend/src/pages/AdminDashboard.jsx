@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import MovieTable from "components/admin/MovieTable";
 import UserTable from "components/admin/UserTable";
 import CommentTable from "components/admin/CommentTable";
@@ -8,8 +9,43 @@ import AdminNotificationTab from "components/admin/AdminNotificationTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState(ADMIN_TABS.OVERVIEW);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Lấy tab từ URL query parameter, mặc định là OVERVIEW
+  const getTabFromURL = () => {
+    const tabParam = searchParams.get("tab");
+    // Validate tab từ URL
+    const validTabs = Object.values(ADMIN_TABS);
+    if (tabParam && validTabs.includes(tabParam)) {
+      return tabParam;
+    }
+    return ADMIN_TABS.OVERVIEW;
+  };
+
+  const [activeTab, setActiveTab] = useState(getTabFromURL());
+
+  // Đảm bảo URL được set khi component mount nếu chưa có tab trong URL
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (!tabParam) {
+      setSearchParams({ tab: ADMIN_TABS.OVERVIEW }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Đồng bộ activeTab với URL khi URL thay đổi (ví dụ: back/forward button)
+  useEffect(() => {
+    const tabFromURL = getTabFromURL();
+    setActiveTab(tabFromURL);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Hàm để chuyển tab và cập nhật URL
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab });
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -24,7 +60,6 @@ const AdminDashboard = () => {
       case ADMIN_TABS.USERS:
         return (
           <div className="animate-fade-in">
-            <h1 className="text-2xl font-bold text-white mb-6">Quản Lý Người Dùng</h1>
             <UserTable />
           </div>
         );
@@ -56,13 +91,10 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-bgColor text-white font-sans flex overflow-hidden">
       <AdminSidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
-        menuItems={ADMIN_MENU_ITEMS.filter(
-          (item) =>
-            item.id !== ADMIN_TABS.USERS && item.id !== ADMIN_TABS.SETTINGS
-        )}
+        menuItems={ADMIN_MENU_ITEMS}
       />
 
       <div
