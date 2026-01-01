@@ -3,6 +3,7 @@ import { BarSpinner } from "components/common/LoadingState";
 import { statsAPI } from "services/admin.service";
 import { Bar, Doughnut } from "react-chartjs-2";
 import { Chart, registerables } from "chart.js";
+import { getOptimizedImageUrl } from "constants/imageSizes";
 import {
   FiActivity,
   FiUsers,
@@ -157,7 +158,8 @@ const AdminOverviewTab = () => {
             }
           } else {
             const img = new Image();
-            img.src = `https://images.weserv.nl/?url=${src}&w=200&q=80`;
+            // Use standardized SIDEBAR size for consistency
+            img.src = getOptimizedImageUrl(src, "SIDEBAR") || src;
             img.onload = () => chart.ctx && chart.draw();
             cache.set(src, img);
           }

@@ -22,7 +22,7 @@ const HoverCardHeader = ({ backgroundImage, title, subtitle, onClick, compact = 
       className="h-full w-full object-cover"
       lazy={false}
       priority={true}
-      size={compact ? "300" : "400"}
+      sizeKey="DETAIL"
     />
     {/* Gradient overlay */}
     <div className="absolute inset-0 bg-gradient-to-t from-gray-800 via-gray-700/10 to-transparent" />

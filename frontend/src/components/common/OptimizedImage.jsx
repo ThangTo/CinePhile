@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { preloadImage } from "utils/imagePreloader";
 import { useSectionVisible } from "components/common/LazySection";
 import imageCache from "utils/imageCache";
+import { getOptimizedImageUrl } from "constants/imageSizes";
 
 /**
  * Optimized Image Component
@@ -22,18 +23,29 @@ const OptimizedImage = ({
   preloadOnHover = true,
   lazy = true,
   priority = false, // If true, load immediately without lazy loading
-  size = 400,
-  quality = 100,
+  sizeKey = null, // Use size key from constants (THUMBNAIL, CARD, DETAIL, BANNER, SIDEBAR)
+  size = null, // Custom size (backward compatible)
+  quality = null, // Custom quality (backward compatible)
   ...props
 }) => {
   // Check if section is visible (from LazySection context)
   const sectionVisible = useSectionVisible();
 
   // Generate optimized URL once using useMemo
-  const optimizedUrl = useMemo(
-    () => (src ? `https://images.weserv.nl/?url=${src}&w=${size}&q=${quality}&output=webp` : null),
-    [src, size, quality]
-  );
+  // Priority: sizeKey > size/quality (backward compatible)
+  const optimizedUrl = useMemo(() => {
+    if (!src) return null;
+
+    if (sizeKey) {
+      // Use standardized size from constants
+      return getOptimizedImageUrl(src, sizeKey);
+    } else {
+      // Use custom size/quality (backward compatible)
+      const finalSize = size || 400;
+      const finalQuality = quality || 100;
+      return `https://images.weserv.nl/?url=${src}&w=${finalSize}&q=${finalQuality}&output=webp`;
+    }
+  }, [src, sizeKey, size, quality]);
 
   // If lazy is false or priority is true, or section is visible, load immediately
   const shouldLoadImmediately = !lazy || priority || sectionVisible;

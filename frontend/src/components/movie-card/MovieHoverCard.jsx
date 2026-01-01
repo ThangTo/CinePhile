@@ -6,6 +6,7 @@ import userService from "services/user.service";
 import ToastContainer from "components/common/ToastContainer";
 import { preloadImage } from "utils/imagePreloader";
 import favoritesCache from "utils/favoritesCache";
+import { getOptimizedImageUrl } from "constants/imageSizes";
 import HoverCardHeader from "./HoverCardHeader";
 import HoverCardActions from "./HoverCardActions";
 import HoverCardInfo from "./HoverCardInfo";
@@ -28,15 +29,15 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
   useEffect(() => {
     if (!movie) return;
 
-    // Preload background and poster for detail page
+    // Preload background and poster for detail page using standardized sizes
     const bgImage = movie.bgImage || movie.backgroundImage || movie.poster;
     if (bgImage) {
-      const optimizedBg = `https://images.weserv.nl/?url=${bgImage}&w=1400&q=85&output=webp`;
-      preloadImage(optimizedBg).catch(() => {});
+      const optimizedBg = getOptimizedImageUrl(bgImage, "BANNER");
+      if (optimizedBg) preloadImage(optimizedBg).catch(() => {});
     }
     if (movie.poster) {
-      const optimizedPoster = `https://images.weserv.nl/?url=${movie.poster}&w=400&q=90&output=webp`;
-      preloadImage(optimizedPoster).catch(() => {});
+      const optimizedPoster = getOptimizedImageUrl(movie.poster, "DETAIL");
+      if (optimizedPoster) preloadImage(optimizedPoster).catch(() => {});
     }
   }, [movie]);
 
@@ -53,11 +54,11 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
         const favoriteIds = await favoritesCache.getOrFetch(async () => {
           const response = await userService.getFavorites({ limit: 1000 });
           const favorites = response?.data || [];
-          return favorites.map((fav) => 
-            fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
+          return favorites.map(
+            (fav) => fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
           );
         });
-        
+
         setIsFavorite(favoriteIds.includes(movie.id));
       } catch (error) {
         console.error("Error fetching favorites:", error);
@@ -122,7 +123,9 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
 
   return (
     <>
-      <div className={`${hoverClass} h-full pb-2 rounded-xl overflow-hidden bg-gray-800 shadow-2xl`}>
+      <div
+        className={`${hoverClass} h-full pb-2 rounded-xl overflow-hidden bg-gray-800 shadow-2xl`}
+      >
         {/* Header with backdrop and title */}
         <HoverCardHeader
           backgroundImage={movie.backgroundImage || movie.posterUrl || movie.poster}
@@ -134,14 +137,14 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
 
         {/* Content */}
         <div className={`${compact ? "p-3 space-y-2" : "p-4 space-y-3"}`}>
-        {/* Action Buttons */}
-        <HoverCardActions
-          onWatch={handleWatch}
-          onLike={handleToggleFavorite}
-          onInfo={handleInfo}
-          compact={compact}
-          isFavorite={isFavorite}
-        />
+          {/* Action Buttons */}
+          <HoverCardActions
+            onWatch={handleWatch}
+            onLike={handleToggleFavorite}
+            onInfo={handleInfo}
+            compact={compact}
+            isFavorite={isFavorite}
+          />
 
           {/* Movie Info Badges */}
           <HoverCardInfo

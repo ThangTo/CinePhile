@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import WithHoverCard from "components/common/WithHoverCard";
 import OptimizedImage from "components/common/OptimizedImage";
 import { preloadImage } from "utils/imagePreloader";
+import { getOptimizedImageUrl } from "constants/imageSizes";
 
 const MovieCard = ({
   movie,
@@ -17,6 +18,37 @@ const MovieCard = ({
     navigate(`/movie/${movie.id}`);
   };
 
+  // Preload hover card image when card enters viewport (not just on hover)
+  useEffect(() => {
+    if (!movie) return;
+
+    const cardElement = document.querySelector(`[data-movie-id="${movie.id}"]`);
+    if (!cardElement) return;
+
+    // Preload hover card image when card enters viewport
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // Preload hover card background image with DETAIL size
+            const bgImage = movie.backgroundImage || movie.posterUrl || movie.poster;
+            if (bgImage) {
+              const optimizedUrl = getOptimizedImageUrl(bgImage, "DETAIL");
+              if (optimizedUrl) {
+                preloadImage(optimizedUrl).catch(() => {});
+              }
+            }
+            observer.disconnect(); // Only preload once
+          }
+        });
+      },
+      { rootMargin: "200px" } // Preload 200px before entering viewport
+    );
+
+    observer.observe(cardElement);
+    return () => observer.disconnect();
+  }, [movie]);
+
   // Preload detail page images when hovering over card
   useEffect(() => {
     if (!movie) return;
@@ -25,16 +57,17 @@ const MovieCard = ({
     if (!cardElement) return;
 
     const handleMouseEnter = () => {
-      // Preload background and poster for detail page
+      // Preload background and poster for detail page using standardized sizes
       const bgImage = movie.bgImage || movie.backgroundImage || movie.poster;
       if (bgImage) {
-        // Preload with optimized size
-        const optimizedBg = `https://images.weserv.nl/?url=${bgImage}&w=1400&q=85&output=webp`;
-        preloadImage(optimizedBg).catch(() => {});
+        // Preload with BANNER size
+        const optimizedBg = getOptimizedImageUrl(bgImage, "BANNER");
+        if (optimizedBg) preloadImage(optimizedBg).catch(() => {});
       }
       if (movie.poster) {
-        const optimizedPoster = `https://images.weserv.nl/?url=${movie.poster}&w=400&q=90&output=webp`;
-        preloadImage(optimizedPoster).catch(() => {});
+        // Preload with DETAIL size
+        const optimizedPoster = getOptimizedImageUrl(movie.poster, "DETAIL");
+        if (optimizedPoster) preloadImage(optimizedPoster).catch(() => {});
       }
     };
 
@@ -69,7 +102,7 @@ const MovieCard = ({
             preloadOnHover={true}
             lazy={true}
             priority={false}
-            size={compact ? "160" : "250"}
+            sizeKey={compact ? "THUMBNAIL" : "CARD"}
           />
           <div className="absolute left-2 top-1 z-10">
             <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white shadow">

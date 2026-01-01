@@ -15,6 +15,7 @@ import LazySection from "components/common/LazySection";
 import { preloadImages } from "utils/imagePreloader";
 import imageCache from "utils/imageCache";
 import apiCache from "utils/apiCache";
+import { getOptimizedImageUrl } from "constants/imageSizes";
 
 const PAGE_SIZE = 32;
 const TYPE_FILTERS = {
@@ -221,11 +222,12 @@ const FilteredMovies = ({ pageType = "genre" }) => {
           const nextPageMovies = response?.data || [];
           if (nextPageMovies.length === 0) return;
 
-          // Generate optimized poster URLs for next page movies
+          // Generate optimized poster URLs for next page movies using standardized size
+          // Use THUMBNAIL size to match MovieCard compact mode
           const posterUrls = nextPageMovies
             .map((movie) => {
               if (!movie.poster) return null;
-              return `https://images.weserv.nl/?url=${movie.poster}&w=160&q=85&output=webp`;
+              return getOptimizedImageUrl(movie.poster, "THUMBNAIL");
             })
             .filter((url) => url && !imageCache.isCached(url));
 
@@ -264,15 +266,12 @@ const FilteredMovies = ({ pageType = "genre" }) => {
         const nextPageMovies = response?.data || [];
         if (nextPageMovies.length === 0) return;
 
-        // Generate optimized poster URLs for next page movies
-        // Preload with the same size and quality as MovieCard uses
-        // MovieCard uses size="160" (compact) or size="250" (non-compact) with quality=100 (default)
-        // Since FilteredMovies uses compact=true, we preload with size=160 and quality=100
+        // Generate optimized poster URLs for next page movies using standardized size
+        // Use THUMBNAIL size to match MovieCard compact mode
         const posterUrls = nextPageMovies
           .map((movie) => {
             if (!movie.poster) return null;
-            // Match the URL format used by OptimizedImage in MovieCard (compact mode)
-            return `https://images.weserv.nl/?url=${movie.poster}&w=160&q=100&output=webp`;
+            return getOptimizedImageUrl(movie.poster, "THUMBNAIL");
           })
           .filter((url) => url && !imageCache.isCached(url)); // Only preload if not cached
 

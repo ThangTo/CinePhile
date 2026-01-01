@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMovieHover } from "hooks/useMovieHover";
 import MovieHoverCard from "components/movie-card/MovieHoverCard";
 import { preloadImage } from "utils/imagePreloader";
+import { getOptimizedImageUrl } from "constants/imageSizes";
 
 const WithHoverCard = ({
   children,
@@ -112,14 +113,18 @@ const WithHoverCard = ({
   const onEnter = (e) => {
     isPointerInsideRef.current = true;
 
-    // Preload hover card background image immediately on hover
+    // Preload hover card background image with optimized URL immediately on hover
     // This ensures the image is ready when the hover card appears (after delay)
+    // Use DETAIL size to match HoverCardHeader component
     if (movie) {
       const backgroundImage = movie.backgroundImage || movie.posterUrl || movie.poster;
       if (backgroundImage) {
-        preloadImage(backgroundImage).catch(() => {
-          // Silently fail if preload fails
-        });
+        const optimizedUrl = getOptimizedImageUrl(backgroundImage, "DETAIL");
+        if (optimizedUrl) {
+          preloadImage(optimizedUrl).catch(() => {
+            // Silently fail if preload fails
+          });
+        }
       }
     }
 
