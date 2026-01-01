@@ -71,7 +71,7 @@ def run_security_test():
     
     # 1. SETUP: Register a User (to have valid userId)
     # We need a user to verify the coin balance increase
-    username = f"sectest1"
+    username = f"sectest{random_string(3)}"
     email = f"{username}@example.com"
     password = "password123"
     
