@@ -5,7 +5,7 @@ import MovieCrawlModal from "./MovieCrawlModal";
 import MovieFilter from "components/common/MovieFilter";
 import { BarSpinner } from "components/common/LoadingState";
 import OptimizedImage from "components/common/OptimizedImage";
-import Pagination from "components/common/Pagination";
+import PaginationV2 from "components/common/PaginationV2";
 import ConfirmDialog from "components/common/ConfirmDialog";
 
 import {
@@ -347,12 +347,12 @@ const MovieTable = () => {
           </span>
 
           {pagination.totalPages > 1 && (
-            <div className="scale-90 sm:scale-100 origin-right mt-[-32px]">
-              <Pagination
+            <div className="scale-90 sm:scale-100 origin-right ">
+              <PaginationV2
                 page={pagination.currentPage}
                 totalPages={pagination.totalPages}
                 onPageChange={handlePageChange}
-                className="bg-bgColor3"
+                // className="bg-bgColor3"
               />
             </div>
           )}

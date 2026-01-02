@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { userAPI } from "services/admin.service";
 import UserFormModal from "./UserFormModal";
 import { BarSpinner } from "components/common/LoadingState";
-import Pagination from "components/common/Pagination";
+import PaginationV2 from "components/common/PaginationV2";
 import ConfirmDialog from "components/common/ConfirmDialog";
 import { formatTimeAgo } from "utils/dateUtils";
 import { FiSearch, FiPlus, FiTrash2, FiUsers, FiMail, FiCalendar, FiUser } from "react-icons/fi";
@@ -372,12 +372,12 @@ const UserTable = () => {
           </span>
 
           {pagination.totalPages > 1 && (
-            <div className="scale-90 sm:scale-100 origin-right mt-[-32px]">
-              <Pagination
+            <div className="scale-90 sm:scale-100 origin-right">
+              <PaginationV2
                 page={pagination.currentPage}
                 totalPages={pagination.totalPages}
                 onPageChange={handlePageChange}
-                className="bg-bgColor3 mt-0"
+                // className="bg-bgColor3"
               />
             </div>
           )}

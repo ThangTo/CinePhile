@@ -382,7 +382,7 @@ const crawlMovieBySlug = async (req, res) => {
     }
 
     const result = await crawlMovieBySlug(slug.trim());
-
+    
     if (!result.success) {
       return res.status(400).json({ message: result.message || 'Failed to crawl movie' });
     }

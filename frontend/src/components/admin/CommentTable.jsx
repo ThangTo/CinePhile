@@ -2,18 +2,17 @@ import React, { useState, useEffect } from "react";
 import { commentAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
 import ConfirmDialog from "components/common/ConfirmDialog";
+import PaginationV2 from "components/common/PaginationV2";
 // Import Icons
-import { 
-  FiCheck, 
-  FiTrash2, 
-  FiEyeOff, 
-  FiAlertCircle, 
+import {
+  FiCheck,
+  FiTrash2,
+  FiEyeOff,
+  FiAlertCircle,
   FiMessageSquare,
   FiUser,
   FiClock,
   FiFilter,
-  FiChevronLeft,
-  FiChevronRight
 } from "react-icons/fi";
 
 const CommentTable = () => {
@@ -33,10 +32,10 @@ const CommentTable = () => {
   const loadComments = async (page = 1, status = "all") => {
     setIsLoading(true);
     try {
-      const response = await commentAPI.getAll({ 
-        page, 
-        limit: 10, 
-        status: status !== 'all' ? status : undefined 
+      const response = await commentAPI.getAll({
+        page,
+        limit: 10,
+        status: status !== "all" ? status : undefined,
       });
       if (response && response.data) {
         setComments(response.data);
@@ -44,7 +43,7 @@ const CommentTable = () => {
           currentPage: response.pagination.page,
           totalPages: response.pagination.totalPages,
           totalItems: response.pagination.totalItems,
-          limit: response.pagination.limit
+          limit: response.pagination.limit,
         });
       }
     } catch (err) {
@@ -67,8 +66,8 @@ const CommentTable = () => {
       setComments((prev) =>
         prev.map((c) => {
           if (c.id !== id) return c;
-          
-          if (newStatus === 'allowed') {
+
+          if (newStatus === "allowed") {
             return { ...c, status: newStatus, flag: null, reason: null };
           }
           return { ...c, status: newStatus };
@@ -116,28 +115,28 @@ const CommentTable = () => {
 
   const formatDateTime = (dateString) => {
     if (!dateString) return { date: "N/A", time: "N/A" };
-    
+
     const date = new Date(dateString);
-    
+
     // Format to UTC+7 (Asia/Ho_Chi_Minh)
-    const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
+    const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
 
-    const timeFormatter = new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      hour: '2-digit', 
-      minute: '2-digit',
+    const timeFormatter = new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      hour: "2-digit",
+      minute: "2-digit",
       // second: '2-digit', // Optional, maybe keep it simple or match previous
-      hour12: false
+      hour12: false,
     });
 
     return {
       date: dateFormatter.format(date),
-      time: timeFormatter.format(date)
+      time: timeFormatter.format(date),
     };
   };
 
@@ -157,8 +156,20 @@ const CommentTable = () => {
     };
 
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${styles[status] || styles.dismissed}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${status === 'allowed' ? 'bg-green-500' : status === 'pending' ? 'bg-yellow-500' : 'bg-current'}`}></span>
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${
+          styles[status] || styles.dismissed
+        }`}
+      >
+        <span
+          className={`w-1.5 h-1.5 rounded-full ${
+            status === "allowed"
+              ? "bg-green-500"
+              : status === "pending"
+              ? "bg-yellow-500"
+              : "bg-current"
+          }`}
+        ></span>
         {labels[status] || status}
       </span>
     );
@@ -166,14 +177,13 @@ const CommentTable = () => {
 
   return (
     <div className="bg-[#1a1a1a] rounded-2xl border border-white/5 shadow-xl flex flex-col h-full">
-      
       {/* --- HEADER & FILTERS --- */}
       <div className="p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <FiMessageSquare className="text-primaryColor" />
           Quản lý Bình luận
         </h2>
-        
+
         <div className="flex bg-black/20 p-1 rounded-lg border border-white/5">
           {[
             { id: "all", label: "Tất cả" },
@@ -213,14 +223,24 @@ const CommentTable = () => {
         <table className="w-full text-left border-collapse">
           <thead className="bg-white/[0.02] border-b border-white/5">
             <tr>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nội dung / Lý do</th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Người dùng</th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Trạng thái</th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Thời gian</th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Hành động</th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                Nội dung / Lý do
+              </th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                Người dùng
+              </th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                Trạng thái
+              </th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                Thời gian
+              </th>
+              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">
+                Hành động
+              </th>
             </tr>
           </thead>
-          
+
           <tbody className="divide-y divide-white/5">
             {isLoading && comments.length === 0 ? (
               <tr>
@@ -240,11 +260,13 @@ const CommentTable = () => {
             ) : (
               comments.map((comment) => (
                 <tr key={comment.id} className="group hover:bg-white/[0.02] transition-colors">
-                  
                   {/* Cột Nội Dung */}
                   <td className="px-6 py-4 max-w-sm">
                     <div className="flex flex-col gap-1.5">
-                      <p className="text-sm text-gray-200 line-clamp-2 leading-relaxed" title={comment.fullContent}>
+                      <p
+                        className="text-sm text-gray-200 line-clamp-2 leading-relaxed"
+                        title={comment.fullContent}
+                      >
                         {comment.content}
                       </p>
                       <div className="flex items-center gap-2">
@@ -255,7 +277,7 @@ const CommentTable = () => {
                         )}
                         {comment.reason && (
                           <span className="text-xs text-gray-500 italic flex items-center gap-1">
-                             • Lý do: {comment.reason}
+                            • Lý do: {comment.reason}
                           </span>
                         )}
                       </div>
@@ -278,14 +300,14 @@ const CommentTable = () => {
                   </td>
 
                   {/* Cột Trạng Thái */}
-                  <td className="px-6 py-4">
-                    {getStatusBadge(comment.status)}
-                  </td>
+                  <td className="px-6 py-4">{getStatusBadge(comment.status)}</td>
 
                   {/* Cột Thời Gian */}
                   <td className="px-6 py-4">
                     <div className="flex flex-col text-xs text-gray-400">
-                      <span className="text-gray-300 font-medium">{formatDateTime(comment.createdAt).date}</span>
+                      <span className="text-gray-300 font-medium">
+                        {formatDateTime(comment.createdAt).date}
+                      </span>
                       <span className="flex items-center gap-1 mt-0.5">
                         <FiClock className="w-3 h-3" /> {formatDateTime(comment.createdAt).time}
                       </span>
@@ -295,7 +317,6 @@ const CommentTable = () => {
                   {/* Cột Hành Động (Icons) */}
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                      
                       <button
                         onClick={() => handleStatusUpdate(comment.id, "allowed")}
                         title="Chấp nhận"
@@ -333,46 +354,15 @@ const CommentTable = () => {
       {/* --- FOOTER / PAGINATION --- */}
       <div className="p-4 border-t border-white/5 flex items-center justify-between bg-white/[0.01]">
         <div className="text-xs text-gray-500">
-          Hiển thị <span className="text-white font-bold">{comments.length}</span> trên tổng <span className="text-white font-bold">{pagination.totalItems}</span> bình luận
+          Hiển thị <span className="text-white font-bold">{comments.length}</span> trên tổng{" "}
+          <span className="text-white font-bold">{pagination.totalItems}</span> bình luận
         </div>
-        
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => loadComments(pagination.currentPage - 1, filterStatus)}
-            disabled={pagination.currentPage === 1}
-            className="p-1.5 rounded-md hover:bg-white/5 text-gray-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-          >
-            <FiChevronLeft size={16} />
-          </button>
-          
-          <div className="flex items-center gap-1">
-             {/* Giả lập pagination logic đơn giản */}
-             {Array.from({ length: pagination.totalPages > 5 ? 5 : pagination.totalPages }, (_, i) => {
-               const pageNum = i + 1; // Logic thực tế cần complex hơn
-               return (
-                 <button
-                   key={pageNum}
-                   onClick={() => loadComments(pageNum, filterStatus)}
-                   className={`w-7 h-7 rounded-md text-xs font-medium transition-colors ${
-                     pagination.currentPage === pageNum
-                       ? "bg-primaryColor text-black shadow-sm"
-                       : "text-gray-400 hover:bg-white/5 hover:text-white"
-                   }`}
-                 >
-                   {pageNum}
-                 </button>
-               )
-             })}
-          </div>
 
-          <button 
-            onClick={() => loadComments(pagination.currentPage + 1, filterStatus)}
-            disabled={pagination.currentPage === pagination.totalPages}
-            className="p-1.5 rounded-md hover:bg-white/5 text-gray-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-          >
-            <FiChevronRight size={16} />
-          </button>
-        </div>
+        <PaginationV2
+          page={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          onPageChange={(newPage) => loadComments(newPage, filterStatus)}
+        />
       </div>
 
       {/* Confirm Delete Dialog */}
@@ -389,7 +379,6 @@ const CommentTable = () => {
         cancelText="Hủy bỏ"
         isDanger={true}
       />
-
     </div>
   );
 };

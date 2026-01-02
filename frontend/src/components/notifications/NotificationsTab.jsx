@@ -1,15 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationItem from "./NotificationItem";
-import { 
-  FiFilter, 
-  FiCheck, 
-  FiRotateCw, 
-  FiChevronLeft, 
-  FiChevronRight, 
-  FiBellOff,
-  FiLayers 
-} from "react-icons/fi";
+import PaginationV2 from "components/common/PaginationV2";
+import { FiFilter, FiCheck, FiRotateCw, FiBellOff, FiLayers } from "react-icons/fi";
 
 const FILTERS = {
   all: "Tất cả",
@@ -67,15 +60,15 @@ const NotificationsTab = () => {
   const handlePageChange = (page) => {
     setCurrentPage(page);
     // Scroll nhẹ lên đầu danh sách thay vì đầu trang web
-    document.getElementById("notification-list-top")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document
+      .getElementById("notification-list-top")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6" id="notification-list-top">
-      
       {/* --- HEADER TOOLBAR --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#1a1a1a] p-4 rounded-2xl border border-white/5 shadow-lg">
-        
         {/* Left: Filter Tabs */}
         <div className="flex items-center bg-white/[0.04] p-1 rounded-xl">
           {Object.entries(FILTERS).map(([key, label]) => {
@@ -86,14 +79,21 @@ const NotificationsTab = () => {
                 onClick={() => handleFilterChange(key)}
                 className={`
                   relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300
-                  ${isActive ? "text-white shadow-md" : "text-gray-400 hover:text-white hover:bg-white/5"}
+                  ${
+                    isActive
+                      ? "text-white shadow-md"
+                      : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }
                 `}
               >
                 {isActive && (
-                  <div className="absolute inset-0 bg-primaryColor rounded-lg shadow-sm" style={{ zIndex: -1 }} />
+                  <div
+                    className="absolute inset-0 bg-primaryColor rounded-lg shadow-sm"
+                    style={{ zIndex: -1 }}
+                  />
                 )}
                 <span className="relative z-10 flex items-center gap-2">
-                  {key === 'all' && <FiLayers className="w-3.5 h-3.5" />}
+                  {key === "all" && <FiLayers className="w-3.5 h-3.5" />}
                   {label}
                 </span>
               </button>
@@ -130,16 +130,18 @@ const NotificationsTab = () => {
         {paginatedNotifications.length === 0 ? (
           /* Empty State */
           <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-             <div className="relative mb-6 group">
-                <div className="absolute inset-0 bg-primaryColor/20 rounded-full blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="relative w-24 h-24 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/5">
-                  <FiBellOff className="w-10 h-10 text-gray-600" />
-                </div>
+            <div className="relative mb-6 group">
+              <div className="absolute inset-0 bg-primaryColor/20 rounded-full blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative w-24 h-24 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/5">
+                <FiBellOff className="w-10 h-10 text-gray-600" />
               </div>
+            </div>
             <h3 className="text-xl font-bold text-white mb-2">
-              {filter === "all" ? "Chưa có thông báo nào" : 
-               filter === "unread" ? "Không có thông báo mới" : 
-               "Chưa có thông báo đã đọc"}
+              {filter === "all"
+                ? "Chưa có thông báo nào"
+                : filter === "unread"
+                ? "Không có thông báo mới"
+                : "Chưa có thông báo đã đọc"}
             </h3>
             <p className="text-gray-500 max-w-sm">
               Hệ thống sẽ gửi thông báo cho bạn khi có cập nhật quan trọng hoặc hoạt động mới.
@@ -164,53 +166,19 @@ const NotificationsTab = () => {
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
           <p className="text-sm text-gray-500">
-            Hiển thị <span className="text-white font-medium">{startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, sortedNotifications.length)}</span> trong tổng số <span className="text-white font-medium">{sortedNotifications.length}</span>
+            Hiển thị{" "}
+            <span className="text-white font-medium">
+              {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, sortedNotifications.length)}
+            </span>{" "}
+            trong tổng số{" "}
+            <span className="text-white font-medium">{sortedNotifications.length}</span>
           </p>
 
-          <div className="flex items-center bg-[#1a1a1a] p-1 rounded-xl border border-white/5 shadow-sm">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`
-                w-9 h-9 flex items-center justify-center rounded-lg transition-all
-                ${currentPage === 1 
-                  ? "text-gray-600 cursor-not-allowed" 
-                  : "text-gray-300 hover:bg-white/10 hover:text-white"}
-              `}
-            >
-              <FiChevronLeft className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center px-2 gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => handlePageChange(page)}
-                  className={`
-                    w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all
-                    ${currentPage === page
-                      ? "bg-primaryColor text-white shadow-md transform scale-105"
-                      : "text-gray-400 hover:bg-white/5 hover:text-white"}
-                  `}
-                >
-                  {page}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`
-                w-9 h-9 flex items-center justify-center rounded-lg transition-all
-                ${currentPage === totalPages 
-                  ? "text-gray-600 cursor-not-allowed" 
-                  : "text-gray-300 hover:bg-white/10 hover:text-white"}
-              `}
-            >
-              <FiChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          <PaginationV2
+            page={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
         </div>
       )}
     </div>

@@ -65,18 +65,20 @@ const AccountSidebar = ({ user, onLogout }) => {
         to="/premium"
         className={`flex flex-col px-4 py-3 rounded-lg mb-2 font-medium no-underline transition-all ${
           isPremiumActive(user)
-            ? "bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-white"
+            ? "bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-black"
             : "bg-primaryColor/20 text-primaryColor hover:bg-primaryColor/30 border border-primaryColor/50"
         }`}
       >
         <div className="flex items-center">
-          <i className={`fas ${isPremiumActive(user) ? "fa-crown" : "fa-star"} w-5 text-center mr-3`}></i>
-          <span>{isPremiumActive(user) ? "Premium" : "Nâng Cấp Premium"}</span>
+          <i
+            className={`fas ${isPremiumActive(user) ? "fa-crown" : "fa-star"} w-5 text-center`}
+          ></i>
+          <span className={`ml-1 ${isPremiumActive(user) ? "font-bold" : ""}`}>
+            {isPremiumActive(user) ? "Premium" : "Nâng Cấp Premium"}
+          </span>
         </div>
         {isPremiumActive(user) && (
-          <span className="text-xs mt-1 ml-8 opacity-90">
-            {getPremiumStatusText(user)}
-          </span>
+          <span className="text-xs mt-1 opacity-90">{getPremiumStatusText(user)}</span>
         )}
       </Link>
 
