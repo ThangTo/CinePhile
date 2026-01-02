@@ -114,12 +114,19 @@ const Header = () => {
                   )}
                 </button>
                 {showMobileNotifications && (
-                  <div className="absolute right-0 top-full mt-2 z-50">
-                    <NotificationPanel
-                      onClose={() => setShowMobileNotifications(false)}
-                      triggerRef={mobileBellButtonRef}
+                  <>
+                    {/* Backdrop cho mobile */}
+                    <div
+                      className="fixed inset-0 bg-black/50 z-[100001] md:hidden"
+                      onClick={() => setShowMobileNotifications(false)}
                     />
-                  </div>
+                    <div className="fixed px-2 py-2 md:absolute inset-0 md:inset-auto right-0 md:right-0 top-[56px] md:top-full mt-0 md:mt-2 z-[100002] md:z-50">
+                      <NotificationPanel
+                        onClose={() => setShowMobileNotifications(false)}
+                        triggerRef={mobileBellButtonRef}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             ) : null}

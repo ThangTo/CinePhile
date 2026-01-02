@@ -86,7 +86,9 @@ const PaginationV2 = ({ page, totalPages, onPageChange, className }) => {
   }
 
   return (
-    <div className={`flex items-center justify-center gap-2 ${className || ""}`}>
+    <div
+      className={`flex flex-col md:flex-row items-center justify-center gap-2 ${className || ""}`}
+    >
       {/* Container với style giống NotificationsTab/CommentTable */}
       <div className="flex items-center bg-[#1a1a1a] p-1 rounded-xl border border-white/5 shadow-sm">
         {/* Nút Previous */}

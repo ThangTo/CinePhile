@@ -145,7 +145,7 @@ const RechargeCoinPage = () => {
   const totalAfterRecharge = userCoins + finalAmount + (selectedPackage?.bonus || 0);
 
   return (
-    <div className="min-h-screen bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
+    <div className="min-h-screen pt-12 md:pt-0 bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
       {/* --- Background Effects --- */}
       <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primaryColor/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
@@ -183,8 +183,8 @@ const RechargeCoinPage = () => {
         <div className="space-y-12">
           {/* STEP 1: Selection Area */}
           <div>
-            <h2 className="text-2xl font-bold text-yellow-400 mb-6 flex items-center gap-2">
-              Bước 1: <span className="text-white">Chọn gói nạp nhanh</span>
+            <h2 className="md:text-2xl text-xl font-bold text-yellow-400 mb-6 flex items-center gap-2">
+              Bước 1: <span className="text-white text-lg md:text-2xl">Chọn gói nạp nhanh</span>
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {coinPackages.map((pkg) => {
@@ -266,8 +266,9 @@ const RechargeCoinPage = () => {
 
           {/* STEP 2: Payment Method */}
           <div>
-            <h2 className="text-2xl font-bold text-yellow-400 mb-6 flex items-center gap-2">
-              Bước 2: <span className="text-white">Chọn phương thức thanh toán</span>
+            <h2 className="md:text-2xl text-xl font-bold text-yellow-400 mb-6 flex items-center gap-2">
+              Bước 2:{" "}
+              <span className="text-white text-lg md:text-2xl">Chọn phương thức thanh toán</span>
             </h2>
 
             <div className="grid md:grid-cols-2 gap-4">

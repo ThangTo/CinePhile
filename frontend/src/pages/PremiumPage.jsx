@@ -6,18 +6,18 @@ import { BarSpinner } from "components/common/LoadingState";
 import { isPremiumActive, getRemainingDays } from "utils/premiumUtils";
 
 // Import Icons
-import { 
-  FiCheck, 
-  FiStar, 
-  FiZap, 
-  FiShield, 
-  FiFilm, 
-  FiDownload, 
-  FiHeadphones, 
-  FiPlus, 
-  FiAlertCircle, 
+import {
+  FiCheck,
+  FiStar,
+  FiZap,
+  FiShield,
+  FiFilm,
+  FiDownload,
+  FiHeadphones,
+  FiPlus,
+  FiAlertCircle,
   FiCheckCircle,
-  FiCpu
+  FiCpu,
 } from "react-icons/fi";
 import { FaCoins } from "react-icons/fa";
 
@@ -105,7 +105,7 @@ const PremiumPage = () => {
     try {
       const result = await userService.upgradePremium(planId);
       setSuccess(result.message || "Nâng cấp Premium thành công!");
-      
+
       // Cập nhật thông tin user
       if (result.user) {
         updateUser(result.user);
@@ -142,21 +142,22 @@ const PremiumPage = () => {
   const remainingDays = getRemainingDays(user);
 
   return (
-    <div className="min-h-screen bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
-      
+    <div className="min-h-screen pt-12 md:pt-0 bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
       {/* --- Background Effects (Glow nền) --- */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[500px] bg-primaryColor/20 blur-[120px] rounded-full pointer-events-none mix-blend-screen" />
       <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-600/10 blur-[100px] rounded-full pointer-events-none" />
 
       <div className="container mx-auto px-4 py-12 relative z-10 max-w-7xl">
-        
         {/* --- Header Section --- */}
         <div className="text-center mb-12 md:mb-16 space-y-4">
           <span className="inline-block py-1 px-3 rounded-full bg-white/5 border border-white/10 text-xs font-bold tracking-widest uppercase text-primaryColor backdrop-blur-md">
             Nâng tầm trải nghiệm
           </span>
           <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight">
-            Chọn gói <span className="text-transparent bg-clip-text bg-gradient-to-r from-primaryColor to-yellow-200">Premium</span>
+            Chọn gói{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primaryColor to-yellow-200">
+              Premium
+            </span>
             <br className="hidden md:block" /> phù hợp với bạn
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
@@ -172,13 +173,16 @@ const PremiumPage = () => {
                 <FaCoins className="text-black text-sm md:text-lg" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] md:text-xs text-gray-400 font-medium uppercase tracking-wider">Số dư</span>
+                <span className="text-[10px] md:text-xs text-gray-400 font-medium uppercase tracking-wider">
+                  Số dư
+                </span>
                 <span className="text-sm md:text-xl font-bold text-white leading-none font-mono">
-                  {userCoins.toLocaleString()} <span className="text-xs text-yellow-500 font-sans">Coin</span>
+                  {userCoins.toLocaleString()}{" "}
+                  <span className="text-xs text-yellow-500 font-sans">Coin</span>
                 </span>
               </div>
             </div>
-            
+
             <button
               onClick={() => navigate("/recharge")}
               className="group flex items-center gap-2 px-4 md:px-6 py-3 bg-primaryColor hover:bg-hoverPrimaryColor text-black font-bold rounded-xl transition-all hover:shadow-lg hover:shadow-primaryColor/20 active:scale-95"
@@ -220,9 +224,10 @@ const PremiumPage = () => {
                   // Flex-col và h-full: Để nội dung dàn dọc và chiếm hết chiều cao
                   className={`
                     relative flex flex-col h-full rounded-3xl transition-all duration-300
-                    ${isPopular 
-                      ? "bg-[#1a1a1a]/90 border-2 border-primaryColor shadow-2xl shadow-primaryColor/15 z-10 md:scale-105" 
-                      : "bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.05]"
+                    ${
+                      isPopular
+                        ? "bg-[#1a1a1a]/90 border-2 border-primaryColor shadow-2xl shadow-primaryColor/15 z-10 md:scale-105"
+                        : "bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.05]"
                     }
                     backdrop-blur-xl p-6 lg:p-8
                     ${isDisabled && !isPremium ? "opacity-70 grayscale-[0.3]" : ""}
@@ -238,12 +243,20 @@ const PremiumPage = () => {
 
                   {/* Header của thẻ */}
                   <div className="text-center mb-6">
-                    <h3 className={`text-lg font-bold mb-2 uppercase tracking-wider ${isPopular ? "text-white" : "text-gray-400"}`}>
+                    <h3
+                      className={`text-lg font-bold mb-2 uppercase tracking-wider ${
+                        isPopular ? "text-white" : "text-gray-400"
+                      }`}
+                    >
                       {plan.name}
                     </h3>
-                    
+
                     <div className="flex items-center justify-center gap-1">
-                      <span className={`text-4xl lg:text-5xl font-extrabold ${isPopular ? "text-primaryColor" : "text-white"}`}>
+                      <span
+                        className={`text-4xl lg:text-5xl font-extrabold ${
+                          isPopular ? "text-primaryColor" : "text-white"
+                        }`}
+                      >
                         {plan.price}
                       </span>
                       <span className="text-gray-500 font-medium mt-auto mb-2">Coin</span>
@@ -256,7 +269,7 @@ const PremiumPage = () => {
                         Premium {remainingDays} ngày
                       </div>
                     )}
-                    
+
                     {/* Khu vực giá gốc (Dùng Spacer nếu không có giảm giá) */}
                     <div className="h-6 mt-2 flex items-center justify-center gap-2">
                       {plan.originalPrice ? (
@@ -265,7 +278,7 @@ const PremiumPage = () => {
                             {plan.originalPrice}
                           </span>
                           <span className="text-[10px] font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded border border-green-400/20">
-                            -{Math.round((1 - plan.price/plan.originalPrice) * 100)}%
+                            -{Math.round((1 - plan.price / plan.originalPrice) * 100)}%
                           </span>
                         </>
                       ) : (
@@ -282,7 +295,11 @@ const PremiumPage = () => {
                     <ul className="space-y-4">
                       {plan.features.map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-3 text-sm text-gray-300">
-                          <div className={`mt-0.5 p-0.5 rounded-full flex-shrink-0 ${isPopular ? "text-primaryColor" : "text-gray-600"}`}>
+                          <div
+                            className={`mt-0.5 p-0.5 rounded-full flex-shrink-0 ${
+                              isPopular ? "text-primaryColor" : "text-gray-600"
+                            }`}
+                          >
                             <FiCheck className="w-4 h-4" />
                           </div>
                           <span className="leading-relaxed font-light">{feature}</span>
@@ -299,31 +316,39 @@ const PremiumPage = () => {
                       className={`
                         w-full py-3.5 rounded-xl font-bold text-sm tracking-wide transition-all duration-300
                         flex items-center justify-center gap-2 group relative overflow-hidden
-                        ${isPremium
-                          ? "bg-gray-700/50 text-gray-400 cursor-not-allowed border border-white/5"
-                          : !canAfford
+                        ${
+                          isPremium
+                            ? "bg-gray-700/50 text-gray-400 cursor-not-allowed border border-white/5"
+                            : !canAfford
                             ? "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
                             : isPopular
-                              ? "bg-primaryColor hover:bg-hoverPrimaryColor text-black shadow-lg shadow-primaryColor/25 hover:shadow-primaryColor/40 hover:-translate-y-1"
-                              : "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-primaryColor/50 hover:-translate-y-1"
+                            ? "bg-primaryColor hover:bg-hoverPrimaryColor text-black shadow-lg shadow-primaryColor/25 hover:shadow-primaryColor/40 hover:-translate-y-1"
+                            : "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-primaryColor/50 hover:-translate-y-1"
                         }
                       `}
                     >
                       {isProcessing ? (
-                        <><BarSpinner className="w-4 h-4" /> Đang xử lý...</>
+                        <>
+                          <BarSpinner className="w-4 h-4" /> Đang xử lý...
+                        </>
                       ) : isCurrentPlan ? (
-                        <><FiCheckCircle className="w-4 h-4" /> Đang sử dụng</>
+                        <>
+                          <FiCheckCircle className="w-4 h-4" /> Đang sử dụng
+                        </>
                       ) : !canAfford ? (
                         `Thiếu ${(plan.price - userCoins).toLocaleString()}`
                       ) : (
                         <>
-                          Nâng cấp ngay 
-                          <FiZap className={`w-4 h-4 transition-transform group-hover:scale-110 ${isPopular ? "fill-black" : ""}`} />
+                          Nâng cấp ngay
+                          <FiZap
+                            className={`w-4 h-4 transition-transform group-hover:scale-110 ${
+                              isPopular ? "fill-black" : ""
+                            }`}
+                          />
                         </>
                       )}
                     </button>
                   </div>
-
                 </div>
               );
             })}
@@ -337,23 +362,41 @@ const PremiumPage = () => {
             Đặc quyền VIP có gì hot?
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-             {[
-               { icon: FiFilm, title: "Kho Phim 4K", desc: "Chất lượng hình ảnh sắc nét, sống động từng chi tiết." },
-               { icon: FiShield, title: "Không Quảng Cáo", desc: "Tận hưởng trọn vẹn bộ phim không bị làm phiền." },
-               { icon: FiDownload, title: "Xem Offline", desc: "Tải phim về máy xem mọi lúc mọi nơi không cần mạng." },
-               { icon: FiHeadphones, title: "CSKH Ưu Tiên", desc: "Đội ngũ hỗ trợ riêng biệt 24/7 cho tài khoản VIP." },
-             ].map((item, index) => (
-               <div key={index} className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl hover:bg-white/[0.04] transition-colors group cursor-default">
-                 <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primaryColor group-hover:text-black transition-colors duration-300 shadow-lg">
-                   <item.icon className="w-6 h-6 text-primaryColor group-hover:text-black transition-colors duration-300" />
-                 </div>
-                 <h3 className="text-white font-bold mb-2">{item.title}</h3>
-                 <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
-               </div>
-             ))}
+            {[
+              {
+                icon: FiFilm,
+                title: "Kho Phim 4K",
+                desc: "Chất lượng hình ảnh sắc nét, sống động từng chi tiết.",
+              },
+              {
+                icon: FiShield,
+                title: "Không Quảng Cáo",
+                desc: "Tận hưởng trọn vẹn bộ phim không bị làm phiền.",
+              },
+              {
+                icon: FiDownload,
+                title: "Xem Offline",
+                desc: "Tải phim về máy xem mọi lúc mọi nơi không cần mạng.",
+              },
+              {
+                icon: FiHeadphones,
+                title: "CSKH Ưu Tiên",
+                desc: "Đội ngũ hỗ trợ riêng biệt 24/7 cho tài khoản VIP.",
+              },
+            ].map((item, index) => (
+              <div
+                key={index}
+                className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl hover:bg-white/[0.04] transition-colors group cursor-default"
+              >
+                <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primaryColor group-hover:text-black transition-colors duration-300 shadow-lg">
+                  <item.icon className="w-6 h-6 text-primaryColor group-hover:text-black transition-colors duration-300" />
+                </div>
+                <h3 className="text-white font-bold mb-2">{item.title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -163,7 +163,7 @@ const ContinueWatching = () => {
 
       {/* Movies List */}
       <div className="px-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
+        <div className="flex md:grid md:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4 overflow-x-auto md:overflow-x-visible scrollbar-hide md:scrollbar-default pb-2 md:pb-0">
           {continueWatchingData.map((item) => {
             const title = item.title || item.movie?.name || item.movie?.title || "Không có tiêu đề";
             const engTitle = item.englishTitle || item.movie?.englishTitle;
@@ -174,7 +174,7 @@ const ContinueWatching = () => {
             return (
               <div
                 key={`${item.movieId || item.id}-${item.lastWatchedEpisode || 0}`}
-                className="bg-[#10121b] rounded-2xl p-3 shadow-lg border border-white/5 cursor-pointer hover:border-primaryColor/60 hover:opacity-60 transition-all duration-300"
+                className="bg-[#10121b] rounded-2xl p-3 shadow-lg border border-white/5 cursor-pointer hover:border-primaryColor/60 hover:opacity-60 transition-all duration-300 flex-shrink-0 w-[140px] md:w-auto md:flex-shrink"
                 onClick={() => handleMovieClick(item)}
               >
                 <div className="relative rounded-2xl overflow-hidden">

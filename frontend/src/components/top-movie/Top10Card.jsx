@@ -23,7 +23,7 @@ const Top10Card = ({ movie, rank }) => {
     <WithHoverCard
       movie={movie}
       hoverPosition="-left-20 -top-4"
-      className="relative flex-shrink-0 w-[90%] sm:w-[45%] md:w-[30%] lg:w-[16.5%] min-w-[200px] select-none cursor-pointer"
+      className="relative flex-shrink-0 w-[50%] sm:w-[30%] md:w-[20%] lg:w-[16.5%] min-w-[100px] select-none cursor-pointer"
       onClick={handleClick}
     >
       <ClippedPoster src={movie.poster} alt={movie.title} isOdd={isOdd} />

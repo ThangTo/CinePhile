@@ -150,7 +150,9 @@ const EpisodeSection = ({
                         <span className="text-xs uppercase tracking-wide text-gray-200">
                           {opt.label}
                         </span>
-                        <span className="text-[11px] text-gray-300/90">{opt.description}</span>
+                        <span className="text-[11px] hidden md:block text-gray-300/90">
+                          {opt.description}
+                        </span>
                       </div>
                     </div>
 

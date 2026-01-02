@@ -2,13 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationItem from "./NotificationItem";
-import { 
-  FiBell, 
-  FiCheck, 
-  FiArrowRight, 
-  FiBellOff,
-  FiList 
-} from "react-icons/fi";
+import { FiBell, FiCheck, FiArrowRight, FiBellOff, FiList } from "react-icons/fi";
 
 const NotificationPanel = ({ onClose, triggerRef }) => {
   const panelRef = useRef(null);
@@ -59,8 +53,7 @@ const NotificationPanel = ({ onClose, triggerRef }) => {
   return (
     <div
       ref={panelRef}
-      className="absolute top-full right-0 mt-3 w-[400px] max-w-[calc(100vw-1.5rem)] bg-bgColor3 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 z-50 flex flex-col overflow-hidden animate-fade-in origin-top-right ring-1 ring-white/5"
-      style={{ maxHeight: '600px' }}
+      className="w-full md:w-[400px] h-[75%] mx-auto md:h-auto md:max-h-[600px] bg-bgColor3 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden animate-fade-in origin-top-right ring-0 md:ring-1 ring-white/5"
     >
       {/* Background decoration (Glow effect) */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-primaryColor/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
@@ -83,12 +76,13 @@ const NotificationPanel = ({ onClose, triggerRef }) => {
               </span>
             )}
           </div>
-          
+
           <button
             onClick={handleViewAll}
             className="group flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-primaryColor transition-colors"
           >
-            Xem tất cả <FiArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
+            Xem tất cả{" "}
+            <FiArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
           </button>
         </div>
 
@@ -123,10 +117,7 @@ const NotificationPanel = ({ onClose, triggerRef }) => {
         ) : (
           <div className="divide-y divide-white/5">
             {unreadNotifications.slice(0, 5).map((notification) => (
-              <div 
-                key={notification.id} 
-                className="transition-colors hover:bg-white/[0.02]"
-              >
+              <div key={notification.id} className="transition-colors hover:bg-white/[0.02]">
                 <NotificationItem
                   notification={notification}
                   isActive={activeNotificationId === notification.id}
@@ -134,9 +125,9 @@ const NotificationPanel = ({ onClose, triggerRef }) => {
                 />
               </div>
             ))}
-            
+
             {unreadNotifications.length > 5 && (
-              <button 
+              <button
                 onClick={handleViewAll}
                 className="w-full py-3 text-xs text-gray-500 hover:text-primaryColor hover:bg-white/5 transition-all text-center border-t border-white/5"
               >

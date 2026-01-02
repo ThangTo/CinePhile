@@ -109,7 +109,7 @@ const NotificationsTab = () => {
               className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-primaryColor bg-primaryColor/10 hover:bg-primaryColor/20 border border-primaryColor/20 rounded-xl transition-all"
             >
               <FiCheck className="w-4 h-4" />
-              <span className="hidden sm:inline">Đánh dấu đã đọc</span>
+              <span className="inline">Đánh dấu đã đọc</span>
             </button>
           )}
 

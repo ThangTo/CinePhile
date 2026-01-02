@@ -15,7 +15,7 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-bgColor overflow-visible">
       <Banner />
-      <div className="py-8 sm:py-12 bg-bgColor overflow-visible">
+      <div className=" sm:py-12 bg-bgColor overflow-visible">
         <CategoryChips />
 
         {/* Continue Watching Section - Only shows when user is authenticated */}

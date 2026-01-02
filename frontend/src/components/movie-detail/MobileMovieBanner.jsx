@@ -29,7 +29,7 @@ const MobileMovieBanner = ({ movie }) => {
   };
 
   return (
-    <div className="relative min-h-screen mt-[60px]">
+    <div className="relative mt-[60px]">
       {/* Background Image */}
       <BannerBackground
         backgroundImage={movie.bgImage || movie.backgroundImage || movie.poster}

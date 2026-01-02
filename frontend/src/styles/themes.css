@@ -278,6 +278,24 @@
   animation: lantern-sway 3s ease-in-out infinite;
 }
 
+/* Ẩn lồng đèn và dây treo trên mobile */
+@media (max-width: 768px) {
+  .tet-lantern {
+    display: none !important;
+  }
+
+  .tet-lantern-string {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+
+  /* Ẩn tất cả element có class chứa lantern-string */
+  [class*="lantern-string"] {
+    display: none !important;
+  }
+}
+
 /* ===== GIÁNG SINH ===== */
 .christmas-background {
   position: relative;
