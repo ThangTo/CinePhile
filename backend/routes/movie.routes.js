@@ -24,6 +24,12 @@ router.get('/search/query', movieController.search);
 // GET /api/v1/movies/meta/filters - Get available filters
 router.get('/meta/filters', movieController.getFilters);
 
+// GET /api/v1/movies/meta/top-genres - Get top genres by views
+router.get('/meta/top-genres', movieController.getTopGenres);
+
+// GET /api/v1/movies/meta/theme - Get current theme (public endpoint)
+router.get('/meta/theme', movieController.getTheme);
+
 // GET /api/v1/movies/genre/:genre - Get movies by genre (must be before /:id)
 router.get('/genre/:genre', movieController.getByGenre);
 

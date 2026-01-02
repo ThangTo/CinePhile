@@ -382,7 +382,7 @@ const crawlMovieBySlug = async (req, res) => {
     }
 
     const result = await crawlMovieBySlug(slug.trim());
-    
+
     if (!result.success) {
       return res.status(400).json({ message: result.message || 'Failed to crawl movie' });
     }
@@ -397,6 +397,36 @@ const crawlMovieBySlug = async (req, res) => {
       episodes: result.episodes,
       isUpdate: result.isUpdate,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /admin/settings/theme
+ * Get current theme setting
+ */
+const getTheme = async (req, res) => {
+  try {
+    const theme = await adminService.getTheme();
+    res.json({ theme });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * PUT /admin/settings/theme
+ * Update theme setting
+ */
+const setTheme = async (req, res) => {
+  try {
+    const { theme } = req.body;
+    if (!theme) {
+      return res.status(400).json({ message: 'Theme is required' });
+    }
+    await adminService.setTheme(theme);
+    res.json({ message: 'Theme updated successfully', theme });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -424,4 +454,7 @@ module.exports = {
   // Stats
   getStats,
   getChartData,
+  // Settings
+  getTheme,
+  setTheme,
 };

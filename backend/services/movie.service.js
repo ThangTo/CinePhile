@@ -625,6 +625,32 @@ const getFilterOptions = async () => {
 };
 
 /**
+ * Get top genres by total view count
+ * @param {number} limit - Number of genres to return (default: 10)
+ * @returns {Promise<Array>} Array of { name, slug, totalViews }
+ */
+const getTopGenresByViews = async (limit = 10) => {
+  const topGenres = await Movie.aggregate([
+    { $unwind: '$categories' },
+    {
+      $group: {
+        _id: '$categories.name',
+        slug: { $first: '$categories.slug' },
+        totalViews: { $sum: '$viewCount' },
+      },
+    },
+    { $sort: { totalViews: -1 } },
+    { $limit: limit },
+  ]);
+
+  return topGenres.map((g) => ({
+    name: g._id,
+    slug: g.slug || g._id,
+    totalViews: g.totalViews || 0,
+  }));
+};
+
+/**
  * Search movies using MongoDB $text search (BM25) for relevance scoring
  * Combines BM25 scoring with accent-insensitive regex matching
  * Falls back to regex search if text index is not available
@@ -1511,6 +1537,7 @@ module.exports = {
   getByCountry,
   getByType,
   getFilterOptions,
+  getTopGenresByViews,
   search,
   getEpisodes,
   getCast,

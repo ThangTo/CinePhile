@@ -3,6 +3,7 @@ const UserModel = require('../models/user.model');
 const EpisodeModel = require('../models/episode.model');
 const UserHistoryModel = require('../models/user_history.model');
 const { transformMovies } = require('../utils/movieTransformer');
+const movieService = require('./movie.service');
 
 /**
  * Admin Service
@@ -481,13 +482,14 @@ const getChartData = async (type) => {
 
   // Top 10 categories by total viewCount
   if (type === 'genres') {
-    const topGenres = await MovieModel.aggregate([
-      { $unwind: '$categories' },
-      { $group: { _id: '$categories.name', totalViews: { $sum: '$viewCount' } } },
-      { $sort: { totalViews: -1 } },
-      { $limit: 10 },
-    ]);
-    return { labels: topGenres.map((g) => g._id), data: topGenres.map((g) => g.totalViews) };
+    // Sử dụng logic từ movie service
+    const topGenres = await movieService.getTopGenresByViews(10);
+    return {
+      labels: topGenres.map((g) => g.name),
+      data: topGenres.map((g) => g.totalViews),
+      slugs: topGenres.map((g) => g.slug),
+      genres: topGenres,
+    };
   }
 
   // Placeholder cho các loại chart khác
@@ -495,6 +497,55 @@ const getChartData = async (type) => {
     labels: [],
     data: [],
   };
+};
+
+/**
+ * Settings Service
+ */
+const SettingsModel = require('../models/Settings');
+
+/**
+ * Get setting by key
+ * @param {string} key - Setting key
+ * @returns {Promise<Object|null>} Setting object or null
+ */
+const getSetting = async (key) => {
+  const setting = await SettingsModel.findOne({ key });
+  return setting ? setting.value : null;
+};
+
+/**
+ * Set setting by key
+ * @param {string} key - Setting key
+ * @param {any} value - Setting value
+ * @param {string} description - Optional description
+ * @returns {Promise<Object>} Updated or created setting
+ */
+const setSetting = async (key, value, description = '') => {
+  const setting = await SettingsModel.findOneAndUpdate(
+    { key },
+    { key, value, description },
+    { upsert: true, new: true },
+  );
+  return setting;
+};
+
+/**
+ * Get theme setting
+ * @returns {Promise<string>} Theme name (default: 'default')
+ */
+const getTheme = async () => {
+  const theme = await getSetting('theme');
+  return theme || 'default';
+};
+
+/**
+ * Set theme setting
+ * @param {string} themeName - Theme name
+ * @returns {Promise<Object>} Updated setting
+ */
+const setTheme = async (themeName) => {
+  return await setSetting('theme', themeName, 'Global theme for the website');
 };
 
 module.exports = {
@@ -515,4 +566,9 @@ module.exports = {
   // Stats
   getStats,
   getChartData,
+  // Settings
+  getTheme,
+  setTheme,
+  getSetting,
+  setSetting,
 };

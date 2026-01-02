@@ -103,7 +103,7 @@ export const movieAPI = {
     const http = (await import("lib/axios")).default;
     const baseURL =
       http.defaults.baseURL || process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
-    
+
     // Lấy token từ auth-storage
     let token = null;
     try {
@@ -112,9 +112,9 @@ export const movieAPI = {
     } catch (e) {
       token = localStorage.getItem("token");
     }
-    
+
     const url = `${baseURL}/admin/movies/crawl/by-page`;
-    
+
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -147,7 +147,7 @@ export const movieAPI = {
             }
 
             const { done, value } = await reader.read();
-            
+
             if (done) {
               break;
             }
@@ -377,7 +377,7 @@ export const commentAPI = {
  * Stats API
  */
 export const statsAPI = {
-// ... (rest of the file)
+  // ... (rest of the file)
   /**
    * Get dashboard statistics
    * @returns {Promise<Object>} Stats object
@@ -399,5 +399,35 @@ export const statsAPI = {
       requiresAuth: true,
     });
     return response;
+  },
+};
+
+/**
+ * Settings API
+ */
+export const settingsAPI = {
+  /**
+   * Get current theme setting
+   * @returns {Promise<string>} Theme name
+   */
+  getTheme: async () => {
+    const response = await apiRequest("/admin/settings/theme", {
+      requiresAuth: true,
+    });
+    return response.theme || response.data?.theme || "default";
+  },
+
+  /**
+   * Update theme setting
+   * @param {string} theme - Theme name
+   * @returns {Promise<Object>} Response object
+   */
+  setTheme: async (theme) => {
+    const response = await apiRequest("/admin/settings/theme", {
+      method: "PUT",
+      data: { theme },
+      requiresAuth: true,
+    });
+    return response.data || response;
   },
 };

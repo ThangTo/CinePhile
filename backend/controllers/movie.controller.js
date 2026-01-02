@@ -154,6 +154,36 @@ const getFilters = async (_req, res) => {
 };
 
 /**
+ * GET /movies/meta/top-genres
+ * Get top genres by total view count
+ * @param {number} req.query.limit - Number of genres to return (default: 10)
+ */
+const getTopGenres = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const topGenres = await movieService.getTopGenresByViews(limit);
+    res.json({ genres: topGenres });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /api/v1/movies/meta/theme
+ * Get current theme setting (public endpoint)
+ */
+const getTheme = async (req, res) => {
+  try {
+    const adminService = require('../services/admin.service');
+    const theme = await adminService.getTheme();
+    res.json({ theme });
+  } catch (error) {
+    // Fallback to default if error
+    res.json({ theme: 'default' });
+  }
+};
+
+/**
  * GET /movies/country/:country
  * Get movies filtered by country
  * @param {string} req.params.country - country slug
@@ -473,6 +503,8 @@ module.exports = {
   getByCountry,
   getByType,
   getFilters,
+  getTopGenres,
+  getTheme,
   search,
   getEpisodes,
   getCast,

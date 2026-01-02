@@ -6,6 +6,7 @@ import CommentTable from "components/admin/CommentTable";
 import AdminSidebar from "components/admin/AdminSidebar";
 import AdminOverviewTab from "components/admin/AdminOverviewTab";
 import AdminNotificationTab from "components/admin/AdminNotificationTab";
+import AdminSettingsTab from "components/admin/AdminSettingsTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminDashboard = () => {
@@ -73,15 +74,7 @@ const AdminDashboard = () => {
       case ADMIN_TABS.NOTIFICATIONS:
         return <AdminNotificationTab />;
       case ADMIN_TABS.SETTINGS:
-        return (
-          <div className="animate-fade-in">
-            <h1 className="text-2xl font-bold text-white mb-6">Cài Đặt</h1>
-            <div className="bg-bgColor3 rounded-xl p-8 border border-white/10 text-center">
-              <i className="fa-solid fa-gear text-4xl text-gray-600 mb-4"></i>
-              <p className="text-gray-400">Tính năng đang được phát triển</p>
-            </div>
-          </div>
-        );
+        return <AdminSettingsTab />;
       default:
         return null;
     }

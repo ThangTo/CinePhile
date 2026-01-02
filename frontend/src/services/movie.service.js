@@ -70,6 +70,13 @@ const movieService = {
   getFilterOptions: () => apiRequest("/movies/meta/filters"),
 
   /**
+   * Lấy top genres theo tổng lượt xem
+   * @param {number} limit - Số lượng genres (default: 10)
+   * @returns {Promise<Object>} { genres: [{ name, slug, totalViews }] }
+   */
+  getTopGenresByViews: (limit = 10) => apiRequest("/movies/meta/top-genres", { params: { limit } }),
+
+  /**
    * Tìm kiếm movies
    * @param {string} query - Search query
    * @param {Object} params - { page?, limit? }

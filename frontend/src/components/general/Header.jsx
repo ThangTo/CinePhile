@@ -9,6 +9,7 @@ import {
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationPanel from "components/notifications/NotificationPanel";
 import useAuth from "hooks/useAuth";
+import ThemeSelector from "components/common/ThemeSelector";
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -75,7 +76,11 @@ const Header = () => {
           </button>
 
           {/* Left: Logo */}
-          <Link to="/" className="shrink-0 text-xl lg:text-2xl font-extrabold tracking-tight">
+          <Link
+            to="/"
+            className="shrink-0 text-xl lg:text-2xl font-extrabold tracking-tight"
+            data-theme-glow="true"
+          >
             <span className="text-white">Cine</span>
             <span className="text-cyan-400">Phine</span>
           </Link>
@@ -85,6 +90,10 @@ const Header = () => {
 
           {/* Right: Search + actions */}
           <div className="ml-auto flex items-center gap-3">
+            {/* Theme Selector - Desktop */}
+            <div className="hidden lg:block">
+              <ThemeSelector />
+            </div>
             {user ? (
               <div className="lg:hidden relative">
                 <button
@@ -169,6 +178,12 @@ const Header = () => {
               onOpenAuth={openAuthModal}
               onClose={() => setShowMobileMenu(false)}
             />
+
+            {/* Theme Selector - Mobile */}
+            <div className="lg:hidden mt-4 mb-4 flex items-center justify-between px-2">
+              <span className="text-sm text-gray-300">Theme</span>
+              <ThemeSelector />
+            </div>
 
             <NavigationLinks isMobile={true} />
           </div>

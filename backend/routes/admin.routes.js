@@ -2,14 +2,12 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
 
-// const passport = require('passport');
-
 const authMiddleware = require('../middleware/auth.middleware');
-
 const { isAdmin } = require('../middleware/admin.middleware');
-// // All admin routes require authentication
-// // TODO: Add role-based authorization when auth middleware is implemented
-// router.use(authMiddleware, isAdmin);
+
+// All admin routes require authentication first, then check admin role
+router.use(authMiddleware);
+router.use(isAdmin);
 
 const adminCommentRoutes = require('./admin.comment.routes');
 
@@ -70,6 +68,13 @@ router.get('/stats', adminController.getStats);
 
 // GET /api/v1/admin/stats/charts/:type - Get chart data
 router.get('/stats/charts/:type', adminController.getChartData);
+
+// ===== ADMIN SETTINGS =====
+// GET /api/v1/admin/settings/theme - Get current theme
+router.get('/settings/theme', adminController.getTheme);
+
+// PUT /api/v1/admin/settings/theme - Update theme
+router.put('/settings/theme', adminController.setTheme);
 
 // function isAdmin(req, res, next) {
 //   if (req.isAuthenticated() && (req.user.role === 'admin')) {

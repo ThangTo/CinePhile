@@ -5,6 +5,8 @@
 @layer base {
   body {
     @apply bg-[#000000] text-white font-sans;
+    background-color: var(--theme-background, #000000);
+    color: var(--theme-text, #ffffff);
   }
 
   /* Custom scrollbar – áp dụng toàn site */
