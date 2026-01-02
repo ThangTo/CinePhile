@@ -3,12 +3,41 @@ const USER_KEY = "user";
 const TOKEN_KEY = "token"; // legacy key
 const REFRESH_KEY = "refresh_token"; // legacy key
 
-export const getToken = () => null;
-export const getRefreshToken = () => null;
+export const getToken = () => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return token || null;
+};
 
-export const setAuthData = ({ user }) => {
+export const getRefreshToken = () => {
+  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  return refreshToken || null;
+};
+
+export const setToken = (token) => {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+};
+
+export const setRefreshToken = (refreshToken) => {
+  if (refreshToken) {
+    localStorage.setItem(REFRESH_KEY, refreshToken);
+  } else {
+    localStorage.removeItem(REFRESH_KEY);
+  }
+};
+
+export const setAuthData = ({ user, token, refreshToken }) => {
   if (user) {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+  if (token) {
+    setToken(token);
+  }
+  if (refreshToken) {
+    setRefreshToken(refreshToken);
   }
 };
 

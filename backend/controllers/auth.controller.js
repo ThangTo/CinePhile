@@ -170,9 +170,19 @@ const googleCallback = (req, res) => {
       return res.redirect(failureRedirect);
     }
 
-    const { token, refreshToken } = req.user;
+    const { token, refreshToken, user } = req.user;
+
+    // Set cookies (for desktop/browser)
     attachAuthCookies(res, { token, refreshToken });
-    return res.redirect(successRedirect);
+
+    // Also include tokens in URL params as fallback for mobile devices
+    // where cookies with sameSite: 'none' might not work properly
+    const redirectUrl = new URL(successRedirect);
+    redirectUrl.searchParams.set('token', token);
+    redirectUrl.searchParams.set('refreshToken', refreshToken);
+    redirectUrl.searchParams.set('auth', 'google_success');
+
+    return res.redirect(redirectUrl.toString());
   } catch (error) {
     return res.redirect(failureRedirect);
   }
