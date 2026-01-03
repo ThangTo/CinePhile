@@ -135,9 +135,8 @@ const GoogleAuthHandler = () => {
                 await new Promise((resolve) => setTimeout(resolve, 100));
               }
 
-              //  Thêm timestamp để tránh cache
-              const timestamp = Date.now();
-              navigate(`/?t=${timestamp}`, {
+              // Navigate về homepage (xóa hết params để tránh vòng lặp)
+              navigate("/", {
                 replace: true,
                 state: { authSuccess: "Đăng nhập thành công" },
               });
@@ -156,16 +155,14 @@ const GoogleAuthHandler = () => {
         // 💻 DESKTOP hoặc MOBILE fallback: Dùng cookies
         await getCurrentUser();
 
-        //  Thêm timestamp để tránh cache
-        const timestamp = Date.now();
-        navigate(`/?t=${timestamp}`, {
+        // Navigate về homepage (xóa hết params để tránh vòng lặp)
+        navigate("/", {
           replace: true,
           state: { authSuccess: "Đăng nhập thành công" },
         });
       } catch (error) {
-        //  Thêm timestamp để tránh cache
-        const timestamp = Date.now();
-        navigate(`/?t=${timestamp}`, {
+        // Navigate về homepage (xóa hết params để tránh vòng lặp)
+        navigate("/", {
           replace: true,
           state: { authError: error?.message || "Không thể tải thông tin tài khoản" },
         });
