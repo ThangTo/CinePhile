@@ -39,6 +39,14 @@ const GoogleAuthHandler = () => {
         token = params.get("token");
         refreshToken = params.get("refreshToken");
 
+        // Debug: Kiểm tra token có bị truncate không
+        console.log("🔍 Token from URL (before decode):", {
+          hasToken: !!token,
+          tokenLength: token?.length,
+          tokenPreview: token ? token.substring(0, 50) + "..." : null,
+          tokenEndsWith: token ? token.substring(Math.max(0, token.length - 30)) : null,
+        });
+
         //  URL Encoding trên iOS - decode đúng token
         if (token) {
           try {
@@ -54,6 +62,16 @@ const GoogleAuthHandler = () => {
             console.warn("RefreshToken decode error, using original:", e);
           }
         }
+
+        // Debug: Kiểm tra token sau khi decode
+        console.log("🔍 Token from URL (after decode):", {
+          hasToken: !!token,
+          tokenLength: token?.length,
+          tokenParts: token ? token.split(".").length : 0,
+          isComplete: token && token.split(".").length === 3,
+          tokenPreview: token ? token.substring(0, 50) + "..." : null,
+          tokenEndsWith: token ? token.substring(Math.max(0, token.length - 30)) : null,
+        });
       } else {
         // Desktop: KHÔNG lấy tokens từ URL (bảo mật)
         // Chỉ dùng cookies
@@ -125,8 +143,24 @@ const GoogleAuthHandler = () => {
             // Token JWT thường có format: header.payload.signature
             const tokenParts = token.split(".");
             if (tokenParts.length !== 3) {
+              console.error("❌ Token không đúng format JWT:", {
+                parts: tokenParts.length,
+                tokenLength: token.length,
+                tokenPreview: token.substring(0, 100),
+              });
               throw new Error("Token không đúng format JWT");
             }
+
+            // Debug: Kiểm tra token trước khi gọi API
+            const savedTokenBeforeAPI = localStorage.getItem("token");
+            console.log("🔍 Before calling /auth/me:", {
+              hasToken: !!token,
+              tokenLength: token?.length,
+              localStorageToken: savedTokenBeforeAPI,
+              localStorageTokenLength: savedTokenBeforeAPI?.length,
+              tokensMatch: savedTokenBeforeAPI === token,
+              tokenPreview: token ? token.substring(0, 50) + "..." : null,
+            });
 
             // Try to get user info using the token from URL
             const userData = await apiRequest("/auth/me", {

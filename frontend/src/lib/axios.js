@@ -28,6 +28,19 @@ http.interceptors.request.use((config) => {
       const authStorage = require("./auth-storage");
       const token = authStorage.getToken();
 
+      // Debug logging cho /auth/me requests
+      if (config.url?.includes("/auth/me")) {
+        console.log("🔐 Axios interceptor for /auth/me:", {
+          hasToken: !!token,
+          tokenLength: token?.length,
+          tokenType: typeof token,
+          tokenPreview: token ? token.substring(0, 50) + "..." : null,
+          tokenEndsWith: token ? token.substring(Math.max(0, token.length - 30)) : null,
+          localStorageDirect: localStorage.getItem("token"),
+          localStorageDirectLength: localStorage.getItem("token")?.length,
+        });
+      }
+
       //  Kiểm tra token format và đảm bảo header đúng
       if (token) {
         // Validate token format
@@ -35,8 +48,21 @@ http.interceptors.request.use((config) => {
           console.error("❌ Invalid token format:", {
             type: typeof token,
             length: token?.length,
+            url: config.url,
           });
           throw new Error("Token không hợp lệ");
+        }
+
+        // Validate JWT format
+        const tokenParts = token.split(".");
+        if (tokenParts.length !== 3) {
+          console.error("❌ Token không đúng format JWT:", {
+            parts: tokenParts.length,
+            tokenLength: token.length,
+            url: config.url,
+            tokenPreview: token.substring(0, 100),
+          });
+          throw new Error("Token không đúng format JWT");
         }
 
         config.headers = config.headers || {};
@@ -46,21 +72,28 @@ http.interceptors.request.use((config) => {
 
         // Debug log cho /auth/me requests
         if (config.url?.includes("/auth/me")) {
-          console.log("🔐 Request /auth/me:", {
-            hasToken: !!token,
-            tokenLength: token.length,
-            headerFormat: bearerToken.substring(0, 20) + "...",
+          console.log("✅ Authorization header set:", {
+            headerLength: bearerToken.length,
+            headerPreview: bearerToken.substring(0, 30) + "...",
+            willSend: true,
           });
         }
       } else {
         // Log warning nếu không có token
         if (config.url?.includes("/auth/me")) {
-          console.warn("⚠️ No token found for /auth/me request");
+          console.warn("⚠️ No token found for /auth/me request", {
+            url: config.url,
+            localStorageToken: localStorage.getItem("token"),
+          });
         }
       }
     } catch (e) {
       // Bỏ qua nếu không tìm thấy file auth-storage
-      console.error("❌ Auth storage error:", e);
+      console.error("❌ Auth storage error:", {
+        error: e,
+        url: config.url,
+        message: e?.message,
+      });
     }
   }
   return config;
