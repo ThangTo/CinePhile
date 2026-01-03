@@ -174,7 +174,6 @@ const googleCallback = (req, res) => {
 
     // Validate tokens
     if (!token || !refreshToken) {
-      console.error('❌ Missing tokens in req.user');
       return res.redirect(failureRedirect);
     }
 
@@ -194,10 +193,6 @@ const googleCallback = (req, res) => {
       // Mobile: Include tokens in URL params (cookies có thể không hoạt động)
       redirectUrl.searchParams.set('token', encodeURIComponent(token));
       redirectUrl.searchParams.set('refreshToken', encodeURIComponent(refreshToken));
-      console.log('📱 Mobile device detected - tokens included in URL');
-    } else {
-      // Desktop: KHÔNG thêm tokens vào URL (chỉ dùng cookies - bảo mật hơn)
-      console.log('💻 Desktop device detected - using cookies only (no tokens in URL)');
     }
 
     // Common params for both
@@ -205,11 +200,9 @@ const googleCallback = (req, res) => {
     redirectUrl.searchParams.set('t', Date.now().toString()); // Cache busting
 
     const finalUrl = redirectUrl.toString();
-    console.log('✅ Redirecting to:', finalUrl.substring(0, 100) + '...');
 
     return res.redirect(finalUrl);
   } catch (error) {
-    console.error('❌ Google callback error:', error);
     return res.redirect(failureRedirect);
   }
 };

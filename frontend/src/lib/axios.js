@@ -2,8 +2,6 @@ import axios from "axios";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
 
-console.log(API_BASE_URL);
-
 // Increase timeout for production (Railway can be slower due to cold starts, network latency)
 // Use environment variable or default to 30s for production, 10s for development
 const isProduction = process.env.NODE_ENV === "production";
@@ -28,40 +26,16 @@ http.interceptors.request.use((config) => {
       const authStorage = require("./auth-storage");
       const token = authStorage.getToken();
 
-      // Debug logging cho /auth/me requests
-      if (config.url?.includes("/auth/me")) {
-        console.log("🔐 Axios interceptor for /auth/me:", {
-          hasToken: !!token,
-          tokenLength: token?.length,
-          tokenType: typeof token,
-          tokenPreview: token ? token.substring(0, 50) + "..." : null,
-          tokenEndsWith: token ? token.substring(Math.max(0, token.length - 30)) : null,
-          localStorageDirect: localStorage.getItem("token"),
-          localStorageDirectLength: localStorage.getItem("token")?.length,
-        });
-      }
-
-      //  Kiểm tra token format và đảm bảo header đúng
+      // Kiểm tra token format và đảm bảo header đúng
       if (token) {
         // Validate token format
         if (typeof token !== "string" || token.length < 10) {
-          console.error("❌ Invalid token format:", {
-            type: typeof token,
-            length: token?.length,
-            url: config.url,
-          });
           throw new Error("Token không hợp lệ");
         }
 
         // Validate JWT format
         const tokenParts = token.split(".");
         if (tokenParts.length !== 3) {
-          console.error("❌ Token không đúng format JWT:", {
-            parts: tokenParts.length,
-            tokenLength: token.length,
-            url: config.url,
-            tokenPreview: token.substring(0, 100),
-          });
           throw new Error("Token không đúng format JWT");
         }
 
@@ -69,31 +43,9 @@ http.interceptors.request.use((config) => {
         // Đảm bảo format header đúng: "Bearer <token>" (có dấu cách)
         const bearerToken = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
         config.headers.Authorization = bearerToken;
-
-        // Debug log cho /auth/me requests
-        if (config.url?.includes("/auth/me")) {
-          console.log("✅ Authorization header set:", {
-            headerLength: bearerToken.length,
-            headerPreview: bearerToken.substring(0, 30) + "...",
-            willSend: true,
-          });
-        }
-      } else {
-        // Log warning nếu không có token
-        if (config.url?.includes("/auth/me")) {
-          console.warn("⚠️ No token found for /auth/me request", {
-            url: config.url,
-            localStorageToken: localStorage.getItem("token"),
-          });
-        }
       }
     } catch (e) {
       // Bỏ qua nếu không tìm thấy file auth-storage
-      console.error("❌ Auth storage error:", {
-        error: e,
-        url: config.url,
-        message: e?.message,
-      });
     }
   }
   return config;

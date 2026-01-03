@@ -21,6 +21,7 @@ import ProtectedRoute from "./components/general/ProtectedRoute";
 import MainLayout from "layouts/MainLayout";
 import NotFoundPage from "./pages/NotFound";
 import GoogleAuthHandler from "pages/GoogleAuthHandler";
+import GoogleAuthHandlerWrapper from "components/common/GoogleAuthHandlerWrapper";
 
 function App() {
   return (
@@ -31,8 +32,15 @@ function App() {
             <Router>
               <Routes>
                 <Route path="/auth/google/callback" element={<GoogleAuthHandler />} />
-                {/* All routes use MainLayout (includes Header and Footer) */}
-                <Route path="/" element={<MainLayout />}>
+                {/* Handle Google auth callback on homepage (when backend redirects to /?auth=google_success) */}
+                <Route
+                  path="/"
+                  element={
+                    <GoogleAuthHandlerWrapper>
+                      <MainLayout />
+                    </GoogleAuthHandlerWrapper>
+                  }
+                >
                   <Route index element={<HomePage />} />
                   <Route path="/genre/:slug" element={<GenrePage />} />
                   <Route path="/movie/:id" element={<MovieDetail />} />

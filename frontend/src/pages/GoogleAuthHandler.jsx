@@ -39,43 +39,21 @@ const GoogleAuthHandler = () => {
         token = params.get("token");
         refreshToken = params.get("refreshToken");
 
-        // Debug: Kiểm tra token có bị truncate không
-        console.log("🔍 Token from URL (before decode):", {
-          hasToken: !!token,
-          tokenLength: token?.length,
-          tokenPreview: token ? token.substring(0, 50) + "..." : null,
-          tokenEndsWith: token ? token.substring(Math.max(0, token.length - 30)) : null,
-        });
-
-        //  URL Encoding trên iOS - decode đúng token
+        // URL Encoding trên iOS - decode đúng token
         if (token) {
           try {
             token = decodeURIComponent(token);
           } catch (e) {
-            console.warn("Token decode error, using original:", e);
+            // Ignore decode errors
           }
         }
         if (refreshToken) {
           try {
             refreshToken = decodeURIComponent(refreshToken);
           } catch (e) {
-            console.warn("RefreshToken decode error, using original:", e);
+            // Ignore decode errors
           }
         }
-
-        // Debug: Kiểm tra token sau khi decode
-        console.log("🔍 Token from URL (after decode):", {
-          hasToken: !!token,
-          tokenLength: token?.length,
-          tokenParts: token ? token.split(".").length : 0,
-          isComplete: token && token.split(".").length === 3,
-          tokenPreview: token ? token.substring(0, 50) + "..." : null,
-          tokenEndsWith: token ? token.substring(Math.max(0, token.length - 30)) : null,
-        });
-      } else {
-        // Desktop: KHÔNG lấy tokens từ URL (bảo mật)
-        // Chỉ dùng cookies
-        console.log("💻 Desktop: Using cookies only, ignoring any tokens in URL");
       }
 
       if (status === "google_failed" || status === "failure") {
@@ -88,7 +66,6 @@ const GoogleAuthHandler = () => {
         if (isMobile && token && refreshToken) {
           // Validate token format
           if (token.length < 50) {
-            console.error("❌ Token quá ngắn, có thể bị truncate:", token.length);
             throw new Error("Token không hợp lệ (quá ngắn)");
           }
 
@@ -102,7 +79,6 @@ const GoogleAuthHandler = () => {
               localStorage.removeItem(testKey);
               localStorageAvailable = true;
             } catch (storageError) {
-              console.error("❌ localStorage is blocked (Private mode?):", storageError);
               localStorageAvailable = false;
             }
 
@@ -134,33 +110,14 @@ const GoogleAuthHandler = () => {
               if (savedToken !== token) {
                 throw new Error("Không thể lưu token vào localStorage");
               }
-            } else {
-              // localStorage không available, thử dùng cookies
-              console.warn("⚠️ localStorage không available, thử dùng cookies");
             }
 
-            //  Kiểm tra format token trước khi gọi API
+            // Kiểm tra format token trước khi gọi API
             // Token JWT thường có format: header.payload.signature
             const tokenParts = token.split(".");
             if (tokenParts.length !== 3) {
-              console.error("❌ Token không đúng format JWT:", {
-                parts: tokenParts.length,
-                tokenLength: token.length,
-                tokenPreview: token.substring(0, 100),
-              });
               throw new Error("Token không đúng format JWT");
             }
-
-            // Debug: Kiểm tra token trước khi gọi API
-            const savedTokenBeforeAPI = localStorage.getItem("token");
-            console.log("🔍 Before calling /auth/me:", {
-              hasToken: !!token,
-              tokenLength: token?.length,
-              localStorageToken: savedTokenBeforeAPI,
-              localStorageTokenLength: savedTokenBeforeAPI?.length,
-              tokensMatch: savedTokenBeforeAPI === token,
-              tokenPreview: token ? token.substring(0, 50) + "..." : null,
-            });
 
             // Try to get user info using the token from URL
             const userData = await apiRequest("/auth/me", {
@@ -187,25 +144,16 @@ const GoogleAuthHandler = () => {
               return;
             }
           } catch (tokenError) {
-            console.error("❌ Token-based auth failed:", {
-              error: tokenError,
-              message: tokenError?.message,
-              status: tokenError?.status,
-            });
-
             // Clear tokens if they failed
             if (localStorageAvailable) {
               setToken(null);
               setRefreshToken(null);
             }
-
             // Fall through to try cookies
-            console.log("🔄 Falling back to cookies...");
           }
         }
 
         // 💻 DESKTOP hoặc MOBILE fallback: Dùng cookies
-        console.log("🍪 Authenticating with cookies...");
         await getCurrentUser();
 
         //  Thêm timestamp để tránh cache
@@ -215,12 +163,6 @@ const GoogleAuthHandler = () => {
           state: { authSuccess: "Đăng nhập thành công" },
         });
       } catch (error) {
-        console.error("❌ Google auth callback error:", {
-          error,
-          message: error?.message,
-          status: error?.status,
-        });
-
         //  Thêm timestamp để tránh cache
         const timestamp = Date.now();
         navigate(`/?t=${timestamp}`, {
