@@ -60,7 +60,7 @@ const ProfileCard = ({ user, onUpdate }) => {
         <h2 className={cardStyles.headerTitle}>Hồ sơ của tôi</h2>
       </div>
       <div className={cardStyles.body}>
-        <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+        <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-6 text-center md:text-left">
           <div className="text-center">
             <img
               src={user.avatar || "https://i.pravatar.cc/150?img=68"}

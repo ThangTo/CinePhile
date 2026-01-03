@@ -14,20 +14,34 @@ const GoogleAuthHandler = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { getCurrentUser } = useAuth();
-  const hasProcessedRef = useRef(false); //  React StrictMode chạy 2 lần
+  const hasProcessedRef = useRef(false);
+  const lastProcessedSearchRef = useRef(null); // Lưu location.search đã xử lý
 
   useEffect(() => {
-    //  Đảm bảo chỉ chạy 1 lần
-    if (hasProcessedRef.current) {
+    // Bỏ qua nếu location.search rỗng (đã navigate về "/" không có params)
+    if (!location.search || location.search.trim() === "") {
       return;
     }
 
-    const handleCallback = async () => {
-      // Đánh dấu đã xử lý
-      hasProcessedRef.current = true;
+    const params = new URLSearchParams(location.search);
+    const status = params.get("status") || params.get("auth");
+    const hasToken = params.get("token") && params.get("refreshToken");
+    const hasFailure = status === "google_failed" || status === "failure";
 
-      const params = new URLSearchParams(location.search);
-      const status = params.get("status") || params.get("auth");
+    // Chỉ xử lý nếu có auth params hoặc token, và chưa xử lý location.search này
+    const shouldProcess =
+      (status === "google_success" || hasToken || hasFailure) &&
+      location.search !== lastProcessedSearchRef.current;
+
+    if (!shouldProcess) {
+      return;
+    }
+
+    // Đánh dấu đã xử lý location.search này
+    lastProcessedSearchRef.current = location.search;
+    hasProcessedRef.current = true;
+
+    const handleCallback = async () => {
       const isMobile = isMobileDevice();
 
       // 🔒 CHỈ xử lý tokens từ URL nếu là mobile device

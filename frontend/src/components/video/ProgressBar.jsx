@@ -38,7 +38,7 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
     <div className="mb-2 pointer-events-auto relative">
       <div
         ref={progressBarRef}
-        className="group/seek w-full h-0.5 md:h-1 bg-white/30 rounded-full cursor-pointer hover:h-1 md:hover:h-1.5 transition-all relative overflow-visible"
+        className="group/seek w-full h-1 bg-white/30 rounded-full cursor-pointer hover:h-1 md:hover:h-1.5 transition-all relative overflow-visible"
         onClick={onSeek}
         onMouseMove={handleProgressHover}
         onMouseLeave={handleProgressLeave}

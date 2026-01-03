@@ -11,8 +11,9 @@ const Tooltip = ({ text, children, position = "top" }) => {
   return (
     <div className="relative group/tooltip">
       {children}
+      {/* Tooltip chỉ hiển thị từ md trở lên (desktop) */}
       <div
-        className={`absolute ${positionClasses[position]} px-2 py-1 bg-black/90 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50`}
+        className={`hidden md:block absolute ${positionClasses[position]} px-2 py-1 bg-black/90 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50`}
       >
         {text}
       </div>

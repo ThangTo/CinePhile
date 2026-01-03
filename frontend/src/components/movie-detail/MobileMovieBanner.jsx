@@ -1,30 +1,137 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { GenreTag, BannerBackground, MovieInfo, useBannerConfig } from "components/banner/index";
 import StatusBadge from "./StatusBadge";
+import useToast from "hooks/useToast";
+import useAuth from "hooks/useAuth";
+import useMovieRating from "hooks/useMovieRating";
+import ToastContainer from "components/common/ToastContainer";
+import RatingModal from "components/watch-page/RatingModal";
+import userService from "services/user.service";
+import favoritesCache from "utils/favoritesCache";
 
 /**
  * Mobile Movie Hero Component - Hero section for mobile movie detail page
  * Reuses GenreTag, MovieInfo, and useBannerConfig from BannerHome for consistency
  * @param {Object} props
  * @param {Object} props.movie - Movie data
+ * @param {string} props.audioType - Audio type for watch navigation
  */
-const MobileMovieBanner = ({ movie }) => {
+const MobileMovieBanner = ({ movie, audioType }) => {
   const navigate = useNavigate();
   const [showInfo, setShowInfo] = useState(false);
+  const { toasts, removeToast, success, info, warning } = useToast();
+  const { isAuthenticated, openAuthModal, user } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const hasFetchedRef = useRef(false);
 
   // Reuse BannerHome's config hook to generate infoBadges
   const { infoBadges } = useBannerConfig(movie);
 
+  // Fetch favorites list when authenticated (with cache) - Same logic as desktop
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || !movie?.id) {
+      setIsFavorite(false);
+      return;
+    }
+
+    // Use cache to avoid repeated API calls
+    const fetchFavorites = async () => {
+      try {
+        const favoriteIds = await favoritesCache.getOrFetch(async () => {
+          const response = await userService.getFavorites({ limit: 1000 });
+          const favorites = response?.data || [];
+          return favorites.map(
+            (fav) => fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
+          );
+        });
+
+        setIsFavorite(favoriteIds.includes(movie.id));
+      } catch (error) {
+        console.error("Error fetching favorites:", error);
+        setIsFavorite(false);
+      }
+    };
+
+    // Only fetch once per component mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchFavorites();
+    } else {
+      // If already fetched, check cache
+      const cached = favoritesCache.get();
+      if (cached) {
+        setIsFavorite(cached.includes(movie.id));
+      }
+    }
+  }, [isAuthenticated, user?.id, movie?.id]);
+
+  const {
+    isModalOpen,
+    openRatingModal,
+    closeRatingModal,
+    rateMovie: rateMovieWithHook,
+  } = useMovieRating(movie);
+
   const handleWatch = () => {
-    navigate(`/watch/${movie.id}?ep=1`);
+    navigate(
+      `/watch/${movie.id}?ep=1${audioType ? `&audio=${encodeURIComponent(audioType)}` : ""}`
+    );
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!isAuthenticated) {
+      openAuthModal("login");
+      return;
+    }
+    try {
+      if (isFavorite) {
+        await userService.removeFromFavorites(movie.id);
+        setIsFavorite(false);
+        // Clear cache to force refresh on next fetch
+        favoritesCache.clear();
+        success("Đã xóa khỏi danh sách yêu thích!");
+      } else {
+        await userService.addToFavorites(movie.id);
+        setIsFavorite(true);
+        // Clear cache to force refresh on next fetch
+        favoritesCache.clear();
+        success("Đã thêm vào danh sách yêu thích!");
+      }
+    } catch (error) {
+      warning(error.message || "Không thể cập nhật yêu thích. Vui lòng thử lại!");
+      console.error("Error toggling favorite:", error);
+    }
+  };
+
+  const handleAddToList = async () => {
+    if (!isAuthenticated) {
+      openAuthModal("login");
+      return;
+    }
+    try {
+      await userService.addToWatchlist(movie.id);
+      success("Đã thêm vào danh sách!");
+    } catch (error) {
+      warning(error.message || "Không thể thêm vào danh sách. Vui lòng thử lại!");
+      console.error("Error adding to watchlist:", error);
+    }
+  };
+
+  const handleShare = () => {
+    info("Chức năng chia sẻ sẽ được tích hợp!");
   };
 
   const handleComment = () => {
     // Scroll to comments section
     const commentsSection = document.querySelector(".comments-section-mobile");
     if (commentsSection) {
-      commentsSection.scrollIntoView({ behavior: "smooth" });
+      const elementPosition = commentsSection.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - 100;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
     }
   };
 
@@ -158,21 +265,36 @@ const MobileMovieBanner = ({ movie }) => {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-center gap-6 text-white">
-          <button className="flex flex-col items-center gap-2 hover:text-primaryColor transition-colors">
-            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-              <i className="fa-solid fa-heart text-xl" />
+          <button
+            onClick={handleToggleFavorite}
+            className={`flex flex-col items-center gap-2 transition-colors ${
+              isFavorite ? "text-red-400" : "text-white"
+            }`}
+          >
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center border ${
+                isFavorite ? "bg-red-500/20 border-red-400/30" : "bg-white/10 border-white/20"
+              }`}
+            >
+              <i className={`fa-solid fa-heart text-xl ${isFavorite ? "text-red-400" : ""}`} />
             </div>
             <span className="text-xs text-gray-400">Yêu thích</span>
           </button>
 
-          <button className="flex flex-col items-center gap-2 hover:text-primaryColor transition-colors">
+          <button
+            onClick={handleAddToList}
+            className="flex flex-col items-center gap-2 transition-colors text-white"
+          >
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-plus text-xl" />
             </div>
             <span className="text-xs text-gray-400">Thêm vào</span>
           </button>
 
-          <button className="flex flex-col items-center gap-2 hover:text-primaryColor transition-colors">
+          <button
+            onClick={handleShare}
+            className="flex flex-col items-center gap-2 transition-colors text-white"
+          >
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-share-nodes text-xl" />
             </div>
@@ -181,7 +303,7 @@ const MobileMovieBanner = ({ movie }) => {
 
           <button
             onClick={handleComment}
-            className="hidden sm:flex flex-col items-center gap-2 hover:text-primaryColor transition-colors"
+            className="hidden sm:flex flex-col items-center gap-2 transition-colors text-white"
           >
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-comment text-xl" />
@@ -189,8 +311,11 @@ const MobileMovieBanner = ({ movie }) => {
             <span className="text-xs text-gray-400">Bình luận</span>
           </button>
 
-          {/* Rating Button - Star icon only */}
-          <button className="flex flex-col items-center gap-2 hover:text-primaryColor transition-colors">
+          {/* Rating Button */}
+          <button
+            onClick={openRatingModal}
+            className="flex flex-col items-center gap-2 transition-colors text-white"
+          >
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <i className="fa-solid fa-star text-xl text-primaryColor" />
             </div>
@@ -198,6 +323,14 @@ const MobileMovieBanner = ({ movie }) => {
           </button>
         </div>
       </div>
+
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <RatingModal
+        isOpen={isModalOpen}
+        onClose={closeRatingModal}
+        movie={movie}
+        onRate={rateMovieWithHook}
+      />
     </div>
   );
 };

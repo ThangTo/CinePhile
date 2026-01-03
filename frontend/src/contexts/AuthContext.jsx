@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import authService from "services/auth.service";
 import AuthModal from "components/auth/AuthModal";
 
@@ -151,7 +151,7 @@ export const AuthProvider = ({ children }) => {
   /**
    * Force refresh user from API
    */
-  const refetchCurrentUser = async () => {
+  const refetchCurrentUser = useCallback(async () => {
     const data = await authService.getCurrentUser();
     const userData = data?.data || data;
     if (userData) {
@@ -160,7 +160,7 @@ export const AuthProvider = ({ children }) => {
       return userData;
     }
     throw new Error("Unable to fetch user");
-  };
+  }, []);
 
   /**
    * Check if user is authenticated

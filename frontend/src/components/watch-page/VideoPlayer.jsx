@@ -560,9 +560,24 @@ const VideoPlayer = ({
 
   const toggleFullscreen = useCallback(() => {
     const container = containerRef.current;
+    const video = videoRef.current;
     if (!container) return;
 
-    if (!document.fullscreenElement) {
+    // Detect iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      // iOS Safari/Chrome: Use native video fullscreen
+      if (isIOS && video && video.webkitEnterFullscreen) {
+        try {
+          video.webkitEnterFullscreen();
+          setIsFullscreen(true);
+          return;
+        } catch (err) {
+          console.log("iOS fullscreen not available, trying standard API");
+        }
+      }
+
       // Try different fullscreen APIs for cross-browser support
       const requestFullscreen =
         container.requestFullscreen ||
@@ -1098,7 +1113,7 @@ const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className="relative w-full bg-black rounded-lg aspect-[16/9] max-w-full"
+      className="relative w-full bg-black rounded-lg aspect-[16/9] max-w-full touch-none"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
         if (isPlaying) setShowControls(false);
@@ -1106,6 +1121,12 @@ const VideoPlayer = ({
         setShowSpeedMenu(false);
         setShowQualityMenu(false);
         setShowAudioMenu(false);
+      }}
+      onTouchStart={(e) => {
+        // Prevent default touch behavior that might interfere with video controls
+        if (e.target.closest('.pointer-events-auto')) {
+          e.stopPropagation();
+        }
       }}
     >
       {/* Actual Video Element */}
@@ -1115,12 +1136,18 @@ const VideoPlayer = ({
           className="w-full h-full cursor-pointer rounded-lg"
           src={!hlsSource ? fileSource : undefined}
           onClick={handlePlayPause}
+          playsInline
+          webkit-playsinline="true"
+          x5-playsinline="true"
           style={{
             width: "100%",
             height: "100%",
             objectFit: "contain",
             filter: blurAmount > 0 ? `blur(${blurAmount}px)` : "none",
             transition: "filter 0.3s ease-in-out",
+            WebkitTouchCallout: "none",
+            WebkitUserSelect: "none",
+            touchAction: "manipulation",
           }}
         />
       ) : embedSource ? (

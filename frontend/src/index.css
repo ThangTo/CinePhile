@@ -52,4 +52,45 @@
   .scrollbar-default::-webkit-scrollbar {
     display: block;
   }
+
+  /* Prevent zoom and touch issues on iOS */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  /* Allow text selection in specific areas */
+  input,
+  textarea,
+  [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Prevent double-tap zoom on buttons */
+  button,
+  a {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Ensure video controls are clickable on mobile */
+  .pointer-events-auto {
+    pointer-events: auto !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Video player container */
+  video {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
 }

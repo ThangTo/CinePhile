@@ -64,7 +64,7 @@ const VideoControls = ({
   }
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none opacity-100">
+    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none opacity-100 touch-none">
       {/* Progress Bar */}
       <ProgressBar
         currentTime={currentTime}
@@ -75,7 +75,7 @@ const VideoControls = ({
       />
 
       {/* Control Buttons */}
-      <div className="flex items-center justify-between gap-2 md:gap-3 pointer-events-auto">
+      <div className="flex items-center justify-between gap-2 md:gap-3 pointer-events-auto touch-auto">
         <div className="flex items-center gap-2 md:gap-3">
           {/* Play/Pause */}
           <Tooltip text={isPlaying ? "Tạm dừng (k)" : "Phát (k)"}>
