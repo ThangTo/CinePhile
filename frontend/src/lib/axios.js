@@ -7,9 +7,11 @@ console.log(API_BASE_URL);
 // Increase timeout for production (Railway can be slower due to cold starts, network latency)
 // Use environment variable or default to 30s for production, 10s for development
 const isProduction = process.env.NODE_ENV === "production";
-const TIMEOUT = process.env.REACT_APP_API_TIMEOUT 
-  ? parseInt(process.env.REACT_APP_API_TIMEOUT, 10) 
-  : isProduction ? 30000 : 10000; // 30s for production, 10s for development
+const TIMEOUT = process.env.REACT_APP_API_TIMEOUT
+  ? parseInt(process.env.REACT_APP_API_TIMEOUT, 10)
+  : isProduction
+  ? 30000
+  : 10000; // 30s for production, 10s for development
 
 const http = axios.create({
   baseURL: API_BASE_URL,
@@ -25,13 +27,40 @@ http.interceptors.request.use((config) => {
       // Dynamic import để tránh lỗi vòng lặp dependency nếu có
       const authStorage = require("./auth-storage");
       const token = authStorage.getToken();
+
+      //  Kiểm tra token format và đảm bảo header đúng
       if (token) {
+        // Validate token format
+        if (typeof token !== "string" || token.length < 10) {
+          console.error("❌ Invalid token format:", {
+            type: typeof token,
+            length: token?.length,
+          });
+          throw new Error("Token không hợp lệ");
+        }
+
         config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${token}`;
+        // Đảm bảo format header đúng: "Bearer <token>" (có dấu cách)
+        const bearerToken = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+        config.headers.Authorization = bearerToken;
+
+        // Debug log cho /auth/me requests
+        if (config.url?.includes("/auth/me")) {
+          console.log("🔐 Request /auth/me:", {
+            hasToken: !!token,
+            tokenLength: token.length,
+            headerFormat: bearerToken.substring(0, 20) + "...",
+          });
+        }
+      } else {
+        // Log warning nếu không có token
+        if (config.url?.includes("/auth/me")) {
+          console.warn("⚠️ No token found for /auth/me request");
+        }
       }
     } catch (e) {
       // Bỏ qua nếu không tìm thấy file auth-storage
-      console.warn("Auth storage not found or error loading token");
+      console.error("❌ Auth storage error:", e);
     }
   }
   return config;

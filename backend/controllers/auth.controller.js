@@ -172,18 +172,44 @@ const googleCallback = (req, res) => {
 
     const { token, refreshToken, user } = req.user;
 
-    // Set cookies (for desktop/browser)
+    // Validate tokens
+    if (!token || !refreshToken) {
+      console.error('❌ Missing tokens in req.user');
+      return res.redirect(failureRedirect);
+    }
+
+    // Set cookies (for both desktop and mobile)
     attachAuthCookies(res, { token, refreshToken });
 
-    // Also include tokens in URL params as fallback for mobile devices
-    // where cookies with sameSite: 'none' might not work properly
-    const redirectUrl = new URL(successRedirect);
-    redirectUrl.searchParams.set('token', token);
-    redirectUrl.searchParams.set('refreshToken', refreshToken);
-    redirectUrl.searchParams.set('auth', 'google_success');
+    // Detect mobile device via User-Agent
+    const userAgent = req.headers['user-agent'] || '';
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      userAgent,
+    );
 
-    return res.redirect(redirectUrl.toString());
+    const redirectUrl = new URL(successRedirect);
+
+    // 🔒 CHỈ thêm tokens vào URL cho mobile devices (bảo mật)
+    if (isMobile) {
+      // Mobile: Include tokens in URL params (cookies có thể không hoạt động)
+      redirectUrl.searchParams.set('token', encodeURIComponent(token));
+      redirectUrl.searchParams.set('refreshToken', encodeURIComponent(refreshToken));
+      console.log('📱 Mobile device detected - tokens included in URL');
+    } else {
+      // Desktop: KHÔNG thêm tokens vào URL (chỉ dùng cookies - bảo mật hơn)
+      console.log('💻 Desktop device detected - using cookies only (no tokens in URL)');
+    }
+
+    // Common params for both
+    redirectUrl.searchParams.set('auth', 'google_success');
+    redirectUrl.searchParams.set('t', Date.now().toString()); // Cache busting
+
+    const finalUrl = redirectUrl.toString();
+    console.log('✅ Redirecting to:', finalUrl.substring(0, 100) + '...');
+
+    return res.redirect(finalUrl);
   } catch (error) {
+    console.error('❌ Google callback error:', error);
     return res.redirect(failureRedirect);
   }
 };

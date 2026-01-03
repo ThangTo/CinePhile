@@ -21,28 +21,52 @@ export const AuthProvider = ({ children }) => {
     const loadUser = async () => {
       setIsLoading(true);
       try {
+        //  Load cached user data trước để hiển thị ngay (không phải "Khách")
         const cachedUserData = authService.getCurrentUserLocal();
         if (cachedUserData) {
           setUser(cachedUserData);
         }
 
-        const currentUser = await authService.getCurrentUser();
-        const userDataFromAPI = currentUser?.data || currentUser;
+        //  Gọi API để lấy user mới nhất (có thể mất thời gian)
+        // Nhưng vẫn giữ isLoading = true để không render UI "Khách"
+        try {
+          const currentUser = await authService.getCurrentUser();
+          const userDataFromAPI = currentUser?.data || currentUser;
 
-        if (userDataFromAPI) {
-          setUser(userDataFromAPI);
-          authService.setAuthData(null, userDataFromAPI);
-        } else {
-          authService.clearAuthData();
-          setUser(null);
+          if (userDataFromAPI) {
+            setUser(userDataFromAPI);
+            authService.setAuthData(null, userDataFromAPI);
+          } else {
+            //  Chỉ clear nếu thực sự không có user (401 hoặc không có data)
+            // Không clear nếu chỉ là network error tạm thời
+            authService.clearAuthData();
+            setUser(null);
+          }
+        } catch (apiError) {
+          //  Chỉ clear auth nếu là 401 (Unauthorized)
+          // Giữ lại cached user nếu là lỗi mạng tạm thời
+          if (apiError?.status === 401) {
+            console.warn("⚠️ 401 Unauthorized, clearing auth data");
+            authService.clearAuthData();
+            setUser(null);
+          } else {
+            // Lỗi mạng tạm thời, giữ lại cached user
+            console.warn("⚠️ Network error, keeping cached user:", apiError?.message);
+            // Không clear user, giữ lại cached data
+          }
+
+          if (apiError?.status && apiError.status !== 401) {
+            console.error("Unexpected error in loadUser:", apiError);
+          }
         }
       } catch (error) {
+        // Lỗi nghiêm trọng, clear tất cả
+        console.error("❌ Critical error in loadUser:", error);
         authService.clearAuthData();
         setUser(null);
-        if (error?.status && error.status !== 401) {
-          console.error("Unexpected error in loadUser:", error);
-        }
       } finally {
+        //  Chỉ set isLoading = false sau khi đã xử lý xong
+        // Đảm bảo UI không hiển thị "Khách" trước khi load xong
         setIsLoading(false);
       }
     };

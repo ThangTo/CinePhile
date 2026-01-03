@@ -14,18 +14,48 @@ export const getRefreshToken = () => {
 };
 
 export const setToken = (token) => {
-  if (token) {
-    localStorage.setItem(TOKEN_KEY, token);
-  } else {
-    localStorage.removeItem(TOKEN_KEY);
+  try {
+    if (token) {
+      //  Kiểm tra localStorage có available không
+      if (typeof Storage !== "undefined") {
+        localStorage.setItem(TOKEN_KEY, token);
+        // Verify write
+        const saved = localStorage.getItem(TOKEN_KEY);
+        if (saved !== token) {
+          throw new Error("Failed to save token to localStorage");
+        }
+      } else {
+        throw new Error("localStorage is not available");
+      }
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  } catch (error) {
+    console.error("❌ Error saving token to localStorage:", error);
+    throw error;
   }
 };
 
 export const setRefreshToken = (refreshToken) => {
-  if (refreshToken) {
-    localStorage.setItem(REFRESH_KEY, refreshToken);
-  } else {
-    localStorage.removeItem(REFRESH_KEY);
+  try {
+    if (refreshToken) {
+      //  Kiểm tra localStorage có available không
+      if (typeof Storage !== "undefined") {
+        localStorage.setItem(REFRESH_KEY, refreshToken);
+        // Verify write
+        const saved = localStorage.getItem(REFRESH_KEY);
+        if (saved !== refreshToken) {
+          throw new Error("Failed to save refreshToken to localStorage");
+        }
+      } else {
+        throw new Error("localStorage is not available");
+      }
+    } else {
+      localStorage.removeItem(REFRESH_KEY);
+    }
+  } catch (error) {
+    console.error("❌ Error saving refreshToken to localStorage:", error);
+    throw error;
   }
 };
 
