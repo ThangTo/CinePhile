@@ -121,7 +121,7 @@ const VideoControls = ({
           </Tooltip>
 
           {/* Volume */}
-          <div className="flex items-center gap-1 md:gap-2 group/volume">
+          <div className="hidden md:flex items-center gap-1 md:gap-2 group/volume">
             <Tooltip text={isMuted ? "Bật tiếng" : "Tắt tiếng"}>
               <button onClick={onToggleMute} className="hover:scale-110 transition-transform">
                 <i

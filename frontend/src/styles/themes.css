@@ -1,13 +1,12 @@
 /**
- * Theme Styles - CSS cho các theme đặc biệt
+ * Theme Styles - Decoration CSS
  */
 
-/* ===== TẾT NGUYÊN ĐÁN ===== */
-.tet-background {
-  position: relative;
-  overflow: hidden;
-}
+/* =========================================
+   THEME: TẾT NGUYÊN ĐÁN
+   ========================================= */
 
+/* --- Background --- */
 .tet-background::before {
   content: "";
   position: fixed;
@@ -17,13 +16,11 @@
   height: 100%;
   background: radial-gradient(circle at 20% 30%, rgba(220, 38, 38, 0.15) 0%, transparent 50%),
     radial-gradient(circle at 80% 70%, rgba(251, 191, 36, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(220, 38, 38, 0.05) 0%, transparent 70%),
     linear-gradient(180deg, rgba(10, 10, 10, 0.92) 0%, rgba(26, 10, 10, 0.96) 100%);
   z-index: -1;
   pointer-events: none;
   animation: tet-background-pulse 8s ease-in-out infinite;
 }
-
 @keyframes tet-background-pulse {
   0%,
   100% {
@@ -34,7 +31,108 @@
   }
 }
 
-/* Hoa đào floating animation */
+/* --- Cành cây --- */
+.tet-branch {
+  position: fixed;
+  top: -50px;
+  width: 300px;
+  height: 150px;
+  z-index: 100001;
+  pointer-events: none;
+  border-bottom: 8px solid #5d4037;
+  border-radius: 0 0 100% 0;
+}
+.branch-left {
+  left: -20px;
+  transform: rotate(10deg);
+  border-radius: 0 0 100% 50%;
+}
+.branch-right {
+  right: -20px;
+  transform: scaleX(-1) rotate(10deg);
+  border-radius: 0 0 100% 50%;
+}
+
+/* --- Dây treo & Điểm neo --- */
+.tet-lantern-anchor {
+  position: fixed;
+  width: 6px;
+  height: 8px;
+  background-color: #3e2723;
+  border-radius: 50%;
+  transform: translateY(35px);
+}
+.tet-lantern-rope {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: linear-gradient(to bottom, #8b4513 60%, #a0522d 100%);
+  transform-origin: top center;
+  animation: swing-natural 3s ease-in-out infinite alternate;
+  cursor: grab;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* --- Vật treo: Lồng đèn --- */
+.tet-lantern-body {
+  position: relative;
+  transform: translateY(15%);
+  cursor: grab;
+  line-height: 1;
+  z-index: 10;
+  filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.8));
+  animation: lantern-glow 3s ease-in-out infinite;
+}
+.tet-lantern-body:active {
+  cursor: grabbing;
+  filter: drop-shadow(0 0 20px rgba(255, 215, 0, 1));
+}
+
+/* --- Vật treo: Bao Lì Xì --- */
+.tet-red-envelope {
+  position: relative;
+  width: 28px;
+  height: 40px;
+  background: #d00000;
+  border: 1px solid #ffcc00;
+  border-radius: 3px;
+  transform: translateY(15%);
+  cursor: grab;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.tet-red-envelope::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 10px;
+  background: #9d0505;
+  border-radius: 0 0 50% 50%;
+}
+.tet-red-envelope .gold-text {
+  font-size: 9px;
+  color: #ffcc00;
+  font-weight: bold;
+  margin-top: 5px;
+  font-family: serif;
+}
+.tet-red-envelope:active {
+  cursor: grabbing;
+  transform: translateY(15%) scale(1.1);
+}
+
+/* --- Hoa Tĩnh (Trôi nổi) --- */
 @keyframes float-peach {
   0%,
   100% {
@@ -44,24 +142,27 @@
     transform: translateY(-20px) rotate(5deg);
   }
 }
+.tet-flower {
+  position: fixed;
+  pointer-events: none;
+  /* Font size và vị trí được set inline trong JS */
+}
 
-/* Cánh hoa anh đào rơi */
-@keyframes cherry-blossom-fall {
+/* --- Hoa Rơi (Falling) & Hoa theo chuột --- */
+@keyframes tet-fall {
   0% {
-    transform: translateY(-100vh) translateX(0) rotate(0deg);
-    opacity: 0.8;
+    transform: translateY(-20px) translateX(0) rotate(0deg);
+    opacity: 0;
   }
-  50% {
-    transform: translateY(50vh) translateX(50px) rotate(180deg);
-    opacity: 0.6;
+  10% {
+    opacity: 1;
   }
   100% {
-    transform: translateY(100vh) translateX(-30px) rotate(360deg);
+    transform: translateY(100vh) translateX(50px) rotate(360deg);
     opacity: 0;
   }
 }
 
-/* Cánh hoa anh đào rơi từ vị trí chuột */
 @keyframes cherry-blossom-fall-from-mouse {
   0% {
     transform: translate(var(--start-x, 0), var(--start-y, 0)) rotate(0deg);
@@ -78,73 +179,14 @@
     opacity: 0;
   }
 }
-
-.tet-cherry-blossom {
+.tet-cherry-blossom-mouse,
+.tet-falling-flower {
   position: fixed;
   pointer-events: none;
   z-index: 1;
-  animation: cherry-blossom-fall linear infinite;
 }
 
-.tet-particles {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
-  overflow: hidden;
-}
-
-.tet-particles::before,
-.tet-particles::after {
-  content: "🌸";
-  position: absolute;
-  font-size: 2rem;
-  opacity: 0.3;
-  animation: float-peach 6s ease-in-out infinite;
-}
-
-.tet-particles::before {
-  top: 10%;
-  left: 10%;
-  animation-delay: 0s;
-}
-
-.tet-particles::after {
-  top: 60%;
-  right: 15%;
-  animation-delay: 3s;
-}
-
-/* Glow effect cho các element quan trọng */
-.tet-glow {
-  box-shadow: 0 0 20px rgba(220, 38, 38, 0.3), 0 0 40px rgba(251, 191, 36, 0.2),
-    0 0 60px rgba(220, 38, 38, 0.1);
-}
-
-/* Áp dụng glow cho các element có data-theme-glow */
-[data-theme="tet"] [data-theme-glow="true"] {
-  text-shadow: 0 0 10px rgba(220, 38, 38, 0.5), 0 0 20px rgba(251, 191, 36, 0.3);
-  transition: text-shadow 0.3s ease;
-}
-
-[data-theme="tet"] [data-theme-glow="true"]:hover {
-  text-shadow: 0 0 15px rgba(220, 38, 38, 0.7), 0 0 30px rgba(251, 191, 36, 0.5);
-}
-
-/* Áp dụng glow cho các element có data-theme-glow */
-[data-theme="tet"] [data-theme-glow="true"] {
-  text-shadow: 0 0 10px rgba(220, 38, 38, 0.5), 0 0 20px rgba(251, 191, 36, 0.3);
-  transition: text-shadow 0.3s ease;
-}
-
-[data-theme="tet"] [data-theme-glow="true"]:hover {
-  text-shadow: 0 0 15px rgba(220, 38, 38, 0.7), 0 0 30px rgba(251, 191, 36, 0.5);
-}
-
-/* Pháo hoa nổ - Animation cho điểm nổ */
+/* --- Pháo hoa --- */
 @keyframes firework-explode {
   0% {
     transform: translate(-50%, -50%) scale(0);
@@ -159,8 +201,6 @@
     opacity: 0;
   }
 }
-
-/* Pháo hoa - Tia sáng tỏa ra */
 @keyframes firework-spark {
   0% {
     transform: translate(-50%, -50%) scale(1);
@@ -171,8 +211,6 @@
     opacity: 0;
   }
 }
-
-/* Pháo hoa - Tia sáng dài */
 @keyframes firework-trail {
   0% {
     transform: translate(-50%, -50%) rotate(var(--trail-angle, 0deg)) scaleY(1);
@@ -184,13 +222,11 @@
     opacity: 0;
   }
 }
-
 .tet-firework {
   position: fixed;
   pointer-events: none;
   z-index: 3;
 }
-
 .tet-firework-center {
   position: absolute;
   width: 8px;
@@ -202,7 +238,6 @@
   animation: firework-explode 0.6s ease-out forwards;
   transform-origin: center;
 }
-
 .tet-firework-spark {
   position: absolute;
   width: 4px;
@@ -211,7 +246,6 @@
   animation: firework-spark 1s ease-out forwards;
   transform-origin: center;
 }
-
 .tet-firework-trail {
   position: absolute;
   width: 2px;
@@ -221,212 +255,129 @@
   transform-origin: center bottom;
 }
 
-/* Tiền vàng rơi */
-@keyframes gold-coin-fall {
+/* --- Animation Chung --- */
+@keyframes swing-natural {
   0% {
-    transform: translateY(-100vh) rotate(0deg);
-    opacity: 1;
+    transform: translateX(-50%) rotate(-3deg);
   }
   100% {
-    transform: translateY(100vh) rotate(360deg);
-    opacity: 0;
+    transform: translateX(-50%) rotate(3deg);
   }
 }
-
-.tet-gold-coin {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: radial-gradient(circle, #fbbf24 0%, #f59e0b 100%);
-  border-radius: 50%;
-  animation: gold-coin-fall 3s linear infinite;
-}
-
-/* Lồng đèn treo */
-@keyframes lantern-sway {
-  0%,
-  100% {
-    transform: translateX(0) rotate(-2deg);
-  }
-  50% {
-    transform: translateX(10px) rotate(2deg);
-  }
-}
-
-/* Animation phát sáng cho lồng đèn */
 @keyframes lantern-glow {
   0%,
   100% {
-    filter: drop-shadow(0 0 8px rgba(220, 38, 38, 1)) drop-shadow(0 0 16px rgba(220, 38, 38, 0.8))
-      drop-shadow(0 0 24px rgba(251, 191, 36, 0.6)) drop-shadow(0 0 32px rgba(251, 191, 36, 0.4))
-      drop-shadow(0 0 40px rgba(220, 38, 38, 0.3));
+    filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.8));
   }
   50% {
-    filter: drop-shadow(0 0 12px rgba(220, 38, 38, 1)) drop-shadow(0 0 24px rgba(220, 38, 38, 0.9))
-      drop-shadow(0 0 36px rgba(251, 191, 36, 0.8)) drop-shadow(0 0 48px rgba(251, 191, 36, 0.6))
-      drop-shadow(0 0 60px rgba(220, 38, 38, 0.5));
+    filter: drop-shadow(0 0 15px rgba(255, 165, 0, 0.9));
   }
 }
 
-.tet-lantern {
-  position: absolute;
-  width: 30px;
+/* =========================================
+   THEME: GIÁNG SINH & NĂM MỚI
+   ========================================= */
+/* Dây đèn */
+.xmas-light-wire {
+  position: fixed;
+  top: -10px;
+  left: 0;
+  width: 100%;
   height: 40px;
-  background: transparent;
-  /* border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  box-shadow: 0 0 20px rgba(220, 38, 38, 0.5); */
-  animation: lantern-sway 3s ease-in-out infinite;
-}
-
-/* Ẩn lồng đèn và dây treo trên mobile */
-@media (max-width: 768px) {
-  .tet-lantern {
-    display: none !important;
-  }
-
-  .tet-lantern-string {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-  }
-
-  /* Ẩn tất cả element có class chứa lantern-string */
-  [class*="lantern-string"] {
-    display: none !important;
-  }
-}
-
-/* ===== GIÁNG SINH ===== */
-.christmas-background {
-  position: relative;
-  overflow: hidden;
-}
-
-.christmas-background::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle at 50% 0%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 50% 100%, rgba(220, 38, 38, 0.1) 0%, transparent 50%),
-    linear-gradient(180deg, rgba(10, 15, 26, 0.95) 0%, rgba(26, 31, 46, 0.98) 100%);
-  z-index: -1;
+  display: flex;
+  justify-content: space-around;
+  border-top: 2px solid #2f3e46;
+  border-radius: 50%;
+  z-index: 999;
   pointer-events: none;
 }
-
-/* Tuyết rơi */
-@keyframes snow-fall {
+.xmas-bulb {
+  width: 12px;
+  height: 20px;
+  border-radius: 50%;
+  margin-top: 5px;
+  animation: xmas-blink 1.5s infinite alternate;
+}
+.color-0 {
+  background: #ff0000;
+  box-shadow: 0 0 10px #ff0000;
+}
+.color-1 {
+  background: #00ff00;
+  box-shadow: 0 0 10px #00ff00;
+}
+.color-2 {
+  background: #ffd700;
+  box-shadow: 0 0 10px #ffd700;
+}
+.color-3 {
+  background: #0000ff;
+  box-shadow: 0 0 10px #0000ff;
+}
+@keyframes xmas-blink {
   0% {
-    transform: translateY(-100vh) translateX(0);
-    opacity: 1;
+    opacity: 0.3;
+    transform: scale(0.8);
   }
   100% {
-    transform: translateY(100vh) translateX(20px);
-    opacity: 0;
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+@keyframes xmas-snow-fall {
+  0% {
+    transform: translateY(-20px);
+  }
+  100% {
+    transform: translateY(105vh);
+  }
+}
+.xmas-santa {
+  position: fixed;
+  top: 10%;
+  left: -20%;
+  font-size: 60px;
+  animation: santa-fly 10s linear forwards;
+  z-index: 5;
+}
+@keyframes santa-fly {
+  0% {
+    left: -20%;
+    transform: rotate(5deg);
+  }
+  100% {
+    left: 120%;
+    transform: rotate(-5deg);
   }
 }
 
-.christmas-particles::before {
-  content: "❄";
+/* New Year */
+.ny-balloon {
   position: absolute;
-  font-size: 1rem;
-  animation: snow-fall 5s linear infinite;
-  opacity: 0.7;
+  bottom: -50px;
+  opacity: 0.8;
+  z-index: 2;
 }
-
-/* ===== NĂM MỚI ===== */
-.newyear-background {
-  position: relative;
-  overflow: hidden;
-}
-
-.newyear-background::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle at 30% 40%, rgba(251, 191, 36, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 70% 60%, rgba(236, 72, 153, 0.15) 0%, transparent 50%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, rgba(26, 26, 26, 0.98) 100%);
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* Pháo hoa */
-@keyframes firework {
+@keyframes ny-float-up {
   0% {
-    transform: scale(0);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1);
-    opacity: 0.8;
+    bottom: -50px;
+    transform: translateX(0);
   }
   100% {
-    transform: scale(2);
-    opacity: 0;
+    bottom: 110vh;
+    transform: translateX(-20px);
   }
 }
-
-.newyear-particles {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+.ny-confetti {
+  position: absolute;
+  top: -10px;
+  width: 8px;
+  height: 12px;
   z-index: 1;
 }
-
-/* Confetti */
-@keyframes confetti-fall {
+@keyframes ny-confetti-fall {
   0% {
-    transform: translateY(-100vh) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(100vh) rotate(720deg);
-    opacity: 0;
-  }
-}
-
-.newyear-confetti {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: #fbbf24;
-  animation: confetti-fall 3s linear infinite;
-}
-
-/* ===== ANIMATIONS ===== */
-@keyframes float-peach {
-  0%,
-  100% {
     transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-20px) rotate(5deg);
-  }
-}
-
-@keyframes snow-fall {
-  0% {
-    transform: translateY(-100vh) translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(100vh) translateX(20px);
-    opacity: 0;
-  }
-}
-
-@keyframes confetti-fall {
-  0% {
-    transform: translateY(-100vh) rotate(0deg);
     opacity: 1;
   }
   100% {
@@ -434,53 +385,40 @@
     opacity: 0;
   }
 }
-
-/* ===== UTILITY CLASSES ===== */
-.theme-transition {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+.ny-floating-text {
+  position: fixed;
+  bottom: 0;
+  font-size: 40px;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+  animation: ny-text-float 4s ease-out forwards;
+  opacity: 0;
+}
+@keyframes ny-text-float {
+  0% {
+    bottom: 0;
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    bottom: 60%;
+    opacity: 0;
+    transform: scale(1);
+  }
 }
 
-/* Apply theme colors to CSS variables */
-:root {
-  --theme-primary: #f97316;
-  --theme-primary-hover: #ea580c;
-  --theme-background: #000000;
-  --theme-surface: #111827;
-  --theme-text: #ffffff;
-  --theme-text-secondary: #9ca3af;
-  --theme-border: #374151;
-  --theme-accent: #6366f1;
-}
-
-[data-theme="tet"] {
-  --theme-primary: #dc2626;
-  --theme-primary-hover: #b91c1c;
-  --theme-background: #0a0a0a;
-  --theme-surface: #1a0a0a;
-  --theme-text: #ffffff;
-  --theme-text-secondary: #fca5a5;
-  --theme-border: #7f1d1d;
-  --theme-accent: #fbbf24;
-}
-
-[data-theme="christmas"] {
-  --theme-primary: #dc2626;
-  --theme-primary-hover: #b91c1c;
-  --theme-background: #0a0f1a;
-  --theme-surface: #1a1f2e;
-  --theme-text: #ffffff;
-  --theme-text-secondary: #cbd5e1;
-  --theme-border: #334155;
-  --theme-accent: #22c55e;
-}
-
-[data-theme="newyear"] {
-  --theme-primary: #fbbf24;
-  --theme-primary-hover: #f59e0b;
-  --theme-background: #000000;
-  --theme-surface: #1a1a1a;
-  --theme-text: #ffffff;
-  --theme-text-secondary: #fbbf24;
-  --theme-border: #374151;
-  --theme-accent: #ec4899;
+/* Mobile */
+@media (max-width: 768px) {
+  .tet-branch,
+  .tet-lantern-anchor {
+    display: none !important;
+  }
 }
