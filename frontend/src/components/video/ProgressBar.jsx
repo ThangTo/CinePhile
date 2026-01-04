@@ -1,14 +1,5 @@
 import React, { useState, useRef } from "react";
-
-const formatTime = (seconds) => {
-  if (!seconds || isNaN(seconds)) return "00:00";
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs
-    .toString()
-    .padStart(2, "0")}`;
-};
+import { formatTime } from "utils/ultils";
 
 const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoRef }) => {
   const [hoverTime, setHoverTime] = useState(null);
@@ -90,7 +81,7 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
           </>
         )}
       </div>
-      <div className="flex justify-between text-[10px] md:text-xs text-white mt-1 md:mt-1.5 font-medium">
+      <div className="hidden md:flex justify-between text-[10px] md:text-xs text-white mt-1 md:mt-1.5 font-medium">
         <span>{formatTime(currentTime)}</span>
         <span>{formatTime(duration)}</span>
       </div>

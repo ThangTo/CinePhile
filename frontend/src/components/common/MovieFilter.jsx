@@ -108,8 +108,22 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
     });
   }, [taxonomyCountries]);
 
-  // Determine default type - always return empty string (tất cả) by default
+  // Determine default type based on pageType and slug
   const getDefaultType = () => {
+    // If pageType is "type" and slug exists, map slug to type filter
+    if (pageType === "type" && slug) {
+      const TYPE_MAP = {
+        "phim-le": "single",
+        "phim-bo": "series",
+        single: "single",
+        series: "series",
+      };
+      const mappedType = TYPE_MAP[slug];
+      if (mappedType) {
+        return mappedType;
+      }
+    }
+    // Otherwise, use filters.type or empty string
     return filters.type || "";
   };
 
@@ -598,7 +612,7 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
           {[
             { value: "newest", label: "Mới nhất" },
             { value: "updated", label: "Mới cập nhật" },
-            { value: "imdb", label: "Điểm IMDb" },
+            { value: "imdb", label: "Điểm đánh giá" },
             { value: "views", label: "Lượt xem" },
           ].map((option) => (
             <button

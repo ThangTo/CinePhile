@@ -33,11 +33,11 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
         const favoriteIds = await favoritesCache.getOrFetch(async () => {
           const response = await userService.getFavorites({ limit: 1000 });
           const favorites = response?.data || [];
-          return favorites.map((fav) => 
-            fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
+          return favorites.map(
+            (fav) => fav.movieId?._id || fav.movieId?.id || fav.movieId || fav._id
           );
         });
-        
+
         setFavoritesList(favoriteIds);
         setIsFavorite(favoriteIds.includes(movieData.id));
       } catch (error) {
@@ -64,7 +64,11 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
   // Info badges configuration
   const infoBadges = useMemo(
     () => [
-      { label: "IMDb", value: movieData.imdb, isIMDb: true },
+      {
+        label: "⭐",
+        value: movieData.rating ? movieData.rating.toFixed(1) : "Chưa có",
+        isRating: true,
+      },
       { label: movieData.ageRating },
       { label: movieData.year },
       { label: movieData.duration },

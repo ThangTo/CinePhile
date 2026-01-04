@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { FaStar } from "react-icons/fa";
 import OptimizedImage from "components/common/OptimizedImage";
 // import CastSection  from './CastSection'
 
@@ -28,19 +29,19 @@ const MovieInfoBrief = ({ movie, activeEp }) => {
 
           {/* Dòng badge */}
           <div className="flex flex-wrap gap-2 mb-4">
-            <span className="bg-primaryColor text-primaryColorButtonText px-3 py-1 rounded text-xs font-semibold">
-              IMDb {movie.imdb}
+            <span className="flex items-center gap-1 bg-primaryColor/90 text-primaryColorButtonText px-2 py-1 rounded text-xs font-bold">
+              <FaStar /> {movie.rating ? ` ${movie.rating.toFixed(1)}` : "Chưa có đánh giá"}
             </span>
-            <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">
+            <span className="bg-white text-black px-2 py-1 rounded text-xs font-semibold">
               {movie.ageRating}
             </span>
-            <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">
+            <span className="bg-white text-black px-2 py-1 rounded text-xs font-semibold">
               {movie.year}
             </span>
             {/* <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">
               {movie.part}
             </span> */}
-            <span className="bg-white text-black px-3 py-1 rounded text-xs font-semibold">
+            <span className="bg-white text-black px-2 py-1 rounded text-xs font-semibold">
               Tập {activeEp}
             </span>
           </div>

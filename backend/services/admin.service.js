@@ -2,8 +2,15 @@ const MovieModel = require('../models/movie.model');
 const UserModel = require('../models/user.model');
 const EpisodeModel = require('../models/episode.model');
 const UserHistoryModel = require('../models/user_history.model');
+const UserFavoriteModel = require('../models/user_favorite.model');
+const UserWatchlistModel = require('../models/user_watchlist.model');
+const CommentModel = require('../models/comment.model');
+const RatingModel = require('../models/rating.model');
+const ChatModel = require('../models/chat.model');
+const NotificationModel = require('../models/notification.model');
 const { transformMovies } = require('../utils/movieTransformer');
 const movieService = require('./movie.service');
+const notificationService = require('./notification.service');
 
 /**
  * Admin Service
@@ -264,15 +271,78 @@ const updateMovie = async (id, movieData) => {
  * @returns {Promise<boolean>} Success status
  */
 const deleteMovie = async (id) => {
-  const movie = await MovieModel.findByIdAndDelete(id);
-
-  if (movie) {
-    // TÍNH NĂNG QUAN TRỌNG: Cascade Delete
-    // Khi xóa phim, phải xóa luôn tất cả tập phim của nó để sạch DB
-    await EpisodeModel.deleteMany({ movieId: id });
-    return true;
+  // Lấy thông tin phim trước khi xóa để dùng cho thông báo
+  const movie = await MovieModel.findById(id);
+  if (!movie) {
+    return false;
   }
-  return false;
+
+  const movieName = movie.name || movie.title || 'phim này';
+  const movieId = movie._id;
+
+  // 1. Tìm tất cả users bị ảnh hưởng (có phim trong favorites, watchlist, hoặc history)
+  const [favoriteUsers, watchlistUsers, historyUsers] = await Promise.all([
+    UserFavoriteModel.find({ movieId: id }).distinct('userId'),
+    UserWatchlistModel.find({ movieId: id }).distinct('userId'),
+    UserHistoryModel.find({ movieId: id }).distinct('userId'),
+  ]);
+
+  // Gộp tất cả userIds lại và loại bỏ trùng lặp
+  const affectedUserIds = [
+    ...new Set([
+      ...favoriteUsers.map((id) => id.toString()),
+      ...watchlistUsers.map((id) => id.toString()),
+      ...historyUsers.map((id) => id.toString()),
+    ]),
+  ];
+
+  // 2. Xóa tất cả references đến phim này
+  await Promise.all([
+    // Xóa episodes
+    EpisodeModel.deleteMany({ movieId: id }),
+    // Xóa user history (xem tiếp)
+    UserHistoryModel.deleteMany({ movieId: id }),
+    // Xóa favorites
+    UserFavoriteModel.deleteMany({ movieId: id }),
+    // Xóa watchlist
+    UserWatchlistModel.deleteMany({ movieId: id }),
+    // Xóa comments
+    CommentModel.deleteMany({ movieId: id }),
+    // Xóa ratings
+    RatingModel.deleteMany({ movieId: id }),
+    // Xóa notifications liên quan đến phim này
+    NotificationModel.deleteMany({ movieId: id }),
+    // Set null movieId trong chat metadata (giữ lại chat history nhưng không link đến phim đã xóa)
+    ChatModel.updateMany({ 'metadata.movieId': id }, { $set: { 'metadata.movieId': null } }),
+  ]);
+
+  // 3. Tạo thông báo cho tất cả users bị ảnh hưởng
+  if (affectedUserIds.length > 0) {
+    try {
+      const notifications = affectedUserIds.map((userId) => ({
+        userId: userId,
+        type: 'system',
+        title: 'Phim đã bị xóa',
+        message: `Phim "${movieName}" đã bị xóa khỏi hệ thống. Phim đã được gỡ khỏi danh sách yêu thích, xem tiếp và các danh sách khác của bạn.`,
+        movieId: null, // Không link đến phim vì đã bị xóa
+        targetUrl: null,
+        isRead: false,
+      }));
+
+      // Tạo thông báo cho từng user
+      await Promise.all(
+        notifications.map((notiData) => notificationService.createNotification(notiData)),
+      );
+    } catch (error) {
+      // Log lỗi nhưng không fail việc xóa phim
+      console.error('Error creating notifications for deleted movie:', error);
+    }
+  }
+
+  // 4. Cuối cùng mới xóa phim
+  await MovieModel.findByIdAndDelete(id);
+
+  return true;
 };
 /**
  * Search movies

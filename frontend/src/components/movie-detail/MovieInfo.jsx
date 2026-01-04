@@ -32,19 +32,19 @@ const MovieInfo = ({ movie }) => {
 
           {/* Info Badges */}
           <div className="flex flex-wrap gap-2 mb-4">
-            <span className="bg-primaryColor text-primaryColorButtonText px-3 py-1 rounded text-sm font-semibold">
-              IMDb {movie.imdb}
+            <span className="bg-primaryColor text-primaryColorButtonText px-2 py-1 rounded text-sm font-semibold">
+              {movie.rating ? `⭐ ${movie.rating.toFixed(1)}` : "Chưa có đánh giá"}
             </span>
-            <span className="bg-white text-black px-3 py-1 rounded text-sm font-semibold">
+            <span className="bg-white text-black px-2 py-1 rounded text-sm font-semibold">
               {movie.ageRating}
             </span>
-            <span className="bg-white text-black px-3 py-1 rounded text-sm font-semibold">
+            <span className="bg-white text-black px-2 py-1 rounded text-sm font-semibold">
               {movie.year}
             </span>
-            <span className="bg-white text-black px-3 py-1 rounded text-sm font-semibold">
+            <span className="bg-white text-black px-2 py-1 rounded text-sm font-semibold">
               {movie.part}
             </span>
-            <span className="bg-white text-black px-3 py-1 rounded text-sm font-semibold">
+            <span className="bg-white text-black px-2 py-1 rounded text-sm font-semibold">
               {movie.episode}
             </span>
           </div>

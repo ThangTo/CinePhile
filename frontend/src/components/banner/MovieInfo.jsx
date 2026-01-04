@@ -13,5 +13,4 @@ const MovieInfo = ({ badges, className = "justify-center" }) => (
     ))}
   </div>
 );
-
 export default MovieInfo;

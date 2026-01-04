@@ -103,7 +103,6 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     englishTitle: "",
     year: new Date().getFullYear(),
     rating: 0,
-    imdb: 0,
     country: "",
     genres: "",
     duration: "",
@@ -125,7 +124,6 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         englishTitle: movie.englishTitle || movie.original_name || "",
         year: movie.year || new Date().getFullYear(),
         rating: movie.rating || 0,
-        imdb: movie.imdb || 0,
         country: movie.country || "",
         genres: Array.isArray(movie.genres) ? movie.genres.join(", ") : "",
         duration: movie.duration || movie.time || "",
@@ -141,7 +139,6 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         englishTitle: "",
         year: new Date().getFullYear(),
         rating: 0,
-        imdb: 0,
         country: "",
         genres: "",
         duration: "",
@@ -200,7 +197,6 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
           .map((g) => g.trim())
           .filter(Boolean),
         rating: parseFloat(formData.rating),
-        imdb: parseFloat(formData.imdb),
         year: parseInt(formData.year),
         // Ensure poster and backgroundImage are included even if empty
         poster: formData.poster || "",
@@ -321,15 +317,6 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                       value={formData.duration}
                       onChange={handleChange}
                       placeholder="90 min"
-                    />
-                    <FormField
-                      label="IMDb"
-                      name="imdb"
-                      type="number"
-                      step="0.5"
-                      icon={FiStar}
-                      value={formData.imdb}
-                      onChange={handleChange}
                     />
                     <FormField
                       label="Rating App"

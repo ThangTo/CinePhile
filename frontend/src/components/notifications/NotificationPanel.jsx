@@ -53,7 +53,7 @@ const NotificationPanel = ({ onClose, triggerRef }) => {
   return (
     <div
       ref={panelRef}
-      className="md:absolute md:top-full md:right-0 w-full md:w-[400px] h-[75%] mx-auto md:h-auto md:max-h-[600px] bg-bgColor3 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden animate-fade-in origin-top-right ring-0 md:ring-1 ring-white/5"
+      className="md:absolute md:top-full mt-1 md:right-0 w-full md:w-[400px] h-[75%] mx-auto md:h-auto md:max-h-[600px] bg-bgColor3 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden animate-fade-in origin-top-right ring-0 md:ring-1 ring-white/5"
     >
       {/* Background decoration (Glow effect) */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-primaryColor/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />

@@ -18,7 +18,7 @@ const InfoBadge = ({ label, value, isIMDb = false }) => {
       }`}
     >
       {label}
-      {value && <strong className="ml-1 text-white">{formattedValue}</strong>}
+      {value && <strong className="text-white">{formattedValue}</strong>}
     </span>
   );
 };

@@ -5,6 +5,7 @@ import QualityMenu from "./QualityMenu";
 import SpeedMenu from "./SpeedMenu";
 import AudioMenu from "./AudioMenu";
 import MobileMoreMenu from "./MobileMoreMenu";
+import { formatTime } from "utils/ultils";
 
 const VideoControls = ({
   showControls,
@@ -151,6 +152,12 @@ const VideoControls = ({
                 className="absolute inset-0 w-full h-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 md:[&::-webkit-slider-thumb]:w-3 md:[&::-webkit-slider-thumb]:h-3 lg:[&::-webkit-slider-thumb]:w-3.5 lg:[&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:h-2.5 md:[&::-moz-range-thumb]:w-3 md:[&::-moz-range-thumb]:h-3 lg:[&::-moz-range-thumb]:w-3.5 lg:[&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
               />
             </div>
+          </div>
+
+          <div className="flex md:hidden text-[10px] text-white mt-1 font-medium">
+            <span>
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
           </div>
         </div>
 
