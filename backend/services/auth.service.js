@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const { getRandomAvatar } = require('../utils/avatarUtils');
+const redisService = require('./redis.service');
 
 // Helper to generate tokens
 const generateTokens = (userId) => {
@@ -119,14 +120,37 @@ const login = async (credentials) => {
 
 /**
  * Logout user
- * @param {string} userId - User ID
- * @param {string} token - Access token
+ * Blacklist token in Redis for proper logout
+ * @param {string} token - Access token to blacklist
  * @returns {Promise<Object>} { message: string }
  */
-const logout = async (userId) => {
-  // In a stateless JWT setup, we can't really "invalidate" tokens without a blacklist (Redis, etc.)
-  // For now, we'll just return success. Client should remove token.
-  return { message: 'Logged out successfully' };
+const logout = async (token) => {
+  if (!token) {
+    return { message: 'Logged out successfully' };
+  }
+
+  try {
+    // Decode token to get expiration time
+    const decoded = jwt.decode(token);
+    if (!decoded || !decoded.exp) {
+      return { message: 'Logged out successfully' };
+    }
+
+    // Calculate remaining time until token expires
+    const expiresIn = decoded.exp - Math.floor(Date.now() / 1000);
+
+    // Blacklist token in Redis (if Redis available)
+    if (redisService.isConnected && expiresIn > 0) {
+      await redisService.set(`blacklist:${token}`, true, expiresIn);
+      console.log(`✅ Token blacklisted, expires in ${expiresIn}s`);
+    }
+
+    return { message: 'Logged out successfully' };
+  } catch (error) {
+    console.error('Logout error:', error.message);
+    // Still return success even if blacklist fails
+    return { message: 'Logged out successfully' };
+  }
 };
 
 /**

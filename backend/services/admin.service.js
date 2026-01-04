@@ -11,6 +11,7 @@ const NotificationModel = require('../models/notification.model');
 const { transformMovies } = require('../utils/movieTransformer');
 const movieService = require('./movie.service');
 const notificationService = require('./notification.service');
+const { invalidateMovieCache } = require('../middleware/cache.middleware');
 
 /**
  * Admin Service
@@ -226,6 +227,11 @@ const createMovie = async (movieData) => {
   // Create movie
   const movie = await MovieModel.create(movieData);
 
+  // Invalidate movie cache after creating new movie
+  invalidateMovieCache().catch((err) => {
+    console.error('Error invalidating cache:', err);
+  });
+
   return movie;
 };
 
@@ -261,6 +267,13 @@ const updateMovie = async (id, movieData) => {
     { $set: movieData },
     { new: true, runValidators: true },
   );
+
+  // Invalidate movie cache after updating
+  if (updatedMovie) {
+    invalidateMovieCache().catch((err) => {
+      console.error('Error invalidating cache:', err);
+    });
+  }
 
   return updatedMovie;
 };
@@ -341,6 +354,11 @@ const deleteMovie = async (id) => {
 
   // 4. Cuối cùng mới xóa phim
   await MovieModel.findByIdAndDelete(id);
+
+  // 5. Invalidate movie cache after deletion
+  invalidateMovieCache().catch((err) => {
+    console.error('Error invalidating cache:', err);
+  });
 
   return true;
 };

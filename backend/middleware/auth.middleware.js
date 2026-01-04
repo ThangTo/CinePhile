@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const authService = require('../services/auth.service');
 const { attachAuthCookies } = require('../utils/authUtils');
+const redisService = require('../services/redis.service');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -54,6 +55,16 @@ const authMiddleware = async (req, res, next) => {
     }
 
     try {
+      // Check if token is blacklisted (logout)
+      if (redisService.isConnected) {
+        const isBlacklisted = await redisService.exists(`blacklist:${token}`);
+        if (isBlacklisted) {
+          return res.status(401).json({
+            message: 'Token has been revoked. Please login again.',
+          });
+        }
+      }
+
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.userId);
 

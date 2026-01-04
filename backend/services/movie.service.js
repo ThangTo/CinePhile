@@ -4,6 +4,7 @@ const Episode = require('../models/episode.model');
 const Cast = require('../models/cast.model');
 const Comment = require('../models/comment.model');
 const Rating = require('../models/rating.model');
+const redisService = require('./redis.service');
 const {
   transformMovie,
   transformMovies,
@@ -519,32 +520,89 @@ const getById = async (identifier) => {
 
 /**
  * Get trending movies by view count
+ * Cached for 10 minutes
  */
 const getTrending = async (limit = 10) => {
+  const cacheKey = `movies:trending:${limit}`;
+
+  // Try cache first
+  if (redisService.isConnected) {
+    const cached = await redisService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  // Cache miss - fetch from DB
   const data = await Movie.find().sort({ viewCount: -1 }).limit(limit).lean();
-  return {
+  const result = {
     data: transformMovies(data),
   };
+
+  // Cache for 10 minutes
+  if (redisService.isConnected) {
+    await redisService.set(cacheKey, result, 600);
+  }
+
+  return result;
 };
 
 /**
  * Get top rated movies
+ * Cached for 10 minutes
  */
 const getTopRated = async (limit = 10) => {
+  const cacheKey = `movies:top-rated:${limit}`;
+
+  // Try cache first
+  if (redisService.isConnected) {
+    const cached = await redisService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  // Cache miss - fetch from DB
   const data = await Movie.find().sort({ rating: -1, totalRatings: -1 }).limit(limit).lean();
-  return {
+  const result = {
     data: transformMovies(data),
   };
+
+  // Cache for 10 minutes
+  if (redisService.isConnected) {
+    await redisService.set(cacheKey, result, 600);
+  }
+
+  return result;
 };
 
 /**
  * Get newest movies
+ * Cached for 5 minutes
  */
 const getNewReleases = async (limit = 10) => {
+  const cacheKey = `movies:new-releases:${limit}`;
+
+  // Try cache first
+  if (redisService.isConnected) {
+    const cached = await redisService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  // Cache miss - fetch from DB
   const data = await Movie.find().sort({ createdAt: -1 }).limit(limit).lean();
-  return {
+  const result = {
     data: transformMovies(data),
   };
+
+  // Cache for 5 minutes
+  if (redisService.isConnected) {
+    await redisService.set(cacheKey, result, 300);
+  }
+
+  return result;
 };
 
 /**
@@ -626,10 +684,22 @@ const getFilterOptions = async () => {
 
 /**
  * Get top genres by total view count
+ * Cached for 30 minutes
  * @param {number} limit - Number of genres to return (default: 10)
  * @returns {Promise<Array>} Array of { name, slug, totalViews }
  */
 const getTopGenresByViews = async (limit = 10) => {
+  const cacheKey = `movies:top-genres:${limit}`;
+
+  // Try cache first
+  if (redisService.isConnected) {
+    const cached = await redisService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  // Cache miss - fetch from DB
   const topGenres = await Movie.aggregate([
     { $unwind: '$categories' },
     {
@@ -643,11 +713,18 @@ const getTopGenresByViews = async (limit = 10) => {
     { $limit: limit },
   ]);
 
-  return topGenres.map((g) => ({
+  const result = topGenres.map((g) => ({
     name: g._id,
     slug: g.slug || g._id,
     totalViews: g.totalViews || 0,
   }));
+
+  // Cache for 30 minutes
+  if (redisService.isConnected) {
+    await redisService.set(cacheKey, result, 1800);
+  }
+
+  return result;
 };
 
 /**

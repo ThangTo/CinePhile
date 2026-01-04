@@ -5,6 +5,7 @@ const EpisodeModel = require('../models/episode.model');
 const { ensureCastForNames } = require('../integrations/cast.service');
 
 const { createNotification } = require('../controllers/notification.controller');
+const { invalidateMovieCache } = require('../middleware/cache.middleware');
 
 const API_BASE_URL = 'https://phimapi.com';
 
@@ -191,6 +192,16 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
         count++;
       } catch (err) {
         logError(`❌ Lỗi phim ${slug}: ${err.message}`);
+      }
+    }
+
+    // Invalidate cache sau khi crawl xong trang (nếu có phim mới được crawl)
+    if (count > 0) {
+      try {
+        await invalidateMovieCache();
+        log(`🔄 Đã invalidate cache sau khi crawl ${count} phim`);
+      } catch (cacheError) {
+        logError(`⚠️ Lỗi invalidate cache: ${cacheError.message}`);
       }
     }
 
@@ -496,6 +507,13 @@ const crawlMovieBySlug = async (slug) => {
           episodeCount++;
         }
       }
+    }
+
+    // Invalidate cache sau khi crawl xong phim
+    try {
+      await invalidateMovieCache();
+    } catch (cacheError) {
+      console.error(`⚠️ Lỗi invalidate cache: ${cacheError.message}`);
     }
 
     return {

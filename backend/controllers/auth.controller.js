@@ -47,10 +47,19 @@ const login = async (req, res) => {
  */
 const logout = async (req, res) => {
   try {
-    const result = await authService.logout(req.user?._id);
+    // Get token from cookies or header
+    const token = req.cookies?.accessToken || 
+                  req.headers.authorization?.split(' ')[1];
+
+    // Blacklist token in Redis
+    const result = await authService.logout(token);
+
+    // Clear cookies
     clearAuthCookies(res);
     res.json(result);
   } catch (error) {
+    // Still clear cookies even if logout fails
+    clearAuthCookies(res);
     res.status(500).json({ message: error.message });
   }
 };

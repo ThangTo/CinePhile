@@ -2,3 +2,8 @@
 # .env.*
 /node_modules
 
+# PM2 logs
+logs/
+*.log
+.pm2/
+
