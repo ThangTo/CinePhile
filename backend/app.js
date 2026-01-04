@@ -23,11 +23,12 @@ app.use(compression());
 // Rate limiting - Bảo vệ khỏi DDoS và abuse
 // Use Redis store if available, otherwise use memory store
 const createRateLimiter = (windowMs, max, message) => {
-  const store = redisService.isConnected && redisService.client
-    ? new RedisStore({
-        sendCommand: (...args) => redisService.client.sendCommand(args),
-      })
-    : undefined; // Use default memory store
+  const store =
+    redisService.isConnected && redisService.client
+      ? new RedisStore({
+          sendCommand: (...args) => redisService.client.sendCommand(args),
+        })
+      : undefined; // Use default memory store
 
   return rateLimit({
     store,
@@ -43,17 +44,17 @@ const createRateLimiter = (windowMs, max, message) => {
   });
 };
 
-// General API rate limiter - 100 requests per 15 minutes
+// General API rate limiter - 600 requests per 15 minutes
 const apiLimiter = createRateLimiter(
   15 * 60 * 1000, // 15 minutes
-  100, // 100 requests
+  process.env.RATE_LIMIT_MAX || 600, // 600 requests
   'Too many requests from this IP, please try again later.',
 );
 
-// Strict rate limiter for auth endpoints - 5 requests per 15 minutes
+// Strict rate limiter for auth endpoints - 10 requests per 15 minutes
 const authLimiter = createRateLimiter(
   15 * 60 * 1000, // 15 minutes
-  5, // 5 requests (login attempts)
+  process.env.RATE_LIMIT_MAX_AUTH || 10, // 10 requests (login attempts)
   'Too many login attempts, please try again later.',
 );
 
