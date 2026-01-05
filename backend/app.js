@@ -16,12 +16,17 @@ const User = require('./models/user.model');
 const cookieParser = require('cookie-parser');
 const authService = require('./services/auth.service');
 const { getGoogleCallbackUrl } = require('./utils/authUtils');
+const { optionalAuth } = require('./middleware/auth.middleware');
 
 // Compression middleware - Nén responses để giảm bandwidth
 app.use(compression());
 
+// Trust proxy - for rate limiting by IP
+app.set('trust proxy', true);
+
 // Rate limiting - Bảo vệ khỏi DDoS và abuse
 // Use Redis store if available, otherwise use memory store
+// Rate limit by userId if logged in, otherwise by IP
 const createRateLimiter = (windowMs, max, message) => {
   const store =
     redisService.isConnected && redisService.client
@@ -37,6 +42,23 @@ const createRateLimiter = (windowMs, max, message) => {
     message: { error: message },
     standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
     legacyHeaders: false, // Disable `X-RateLimit-*` headers
+    // Key generator: Use userId if logged in, otherwise use IP
+    keyGenerator: (req) => {
+      // If user is logged in, use userId for rate limiting
+      if (req.user && req.user._id) {
+        return `user:${req.user._id}`;
+      }
+
+      // Get IP from X-Forwarded-For if available
+      const forwardedFor = req.headers['x-forwarded-for'];
+      if (forwardedFor) {
+        const ip = forwardedFor.split(',')[0].trim();
+        return ip;
+      }
+
+      // Otherwise, use IP address
+      return req.ip || req.connection.remoteAddress || 'unknown';
+    },
     skip: (req) => {
       // Skip rate limiting for health check endpoint
       return req.path === '/' || req.path === '/health';
@@ -45,10 +67,11 @@ const createRateLimiter = (windowMs, max, message) => {
 };
 
 // General API rate limiter - 600 requests per 15 minutes
+// Rate limit by userId if logged in, otherwise by IP
 const apiLimiter = createRateLimiter(
   15 * 60 * 1000, // 15 minutes
   process.env.RATE_LIMIT_MAX || 600, // 600 requests
-  'Too many requests from this IP, please try again later.',
+  'Too many requests, please try again later.',
 );
 
 // Strict rate limiter for auth endpoints - 10 requests per 15 minutes
@@ -92,6 +115,10 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Cookie parser
 app.use(cookieParser());
+
+// Optional auth middleware - Parse user if available (for rate limiting by userId)
+// This runs before rate limiting so we can use userId in keyGenerator
+app.use(optionalAuth);
 
 // Logging middleware - Chỉ log trong development
 if (process.env.NODE_ENV === 'development') {

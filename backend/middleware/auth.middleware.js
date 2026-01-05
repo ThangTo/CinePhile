@@ -151,6 +151,16 @@ const optionalAuth = async (req, res, next) => {
     }
 
     try {
+      // Check if token is blacklisted (logout)
+      if (redisService.isConnected) {
+        const isBlacklisted = await redisService.exists(`blacklist:${token}`);
+        if (isBlacklisted) {
+          // Token is blacklisted, don't set user
+          req.user = null;
+          return next();
+        }
+      }
+
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.userId);
 
