@@ -78,6 +78,11 @@
   align-items: center;
   justify-content: flex-end;
 }
+.firecracker-rope {
+  /* Dây riêng cho pháo */
+  width: 3px;
+  background: linear-gradient(to bottom, #b71c1c 30%, #ffd700 100%);
+}
 
 /* --- Vật treo: Lồng đèn --- */
 .tet-lantern-body {
@@ -132,7 +137,185 @@
   transform: translateY(15%) scale(1.1);
 }
 
-/* --- Hoa Tĩnh (Trôi nổi) --- */
+/* --- DÂY PHÁO (THIẾT KẾ MỚI) --- */
+.tet-firecracker-body-v2 {
+  position: relative;
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: grab;
+  z-index: 10;
+  transform-style: preserve-3d;
+  animation: swing-gentle 3s ease-in-out infinite alternate;
+}
+.tet-firecracker-body-v2:active {
+  cursor: grabbing;
+  animation: none;
+}
+
+.fc-diamond {
+  width: 32px;
+  height: 32px;
+  background: #d00000;
+  border: 2px solid #ffd700;
+  transform: rotate(45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  margin-bottom: 8px;
+  z-index: 5;
+}
+.fc-diamond span {
+  transform: rotate(-45deg);
+  color: #ffd700;
+  font-weight: bold;
+  font-family: serif;
+  font-size: 14px;
+}
+.fc-main {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.fc-axis {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 100%;
+  background: repeating-linear-gradient(to bottom, #ffd700, #ffd700 4px, #d00000 4px, #d00000 8px);
+  z-index: 1;
+}
+.fc-tube-v2 {
+  position: relative;
+  width: 12px;
+  height: 30px;
+  background: #d32f2f;
+  border-radius: 2px;
+  box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  margin-top: -16px;
+}
+.fc-tube-v2 .band {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: #ffd700;
+}
+.fc-tube-v2 .b-top {
+  top: 3px;
+}
+.fc-tube-v2 .b-bot {
+  bottom: 3px;
+}
+.fc-tube-v2:nth-child(odd) {
+  align-self: flex-start;
+  transform: rotate(25deg) translateX(4px);
+}
+.fc-tube-v2:nth-child(even) {
+  align-self: flex-end;
+  transform: rotate(-25deg) translateX(-4px);
+  margin-top: -20px;
+}
+
+/* Đuôi tua rua 3 sợi */
+.fc-tail-group {
+  position: relative;
+  width: 100%;
+  height: 65px; /* Tăng chiều cao một chút */
+  margin-top: -2px; /* Kéo lên một chút để chồng lấn lên phần thân trên */
+  display: flex;
+  justify-content: center;
+  z-index: 0; /* Nằm dưới các ống pháo cuối cùng */
+}
+
+/* Thêm nút thắt vàng kết nối thân và đuôi */
+.fc-tail-group::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 6px;
+  background: #ffd700;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  z-index: 3;
+}
+.fc-tassel {
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  background: linear-gradient(to bottom, #d00000, #ffd700);
+  border-radius: 0 0 5px 5px;
+  transform-origin: top center;
+  animation: tassel-swing 2s ease-in-out infinite alternate;
+}
+.t-0 {
+  left: 30%;
+  height: 50px;
+  animation-delay: 0s;
+}
+.t-1 {
+  left: 50%;
+  transform: translateX(-50%);
+  height: 65px;
+  width: 8px;
+  z-index: 2;
+  animation-delay: 0.3s;
+}
+.t-2 {
+  right: 30%;
+  height: 50px;
+  animation-delay: 0.6s;
+}
+
+/* --- Hiệu ứng Nổ --- */
+.tet-flash {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff, #ff0, transparent);
+  transform: translate(-50%, -50%);
+  animation: flash 0.4s ease-out forwards;
+  z-index: 5;
+}
+.tet-spark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  animation: explode 0.8s ease-out forwards;
+}
+@keyframes flash {
+  from {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(4);
+    opacity: 0;
+  }
+}
+@keyframes explode {
+  to {
+    transform: translate(var(--tx), var(--ty));
+    opacity: 0;
+  }
+}
+
+/* --- Animations --- */
 @keyframes float-peach {
   0%,
   100% {
@@ -145,10 +328,7 @@
 .tet-flower {
   position: fixed;
   pointer-events: none;
-  /* Font size và vị trí được set inline trong JS */
 }
-
-/* --- Hoa Rơi (Falling) & Hoa theo chuột --- */
 @keyframes tet-fall {
   0% {
     transform: translateY(-20px) translateX(0) rotate(0deg);
@@ -162,7 +342,6 @@
     opacity: 0;
   }
 }
-
 @keyframes cherry-blossom-fall-from-mouse {
   0% {
     transform: translate(var(--start-x, 0), var(--start-y, 0)) rotate(0deg);
@@ -185,8 +364,6 @@
   pointer-events: none;
   z-index: 1;
 }
-
-/* --- Pháo hoa --- */
 @keyframes firework-explode {
   0% {
     transform: translate(-50%, -50%) scale(0);
@@ -254,14 +431,28 @@
   animation: firework-trail 1s ease-out forwards;
   transform-origin: center bottom;
 }
-
-/* --- Animation Chung --- */
 @keyframes swing-natural {
   0% {
     transform: translateX(-50%) rotate(-3deg);
   }
   100% {
     transform: translateX(-50%) rotate(3deg);
+  }
+}
+@keyframes swing-gentle {
+  from {
+    transform: rotate(-2deg);
+  }
+  to {
+    transform: rotate(2deg);
+  }
+}
+@keyframes tassel-swing {
+  from {
+    transform: rotate(-5deg) skewX(-2deg);
+  }
+  to {
+    transform: rotate(5deg) skewX(2deg);
   }
 }
 @keyframes lantern-glow {
@@ -275,9 +466,8 @@
 }
 
 /* =========================================
-   THEME: GIÁNG SINH & NĂM MỚI
+   THEME: GIÁNG SINH & NĂM MỚI (Giữ nguyên)
    ========================================= */
-/* Dây đèn */
 .xmas-light-wire {
   position: fixed;
   top: -10px;
@@ -350,8 +540,6 @@
     transform: rotate(-5deg);
   }
 }
-
-/* New Year */
 .ny-balloon {
   position: absolute;
   bottom: -50px;
@@ -414,8 +602,6 @@
     transform: scale(1);
   }
 }
-
-/* Mobile */
 @media (max-width: 768px) {
   .tet-branch,
   .tet-lantern-anchor {
