@@ -24,6 +24,39 @@ app.use(compression());
 // Trust proxy - for rate limiting by IP
 app.set('trust proxy', true);
 
+// CORS middleware
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.CLIENT_URL_LOCAL || 'http://localhost:5001',
+].filter(Boolean); // Remove undefined values
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    optionsSuccessStatus: 200,
+  }),
+);
+
+// Body parser middleware - Tối ưu limit
+app.use(express.json({ limit: '10mb' })); // Giảm từ 50mb xuống 10mb
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Cookie parser
+app.use(cookieParser());
+
+// Optional auth middleware - Parse user if available (for rate limiting by userId)
+app.use(optionalAuth);
+
 // Rate limiting - Bảo vệ khỏi DDoS và abuse
 // Use Redis store if available, otherwise use memory store
 // Rate limit by userId if logged in, otherwise by IP
@@ -81,44 +114,10 @@ const authLimiter = createRateLimiter(
   'Too many login attempts, please try again later.',
 );
 
-// Apply rate limiting
+// Apply rate limiting - SAU cookie parser và optionalAuth
 app.use('/api/v1/', apiLimiter);
 app.use('/api/v1/auth/login', authLimiter);
 app.use('/api/v1/auth/register', authLimiter);
-
-// CORS middleware
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  process.env.CLIENT_URL_LOCAL || 'http://localhost:5001',
-].filter(Boolean); // Remove undefined values
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-    optionsSuccessStatus: 200,
-  }),
-);
-
-// Body parser middleware - Tối ưu limit
-app.use(express.json({ limit: '10mb' })); // Giảm từ 50mb xuống 10mb
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-// Cookie parser
-app.use(cookieParser());
-
-// Optional auth middleware - Parse user if available (for rate limiting by userId)
-// This runs before rate limiting so we can use userId in keyGenerator
-app.use(optionalAuth);
 
 // Logging middleware - Chỉ log trong development
 if (process.env.NODE_ENV === 'development') {
