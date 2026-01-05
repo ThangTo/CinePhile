@@ -2,7 +2,12 @@ import React, { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "contexts/AuthContext";
 import { BarSpinner } from "components/common/LoadingState";
-import { setAuthData, setToken, setRefreshToken } from "lib/auth-storage";
+import {
+  setAuthData,
+  setToken,
+  setRefreshToken,
+  getAndClearReturnLocation,
+} from "lib/auth-storage";
 import apiRequest from "services/utils/apiRequest";
 
 // Helper: Detect mobile device
@@ -149,11 +154,22 @@ const GoogleAuthHandler = () => {
                 await new Promise((resolve) => setTimeout(resolve, 100));
               }
 
-              // Navigate về homepage (xóa hết params để tránh vòng lặp)
-              navigate("/", {
-                replace: true,
-                state: { authSuccess: "Đăng nhập thành công" },
-              });
+              // Lấy location đã lưu và redirect về đó
+              const returnLocation = getAndClearReturnLocation();
+
+              if (returnLocation && returnLocation.pathname !== "/") {
+                // Redirect về location đã lưu
+                navigate(returnLocation.pathname + returnLocation.search, {
+                  state: { ...returnLocation.state, authSuccess: "Đăng nhập thành công" },
+                  replace: true,
+                });
+              } else {
+                // Navigate về homepage nếu không có location đã lưu
+                navigate("/", {
+                  replace: true,
+                  state: { authSuccess: "Đăng nhập thành công" },
+                });
+              }
               return;
             }
           } catch (tokenError) {
@@ -169,11 +185,22 @@ const GoogleAuthHandler = () => {
         // 💻 DESKTOP hoặc MOBILE fallback: Dùng cookies
         await getCurrentUser();
 
-        // Navigate về homepage (xóa hết params để tránh vòng lặp)
-        navigate("/", {
-          replace: true,
-          state: { authSuccess: "Đăng nhập thành công" },
-        });
+        // Lấy location đã lưu và redirect về đó
+        const returnLocation = getAndClearReturnLocation();
+
+        if (returnLocation && returnLocation.pathname !== "/") {
+          // Redirect về location đã lưu
+          navigate(returnLocation.pathname + returnLocation.search, {
+            state: { ...returnLocation.state, authSuccess: "Đăng nhập thành công" },
+            replace: true,
+          });
+        } else {
+          // Navigate về homepage nếu không có location đã lưu
+          navigate("/", {
+            replace: true,
+            state: { authSuccess: "Đăng nhập thành công" },
+          });
+        }
       } catch (error) {
         // Navigate về homepage (xóa hết params để tránh vòng lặp)
         navigate("/", {

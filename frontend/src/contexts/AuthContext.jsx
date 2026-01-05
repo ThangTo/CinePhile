@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import authService from "services/auth.service";
 import AuthModal from "components/auth/AuthModal";
+import { saveReturnLocation } from "lib/auth-storage";
 
 /**
  * AuthContext - Provides authentication state and methods throughout the app
@@ -76,9 +77,25 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * Open authentication modal
+   * Lưu location hiện tại để redirect về sau khi đăng nhập (chủ yếu cho Google OAuth)
    * @param {string} mode - "login" or "register"
    */
   const openAuthModal = (mode = "login") => {
+    // Lưu location hiện tại (trừ khi đang ở trang đăng nhập hoặc callback)
+    // Sử dụng window.location vì AuthProvider có thể được render ngoài Router
+    const currentPath = window.location.pathname;
+    const currentSearch = window.location.search;
+    const isAuthPage = currentPath === "/auth/google/callback" || currentPath.startsWith("/auth/");
+
+    if (!isAuthPage) {
+      // Lưu location hiện tại để redirect về sau khi đăng nhập (chủ yếu cho Google OAuth)
+      saveReturnLocation(
+        currentPath,
+        currentSearch,
+        null // Không thể lấy state từ window.location, nhưng không sao vì state thường không quan trọng
+      );
+    }
+
     setAuthMode(mode);
     setShowAuthModal(true);
   };

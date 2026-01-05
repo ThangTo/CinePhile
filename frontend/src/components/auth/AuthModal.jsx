@@ -91,8 +91,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
     setIsLoading(true);
     try {
       // Use email for login (backend expects email)
-
       await login({ email: formData.email, password: formData.password });
+      // Chỉ cần tắt modal - AuthContext đã set user state
+      // Các component sẽ tự động re-render khi auth state thay đổi
       onClose();
     } catch (error) {
       console.error("Login error:", error);
@@ -119,6 +120,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
         email: formData.email,
         password: formData.password,
       });
+      // Chỉ cần tắt modal - AuthContext đã set user state
+      // Các component sẽ tự động re-render khi auth state thay đổi
       onClose();
     } catch (error) {
       console.error("Register error:", error);
@@ -131,6 +134,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
   };
 
   const handleGoogleLogin = () => {
+    // Location đã được lưu trong openAuthModal (AuthContext)
+    // Google OAuth sẽ redirect về GoogleAuthHandler, nơi sẽ xử lý redirect về return location
     window.location.href = GOOGLE_AUTH_URL;
   };
 

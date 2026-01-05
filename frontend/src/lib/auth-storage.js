@@ -83,3 +83,71 @@ export const clearAuthData = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
 };
+
+// ============================================================================
+// Return Location Management - Lưu vị trí trước khi đăng nhập
+// ============================================================================
+const RETURN_LOCATION_KEY = "return_location";
+
+/**
+ * Lưu location hiện tại để redirect về sau khi đăng nhập
+ * @param {string} pathname - Path hiện tại
+ * @param {string} search - Query string
+ * @param {Object} state - Location state
+ */
+export const saveReturnLocation = (pathname, search = "", state = null) => {
+  try {
+    const locationData = {
+      pathname: pathname || "/",
+      search: search || "",
+      state: state || null,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(RETURN_LOCATION_KEY, JSON.stringify(locationData));
+  } catch (error) {
+    console.error("Error saving return location:", error);
+  }
+};
+
+/**
+ * Lấy và xóa return location đã lưu
+ * @returns {Object|null} { pathname, search, state } hoặc null
+ */
+export const getAndClearReturnLocation = () => {
+  try {
+    const stored = localStorage.getItem(RETURN_LOCATION_KEY);
+    if (!stored) return null;
+
+    const locationData = JSON.parse(stored);
+
+    // Kiểm tra timestamp - nếu quá 1 giờ thì xóa (tránh redirect về trang cũ quá lâu)
+    const maxAge = 60 * 60 * 1000; // 1 giờ
+    if (Date.now() - locationData.timestamp > maxAge) {
+      localStorage.removeItem(RETURN_LOCATION_KEY);
+      return null;
+    }
+
+    // Xóa location đã lưu sau khi lấy
+    localStorage.removeItem(RETURN_LOCATION_KEY);
+    return {
+      pathname: locationData.pathname || "/",
+      search: locationData.search || "",
+      state: locationData.state || null,
+    };
+  } catch (error) {
+    console.error("Error getting return location:", error);
+    localStorage.removeItem(RETURN_LOCATION_KEY);
+    return null;
+  }
+};
+
+/**
+ * Xóa return location mà không lấy (cleanup)
+ */
+export const clearReturnLocation = () => {
+  try {
+    localStorage.removeItem(RETURN_LOCATION_KEY);
+  } catch (error) {
+    console.error("Error clearing return location:", error);
+  }
+};
