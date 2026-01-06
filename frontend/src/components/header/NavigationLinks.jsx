@@ -18,6 +18,8 @@ const NavigationLinks = ({ className = "", isMobile = false }) => {
   const links = [
     { label: "Phim Lẻ", href: "/type/phim-le", type: "link" },
     { label: "Phim Bộ", href: "/type/phim-bo", type: "link" },
+    { label: "Anime", href: "/type/anime", type: "link" },
+    { label: "TV Shows", href: "/type/tvshows", type: "link" },
     { label: "Thể loại", type: "dropdown", items: genreItems },
     { label: "Quốc gia", type: "dropdown", items: countryItems },
   ];

@@ -25,6 +25,7 @@ const BrowsePage = () => {
     const yearTo = searchParams.get("yearTo");
     const quality = searchParams.get("quality");
     const type = searchParams.get("type");
+    const subType = searchParams.get("subType");
     const ageRating = searchParams.get("ageRating");
     const status = searchParams.get("status");
     const ratingMin = searchParams.get("ratingMin");
@@ -34,17 +35,18 @@ const BrowsePage = () => {
 
     if (genres) filters.genres = genres.split(",").filter(Boolean);
     if (countries) filters.countries = countries.split(",").filter(Boolean);
-    if (year) filters.year = year;
+    if (year) filters.year = year.split(",").filter(Boolean);
     if (yearFrom) filters.yearFrom = yearFrom;
     if (yearTo) filters.yearTo = yearTo;
     if (quality) filters.quality = quality;
     if (type) filters.type = type;
-    if (ageRating) filters.ageRating = ageRating;
+    if (subType) filters.subType = subType;
+    if (ageRating) filters.ageRating = ageRating.split(",").filter(Boolean);
     if (status) filters.status = status;
     if (ratingMin) filters.ratingMin = ratingMin;
     if (ratingMax) filters.ratingMax = ratingMax;
     if (sort) filters.sort = sort;
-    if (lang) filters.lang = lang;
+    if (lang) filters.lang = lang.split(",").filter(Boolean);
 
     return filters;
   };
@@ -83,17 +85,18 @@ const BrowsePage = () => {
           limit: PAGE_SIZE,
           ...(filters.genres?.length && { genres: filters.genres.join(",") }),
           ...(filters.countries?.length && { countries: filters.countries.join(",") }),
-          ...(filters.year && { year: filters.year }),
+          ...(filters.year?.length && { year: filters.year.join(",") }),
           ...(filters.yearFrom && { yearFrom: filters.yearFrom }),
           ...(filters.yearTo && { yearTo: filters.yearTo }),
           ...(filters.quality && { quality: filters.quality }),
           ...(filters.type && { type: filters.type }),
-          ...(filters.ageRating && { ageRating: filters.ageRating }),
+          ...(filters.subType && { subType: filters.subType }),
+          ...(filters.ageRating?.length && { ageRating: filters.ageRating.join(",") }),
           ...(filters.status && { status: filters.status }),
           ...(filters.ratingMin && { ratingMin: filters.ratingMin }),
           ...(filters.ratingMax && { ratingMax: filters.ratingMax }),
-          ...(filters.sort && { sort: filters.sort }),
-          ...(filters.lang && { lang: filters.lang }),
+          ...(filters.sort && filters.sort !== "newest" && { sort: filters.sort }),
+          ...(filters.lang?.length && { lang: filters.lang.join(",") }),
         };
 
         // If there's a search query, use search API; otherwise use getAll
@@ -148,17 +151,18 @@ const BrowsePage = () => {
 
     if (newFilters.genres?.length) newParams.set("genres", newFilters.genres.join(","));
     if (newFilters.countries?.length) newParams.set("countries", newFilters.countries.join(","));
-    if (newFilters.year) newParams.set("year", newFilters.year);
+    if (newFilters.year?.length) newParams.set("year", newFilters.year.join(","));
     if (newFilters.yearFrom) newParams.set("yearFrom", newFilters.yearFrom);
     if (newFilters.yearTo) newParams.set("yearTo", newFilters.yearTo);
     if (newFilters.quality) newParams.set("quality", newFilters.quality);
     if (newFilters.type) newParams.set("type", newFilters.type);
-    if (newFilters.ageRating) newParams.set("ageRating", newFilters.ageRating);
+    if (newFilters.subType) newParams.set("subType", newFilters.subType);
+    if (newFilters.ageRating?.length) newParams.set("ageRating", newFilters.ageRating.join(","));
     if (newFilters.status) newParams.set("status", newFilters.status);
     if (newFilters.ratingMin) newParams.set("ratingMin", newFilters.ratingMin);
     if (newFilters.ratingMax) newParams.set("ratingMax", newFilters.ratingMax);
-    if (newFilters.sort) newParams.set("sort", newFilters.sort);
-    if (newFilters.lang) newParams.set("lang", newFilters.lang);
+    if (newFilters.sort && newFilters.sort !== "newest") newParams.set("sort", newFilters.sort);
+    if (newFilters.lang?.length) newParams.set("lang", newFilters.lang.join(","));
 
     // Reset to page 1 when filters change
     newParams.set("page", "1");

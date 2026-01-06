@@ -21,8 +21,11 @@ const PAGE_SIZE = 32;
 const TYPE_FILTERS = {
   "phim-le": { api: "single", label: "Phim lẻ" },
   "phim-bo": { api: "series", label: "Phim bộ" },
-  single: { api: "single", label: "Phim lẻ" },
-  series: { api: "series", label: "Phim bộ" },
+  anime: { api: "hoathinh", label: "Anime" },
+  tvshows: { api: "tvshows", label: "TV Shows" },
+  // single: { api: "single", label: "Phim lẻ" },
+  // series: { api: "series", label: "Phim bộ" },
+  // hoathinh: { api: "hoathinh", label: "Anime" },
 };
 
 const FilteredMovies = ({ pageType = "genre" }) => {
@@ -59,6 +62,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
           ...(filters.yearTo && { yearTo: filters.yearTo }),
           ...(filters.quality && { quality: filters.quality }),
           ...(filters.type && { type: filters.type }),
+          ...(filters.subType && { subType: filters.subType }),
           ...(filters.ageRating && { ageRating: filters.ageRating }),
           ...(filters.status && { status: filters.status }),
           ...(filters.ratingMin && { ratingMin: filters.ratingMin }),
@@ -357,6 +361,8 @@ const FilteredMovies = ({ pageType = "genre" }) => {
               // Check filter type to determine title
               if (filters.type === "series") return "Tổng hợp phim bộ";
               if (filters.type === "single") return "Tổng hợp phim lẻ";
+              if (filters.type === "hoathinh") return "Tổng hợp Anime";
+              if (filters.type === "tvshows") return "Tổng hợp TV Shows";
               return `Tổng hợp ${displayLabel}`;
             }
             return `Phim ${displayLabel}`;

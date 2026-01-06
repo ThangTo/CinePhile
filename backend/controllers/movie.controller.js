@@ -18,20 +18,24 @@ const parseArrayParam = (param) => {
 const buildFiltersFromQuery = (query) => {
   const parsedGenres = parseArrayParam(query.genres);
   const parsedCountries = parseArrayParam(query.countries);
+  const parsedYear = parseArrayParam(query.year);
+  const parsedAgeRating = parseArrayParam(query.ageRating);
+  const parsedLang = parseArrayParam(query.lang);
 
   return {
     ...(parsedGenres && { genres: parsedGenres }),
     ...(parsedCountries && { countries: parsedCountries }),
-    ...(query.year && { year: query.year }),
+    ...(parsedYear && { year: parsedYear }),
     ...(query.yearFrom && { yearFrom: query.yearFrom }),
     ...(query.yearTo && { yearTo: query.yearTo }),
     ...(query.quality && { quality: query.quality }),
     ...(query.type && { type: query.type }),
-    ...(query.ageRating && { ageRating: query.ageRating }),
+    ...(query.subType && { subType: query.subType }),
+    ...(parsedAgeRating && { ageRating: parsedAgeRating }),
     ...(query.status && { status: query.status }),
     ...(query.ratingMin && { ratingMin: query.ratingMin }),
     ...(query.ratingMax && { ratingMax: query.ratingMax }),
-    ...(query.lang && { lang: query.lang }),
+    ...(parsedLang && { lang: parsedLang }),
   };
 };
 
@@ -214,18 +218,20 @@ const getByCountry = async (req, res) => {
  */
 const getByType = async (req, res) => {
   try {
-    if (!['single', 'series'].includes(req.params.type)) {
-      throw new Error('Invalid movie type. Use "single" or "series"');
+    const typeParam = req.params.type;
+    const allowed = ['single', 'series', 'hoathinh', 'tvshows'];
+    if (!allowed.includes(typeParam)) {
+      throw new Error('Invalid movie type. Use "single", "series", "hoathinh" or "tvshows"');
     }
-    const filters = {
-      type: req.params.type,
-      ...buildFiltersFromQuery(req.query),
-    };
-    const result = await movieService.getByType(req.params.type, {
+
+    const baseFilters = buildFiltersFromQuery(req.query);
+    console.log('baseFilters', baseFilters);
+    const result = await movieService.getByType(typeParam, {
       page: req.query.page,
       limit: req.query.limit,
       sort: req.query.sort || 'newest',
-      ...filters,
+      type: typeParam,
+      ...baseFilters,
     });
     res.json(result);
   } catch (error) {

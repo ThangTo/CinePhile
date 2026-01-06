@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   FiFilter,
   FiX,
@@ -36,6 +36,9 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
     defaultCollapsed,
   } = options;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const isBrowsePage = location.pathname === "/filter";
   const { options: filterOptions, loading: optionsLoading } = useFilterOptions();
   const { countries: taxonomyCountries, loading: taxonomyLoading } = useMovieTaxonomies();
   const [isExpanded, setIsExpanded] = useState(false); // For compact mode
@@ -110,13 +113,18 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
 
   // Determine default type based on pageType and slug
   const getDefaultType = () => {
+    // Nếu ở trang /filter, đọc từ URL query params
+    if (isBrowsePage) {
+      return searchParams.get("type") || "";
+    }
+
     // If pageType is "type" and slug exists, map slug to type filter
     if (pageType === "type" && slug) {
       const TYPE_MAP = {
         "phim-le": "single",
         "phim-bo": "series",
-        single: "single",
-        series: "series",
+        anime: "hoathinh",
+        tvshows: "tvshows",
       };
       const mappedType = TYPE_MAP[slug];
       if (mappedType) {
@@ -127,8 +135,30 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
     return filters.type || "";
   };
 
+  // Determine default subType
+  const getDefaultSubType = () => {
+    // Nếu ở trang /filter, đọc từ URL query params
+    if (isBrowsePage) {
+      return searchParams.get("subType") || "";
+    }
+
+    // Nếu ở trang Phim bộ/Phim lẻ, không có subType
+    if (pageType === "type" && (slug === "phim-bo" || slug === "phim-le")) {
+      return "";
+    }
+
+    // Mặc định không có subType
+    return filters.subType || "";
+  };
+
   // Determine default genre/country based on pageType
   const getDefaultGenre = () => {
+    // Nếu ở trang /filter, đọc từ URL query params
+    if (isBrowsePage) {
+      const genresParam = searchParams.get("genres");
+      return genresParam ? genresParam.split(",").filter(Boolean) : [];
+    }
+
     if (pageType === "genre" && slug) {
       return filters.genres?.includes(slug) ? filters.genres : [slug];
     }
@@ -136,32 +166,87 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
   };
 
   const getDefaultCountry = () => {
+    // Nếu ở trang /filter, đọc từ URL query params
+    if (isBrowsePage) {
+      const countriesParam = searchParams.get("countries");
+      return countriesParam ? countriesParam.split(",").filter(Boolean) : [];
+    }
+
     if (pageType === "country" && slug) {
       return filters.countries?.includes(slug) ? filters.countries : [slug];
     }
     return filters.countries || [];
   };
 
+  // Helper function to get default value from URL or filters
+  const getDefaultValue = (key, defaultValue = "") => {
+    if (isBrowsePage) {
+      const value = searchParams.get(key);
+      return value || defaultValue;
+    }
+    return filters[key] !== undefined ? filters[key] : defaultValue;
+  };
+
+  // Helper function to get default array value from URL or filters
+  const getDefaultArrayValue = (key, defaultValue = []) => {
+    if (isBrowsePage) {
+      const value = searchParams.get(key);
+      return value ? value.split(",").filter(Boolean) : defaultValue;
+    }
+    if (Array.isArray(filters[key])) {
+      return filters[key];
+    }
+    return filters[key] ? [filters[key]] : defaultValue;
+  };
+
   // Initialize state with defaults
   const [localFilters, setLocalFilters] = useState(() => ({
     genres: getDefaultGenre(),
     countries: getDefaultCountry(),
-    year: filters.year || "",
-    yearFrom: filters.yearFrom || "",
-    yearTo: filters.yearTo || "",
-    quality: filters.quality || "",
+    year: getDefaultArrayValue("year", []),
+    yearFrom: getDefaultValue("yearFrom", ""),
+    yearTo: getDefaultValue("yearTo", ""),
+    quality: getDefaultValue("quality", ""),
     type: getDefaultType(),
-    ageRating: filters.ageRating || "",
-    status: filters.status || "",
-    ratingMin: filters.ratingMin || "",
-    ratingMax: filters.ratingMax || "",
-    sort: filters.sort || "newest",
-    lang: filters.lang || "",
+    subType: getDefaultSubType(),
+    ageRating: getDefaultArrayValue("ageRating", []),
+    status: getDefaultValue("status", ""),
+    ratingMin: getDefaultValue("ratingMin", ""),
+    ratingMax: getDefaultValue("ratingMax", ""),
+    sort: getDefaultValue("sort", "newest"),
+    lang: getDefaultArrayValue("lang", []),
   }));
 
   useEffect(() => {
-    // Only update if filters prop changes (when applied), but preserve defaults from pageType
+    // Khi ở trang /filter, luôn đọc từ URL query params để tránh dùng giá trị cũ
+    if (isBrowsePage) {
+      const defaultType = getDefaultType();
+      const defaultSubType = getDefaultSubType();
+      const defaultGenre = getDefaultGenre();
+      const defaultCountry = getDefaultCountry();
+
+      setLocalFilters({
+        genres: defaultGenre,
+        countries: defaultCountry,
+        year: getDefaultArrayValue("year", []),
+        yearFrom: getDefaultValue("yearFrom", ""),
+        yearTo: getDefaultValue("yearTo", ""),
+        quality: getDefaultValue("quality", ""),
+        type: defaultType,
+        subType: defaultSubType,
+        ageRating: getDefaultArrayValue("ageRating", []),
+        status: getDefaultValue("status", ""),
+        ratingMin: getDefaultValue("ratingMin", ""),
+        ratingMax: getDefaultValue("ratingMax", ""),
+        sort: getDefaultValue("sort", "newest"),
+        lang: getDefaultArrayValue("lang", []),
+      });
+      return;
+    }
+
+    // Ở các trang khác, chỉ update khi filters prop changes
     const defaultType = getDefaultType();
+    const defaultSubType = getDefaultSubType();
     const defaultGenre = getDefaultGenre();
     const defaultCountry = getDefaultCountry();
 
@@ -169,20 +254,42 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
       ...prev,
       genres: filters.genres?.length ? filters.genres : defaultGenre,
       countries: filters.countries?.length ? filters.countries : defaultCountry,
-      year: filters.year !== undefined ? filters.year : prev.year,
+      year:
+        filters.year !== undefined
+          ? Array.isArray(filters.year)
+            ? filters.year
+            : filters.year
+            ? [filters.year]
+            : []
+          : prev.year,
       yearFrom: filters.yearFrom !== undefined ? filters.yearFrom : prev.yearFrom,
       yearTo: filters.yearTo !== undefined ? filters.yearTo : prev.yearTo,
       quality: filters.quality !== undefined ? filters.quality : prev.quality,
       type: filters.type !== undefined ? filters.type : defaultType || "",
-      ageRating: filters.ageRating !== undefined ? filters.ageRating : prev.ageRating,
+      subType: filters.subType !== undefined ? filters.subType : defaultSubType || "",
+      ageRating:
+        filters.ageRating !== undefined
+          ? Array.isArray(filters.ageRating)
+            ? filters.ageRating
+            : filters.ageRating
+            ? [filters.ageRating]
+            : []
+          : prev.ageRating,
       status: filters.status !== undefined ? filters.status : prev.status,
       ratingMin: filters.ratingMin !== undefined ? filters.ratingMin : prev.ratingMin,
       ratingMax: filters.ratingMax !== undefined ? filters.ratingMax : prev.ratingMax,
       sort: filters.sort || prev.sort || "newest",
-      lang: filters.lang !== undefined ? filters.lang : prev.lang,
+      lang:
+        filters.lang !== undefined
+          ? Array.isArray(filters.lang)
+            ? filters.lang
+            : filters.lang
+            ? [filters.lang]
+            : []
+          : prev.lang,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, pageType, slug]);
+  }, [filters, pageType, slug, isBrowsePage, searchParams]);
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...localFilters, [key]: value };
@@ -200,49 +307,78 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
         params.set("q", searchQuery);
       }
 
+      // Đảm bảo year luôn là array trước khi join
+      const yearArray = Array.isArray(localFilters.year)
+        ? localFilters.year
+        : localFilters.year
+        ? [localFilters.year]
+        : [];
+
       if (localFilters.genres?.length) params.set("genres", localFilters.genres.join(","));
       if (localFilters.countries?.length) params.set("countries", localFilters.countries.join(","));
-      if (localFilters.year) params.set("year", localFilters.year);
+      if (yearArray.length) params.set("year", yearArray.join(","));
       if (localFilters.yearFrom) params.set("yearFrom", localFilters.yearFrom);
       if (localFilters.yearTo) params.set("yearTo", localFilters.yearTo);
       if (localFilters.quality) params.set("quality", localFilters.quality);
       if (localFilters.type) params.set("type", localFilters.type);
-      if (localFilters.ageRating) params.set("ageRating", localFilters.ageRating);
+      if (localFilters.subType) params.set("subType", localFilters.subType);
+      if (localFilters.ageRating?.length) params.set("ageRating", localFilters.ageRating.join(","));
       if (localFilters.status) params.set("status", localFilters.status);
       if (localFilters.ratingMin) params.set("ratingMin", localFilters.ratingMin);
       if (localFilters.ratingMax) params.set("ratingMax", localFilters.ratingMax);
-      if (localFilters.sort) params.set("sort", localFilters.sort);
-      if (localFilters.lang) params.set("lang", localFilters.lang);
+      if (localFilters.sort && localFilters.sort !== "newest")
+        params.set("sort", localFilters.sort);
+      if (localFilters.lang?.length) params.set("lang", localFilters.lang.join(","));
 
       params.set("page", "1");
 
       navigate(`/filter?${params.toString()}`);
     } else {
       // Apply filters when user clicks the button
-      onFilterChange(localFilters);
+      // Đảm bảo year luôn là array trước khi gửi
+      const filtersToApply = {
+        ...localFilters,
+        year: Array.isArray(localFilters.year)
+          ? localFilters.year
+          : localFilters.year
+          ? [localFilters.year]
+          : [],
+      };
+      onFilterChange(filtersToApply);
     }
   };
 
   const clearFilters = () => {
     // Reset to defaults based on pageType
-    const defaultType = getDefaultType();
-    const defaultGenre = getDefaultGenre();
-    const defaultCountry = getDefaultCountry();
+    // Khi ở trang /filter, reset về giá trị rỗng (không đọc từ URL)
+    // Ở các trang khác, giữ lại giá trị mặc định của trang đó
+    let defaultType = "";
+    let defaultSubType = "";
+    let defaultGenre = [];
+    let defaultCountry = [];
+
+    if (!isBrowsePage) {
+      defaultType = getDefaultType();
+      defaultSubType = getDefaultSubType();
+      defaultGenre = getDefaultGenre();
+      defaultCountry = getDefaultCountry();
+    }
 
     const clearedFilters = {
       genres: defaultGenre,
       countries: defaultCountry,
-      year: "",
+      year: [],
       yearFrom: "",
       yearTo: "",
       quality: "",
       type: defaultType,
-      ageRating: "",
+      subType: defaultSubType,
+      ageRating: [],
       status: "",
       ratingMin: "",
       ratingMax: "",
       sort: "newest",
-      lang: "",
+      lang: [],
     };
     setLocalFilters(clearedFilters);
     // Apply cleared filters immediately when clearing
@@ -258,11 +394,15 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
     let count = 0;
     if (filters.genres?.length) count += filters.genres.length;
     if (filters.countries?.length) count += filters.countries.length;
-    ["year", "quality", "type", "ageRating", "status"].forEach((k) => {
-      if (filters[k]) count++;
-    });
+    if (filters.year?.length) count += filters.year.length;
+    if (filters.ageRating?.length) count += filters.ageRating.length;
+    if (filters.lang?.length) count += filters.lang.length;
+    if (filters.quality) count++;
+    if (filters.type) count++;
+    if (filters.status) count++;
     if (filters.yearFrom || filters.yearTo) count++;
     if (filters.ratingMin || filters.ratingMax) count++;
+    if (filters.sort && filters.sort !== "newest") count++;
     return count;
   };
 
@@ -271,11 +411,15 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
     let count = 0;
     if (localFilters.genres?.length) count += localFilters.genres.length;
     if (localFilters.countries?.length) count += localFilters.countries.length;
-    ["year", "quality", "type", "ageRating", "status"].forEach((k) => {
-      if (localFilters[k]) count++;
-    });
+    if (localFilters.year?.length) count += localFilters.year.length;
+    if (localFilters.ageRating?.length) count += localFilters.ageRating.length;
+    if (localFilters.lang?.length) count += localFilters.lang.length;
+    if (localFilters.quality) count++;
+    if (localFilters.type) count++;
+    if (localFilters.status) count++;
     if (localFilters.yearFrom || localFilters.yearTo) count++;
     if (localFilters.ratingMin || localFilters.ratingMax) count++;
+    if (localFilters.sort && localFilters.sort !== "newest") count++;
     return count;
   };
 
@@ -343,41 +487,80 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
           <FiFilm className="text-primaryColor" size={14} /> Loại phim
         </label>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => handleFilterChange("type", "")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
-              !localFilters.type
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            Tất cả
-          </button>
-          <button
-            type="button"
-            onClick={() => handleFilterChange("type", "single")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-              localFilters.type === "single"
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {localFilters.type === "single" && <FiCheck size={12} />}
-            Phim lẻ
-          </button>
-          <button
-            type="button"
-            onClick={() => handleFilterChange("type", "series")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-              localFilters.type === "series"
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {localFilters.type === "series" && <FiCheck size={12} />}
-            Phim bộ
-          </button>
+          {(() => {
+            // Kiểm tra xem có đang ở trang Anime/TVShows không
+            const isAnimeOrTVShows =
+              localFilters.type === "hoathinh" || localFilters.type === "tvshows";
+
+            return (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAnimeOrTVShows) {
+                      // Ở Anime/TVShows: clear subType, giữ type
+                      handleFilterChange("subType", "");
+                    } else {
+                      // Ở Phim lẻ/Phim bộ: clear type
+                      handleFilterChange("type", "");
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
+                    (isAnimeOrTVShows && !localFilters.subType) ||
+                    (!isAnimeOrTVShows && !localFilters.type)
+                      ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
+                      : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  Tất cả
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAnimeOrTVShows) {
+                      // Ở Anime/TVShows: set subType
+                      handleFilterChange("subType", "single");
+                    } else {
+                      // Ở Phim lẻ/Phim bộ: set type
+                      handleFilterChange("type", "single");
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
+                    (isAnimeOrTVShows && localFilters.subType === "single") ||
+                    (!isAnimeOrTVShows && localFilters.type === "single")
+                      ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
+                      : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {((isAnimeOrTVShows && localFilters.subType === "single") ||
+                    (!isAnimeOrTVShows && localFilters.type === "single")) && <FiCheck size={12} />}
+                  Phim lẻ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAnimeOrTVShows) {
+                      // Ở Anime/TVShows: set subType
+                      handleFilterChange("subType", "series");
+                    } else {
+                      // Ở Phim lẻ/Phim bộ: set type
+                      handleFilterChange("type", "series");
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
+                    (isAnimeOrTVShows && localFilters.subType === "series") ||
+                    (!isAnimeOrTVShows && localFilters.type === "series")
+                      ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
+                      : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {((isAnimeOrTVShows && localFilters.subType === "series") ||
+                    (!isAnimeOrTVShows && localFilters.type === "series")) && <FiCheck size={12} />}
+                  Phim bộ
+                </button>
+              </>
+            );
+          })()}
         </div>
       </div>
 
@@ -389,51 +572,44 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => handleFilterChange("ageRating", "")}
+            onClick={() => handleFilterChange("ageRating", [])}
             className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
-              !localFilters.ageRating
+              !localFilters.ageRating?.length
                 ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
                 : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
             }`}
           >
             Tất cả
           </button>
-          <button
-            type="button"
-            onClick={() => handleFilterChange("ageRating", "T12")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-              localFilters.ageRating === "T12"
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {localFilters.ageRating === "T12" && <FiCheck size={12} />}
-            T12 (13 tuổi trở lên)
-          </button>
-          <button
-            type="button"
-            onClick={() => handleFilterChange("ageRating", "T16")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-              localFilters.ageRating === "T16"
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {localFilters.ageRating === "T16" && <FiCheck size={12} />}
-            T16 (16 tuổi trở lên)
-          </button>
-          <button
-            type="button"
-            onClick={() => handleFilterChange("ageRating", "18+")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-              localFilters.ageRating === "18+"
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {localFilters.ageRating === "18+" && <FiCheck size={12} />}
-            T18 (18 tuổi trở lên)
-          </button>
+          {["T12", "T16", "18+"].map((rating) => {
+            const isActive = localFilters.ageRating?.includes(rating);
+            const labels = {
+              T12: "T12 (13 tuổi trở lên)",
+              T16: "T16 (16 tuổi trở lên)",
+              "18+": "T18 (18 tuổi trở lên)",
+            };
+            return (
+              <button
+                key={rating}
+                type="button"
+                onClick={() => {
+                  const current = localFilters.ageRating || [];
+                  const newValue = isActive
+                    ? current.filter((r) => r !== rating)
+                    : [...current, rating];
+                  handleFilterChange("ageRating", newValue);
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
+                  isActive
+                    ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
+                    : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {isActive && <FiCheck size={12} />}
+                {labels[rating]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -501,51 +677,43 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => handleFilterChange("lang", "")}
+            onClick={() => handleFilterChange("lang", [])}
             className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
-              !localFilters.lang
+              !localFilters.lang?.length
                 ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
                 : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
             }`}
           >
             Tất cả
           </button>
-          <button
-            type="button"
-            onClick={() => handleFilterChange("lang", "subtitle")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-              localFilters.lang === "subtitle"
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {localFilters.lang === "subtitle" && <FiCheck size={12} />}
-            Phụ đề
-          </button>
-          <button
-            type="button"
-            onClick={() => handleFilterChange("lang", "thuyet-minh")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-              localFilters.lang === "thuyet-minh"
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {localFilters.lang === "thuyet-minh" && <FiCheck size={12} />}
-            Thuyết minh
-          </button>
-          <button
-            type="button"
-            onClick={() => handleFilterChange("lang", "dubbed")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-              localFilters.lang === "dubbed"
-                ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {localFilters.lang === "dubbed" && <FiCheck size={12} />}
-            Lồng tiếng
-          </button>
+          {[
+            { value: "subtitle", label: "Phụ đề" },
+            { value: "thuyet-minh", label: "Thuyết minh" },
+            { value: "dubbed", label: "Lồng tiếng" },
+          ].map((option) => {
+            const isActive = localFilters.lang?.includes(option.value);
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  const current = localFilters.lang || [];
+                  const newValue = isActive
+                    ? current.filter((l) => l !== option.value)
+                    : [...current, option.value];
+                  handleFilterChange("lang", newValue);
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
+                  isActive
+                    ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
+                    : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {isActive && <FiCheck size={12} />}
+                {option.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -557,9 +725,9 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
         <div className="flex flex-wrap gap-2 items-center">
           <button
             type="button"
-            onClick={() => handleFilterChange("year", "")}
+            onClick={() => handleFilterChange("year", [])}
             className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
-              !localFilters.year
+              !localFilters.year?.length
                 ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
                 : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
             }`}
@@ -569,18 +737,26 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
           {/* Generate year buttons from current year down to 2011 */}
           {Array.from({ length: Math.min(new Date().getFullYear() - 2010, 16) }, (_, i) => {
             const year = new Date().getFullYear() - i;
+            const yearStr = year.toString();
+            const isActive = localFilters.year?.includes(yearStr);
             return (
               <button
                 key={year}
                 type="button"
-                onClick={() => handleFilterChange("year", year.toString())}
+                onClick={() => {
+                  const current = localFilters.year || [];
+                  const newValue = isActive
+                    ? current.filter((y) => y !== yearStr)
+                    : [...current, yearStr];
+                  handleFilterChange("year", newValue);
+                }}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-                  localFilters.year === year.toString()
+                  isActive
                     ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
                     : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
                 }`}
               >
-                {localFilters.year === year.toString() && <FiCheck size={12} />}
+                {isActive && <FiCheck size={12} />}
                 {year}
               </button>
             );
@@ -595,8 +771,17 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
               placeholder="Nhập năm"
               min="1900"
               max={new Date().getFullYear() + 1}
-              value={localFilters.year || ""}
-              onChange={(e) => handleFilterChange("year", e.target.value)}
+              value={
+                Array.isArray(localFilters.year) && localFilters.year.length === 1
+                  ? localFilters.year[0]
+                  : ""
+              }
+              onChange={(e) => {
+                const value = e.target.value;
+                // Nếu có giá trị, convert thành array, nếu không thì là array rỗng
+                const newValue = value ? [value] : [];
+                handleFilterChange("year", newValue);
+              }}
               className="w-full max-w-[140px] bg-black/30 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor/50 transition-all"
             />
           </div>
@@ -614,21 +799,31 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
             { value: "updated", label: "Mới cập nhật" },
             { value: "imdb", label: "Điểm đánh giá" },
             { value: "views", label: "Lượt xem" },
-          ].map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => handleFilterChange("sort", option.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-                localFilters.sort === option.value
-                  ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                  : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              {localFilters.sort === option.value && <FiCheck size={12} />}
-              {option.label}
-            </button>
-          ))}
+          ].map((option) => {
+            const isActive = localFilters.sort === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  // Nếu click vào ô đang active và không phải "newest", thì reset về "newest"
+                  if (isActive && option.value !== "newest") {
+                    handleFilterChange("sort", "newest");
+                  } else {
+                    handleFilterChange("sort", option.value);
+                  }
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
+                  isActive
+                    ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
+                    : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {isActive && <FiCheck size={12} />}
+                {option.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

@@ -245,10 +245,13 @@ const buildQuery = (filters = {}, useTextSearch = true) => {
   const query = {};
 
   // Genre filter (single or array)
+  // - filters.genre: một slug duy nhất
+  // - filters.genres: nhiều slug; yêu cầu phim phải chứa ĐỦ tất cả các thể loại đã chọn (AND)
   if (filters.genre) {
     query['categories.slug'] = filters.genre;
   } else if (filters.genres && Array.isArray(filters.genres) && filters.genres.length > 0) {
-    query['categories.slug'] = { $in: filters.genres };
+    // Sử dụng $all để đảm bảo phim chứa đầy đủ tất cả slug trong mảng
+    query['categories.slug'] = { $all: filters.genres };
   }
 
   // Country filter (single or array)
@@ -263,16 +266,42 @@ const buildQuery = (filters = {}, useTextSearch = true) => {
   }
 
   // Type filter
-  if (filters.type === 'single' || filters.type === 'movie') {
-    query.totalEpisodes = 1;
-  } else if (filters.type === 'series' || filters.type === 'tv') {
-    query.totalEpisodes = { $gt: 1 };
+  switch (filters.type) {
+    case 'hoathinh':
+      query.type = 'hoathinh';
+      if (filters.subType === 'single') {
+        query.totalEpisodes = 1;
+      } else if (filters.subType === 'series') {
+        query.totalEpisodes = { $gt: 1 };
+      }
+      break;
+    case 'tvshows':
+      query.type = 'tvshows';
+      if (filters.subType === 'single') {
+        query.totalEpisodes = 1;
+      } else if (filters.subType === 'series') {
+        query.totalEpisodes = { $gt: 1 };
+      }
+      break;
+    case 'single':
+      query.totalEpisodes = 1;
+      break;
+    case 'series':
+      query.totalEpisodes = { $gt: 1 };
+      break;
+    default:
+      break;
   }
 
-  // Year filter (exact or range)
-  if (filters.year) {
+  // Year filter (exact or range or array)
+  if (Array.isArray(filters.year) && filters.year.length > 0) {
+    // Multiple years: use $in
+    query.year = { $in: filters.year.map((y) => Number(y)) };
+  } else if (filters.year) {
+    // Single year
     query.year = Number(filters.year);
   } else if (filters.yearFrom || filters.yearTo) {
+    // Year range
     query.year = {};
     if (filters.yearFrom) query.year.$gte = Number(filters.yearFrom);
     if (filters.yearTo) query.year.$lte = Number(filters.yearTo);
@@ -283,8 +312,10 @@ const buildQuery = (filters = {}, useTextSearch = true) => {
     query.quality = filters.quality;
   }
 
-  // Age rating filter
-  if (filters.ageRating) {
+  // Age rating filter (single or array)
+  if (Array.isArray(filters.ageRating) && filters.ageRating.length > 0) {
+    query.age_rating = { $in: filters.ageRating };
+  } else if (filters.ageRating) {
     query.age_rating = filters.ageRating;
   }
 
@@ -382,20 +413,27 @@ const getSortOptions = (sort = 'newest') => {
 
 /**
  * Helper: Map frontend audioType filter values to database values
- * @param {string} audioTypeFilter - Frontend filter value ('subtitle', 'thuyet-minh', 'dubbed')
+ * @param {string|string[]} audioTypeFilter - Frontend filter value(s) ('subtitle', 'thuyet-minh', 'dubbed')
  * @returns {string[]} Array of database audioType values
  */
 const mapAudioTypeFilter = (audioTypeFilter) => {
-  if (audioTypeFilter === 'subtitle') {
-    return ['vietsub'];
-  } else if (audioTypeFilter === 'thuyet-minh') {
-    return ['thuyet-minh'];
-  } else if (audioTypeFilter === 'dubbed') {
-    return ['long-tieng'];
-  } else {
-    // If it's already a database value, use it directly
-    return [audioTypeFilter];
-  }
+  const filters = Array.isArray(audioTypeFilter) ? audioTypeFilter : [audioTypeFilter];
+  const mappedValues = [];
+
+  filters.forEach((filter) => {
+    if (filter === 'subtitle') {
+      mappedValues.push('vietsub');
+    } else if (filter === 'thuyet-minh') {
+      mappedValues.push('thuyet-minh');
+    } else if (filter === 'dubbed') {
+      mappedValues.push('long-tieng');
+    } else {
+      // If it's already a database value, use it directly
+      mappedValues.push(filter);
+    }
+  });
+
+  return mappedValues;
 };
 
 /**
@@ -649,8 +687,14 @@ const getByCountry = async (country, options = {}) => {
 const getByType = async (type, options = {}) => {
   const { page, limit, sort, ...filters } = options;
   const pagination = { page, limit, sort };
-  const queryFilters = { type, ...filters };
-  const builder = Movie.find(buildQuery(queryFilters));
+  console.log('filters', type, filters);
+
+  let builder;
+
+  const baseQuery = buildQuery(filters);
+  const mongoQuery = { type, ...baseQuery };
+  builder = Movie.find(mongoQuery);
+
   const result = await paginate(builder, pagination);
   return transformPaginatedResult(result);
 };
