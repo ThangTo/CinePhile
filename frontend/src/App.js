@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "contexts/AuthContext";
 import { NotificationProvider } from "contexts/NotificationContext";
 import { ThemeProvider } from "contexts/ThemeContext";
 import ErrorBoundary from "components/common/ErrorBoundary";
+import { initUserInteractionListener } from "utils/userInteraction";
 import "styles/themes.css";
 import HomePage from "./pages/HomePage";
 import MovieDetail from "./pages/MovieDetail";
@@ -24,6 +25,11 @@ import GoogleAuthHandler from "pages/GoogleAuthHandler";
 import GoogleAuthHandlerWrapper from "components/common/GoogleAuthHandlerWrapper";
 
 function App() {
+  // Khởi tạo listener một lần cho toàn bộ app để phát hiện user interaction (click/keydown/touch)
+  useEffect(() => {
+    initUserInteractionListener();
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import OptimizedImage from "components/common/OptimizedImage";
+import YouTube from "react-youtube";
+import { getHasUserInteracted, subscribeUserInteraction } from "utils/userInteraction";
 
 // Helper function để extract YouTube video ID từ URL
 const extractYouTubeId = (url) => {
@@ -21,11 +23,12 @@ const extractYouTubeId = (url) => {
   return null;
 };
 
-// Helper function để tạo YouTube embed URL
-const getYouTubeEmbedUrl = (videoId) => {
+// Helper function để tạo YouTube embed URL (cho phép bật/tắt tiếng)
+const getYouTubeEmbedUrl = (videoId, withSound = false) => {
   if (!videoId) return null;
-  // Thêm các params để ẩn logo và thông tin người đăng, đồng thời tăng chất lượng video
-  return `https://www.youtube.com/embed/${videoId}?modestbranding=1&controls=0&autoplay=1&mute=0&loop=1&rel=0&playlist=${videoId}&start=0&iv_load_policy=3&cc_load_policy=0&disablekb=1&fs=0&vq=hd1080`;
+  // withSound = true -> mute=0, otherwise mute=1 để tránh bị chặn autoplay
+  const mute = withSound ? 0 : 1;
+  return `https://www.youtube.com/embed/${videoId}?modestbranding=1&controls=0&autoplay=1&mute=${mute}&loop=1&rel=0&playlist=${videoId}&start=5&iv_load_policy=3&cc_load_policy=0&disablekb=1&fs=0&vq=hd1080`;
 };
 
 /**
@@ -36,15 +39,40 @@ const getYouTubeEmbedUrl = (videoId) => {
  * @param {string} props.subtitle - Movie subtitle/English title
  * @param {string} props.trailerUrl - Trailer YouTube URL (optional)
  * @param {Function} props.onClick - Click handler (optional)
+ * @param {boolean} props.useYouTubePlayer - Nếu true: dùng react-youtube (mặc định mute, bật/tắt tiếng từng card)
  */
-const HoverCardHeader = ({ backgroundImage, title, subtitle, trailerUrl, onClick }) => {
+const HoverCardHeader = ({
+  backgroundImage,
+  title,
+  subtitle,
+  trailerUrl,
+  onClick,
+  useYouTubePlayer = false,
+}) => {
   const [showTrailer, setShowTrailer] = useState(false);
   const [hidePoster, setHidePoster] = useState(false);
   const [trailerReady, setTrailerReady] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
+  // withSound (chỉ dùng cho option iframe + interaction)
+  const [withSound, setWithSound] = useState(getHasUserInteracted());
+  // State cho option react-youtube: mặc định mute, bật/tắt tiếng từng card
+  const [isMuted, setIsMuted] = useState(true);
   const trailerTimeoutRef = useRef(null);
   const loadTimeoutRef = useRef(null);
   const iframeRef = useRef(null);
+  const ytPlayerRef = useRef(null);
+
+  // Theo dõi thay đổi trạng thái user interaction toàn cục (đã click/keydown/touch ở bất kỳ đâu)
+  // Chỉ áp dụng cho option iframe (option hiện tại)
+  useEffect(() => {
+    if (useYouTubePlayer) return;
+    const unsubscribe = subscribeUserInteraction((val) => {
+      if (val) setWithSound(true);
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [useYouTubePlayer]);
 
   // Hiển thị trailer sau 1 giây khi component mount (hover card đã hiện)
   useEffect(() => {
@@ -55,6 +83,8 @@ const HoverCardHeader = ({ backgroundImage, title, subtitle, trailerUrl, onClick
     setShowTrailer(false);
     setHidePoster(false);
     setTrailerReady(false);
+    // Giữ nguyên withSound theo cờ global (không reset về false)
+    setIsMuted(true);
 
     if (youtubeId) {
       trailerTimeoutRef.current = setTimeout(() => {
@@ -69,7 +99,7 @@ const HoverCardHeader = ({ backgroundImage, title, subtitle, trailerUrl, onClick
           setHidePoster(false);
           setTrailerReady(false);
         }, 8000);
-      }, 1000); // 1 giây delay ban đầu
+      }, 500); // 1 giây delay ban đầu
     }
 
     // Copy ref values for cleanup
@@ -87,6 +117,7 @@ const HoverCardHeader = ({ backgroundImage, title, subtitle, trailerUrl, onClick
       setHidePoster(false);
       setTrailerReady(false);
       setTrailerError(false);
+      setIsMuted(true);
     };
   }, [trailerUrl]);
 
@@ -111,10 +142,14 @@ const HoverCardHeader = ({ backgroundImage, title, subtitle, trailerUrl, onClick
   };
 
   const youtubeId = extractYouTubeId(trailerUrl);
-  const youtubeEmbedUrl = youtubeId && !trailerError ? getYouTubeEmbedUrl(youtubeId) : null;
+  const youtubeEmbedUrl =
+    !useYouTubePlayer && youtubeId && !trailerError
+      ? getYouTubeEmbedUrl(youtubeId, withSound)
+      : null;
 
   // Chỉ hiển thị trailer nếu có URL hợp lệ và không có lỗi
-  const shouldShowTrailer = youtubeEmbedUrl && showTrailer && !trailerError;
+  const hasValidTrailer = !!youtubeId && !trailerError;
+  const shouldShowTrailer = hasValidTrailer && showTrailer && !trailerError;
 
   return (
     <div
@@ -154,22 +189,91 @@ const HoverCardHeader = ({ backgroundImage, title, subtitle, trailerUrl, onClick
               transformOrigin: "center center",
             }}
           >
-            <iframe
-              ref={iframeRef}
-              src={youtubeEmbedUrl}
-              className="absolute inset-0 w-full h-full"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title={`Trailer ${title}`}
-              onLoad={handleIframeLoad}
-              style={{
-                objectFit: "cover",
-                imageRendering: "high-quality",
-                WebkitImageRendering: "high-quality",
-              }}
-            />
+            {/* Option 1 (mặc định): dùng iframe + interaction global */}
+            {!useYouTubePlayer && youtubeEmbedUrl && (
+              <iframe
+                ref={iframeRef}
+                src={youtubeEmbedUrl}
+                className="absolute inset-0 w-full h-full"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={`Trailer ${title}`}
+                onLoad={handleIframeLoad}
+                style={{
+                  objectFit: "cover",
+                  imageRendering: "high-quality",
+                  WebkitImageRendering: "high-quality",
+                }}
+              />
+            )}
+
+            {/* Option 2: dùng react-youtube, mặc định mute, bật/tắt tiếng từng card */}
+            {useYouTubePlayer && youtubeId && (
+              <YouTube
+                videoId={youtubeId}
+                className="absolute inset-0 w-full h-full"
+                iframeClassName="absolute inset-0 w-full h-full"
+                opts={{
+                  width: "100%",
+                  height: "100%",
+                  playerVars: {
+                    autoplay: 1,
+                    controls: 0,
+                    modestbranding: 1,
+                    rel: 0,
+                    loop: 1,
+                    playlist: youtubeId,
+                    mute: 1, // luôn mute lúc autoplay
+                    start: 0,
+                    iv_load_policy: 3,
+                    cc_load_policy: 0,
+                    disablekb: 1,
+                    fs: 0,
+                    playsinline: 1,
+                  },
+                }}
+                onReady={(event) => {
+                  ytPlayerRef.current = event.target;
+                  // Đảm bảo mute + autoplay
+                  try {
+                    event.target.mute();
+                    event.target.playVideo();
+                  } catch (e) {
+                    // ignore
+                  }
+                  if (!trailerReady) {
+                    setTrailerReady(true);
+                    setHidePoster(true);
+                  }
+                }}
+              />
+            )}
           </div>
+
+          {/* Nút bật/tắt tiếng cho option react-youtube (mặc định mute, không dùng interaction global) */}
+          {useYouTubePlayer && trailerReady && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!ytPlayerRef.current) return;
+                try {
+                  if (isMuted) {
+                    ytPlayerRef.current.unMute();
+                  } else {
+                    ytPlayerRef.current.mute();
+                  }
+                  setIsMuted(!isMuted);
+                } catch (err) {
+                  // ignore
+                }
+              }}
+              className="absolute bottom-3 right-3 z-20 px-3 py-1.5 rounded-full bg-black/70 text-white text-xs font-semibold border border-white/20 hover:bg-black/80 transition"
+            >
+              {isMuted ? "Bật tiếng" : "Tắt tiếng"}
+            </button>
+          )}
         </div>
       )}
 

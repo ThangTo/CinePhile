@@ -160,7 +160,7 @@ const MovieTable = () => {
   };
 
   return (
-    <div className="w-full animate-fade-in space-y-6">
+    <div className="w-full animate-fade-in flex flex-col gap-4">
       {/* 1. Control Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

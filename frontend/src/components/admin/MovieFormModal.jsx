@@ -219,7 +219,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 mt-0">
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
         onClick={onClose}
@@ -387,15 +387,15 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                   </div>
 
                   <div className="space-y-3">
-                      <FormField
-                        label="Trailer URL (YouTube)"
-                        name="trailer"
-                        icon={FiLink}
-                        value={formData.trailer}
-                        onChange={handleChange}
-                        placeholder="https://youtube.com/watch?v=..."
-                      />
-                    </div>
+                    <FormField
+                      label="Trailer URL (YouTube)"
+                      name="trailer"
+                      icon={FiLink}
+                      value={formData.trailer}
+                      onChange={handleChange}
+                      placeholder="https://youtube.com/watch?v=..."
+                    />
+                  </div>
 
                   {/* Row 4: SEO / Slug Preview (Lấp đầy khoảng trống cuối cùng) */}
                   <div className="mt-auto">
@@ -414,8 +414,6 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                       </div>
                     </div>
                   </div>
-
-                  
                 </div>
               </div>
 
@@ -454,7 +452,6 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                         aspectRatio="aspect-video"
                       />
                     </div>
-                    
                   </div>
                 </div>
               </div>
