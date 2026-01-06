@@ -31,6 +31,13 @@ router.post('/movies/crawl/search', adminController.searchMoviesForCrawl);
 // POST /api/v1/admin/movies/crawl/by-slug - Crawl a single movie by slug
 router.post('/movies/crawl/by-slug', adminController.crawlMovieBySlug);
 
+// ===== ADMIN MOVIES EPISODES UPDATE =====
+// GET /api/v1/admin/movies/updating - Get movies with ongoing/upcoming status
+router.get('/movies/updating', adminController.getUpdatingMovies);
+
+// POST /api/v1/admin/movies/update-episodes - Update episodes for selected movies
+router.post('/movies/update-episodes', adminController.updateEpisodesForMovies);
+
 // GET /api/v1/admin/movies/:id - Get movie by ID (Must be after /movies/crawl routes)
 router.get('/movies/:id', adminController.getMovieById);
 

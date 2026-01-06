@@ -1,12 +1,6 @@
 import React from "react";
-import { parseEpisodeNumber } from "utils/ultils";
 
 const StatusBadge = ({ status, currentEpisode, totalEpisodes, className = "" }) => {
-  let currentEpNum = parseEpisodeNumber(currentEpisode);
-  if (currentEpNum > totalEpisodes) {
-    currentEpNum = totalEpisodes;
-  }
-
   if (!totalEpisodes || totalEpisodes === 0) {
     return null;
   }
@@ -17,19 +11,21 @@ const StatusBadge = ({ status, currentEpisode, totalEpisodes, className = "" }) 
   if (status === "upcoming") {
     badgeContent = "Sắp ra mắt";
     badgeClass = "bg-purple-500/80 text-white";
-  } else if (status === "completed" || (currentEpNum > 0 && currentEpNum === totalEpisodes)) {
+  } else if (status === "completed" || (currentEpisode > 0 && currentEpisode === totalEpisodes)) {
     badgeContent =
-      currentEpNum > 1 ? `Đã hoàn thành ${currentEpNum}/${totalEpisodes} tập` : `Đã hoàn thành `;
+      currentEpisode > 1
+        ? `Đã hoàn thành ${currentEpisode}/${totalEpisodes} tập`
+        : `Đã hoàn thành `;
     badgeClass = "bg-green-500/80 text-white";
-  } else if (status === "ongoing" && currentEpNum > 0 && currentEpNum < totalEpisodes) {
+  } else if (status === "ongoing" && currentEpisode > 0 && currentEpisode < totalEpisodes) {
     badgeContent =
-      currentEpNum > 1 ? `Đang cập nhật ${currentEpNum}/${totalEpisodes} tập` : `Đang cập nhật`;
+      currentEpisode > 1 ? `Đang cập nhật ${currentEpisode}/${totalEpisodes} tập` : `Đang cập nhật`;
     badgeClass = "bg-orange-500/80 text-white";
   } else if (status === "ongoing" && totalEpisodes > 0) {
     // Fallback cho ongoing nhưng chưa có currentEpisode
     badgeContent =
-      currentEpNum > 1
-        ? `Đang cập nhật ${currentEpNum || 0}/${totalEpisodes} tập`
+      currentEpisode > 1
+        ? `Đang cập nhật ${currentEpisode || 0}/${totalEpisodes} tập`
         : `Đang cập nhật`;
     badgeClass = "bg-orange-500/80 text-white";
   }
@@ -40,7 +36,7 @@ const StatusBadge = ({ status, currentEpisode, totalEpisodes, className = "" }) 
     <div
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg ${badgeClass} ${className}`}
     >
-      {status === "completed" || (currentEpNum > 0 && currentEpNum === totalEpisodes) ? (
+      {status === "completed" || (currentEpisode > 0 && currentEpisode === totalEpisodes) ? (
         <i className="fa-solid fa-check" />
       ) : status === "upcoming" ? (
         <i className="fa-solid fa-clock" />

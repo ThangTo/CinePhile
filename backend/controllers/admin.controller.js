@@ -432,6 +432,66 @@ const setTheme = async (req, res) => {
   }
 };
 
+/**
+ * GET /admin/movies/updating
+ * Get movies with ongoing/upcoming status for episode update selection
+ */
+const getUpdatingMovies = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, search } = req.query;
+    const result = await adminService.getUpdatingMovies({ page, limit, search });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/movies/update-episodes
+ * Update episodes for selected movies
+ */
+const updateEpisodesForMovies = async (req, res) => {
+  try {
+    const { movieIds } = req.body;
+
+    if (!movieIds || !Array.isArray(movieIds) || movieIds.length === 0) {
+      return res.status(400).json({ message: 'Movie IDs array is required' });
+    }
+
+    // Set up Server-Sent Events for real-time progress
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Flush headers immediately
+    res.flushHeaders();
+
+    // Progress callback to send logs
+    const onProgress = (data) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      // Flush response to send data immediately
+      if (typeof res.flush === 'function') {
+        res.flush();
+      }
+    };
+
+    // Run update in background
+    adminService
+      .updateEpisodesForMovies(movieIds, onProgress)
+      .then((result) => {
+        res.write(`data: ${JSON.stringify({ type: 'complete', ...result })}\n\n`);
+        res.end();
+      })
+      .catch((error) => {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+        res.end();
+      });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   // Movies
   getAllMovies,
@@ -444,6 +504,9 @@ module.exports = {
   crawlMoviesByPage,
   searchMoviesForCrawl,
   crawlMovieBySlug,
+  // Episodes
+  getUpdatingMovies,
+  updateEpisodesForMovies,
   // Users
   getAllUsers,
   getUserById,

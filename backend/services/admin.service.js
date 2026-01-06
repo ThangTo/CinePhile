@@ -12,6 +12,7 @@ const { transformMovies } = require('../utils/movieTransformer');
 const movieService = require('./movie.service');
 const notificationService = require('./notification.service');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
+const { parseEpisodeNumber } = require('../utils/movieTransformer');
 
 /**
  * Admin Service
@@ -636,6 +637,279 @@ const setTheme = async (themeName) => {
   return await setSetting('theme', themeName, 'Global theme for the website');
 };
 
+/**
+ * Episodes Update Service
+ */
+const axios = require('axios');
+
+const API_BASE_URL = 'https://phimapi.com';
+
+// Helpers
+const extractEpisodeNumber = (name = '') => {
+  const match = name.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+};
+
+const detectAudioType = (serverName = '') => {
+  const lower = serverName.toLowerCase();
+  if (lower.includes('vietsub')) return 'vietsub';
+  if (lower.includes('thuyết minh') || lower.includes('thuyet minh')) return 'thuyet-minh';
+  if (lower.includes('lồng tiếng') || lower.includes('long tieng')) return 'long-tieng';
+  return 'khac';
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Update episodes for a single movie
+ * @param {Object} movie - Movie object with _id and slug
+ * @returns {Promise<Object>} Update result
+ */
+const updateEpisodesForMovie = async (movie) => {
+  const slug = movie.slug;
+  if (!slug) return { updated: 0, skipped: true, error: 'No slug' };
+
+  try {
+    // Lấy chi tiết phim từ API nguồn
+    const detailResponse = await axios.get(`${API_BASE_URL}/phim/${slug}`);
+    const movieData = detailResponse.data?.movie;
+    const episodesData = detailResponse.data?.episodes;
+
+    if (!movieData || !episodesData || !episodesData.length) {
+      return { updated: 0, skipped: true, error: 'No episodes data' };
+    }
+
+    // Lưu lại số tập trước khi cập nhật
+    let prevCurrent = parseEpisodeNumber(movie.currentEpisode) || null;
+    const prevTotal = parseInt(movie.totalEpisodes) || 0;
+
+    // Xác định status dựa trên logic giống detail page
+    // Nếu currentEpisode === totalEpisodes thì status = "completed"
+    // Nếu currentEpisode > 0 && currentEpisode < totalEpisodes thì status = "ongoing"
+    // Nếu không có tập nào thì giữ nguyên status hoặc dùng từ API
+    let newStatus = movieData.status || movie.status;
+    let currentEp = parseEpisodeNumber(movieData.episode_current) || 0;
+    const totalEp = parseInt(movieData.episode_total) || 0;
+
+    if (currentEp > 0 && totalEp > 0 && currentEp === totalEp) {
+      // Đã hoàn thành tất cả tập
+      newStatus = 'completed';
+    } else if (currentEp > 0 && totalEp > 0 && currentEp < totalEp) {
+      // Đang cập nhật (có tập nhưng chưa đủ)
+      newStatus = 'ongoing';
+    } else if (currentEp === 0 && totalEp === 0) {
+      // Chưa có tập nào, có thể là upcoming
+      if (movieData.status === 'upcoming' || movie.status === 'upcoming') {
+        newStatus = 'upcoming';
+      } else {
+        // Giữ nguyên status hiện tại nếu không phải upcoming
+        newStatus = movie.status || 'ongoing';
+      }
+    }
+
+    // Cập nhật thống kê tập cho Movie
+    await MovieModel.updateOne(
+      { _id: movie._id },
+      {
+        currentEpisode: currentEp,
+        totalEpisodes: totalEp,
+        status: newStatus,
+      },
+    );
+
+    let updatedCount = 0;
+
+    // Duyệt các server
+    for (const server of episodesData) {
+      const serverData = server.server_data || [];
+      const audioType = detectAudioType(server.server_name);
+
+      for (const ep of serverData) {
+        const episodePayload = {
+          movieId: movie._id,
+          episodeId: extractEpisodeNumber(ep.name),
+          slug: ep.slug,
+          filename: ep.filename,
+          serverName: server.server_name,
+          audioType,
+          link_embed: ep.link_embed,
+          link_m3u8: ep.link_m3u8,
+          duration: 0,
+        };
+
+        await EpisodeModel.findOneAndUpdate(
+          {
+            movieId: movie._id,
+            episodeId: episodePayload.episodeId,
+            audioType,
+          },
+          episodePayload,
+          { upsert: true, new: true },
+        );
+        updatedCount++;
+      }
+    }
+
+    return {
+      updated: updatedCount,
+      skipped: false,
+      prevCurrent,
+      prevTotal,
+      newCurrent: currentEp,
+      newTotal: totalEp,
+      movieSlug: slug,
+      movieName: movie.name || movie.title,
+    };
+  } catch (error) {
+    return {
+      updated: 0,
+      skipped: false,
+      error: error.message,
+      movieSlug: slug,
+      movieName: movie.name || movie.title,
+    };
+  }
+};
+
+/**
+ * Update episodes for multiple movies
+ * @param {Array<string>} movieIds - Array of movie IDs
+ * @param {Function} onProgress - Optional callback for progress updates
+ * @returns {Promise<Object>} Update results
+ */
+const updateEpisodesForMovies = async (movieIds, onProgress = null) => {
+  if (!Array.isArray(movieIds) || movieIds.length === 0) {
+    throw new Error('Movie IDs array is required');
+  }
+
+  // Lấy thông tin phim từ database
+  const movies = await MovieModel.find({
+    _id: { $in: movieIds },
+    status: { $in: ['ongoing', 'upcoming'] },
+  })
+    .select('_id slug name title status currentEpisode totalEpisodes')
+    .lean();
+
+  if (movies.length === 0) {
+    const result = {
+      total: 0,
+      updated: 0,
+      results: [],
+      message: 'No movies found with ongoing/upcoming status',
+    };
+    if (onProgress) {
+      onProgress({ type: 'complete', ...result });
+    }
+    return result;
+  }
+
+  const results = [];
+  let totalUpdated = 0;
+
+  // Send initial progress
+  if (onProgress) {
+    onProgress({
+      type: 'progress',
+      message: `Bắt đầu cập nhật ${movies.length} phim...`,
+      current: 0,
+      total: movies.length,
+    });
+  }
+
+  for (let idx = 0; idx < movies.length; idx++) {
+    const movie = movies[idx];
+    const result = await updateEpisodesForMovie(movie);
+    totalUpdated += result.updated;
+    const resultData = {
+      movieId: movie._id.toString(),
+      movieName: movie.name || movie.title,
+      movieSlug: movie.slug,
+      ...result,
+    };
+    results.push(resultData);
+
+    // Send progress update
+    if (onProgress) {
+      onProgress({
+        type: 'progress',
+        message: `[${idx + 1}/${movies.length}] ${movie.name || movie.title}: ${
+          result.updated
+        } tập đã cập nhật`,
+        current: idx + 1,
+        total: movies.length,
+        result: resultData,
+      });
+    }
+
+    // Tránh spam API
+    if (idx < movies.length - 1) {
+      await sleep(300);
+    }
+  }
+
+  const finalResult = {
+    total: movies.length,
+    updated: totalUpdated,
+    results,
+  };
+
+  return finalResult;
+};
+
+/**
+ * Get movies with ongoing/upcoming status for selection
+ * @param {Object} options - { page?, limit?, search? }
+ * @returns {Promise<Object>} { data: Array, pagination: Object }
+ */
+const getUpdatingMovies = async (options = {}) => {
+  const { page = 1, limit = 50, search } = options;
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 50;
+  const skip = (pageNum - 1) * limitNum;
+
+  const query = {
+    status: { $in: ['ongoing', 'upcoming'] },
+  };
+
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { slug: { $regex: search, $options: 'i' } },
+      { original_name: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  const [movies, total] = await Promise.all([
+    MovieModel.find(query)
+      .select('_id slug name title status currentEpisode totalEpisodes poster_url')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+    MovieModel.countDocuments(query),
+  ]);
+
+  const transformedMovies = movies.map((movie) => ({
+    id: movie._id.toString(),
+    title: movie.name || movie.title,
+    slug: movie.slug,
+    status: movie.status,
+    currentEpisode: parseEpisodeNumber(movie.currentEpisode),
+    totalEpisodes: movie.totalEpisodes,
+    poster: movie.poster_url,
+  }));
+
+  return {
+    data: transformedMovies,
+    pagination: {
+      totalItems: total,
+      totalPages: Math.ceil(total / limitNum),
+      currentPage: pageNum,
+      limit: limitNum,
+    },
+  };
+};
+
 module.exports = {
   // Movies
   getAllMovies,
@@ -644,6 +918,9 @@ module.exports = {
   updateMovie,
   deleteMovie,
   searchMovies,
+  // Episodes
+  updateEpisodesForMovies,
+  getUpdatingMovies,
   // Users
   getAllUsers,
   getUserById,

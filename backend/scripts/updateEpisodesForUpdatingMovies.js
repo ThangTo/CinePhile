@@ -11,6 +11,7 @@ const axios = require('axios');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const { parseEpisodeNumber } = require('../utils/movieTransformer');
 
 // Load .env (tương tự các script crawl)
 const possibleEnvPaths = [
@@ -76,8 +77,32 @@ async function updateEpisodesForMovie(movie) {
     }
 
     // Lưu lại số tập trước khi cập nhật
-    const prevCurrent = movie.currentEpisode || null;
-    const prevTotal = movie.totalEpisodes || 0;
+    const prevCurrent = parseEpisodeNumber(movie.currentEpisode) || null;
+    const prevTotal = parseInt(movie.totalEpisodes) || 0;
+
+    // Xác định status dựa trên logic giống detail page
+    // Nếu currentEpisode === totalEpisodes thì status = "completed"
+    // Nếu currentEpisode > 0 && currentEpisode < totalEpisodes thì status = "ongoing"
+    // Nếu không có tập nào thì giữ nguyên status hoặc dùng từ API
+    let newStatus = movieData.status || movie.status;
+    const currentEp = parseEpisodeNumber(movieData.episode_current) || 0;
+    const totalEp = parseInt(movieData.episode_total) || 0;
+
+    if (currentEp > 0 && totalEp > 0 && currentEp === totalEp) {
+      // Đã hoàn thành tất cả tập
+      newStatus = 'completed';
+    } else if (currentEp > 0 && totalEp > 0 && currentEp < totalEp) {
+      // Đang cập nhật (có tập nhưng chưa đủ)
+      newStatus = 'ongoing';
+    } else if (currentEp === 0 && totalEp === 0) {
+      // Chưa có tập nào, có thể là upcoming
+      if (movieData.status === 'upcoming' || movie.status === 'upcoming') {
+        newStatus = 'upcoming';
+      } else {
+        // Giữ nguyên status hiện tại nếu không phải upcoming
+        newStatus = movie.status || 'ongoing';
+      }
+    }
 
     // Cập nhật thống kê tập cho Movie
     await Movie.updateOne(
@@ -85,7 +110,7 @@ async function updateEpisodesForMovie(movie) {
       {
         currentEpisode: movieData.episode_current,
         totalEpisodes: movieData.episode_total,
-        status: movieData.status || movie.status,
+        status: newStatus,
       },
     );
 

@@ -12,6 +12,7 @@ import {
   FiSquare,
 } from "react-icons/fi";
 import { movieAPI } from "services/admin.service";
+import OptimizedImage from "components/common/OptimizedImage";
 
 const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
   const [activeTab, setActiveTab] = useState("page"); // "page" or "name" - default to "page"
@@ -590,20 +591,54 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                           )}
 
                           <div className="flex gap-4">
-                            {/* Poster hidden */}
+                            {/* Poster */}
+                            {(movie.poster_url || movie.thumb_url) && (
+                              <div className="relative w-20 h-28 flex-shrink-0 rounded overflow-hidden shadow-lg">
+                                <OptimizedImage
+                                  src={movie.poster_url || movie.thumb_url || ""}
+                                  alt={movie.name}
+                                  className="w-full h-full object-cover"
+                                  sizeKey="THUMBNAIL"
+                                />
+                              </div>
+                            )}
                             <div className="flex-1 min-w-0">
-                              <h4 className="text-white font-bold text-sm truncate mb-1">
-                                {movie.name}
-                              </h4>
+                              <h4 className="text-white font-bold text-sm  mb-1">{movie.name}</h4>
                               {movie.origin_name && (
                                 <p className="text-gray-400 text-xs italic truncate mb-2">
                                   {movie.origin_name}
                                 </p>
                               )}
-                              <div className="flex items-center gap-2 text-xs text-gray-500">
-                                <span>Khớp: {similarity}</span>
-                                {movie.year && <span>• {movie.year}</span>}
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
+                                <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
+                                  Khớp: {similarity}
+                                </span>
+                                {movie.year && (
+                                  <span className="bg-gray-500/20 text-gray-300 px-2 py-0.5 rounded">
+                                    {movie.year}
+                                  </span>
+                                )}
+                                {movie.quality && (
+                                  <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">
+                                    {movie.quality}
+                                  </span>
+                                )}
+                                {movie.time && (
+                                  <span className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded">
+                                    {movie.time}
+                                  </span>
+                                )}
                               </div>
+                              {movie.lang && (
+                                <p className="text-gray-500 text-xs mb-1">Ngôn ngữ: {movie.lang}</p>
+                              )}
+                              {movie.category &&
+                                Array.isArray(movie.category) &&
+                                movie.category.length > 0 && (
+                                  <p className="text-gray-500 text-xs mb-1">
+                                    Thể loại: {movie.category.map((c) => c.name || c).join(", ")}
+                                  </p>
+                                )}
                               {isSelected && (
                                 <div className="mt-2 flex items-center gap-1 text-primaryColor text-xs">
                                   <FiCheckCircle size={14} />

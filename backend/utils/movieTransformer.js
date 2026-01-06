@@ -52,7 +52,10 @@ const transformMovie = (movieDoc) => {
       const frontendField = fieldMappings[dbField];
       // Add frontend field name, keep original for backward compatibility
       transformed[frontendField] = transformed[dbField];
-    } else if ((dbField === 'poster_url' || dbField === 'thumb_url' || dbField === 'trailer_url') && transformed[dbField] === '') {
+    } else if (
+      (dbField === 'poster_url' || dbField === 'thumb_url' || dbField === 'trailer_url') &&
+      transformed[dbField] === ''
+    ) {
       // Handle empty string explicitly for URL fields
       const frontendField = fieldMappings[dbField];
       transformed[frontendField] = '';
@@ -119,6 +122,16 @@ const transformMovie = (movieDoc) => {
     transformed.country = '';
   }
 
+  // Transform currentEpisode: parse và normalize thành number
+  // Xử lý các format như "Hoàn tất (3/3)", "Tập 10", "10", etc.
+  if (transformed.currentEpisode !== undefined) {
+    transformed.currentEpisode = parseEpisodeNumber(transformed.currentEpisode);
+  }
+  // Cũng transform cho field name khác nếu có
+  if (transformed.episode_current !== undefined) {
+    transformed.episode_current = parseEpisodeNumber(transformed.episode_current);
+  }
+
   return transformed;
 };
 
@@ -148,8 +161,29 @@ const transformPaginatedResult = (result) => {
   };
 };
 
+const parseEpisodeNumber = (ep) => {
+  if (ep === undefined || ep === null || ep === '') return 0;
+  if (typeof ep === 'number') return ep;
+  if (typeof ep === 'string') {
+    // Xử lý format "Hoàn tất (3/3)" hoặc "Đang cập nhật (5/10)" - lấy số đầu tiên trong ngoặc
+    // Pattern: (X/Y) hoặc (X/Y) - lấy X (số tập hiện tại)
+    const bracketMatch = ep.match(/\((\d+)\/(\d+)\)/);
+    if (bracketMatch) {
+      const currentEp = parseInt(bracketMatch[1], 10);
+      return isNaN(currentEp) ? 0 : currentEp;
+    }
+
+    // Fallback: lấy tất cả số từ chuỗi (cho các format khác như "Tập 10", "10", etc.)
+    const numStr = ep.replace(/\D/g, '');
+    const num = parseInt(numStr, 10);
+    return isNaN(num) ? 1 : num;
+  }
+  return 0;
+};
+
 module.exports = {
   transformMovie,
   transformMovies,
   transformPaginatedResult,
+  parseEpisodeNumber,
 };

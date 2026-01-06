@@ -111,6 +111,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     description: "",
     poster: "",
     backgroundImage: "",
+    trailer: "",
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -132,6 +133,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         description: movie.description || movie.content || movie.synopsis || "",
         poster: movie.poster || movie.poster_url || "",
         backgroundImage: movie.backgroundImage || movie.thumb_url || "",
+        trailer: movie.trailer || movie.trailerUrl || movie.trailer_url || "",
       });
     } else {
       setFormData({
@@ -147,6 +149,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         description: "",
         poster: "",
         backgroundImage: "",
+        trailer: "",
       });
     }
     setErrors({});
@@ -198,9 +201,10 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
           .filter(Boolean),
         rating: parseFloat(formData.rating),
         year: parseInt(formData.year),
-        // Ensure poster and backgroundImage are included even if empty
+        // Ensure poster, backgroundImage, and trailer are included even if empty
         poster: formData.poster || "",
         backgroundImage: formData.backgroundImage || "",
+        trailer: formData.trailer || "",
       };
       await onSave(movieData);
       onClose();
@@ -382,8 +386,19 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                     />
                   </div>
 
+                  <div className="space-y-3">
+                      <FormField
+                        label="Trailer URL (YouTube)"
+                        name="trailer"
+                        icon={FiLink}
+                        value={formData.trailer}
+                        onChange={handleChange}
+                        placeholder="https://youtube.com/watch?v=..."
+                      />
+                    </div>
+
                   {/* Row 4: SEO / Slug Preview (Lấp đầy khoảng trống cuối cùng) */}
-                  <div className="mt-auto pt-4">
+                  <div className="mt-auto">
                     <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3 flex items-start gap-3">
                       <FiLink className="text-blue-400 mt-1 shrink-0" />
                       <div className="overflow-hidden">
@@ -399,6 +414,8 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                       </div>
                     </div>
                   </div>
+
+                  
                 </div>
               </div>
 
@@ -437,6 +454,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                         aspectRatio="aspect-video"
                       />
                     </div>
+                    
                   </div>
                 </div>
               </div>

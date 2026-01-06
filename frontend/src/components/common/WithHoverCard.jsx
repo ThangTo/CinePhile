@@ -8,7 +8,7 @@ const WithHoverCard = ({
   children,
   movie,
   className = "relative flex-shrink-0",
-  hoverPosition = "-left-20 -top-4",
+  hoverPosition,
   showDelay = 500,
   hideDelay = 0,
   viewportPaddingLeft = 16,
@@ -19,9 +19,11 @@ const WithHoverCard = ({
   showHoverOn = "lg",
   // hoverCardClass: class applied to the hover card container (controls width/size).
   hoverCardClass = "w-[400px]",
-  // compact: render a denser/smaller hover content to fit small cards
+  // compact: change position to -left-28 -top-4, keep default size
   compact = false,
 }) => {
+  // Đơn giản hóa: nếu có compact thì position = "-left-28 -top-4", còn không thì dùng mặc định
+  const finalHoverPosition = compact ? "-left-28 -top-4" : hoverPosition || "-left-20 -top-4";
   const { showHoverCard, isAnimating, handleMouseEnter, handleMouseLeave } = useMovieHover(
     showDelay,
     hideDelay
@@ -73,7 +75,7 @@ const WithHoverCard = ({
     }
     scheduleCompute();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showHoverCard, hoverPosition, movie]);
+  }, [showHoverCard, finalHoverPosition, movie]);
 
   // Resize: cho phép tính lại nhưng gộp bằng rAF và debounce nhẹ
   useEffect(() => {
@@ -167,7 +169,7 @@ const WithHoverCard = ({
       {showHoverCard && (
         <div
           ref={hoverShellRef}
-          className={`absolute ${hoverPosition} pointer-events-auto ${
+          className={`absolute ${finalHoverPosition} pointer-events-auto ${
             showHoverOn === "none" ? "block" : `hidden ${showHoverOn}:block`
           }`}
           style={{
@@ -194,7 +196,7 @@ const WithHoverCard = ({
           }}
         >
           <div className={isAnimating ? "animate-pop-up" : "opacity-0"}>
-            <MovieHoverCard movie={movie} hoverClass={hoverCardClass} compact={compact} />
+            <MovieHoverCard movie={movie} hoverClass={hoverCardClass} />
           </div>
         </div>
       )}

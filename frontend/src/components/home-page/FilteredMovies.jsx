@@ -394,7 +394,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
                     key={movie.id}
                     movie={movie}
                     hoverVisibleAt="md"
-                    hoverCardClass="w-[300px] max-h-[360px] overflow-hidden"
+                    hoverCardClass="w-[400px] max-h-[400px] overflow-hidden"
                     compact
                   />
                 ))}

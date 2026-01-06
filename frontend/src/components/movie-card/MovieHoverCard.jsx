@@ -18,7 +18,7 @@ import HoverCardGenres from "./HoverCardGenres";
  * @param {Object} props
  * @param {Object} props.movie - Movie data
  */
-const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) => {
+const MovieHoverCard = ({ movie, hoverClass = "w-[400px]" }) => {
   const navigate = useNavigate();
   const { toasts, removeToast, success, warning } = useToast();
   const { isAuthenticated, openAuthModal, user } = useAuth();
@@ -131,18 +131,17 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]", compact = false }) =>
           backgroundImage={movie.backgroundImage || movie.posterUrl || movie.poster}
           title={movie.title}
           subtitle={movie.subtitle || movie.englishTitle}
-          compact={compact}
+          trailerUrl={movie.trailer || movie.trailerUrl || movie.trailer_url}
           onClick={handleHeaderClick}
         />
 
         {/* Content */}
-        <div className={`${compact ? "p-3 space-y-2" : "p-4 space-y-3"}`}>
+        <div className="p-4 space-y-3">
           {/* Action Buttons */}
           <HoverCardActions
             onWatch={handleWatch}
             onLike={handleToggleFavorite}
             onInfo={handleInfo}
-            compact={compact}
             isFavorite={isFavorite}
           />
 

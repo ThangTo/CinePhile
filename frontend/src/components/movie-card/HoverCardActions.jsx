@@ -11,17 +11,15 @@ import ActionButton from "components/banner/ActionButton";
  * @param {Function} props.onInfo - Info button click handler
  * @param {boolean} props.isFavorite - Whether the movie is favorited
  */
-const HoverCardActions = ({ onWatch, onLike, onAddToList, onInfo, compact = false, isFavorite = false }) => (
+const HoverCardActions = ({ onWatch, onLike, onAddToList, onInfo, isFavorite = false }) => (
   <div className="flex gap-2">
     {/* Watch Now Button - Custom gradient style */}
     <button
       onClick={onWatch}
-      className={`flex-1 flex items-center justify-center gap-2 bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-semibold rounded-lg ${
-        compact ? "py-2 px-3 text-xs" : "py-2.5 px-4"
-      } transition-all shadow-lg`}
+      className="flex-1 flex items-center justify-center gap-2 bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-semibold rounded-lg py-2.5 px-4 text-sm transition-all shadow-lg"
     >
-      <i className={`fa-solid fa-play ${compact ? "text-xs" : "text-sm"}`} />
-      <span className={`${compact ? "text-xs" : "text-sm"}`}>Xem ngay</span>
+      <i className="fa-solid fa-play text-sm" />
+      <span className="text-sm">Xem ngay</span>
     </button>
 
     {/* Like Button - Reuse ActionButton */}
@@ -30,7 +28,7 @@ const HoverCardActions = ({ onWatch, onLike, onAddToList, onInfo, compact = fals
         icon="fa-heart"
         onClick={onLike}
         variant={isFavorite ? "favorite" : "default"}
-        size={compact ? "sm" : "md"}
+        size="md"
         ariaLabel={isFavorite ? "Bỏ yêu thích" : "Yêu thích"}
         isFavorite={isFavorite}
       />
@@ -43,7 +41,7 @@ const HoverCardActions = ({ onWatch, onLike, onAddToList, onInfo, compact = fals
           icon="fa-plus"
           onClick={onAddToList}
           variant="default"
-          size={compact ? "sm" : "md"}
+          size="md"
           ariaLabel="Thêm vào danh sách"
         />
       </div>
@@ -55,7 +53,7 @@ const HoverCardActions = ({ onWatch, onLike, onAddToList, onInfo, compact = fals
         icon="fa-info-circle"
         onClick={onInfo}
         variant="default"
-        size={compact ? "sm" : "md"}
+        size="md"
         ariaLabel="Chi tiết"
       />
     </div>

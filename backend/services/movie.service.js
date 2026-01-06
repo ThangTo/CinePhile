@@ -350,20 +350,34 @@ const buildQuery = (filters = {}, useTextSearch = true) => {
 
 /**
  * Helper: get sort options
+ * Luôn ưu tiên: year giảm dần, sau đó theo sort option, cuối cùng là createdAt giảm dần
  */
 const getSortOptions = (sort = 'newest') => {
+  let sortOption = {};
+
   switch (sort) {
     case 'newest':
-      return { createdAt: -1 };
+      sortOption = { createdAt: -1 };
+      break;
     case 'updated':
-      return { updatedAt: -1, createdAt: -1 };
+      sortOption = { updatedAt: -1, createdAt: -1 };
+      break;
     case 'imdb':
-      return { rating: -1, totalRatings: -1 };
+      sortOption = { rating: -1, totalRatings: -1 };
+      break;
     case 'views':
-      return { viewCount: -1 };
+      sortOption = { viewCount: -1 };
+      break;
     default:
-      return { createdAt: -1 };
+      sortOption = { createdAt: -1 };
   }
+
+  // Luôn ưu tiên year giảm dần trước, sau đó mới đến sort option, cuối cùng là createdAt
+  return {
+    year: -1, // Ưu tiên năm giảm dần
+    ...sortOption, // Sau đó mới đến sort option
+    createdAt: -1, // Cuối cùng là createdAt giảm dần (nếu cùng year và cùng sort option)
+  };
 };
 
 /**
@@ -903,24 +917,35 @@ const search = async (q, options = {}) => {
       };
     });
 
-    // Sort: first by relevance score, then by sort option
+    // Sort: first by relevance score, then by year (giảm dần), then by sort option, finally by createdAt
     moviesWithScores.sort((a, b) => {
       // First priority: relevance score from search
       if (b.relevanceScore !== a.relevanceScore) {
         return b.relevanceScore - a.relevanceScore;
       }
-      // Second priority: sort option
+      // Second priority: year giảm dần
+      const yearDiff = (b.year || 0) - (a.year || 0);
+      if (yearDiff !== 0) return yearDiff;
+      // Third priority: sort option
       if (sort === 'newest') {
         return new Date(b.createdAt) - new Date(a.createdAt);
       } else if (sort === 'updated') {
-        return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+        const updatedDiff =
+          new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+        if (updatedDiff !== 0) return updatedDiff;
+        return new Date(b.createdAt) - new Date(a.createdAt);
       } else if (sort === 'imdb') {
         const ratingDiff = (b.rating || 0) - (a.rating || 0);
         if (ratingDiff !== 0) return ratingDiff;
-        return (b.totalRatings || 0) - (a.totalRatings || 0);
+        const totalRatingsDiff = (b.totalRatings || 0) - (a.totalRatings || 0);
+        if (totalRatingsDiff !== 0) return totalRatingsDiff;
+        return new Date(b.createdAt) - new Date(a.createdAt);
       } else if (sort === 'views') {
-        return (b.viewCount || 0) - (a.viewCount || 0);
+        const viewsDiff = (b.viewCount || 0) - (a.viewCount || 0);
+        if (viewsDiff !== 0) return viewsDiff;
+        return new Date(b.createdAt) - new Date(a.createdAt);
       }
+      // Default: createdAt giảm dần
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
 
@@ -999,19 +1024,31 @@ const search = async (q, options = {}) => {
       relevanceScore: 10, // Same relevance for all in fallback
     }));
 
-    // Sort: first by sort option (since all have same relevance)
+    // Sort: first by year (giảm dần), then by sort option, finally by createdAt
     moviesWithScores.sort((a, b) => {
+      // First priority: year giảm dần
+      const yearDiff = (b.year || 0) - (a.year || 0);
+      if (yearDiff !== 0) return yearDiff;
+      // Second priority: sort option
       if (sort === 'newest') {
         return new Date(b.createdAt) - new Date(a.createdAt);
       } else if (sort === 'updated') {
-        return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+        const updatedDiff =
+          new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+        if (updatedDiff !== 0) return updatedDiff;
+        return new Date(b.createdAt) - new Date(a.createdAt);
       } else if (sort === 'imdb') {
         const ratingDiff = (b.rating || 0) - (a.rating || 0);
         if (ratingDiff !== 0) return ratingDiff;
-        return (b.totalRatings || 0) - (a.totalRatings || 0);
+        const totalRatingsDiff = (b.totalRatings || 0) - (a.totalRatings || 0);
+        if (totalRatingsDiff !== 0) return totalRatingsDiff;
+        return new Date(b.createdAt) - new Date(a.createdAt);
       } else if (sort === 'views') {
-        return (b.viewCount || 0) - (a.viewCount || 0);
+        const viewsDiff = (b.viewCount || 0) - (a.viewCount || 0);
+        if (viewsDiff !== 0) return viewsDiff;
+        return new Date(b.createdAt) - new Date(a.createdAt);
       }
+      // Default: createdAt giảm dần
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
 

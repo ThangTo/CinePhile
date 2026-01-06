@@ -216,6 +216,145 @@ export const movieAPI = {
     });
     return response;
   },
+
+  /**
+   * Get movies with ongoing/upcoming status for episode update
+   * @param {Object} params - { page?, limit?, search? }
+   * @returns {Promise<Object>} { data: [], pagination: {} }
+   */
+  getUpdatingMovies: async (params = {}) => {
+    const response = await apiRequest("/admin/movies/updating", {
+      params,
+      requiresAuth: true,
+    });
+    return response;
+  },
+
+  /**
+   * Update episodes for selected movies with Server-Sent Events
+   * @param {Array<string>} movieIds - Array of movie IDs
+   * @param {Function} onProgress - Callback for progress updates
+   * @param {AbortController} abortController - Optional AbortController to cancel the request
+   * @returns {Promise<Object>} Final result
+   */
+  updateEpisodes: async (movieIds, onProgress, abortController = null) => {
+    // Import axios để lấy baseURL
+    const http = (await import("lib/axios")).default;
+    const baseURL =
+      http.defaults.baseURL || process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+
+    // Lấy token từ auth-storage
+    let token = null;
+    try {
+      const authStorage = require("lib/auth-storage");
+      token = authStorage.getToken();
+    } catch (e) {
+      token = localStorage.getItem("token");
+    }
+
+    const url = `${baseURL}/admin/movies/update-episodes`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ movieIds }),
+      credentials: "include",
+      signal: abortController?.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    return new Promise((resolve, reject) => {
+      const processStream = async () => {
+        try {
+          while (true) {
+            // Kiểm tra nếu đã bị hủy
+            if (abortController?.signal.aborted) {
+              reader.cancel();
+              reject(new Error("Cập nhật tập đã bị hủy bởi người dùng"));
+              return;
+            }
+
+            const { done, value } = await reader.read();
+
+            if (done) {
+              // Xử lý phần buffer còn lại
+              if (buffer.trim()) {
+                const lines = buffer.split("\n");
+                for (const line of lines) {
+                  if (line.trim() && line.startsWith("data: ")) {
+                    try {
+                      const data = JSON.parse(line.slice(6));
+                      if (onProgress) {
+                        onProgress(data);
+                      }
+                      if (data.type === "complete") {
+                        resolve(data);
+                        return;
+                      } else if (data.type === "error") {
+                        reject(new Error(data.message));
+                        return;
+                      }
+                    } catch (err) {
+                      console.error("Error parsing SSE data:", err);
+                    }
+                  }
+                }
+              }
+              break;
+            }
+
+            // Decode và xử lý ngay lập tức
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            // Giữ lại dòng cuối chưa hoàn chỉnh
+            buffer = lines.pop() || "";
+
+            // Xử lý từng dòng ngay lập tức
+            for (const line of lines) {
+              if (line.trim() && line.startsWith("data: ")) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  // Gọi callback ngay lập tức để cập nhật UI
+                  if (onProgress) {
+                    onProgress(data);
+                  }
+                  // Nếu là complete hoặc error, resolve/reject ngay
+                  if (data.type === "complete") {
+                    resolve(data);
+                    return;
+                  } else if (data.type === "error") {
+                    reject(new Error(data.message));
+                    return;
+                  }
+                } catch (err) {
+                  console.error("Error parsing SSE data:", err, "Line:", line);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          // Nếu lỗi do abort, không reject nữa vì đã reject ở trên
+          if (error.name === "AbortError" || abortController?.signal.aborted) {
+            return;
+          }
+          reject(error);
+        }
+      };
+
+      processStream();
+    });
+  },
 };
 
 /**

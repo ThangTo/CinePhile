@@ -1,12 +1,7 @@
 import React from "react";
 import InfoBadge from "components/banner/InfoBadge";
-import { parseEpisodeNumber } from "utils/ultils";
 
 const HoverCardInfo = ({ rating, ageRating, year, season, currentEpisode, totalEpisodes }) => {
-  let currentEpNum = parseEpisodeNumber(currentEpisode);
-  if (currentEpNum > totalEpisodes) {
-    currentEpNum = totalEpisodes;
-  }
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* IMDb Rating - Reuse InfoBadge with custom styling */}
@@ -40,7 +35,7 @@ const HoverCardInfo = ({ rating, ageRating, year, season, currentEpisode, totalE
       {/* Episode Count */}
       {totalEpisodes && (
         <span className="text-gray-300 text-xs">
-          Tập {currentEpNum || 1}/{totalEpisodes}
+          Tập {currentEpisode || 1}/{totalEpisodes}
         </span>
       )}
     </div>

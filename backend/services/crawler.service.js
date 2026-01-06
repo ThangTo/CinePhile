@@ -361,12 +361,26 @@ const searchMovies = async (movieName) => {
         return matches / Math.max(longer.length, 1);
       };
 
+      // Helper function để thêm tiền tố phimimg.com cho URL ảnh
+      const normalizeImageUrl = (url) => {
+        if (!url) return null;
+        // Nếu đã có http/https thì giữ nguyên
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          return url;
+        }
+        // Nếu là relative path, thêm tiền tố phimimg.com
+        return `https://phimimg.com${url.startsWith('/') ? url : '/' + url}`;
+      };
+
       movies = movies.map((movie) => {
         const movieTitle = movie.name || '';
         const similarity = calculateSimilarity(movieName, movieTitle);
         return {
           ...movie,
           similarity,
+          // Normalize poster và thumb URLs
+          poster_url: normalizeImageUrl(movie.poster_url),
+          thumb_url: normalizeImageUrl(movie.thumb_url),
         };
       });
 

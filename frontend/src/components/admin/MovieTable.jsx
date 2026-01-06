@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { movieAPI } from "services/admin.service";
 import MovieFormModal from "./MovieFormModal";
 import MovieCrawlModal from "./MovieCrawlModal";
+import UpdateEpisodesModal from "./UpdateEpisodesModal";
 import MovieFilter from "components/common/MovieFilter";
 import { BarSpinner } from "components/common/LoadingState";
 import OptimizedImage from "components/common/OptimizedImage";
@@ -17,6 +18,7 @@ import {
   FiFilm,
   FiCalendar,
   FiDownload,
+  FiRefreshCw,
 } from "react-icons/fi";
 
 const MovieTable = () => {
@@ -25,6 +27,7 @@ const MovieTable = () => {
   const [filters, setFilters] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCrawlModalOpen, setIsCrawlModalOpen] = useState(false);
+  const [isUpdateEpisodesModalOpen, setIsUpdateEpisodesModalOpen] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -184,6 +187,15 @@ const MovieTable = () => {
               className="block w-full bg-bgColor3 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor transition-all shadow-lg"
             />
           </div>
+
+          {/* Update Episodes Button */}
+          <button
+            onClick={() => setIsUpdateEpisodesModalOpen(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-blue-600/20 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap"
+          >
+            <FiRefreshCw size={20} />
+            <span className="hidden sm:inline">Cập Nhật Tập</span>
+          </button>
 
           {/* Crawl Button - Replaced Add Button */}
           <button
@@ -371,6 +383,14 @@ const MovieTable = () => {
         isOpen={isCrawlModalOpen}
         onClose={() => setIsCrawlModalOpen(false)}
         onCrawlSuccess={() => {
+          loadMovies(pagination.currentPage, searchTerm);
+        }}
+      />
+
+      <UpdateEpisodesModal
+        isOpen={isUpdateEpisodesModalOpen}
+        onClose={() => setIsUpdateEpisodesModalOpen(false)}
+        onUpdateSuccess={() => {
           loadMovies(pagination.currentPage, searchTerm);
         }}
       />
