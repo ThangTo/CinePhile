@@ -28,6 +28,9 @@ router.post('/movies/crawl/by-page', adminController.crawlMoviesByPage);
 // POST /api/v1/admin/movies/crawl/search - Search movies for crawling
 router.post('/movies/crawl/search', adminController.searchMoviesForCrawl);
 
+// POST /api/v1/admin/movies/crawl/by-genre - Search movies by genre/category
+router.post('/movies/crawl/by-genre', adminController.searchMoviesByGenre);
+
 // POST /api/v1/admin/movies/crawl/by-slug - Crawl a single movie by slug
 router.post('/movies/crawl/by-slug', adminController.crawlMovieBySlug);
 

@@ -3,7 +3,7 @@ const he = require('he'); // Import thư viện chuẩn hoá HTML Entities
 const MovieModel = require('../models/movie.model');
 const EpisodeModel = require('../models/episode.model');
 const { ensureCastForNames } = require('../integrations/cast.service');
-
+const { slugify } = require('../utils/movieAdminUtils');
 const { createNotification } = require('../controllers/notification.controller');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
 
@@ -336,15 +336,163 @@ const runPageRange = async (startPage, endPage = null, onProgress = null, skipEx
  * @param {string} movieName - Tên phim cần tìm
  * @returns {Promise<Array>} Danh sách phim tìm được (đã sắp xếp theo độ khớp)
  */
-const searchMovies = async (movieName) => {
+/**
+ * Search movies by genre/category
+ * @param {string} typeList - Genre slug (e.g., 'hanh-dong', 'kinh-di')
+ * @param {Object} options - { page, sort_field, sort_type, sort_lang, country, year, limit }
+ * @returns {Promise<Array>} Array of movies (có kèm existsInDb nếu đã có trong DB)
+ */
+const searchMoviesByGenre = async (typeList, options = {}) => {
+  try {
+    const {
+      page = 1,
+      sort_field = '_id',
+      sort_type = 'asc',
+      sort_lang = '',
+      country = '',
+      year = '',
+      limit = 10,
+    } = options;
+
+    const query = {
+      page,
+      sort_field,
+      sort_type,
+      limit,
+    };
+
+    // Chỉ thêm các tham số có giá trị hợp lệ (không phải empty string hoặc undefined)
+    if (sort_lang && sort_lang.trim()) {
+      query.sort_lang = sort_lang.trim();
+    }
+
+    if (country && country.trim()) {
+      // Convert country name to slug format (remove accents, lowercase, replace spaces with hyphens)
+      const countrySlug = slugify(country);
+      query.country = countrySlug;
+    }
+    if (year && year.toString().trim()) {
+      query.year = year.toString().trim();
+    }
+
+    const response = await axios.get(`${API_BASE_URL}/v1/api/the-loai/${typeList}`, {
+      params: query,
+      timeout: 30000,
+    });
+
+    // Helper function để normalize image URL
+    const normalizeImageUrl = (url) => {
+      if (!url) return null;
+      // Nếu đã có http/https thì giữ nguyên
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+      }
+      // Nếu là relative path, thêm tiền tố phimimg.com
+      return `https://phimimg.com${url.startsWith('/') ? url : '/' + url}`;
+    };
+
+    // Transform response to match searchMovies format
+    // API có thể trả về items trực tiếp hoặc trong data.items
+    let movies = [];
+
+    if (response.data?.data?.items && Array.isArray(response.data.data.items)) {
+      movies = response.data.data.items;
+    } else if (response.data?.items && Array.isArray(response.data.items)) {
+      movies = response.data.items;
+    } else if (Array.isArray(response.data)) {
+      movies = response.data;
+    } else {
+      console.error('Unexpected response format:', {
+        data: response.data,
+        dataType: typeof response.data,
+        isArray: Array.isArray(response.data),
+      });
+      return [];
+    }
+
+    console.log(`Found ${movies.length} movies from API`);
+
+    // Check existing movies in DB theo slug
+    const slugs = movies.map((m) => m.slug).filter(Boolean);
+    const existingMovies = await MovieModel.find({ slug: { $in: slugs } }, 'slug');
+    const existingSlugSet = new Set(existingMovies.map((m) => m.slug));
+
+    return movies
+      .map((movie) => {
+        if (!movie || !movie.slug) {
+          console.warn('Invalid movie object:', movie);
+          return null;
+        }
+        return {
+          slug: movie.slug,
+          name: movie.name || '',
+          origin_name: movie.origin_name || '',
+          year: movie.year || '',
+          quality: movie.quality || '',
+          time: movie.time || '',
+          lang: movie.lang || '',
+          category: movie.category || [],
+          poster_url: normalizeImageUrl(movie.poster_url || movie.thumb_url),
+          thumb_url: normalizeImageUrl(movie.thumb_url),
+          similarity: 1, // Always 1 cho search theo thể loại
+          existsInDb: existingSlugSet.has(movie.slug),
+        };
+      })
+      .filter(Boolean); // Remove null entries
+  } catch (error) {
+    console.error('Error searching movies by genre:', error);
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url,
+    });
+
+    // Provide more specific error message
+    let errorMessage = 'Failed to search movies by genre';
+    if (error.response?.status === 404) {
+      errorMessage = `Genre "${typeList}" not found`;
+    } else if (error.response?.status === 400) {
+      errorMessage = `Invalid request for genre "${typeList}"`;
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    throw new Error(errorMessage);
+  }
+};
+
+/**
+ * Search movies by name with advanced filters
+ * @param {string} movieName - keyword
+ * @param {Object} options - { page, sort_field, sort_type, sort_lang, category, country, year, limit }
+ */
+const searchMovies = async (movieName, options = {}) => {
   try {
     const axios = require('axios');
     const API_BASE_URL = 'https://phimapi.com';
 
+    const { page = 1, sort_field, sort_type, sort_lang, category, country, year, limit } = options;
+
+    const params = {
+      keyword: movieName,
+    };
+
+    if (page) params.page = page;
+    if (sort_field) params.sort_field = sort_field;
+    if (sort_type) params.sort_type = sort_type;
+    if (sort_lang) params.sort_lang = sort_lang;
+    if (category) params.category = slugify(category);
+    if (country) params.country = slugify(country);
+    if (year) params.year = year;
+    if (limit) params.limit = limit;
+
+    console.log('searchMovies params:', params);
+
     const response = await axios.get(`${API_BASE_URL}/v1/api/tim-kiem`, {
-      params: {
-        keyword: movieName,
-      },
+      params,
     });
 
     let movies = response.data?.data?.items || response.data?.items || [];
@@ -372,6 +520,11 @@ const searchMovies = async (movieName) => {
         return `https://phimimg.com${url.startsWith('/') ? url : '/' + url}`;
       };
 
+      // Kiểm tra phim đã tồn tại trong DB theo slug
+      const slugs = movies.map((m) => m.slug).filter(Boolean);
+      const existingMovies = await MovieModel.find({ slug: { $in: slugs } }, 'slug');
+      const existingSlugSet = new Set(existingMovies.map((m) => m.slug));
+
       movies = movies.map((movie) => {
         const movieTitle = movie.name || '';
         const similarity = calculateSimilarity(movieName, movieTitle);
@@ -381,6 +534,7 @@ const searchMovies = async (movieName) => {
           // Normalize poster và thumb URLs
           poster_url: normalizeImageUrl(movie.poster_url),
           thumb_url: normalizeImageUrl(movie.thumb_url),
+          existsInDb: existingSlugSet.has(movie.slug),
         };
       });
 
@@ -547,5 +701,6 @@ module.exports = {
   crawlMovies,
   runPageRange,
   searchMovies,
+  searchMoviesByGenre,
   crawlMovieBySlug,
 };

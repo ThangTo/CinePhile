@@ -13,9 +13,96 @@ import {
 } from "react-icons/fi";
 import { movieAPI } from "services/admin.service";
 import OptimizedImage from "components/common/OptimizedImage";
+import Select from "components/common/Select";
+
+// Reusable card for search/genre results
+const CrawlResultCard = ({ movie, isSelected, isCrawling, onToggle, showSimilarity = false }) => {
+  const existsInDb = movie.existsInDb;
+  const similarity = showSimilarity
+    ? movie.similarity
+      ? `${(movie.similarity * 100).toFixed(0)}%`
+      : "N/A"
+    : null;
+
+  return (
+    <div
+      className={`relative bg-black/20 rounded-xl p-4 border-2 transition-all cursor-pointer ${
+        isSelected
+          ? "border-primaryColor bg-primaryColor/10"
+          : existsInDb
+          ? "border-emerald-500/60 bg-emerald-500/5 hover:border-emerald-400/80"
+          : "border-white/5 hover:border-white/20"
+      } ${isCrawling ? "opacity-50" : ""}`}
+      onClick={onToggle}
+    >
+      {isCrawling && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl z-10">
+          <FiLoader className="animate-spin text-primaryColor" size={24} />
+        </div>
+      )}
+
+      <div className="flex gap-4">
+        {/* Poster */}
+        {(movie.poster_url || movie.thumb_url) && (
+          <div className="relative w-20 h-28 flex-shrink-0 rounded overflow-hidden shadow-lg">
+            <OptimizedImage
+              src={movie.poster_url || movie.thumb_url || null}
+              alt={movie.name}
+              className="w-full h-full object-cover"
+              sizeKey="THUMBNAIL"
+            />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h4 className="text-white font-bold text-sm mb-1">{movie.name}</h4>
+          {movie.origin_name && (
+            <p className="text-gray-400 text-xs italic truncate mb-2">{movie.origin_name}</p>
+          )}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
+            {showSimilarity && similarity && (
+              <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
+                Khớp: {similarity}
+              </span>
+            )}
+            {movie.year && (
+              <span className="bg-gray-500/20 text-gray-300 px-2 py-0.5 rounded">{movie.year}</span>
+            )}
+            {movie.quality && (
+              <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">
+                {movie.quality}
+              </span>
+            )}
+            {movie.time && (
+              <span className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded">
+                {movie.time}
+              </span>
+            )}
+            {existsInDb && (
+              <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">
+                Đã có trong DB
+              </span>
+            )}
+          </div>
+          {movie.lang && <p className="text-gray-500 text-xs mb-1">Ngôn ngữ: {movie.lang}</p>}
+          {movie.category && Array.isArray(movie.category) && movie.category.length > 0 && (
+            <p className="text-gray-500 text-xs mb-1">
+              Thể loại: {movie.category.map((c) => c.name || c).join(", ")}
+            </p>
+          )}
+          {isSelected && (
+            <div className="mt-2 flex items-center gap-1 text-primaryColor text-xs">
+              <FiCheckCircle size={14} />
+              <span>Đã chọn</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
-  const [activeTab, setActiveTab] = useState("page"); // "page" or "name" - default to "page"
+  const [activeTab, setActiveTab] = useState("page"); // "page", "name", or "genre"
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -38,6 +125,47 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedMovies, setSelectedMovies] = useState(new Set());
   const [crawlingMovies, setCrawlingMovies] = useState(new Set());
+  const [namePage, setNamePage] = useState(1);
+  const [nameSortField, setNameSortField] = useState("modified.time");
+  const [nameSortType, setNameSortType] = useState("desc");
+  const [nameSortLang, setNameSortLang] = useState("");
+  const [nameCategory, setNameCategory] = useState("");
+  const [nameCountry, setNameCountry] = useState("");
+  const [nameYear, setNameYear] = useState("");
+  const [nameLimit, setNameLimit] = useState(20);
+
+  // Tab 3: Crawl by Genre
+  const [genreTypeList, setGenreTypeList] = useState("");
+  const [genrePage, setGenrePage] = useState(1);
+  const [genreSortField, setGenreSortField] = useState("_id");
+  const [genreSortType, setGenreSortType] = useState("asc");
+  const [genreSortLang, setGenreSortLang] = useState("");
+  const [genreCountry, setGenreCountry] = useState("");
+  const [genreYear, setGenreYear] = useState("");
+  const [genreLimit, setGenreLimit] = useState(10);
+  const [genreResults, setGenreResults] = useState([]);
+  const [isSearchingGenre, setIsSearchingGenre] = useState(false);
+  const [selectedGenreMovies, setSelectedGenreMovies] = useState(new Set());
+  const [crawlingGenreMovies, setCrawlingGenreMovies] = useState(new Set());
+
+  // Danh sách thể loại phổ biến
+  const GENRE_OPTIONS = [
+    { value: "hanh-dong", label: "Hành Động" },
+    { value: "kinh-di", label: "Kinh Dị" },
+    { value: "hai-huoc", label: "Hài Hước" },
+    { value: "lang-man", label: "Lãng Mạn" },
+    { value: "tam-ly", label: "Tâm Lý" },
+    { value: "vien-tuong", label: "Viễn Tưởng" },
+    { value: "phieu-luu", label: "Phiêu Lưu" },
+    { value: "vo-thuat", label: "Võ Thuật" },
+    { value: "co-trang", label: "Cổ Trang" },
+    { value: "chien-tranh", label: "Chiến Tranh" },
+    { value: "tai-lieu", label: "Tài Liệu" },
+    { value: "hoat-hinh", label: "Hoạt Hình" },
+    { value: "gia-dinh", label: "Gia Đình" },
+    { value: "am-nhac", label: "Âm Nhạc" },
+    { value: "the-thao", label: "Thể Thao" },
+  ];
 
   // Reset state when modal opens/closes
   React.useEffect(() => {
@@ -58,6 +186,17 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
       setSearchResults([]);
       setSelectedMovies(new Set());
       setCrawlingMovies(new Set());
+      setGenreTypeList("");
+      setGenrePage(1);
+      setGenreSortField("_id");
+      setGenreSortType("asc");
+      setGenreSortLang("");
+      setGenreCountry("");
+      setGenreYear("");
+      setGenreLimit(10);
+      setGenreResults([]);
+      setSelectedGenreMovies(new Set());
+      setCrawlingGenreMovies(new Set());
       setError(null);
       setSuccess(null);
       setCrawlProgress(null);
@@ -175,7 +314,17 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
     setSelectedMovies(new Set());
 
     try {
-      const results = await movieAPI.searchForCrawl(searchQuery.trim());
+      const results = await movieAPI.searchForCrawl({
+        movieName: searchQuery.trim(),
+        page: namePage,
+        sort_field: nameSortField,
+        sort_type: nameSortType,
+        sort_lang: nameSortLang || undefined,
+        category: nameCategory || undefined,
+        country: nameCountry || undefined,
+        year: nameYear || undefined,
+        limit: nameLimit,
+      });
       setSearchResults(results);
       if (results.length === 0) {
         setError("Không tìm thấy phim nào");
@@ -285,6 +434,153 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
     }
   };
 
+  // Tab 3: Handle search by genre
+  const handleSearchByGenre = async () => {
+    if (!genreTypeList.trim()) {
+      setError("Vui lòng chọn thể loại");
+      return;
+    }
+
+    setIsSearchingGenre(true);
+    setError(null);
+    setGenreResults([]);
+    setSelectedGenreMovies(new Set());
+
+    try {
+      const results = await movieAPI.searchByGenre({
+        type_list: genreTypeList.trim(),
+        page: genrePage,
+        sort_field: genreSortField,
+        sort_type: genreSortType,
+        sort_lang: genreSortLang || undefined,
+        country: genreCountry || undefined,
+        year: genreYear || undefined,
+        limit: genreLimit,
+      });
+      setGenreResults(results);
+      if (results.length === 0) {
+        setError("Không tìm thấy phim nào");
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || "Có lỗi xảy ra khi tìm kiếm");
+    } finally {
+      setIsSearchingGenre(false);
+    }
+  };
+
+  // Tab 3: Toggle movie selection
+  const toggleGenreMovieSelection = (slug) => {
+    const newSelected = new Set(selectedGenreMovies);
+    if (newSelected.has(slug)) {
+      newSelected.delete(slug);
+    } else {
+      newSelected.add(slug);
+    }
+    setSelectedGenreMovies(newSelected);
+  };
+
+  // Tab 3: Select all movies (skip ones already in DB)
+  const handleSelectAllGenreMovies = () => {
+    const allSlugs = genreResults
+      .filter((movie) => movie.slug && !crawlingGenreMovies.has(movie.slug) && !movie.existsInDb)
+      .map((movie) => movie.slug);
+    setSelectedGenreMovies(new Set(allSlugs));
+  };
+
+  // Tab 3: Deselect all movies
+  const handleDeselectAllGenreMovies = () => {
+    setSelectedGenreMovies(new Set());
+  };
+
+  const genreMoviesInDb = genreResults.filter((movie) => movie.existsInDb);
+
+  // Tab 3: Crawl selected movies
+  const handleCrawlGenreSelected = async () => {
+    if (selectedGenreMovies.size === 0) {
+      setError("Vui lòng chọn ít nhất một phim");
+      return;
+    }
+
+    // Tạo AbortController mới
+    abortControllerRef.current = new AbortController();
+    isCancelledRef.current = false;
+
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+    setCrawlingGenreMovies(new Set(selectedGenreMovies));
+
+    let successCount = 0;
+    let failCount = 0;
+    const moviesArray = Array.from(selectedGenreMovies);
+
+    try {
+      for (let i = 0; i < moviesArray.length; i++) {
+        // Kiểm tra nếu đã bị hủy
+        if (isCancelledRef.current) {
+          break;
+        }
+
+        const slug = moviesArray[i];
+        try {
+          await movieAPI.crawlBySlug(slug);
+          successCount++;
+
+          // Cập nhật crawlingGenreMovies để loại bỏ phim đã crawl xong
+          setCrawlingGenreMovies((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(slug);
+            return newSet;
+          });
+        } catch (err) {
+          failCount++;
+          console.error(`Failed to crawl ${slug}:`, err);
+
+          // Cập nhật crawlingGenreMovies để loại bỏ phim lỗi
+          setCrawlingGenreMovies((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(slug);
+            return newSet;
+          });
+        }
+
+        // Delay between requests (chỉ nếu chưa bị hủy)
+        if (!isCancelledRef.current && i < moviesArray.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+
+      if (isCancelledRef.current) {
+        setError("Crawl đã bị hủy bởi người dùng");
+        setSuccess(
+          `Đã crawl ${successCount} phim trước khi hủy${
+            failCount > 0 ? `, thất bại ${failCount} phim` : ""
+          }`
+        );
+      } else {
+        setSuccess(
+          `Đã crawl thành công ${successCount} phim${
+            failCount > 0 ? `, thất bại ${failCount} phim` : ""
+          }`
+        );
+      }
+
+      setCrawlingGenreMovies(new Set());
+      setSelectedGenreMovies(new Set());
+
+      if (onCrawlSuccess && !isCancelledRef.current) {
+        onCrawlSuccess();
+      }
+    } catch (err) {
+      if (!isCancelledRef.current) {
+        setError(err?.message || "Có lỗi xảy ra khi crawl");
+      }
+    } finally {
+      setIsLoading(false);
+      abortControllerRef.current = null;
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -341,6 +637,19 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
               <div className="flex items-center gap-2">
                 <FiSearch size={18} />
                 <span>Crawl Theo Tên</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("genre")}
+              className={`px-4 py-2 rounded-t-lg font-medium transition-all ${
+                activeTab === "genre"
+                  ? "bg-bgColor3 text-primaryColor border-t-2 border-primaryColor"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FiFilm size={18} />
+                <span>Crawl Theo Thể Loại</span>
               </div>
             </button>
           </div>
@@ -508,10 +817,11 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                   Tìm Kiếm Phim
                 </h3>
                 <p className="text-gray-400 text-sm mb-4">
-                  Nhập tên phim để tìm kiếm, sau đó chọn các phim bạn muốn crawl.
+                  Nhập từ khóa và bộ lọc nâng cao để tìm phim, sau đó chọn các phim bạn muốn crawl.
                 </p>
 
-                <div className="flex gap-3">
+                {/* Keyword + Search Button */}
+                <div className="flex flex-col lg:flex-row gap-3">
                   <input
                     type="text"
                     value={searchQuery}
@@ -520,18 +830,149 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                     placeholder="Nhập tên phim..."
                     className="flex-1 bg-black/20 border border-white/5 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
                   />
-                  <button
-                    onClick={handleSearch}
-                    disabled={isSearching}
-                    className="px-6 py-3 rounded-xl bg-primaryColor text-black font-bold hover:bg-primaryColor/90 transition-all disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isSearching ? (
-                      <FiLoader className="animate-spin" size={20} />
-                    ) : (
-                      <FiSearch size={20} />
-                    )}
-                    <span>Tìm</span>
-                  </button>
+                  <div className="flex gap-3">
+                    <input
+                      type="number"
+                      min="1"
+                      value={namePage}
+                      onChange={(e) => setNamePage(parseInt(e.target.value) || 1)}
+                      className="w-24 bg-black/20 border border-white/5 rounded-xl px-3 py-3 text-white focus:outline-none focus:border-primaryColor"
+                      placeholder="Trang"
+                    />
+                    <button
+                      onClick={handleSearch}
+                      disabled={isSearching}
+                      className="px-6 py-3 rounded-xl bg-primaryColor text-black font-bold hover:bg-primaryColor/90 transition-all disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {isSearching ? (
+                        <FiLoader className="animate-spin" size={20} />
+                      ) : (
+                        <FiSearch size={20} />
+                      )}
+                      <span>Tìm</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Advanced Filters */}
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Sort Field */}
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                      Sắp xếp theo
+                    </label>
+                    <Select
+                      value={nameSortField}
+                      onChange={setNameSortField}
+                      options={[
+                        { value: "modified.time", label: "Thời gian cập nhật" },
+                        { value: "_id", label: "ID" },
+                        { value: "year", label: "Năm phát hành" },
+                      ]}
+                      size="sm"
+                    />
+                  </div>
+
+                  {/* Sort Type */}
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                      Thứ tự
+                    </label>
+                    <Select
+                      value={nameSortType}
+                      onChange={setNameSortType}
+                      options={[
+                        { value: "desc", label: "Giảm dần" },
+                        { value: "asc", label: "Tăng dần" },
+                      ]}
+                      size="sm"
+                    />
+                  </div>
+
+                  {/* Sort Lang */}
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                      Ngôn ngữ
+                    </label>
+                    <Select
+                      value={nameSortLang}
+                      onChange={setNameSortLang}
+                      options={[
+                        { value: "", label: "Tất cả" },
+                        { value: "vietsub", label: "Vietsub" },
+                        { value: "thuyet-minh", label: "Thuyết minh" },
+                        { value: "long-tieng", label: "Lồng tiếng" },
+                      ]}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Category */}
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                      Thể loại (slug)
+                    </label>
+                    <input
+                      type="text"
+                      value={nameCategory}
+                      onChange={(e) => setNameCategory(e.target.value)}
+                      placeholder="vd: hanh-dong"
+                      className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      Lấy slug từ API <span className="underline">phimapi.com/the-loai</span>
+                    </p>
+                  </div>
+
+                  {/* Country */}
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                      Quốc gia (slug)
+                    </label>
+                    <input
+                      type="text"
+                      value={nameCountry}
+                      onChange={(e) => setNameCountry(e.target.value)}
+                      placeholder="vd: han-quoc"
+                      className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      Lấy slug từ API <span className="underline">phimapi.com/quoc-gia</span>
+                    </p>
+                  </div>
+
+                  {/* Year + Limit */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Năm
+                      </label>
+                      <input
+                        type="number"
+                        min="1970"
+                        max={new Date().getFullYear()}
+                        value={nameYear}
+                        onChange={(e) => setNameYear(e.target.value)}
+                        placeholder="vd: 2024"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl px-3 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Giới hạn
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="64"
+                        value={nameLimit}
+                        onChange={(e) => setNameLimit(parseInt(e.target.value) || 20)}
+                        className="w-full bg-black/20 border border-white/5 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primaryColor"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -570,84 +1011,236 @@ const MovieCrawlModal = ({ isOpen, onClose, onCrawlSuccess }) => {
                     {searchResults.map((movie, index) => {
                       const isSelected = selectedMovies.has(movie.slug);
                       const isCrawling = crawlingMovies.has(movie.slug);
-                      const similarity = movie.similarity
-                        ? `${(movie.similarity * 100).toFixed(0)}%`
-                        : "N/A";
-
                       return (
-                        <div
+                        <CrawlResultCard
                           key={movie.slug || index}
-                          className={`relative bg-black/20 rounded-xl p-4 border-2 transition-all cursor-pointer ${
-                            isSelected
-                              ? "border-primaryColor bg-primaryColor/10"
-                              : "border-white/5 hover:border-white/20"
-                          } ${isCrawling ? "opacity-50" : ""}`}
-                          onClick={() => !isCrawling && toggleMovieSelection(movie.slug)}
-                        >
-                          {isCrawling && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl z-10">
-                              <FiLoader className="animate-spin text-primaryColor" size={24} />
-                            </div>
-                          )}
+                          movie={movie}
+                          isSelected={isSelected}
+                          isCrawling={isCrawling}
+                          onToggle={() => !isCrawling && toggleMovieSelection(movie.slug)}
+                          showSimilarity
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
-                          <div className="flex gap-4">
-                            {/* Poster */}
-                            {(movie.poster_url || movie.thumb_url) && (
-                              <div className="relative w-20 h-28 flex-shrink-0 rounded overflow-hidden shadow-lg">
-                                <OptimizedImage
-                                  src={movie.poster_url || movie.thumb_url || ""}
-                                  alt={movie.name}
-                                  className="w-full h-full object-cover"
-                                  sizeKey="THUMBNAIL"
-                                />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-white font-bold text-sm  mb-1">{movie.name}</h4>
-                              {movie.origin_name && (
-                                <p className="text-gray-400 text-xs italic truncate mb-2">
-                                  {movie.origin_name}
-                                </p>
-                              )}
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
-                                <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
-                                  Khớp: {similarity}
-                                </span>
-                                {movie.year && (
-                                  <span className="bg-gray-500/20 text-gray-300 px-2 py-0.5 rounded">
-                                    {movie.year}
-                                  </span>
-                                )}
-                                {movie.quality && (
-                                  <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">
-                                    {movie.quality}
-                                  </span>
-                                )}
-                                {movie.time && (
-                                  <span className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded">
-                                    {movie.time}
-                                  </span>
-                                )}
-                              </div>
-                              {movie.lang && (
-                                <p className="text-gray-500 text-xs mb-1">Ngôn ngữ: {movie.lang}</p>
-                              )}
-                              {movie.category &&
-                                Array.isArray(movie.category) &&
-                                movie.category.length > 0 && (
-                                  <p className="text-gray-500 text-xs mb-1">
-                                    Thể loại: {movie.category.map((c) => c.name || c).join(", ")}
-                                  </p>
-                                )}
-                              {isSelected && (
-                                <div className="mt-2 flex items-center gap-1 text-primaryColor text-xs">
-                                  <FiCheckCircle size={14} />
-                                  <span>Đã chọn</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+          {/* Tab 3: Crawl by Genre */}
+          {activeTab === "genre" && (
+            <div className="space-y-6">
+              <div className="bg-black/10 rounded-xl p-5 border border-white/5">
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                  <FiFilm className="text-primaryColor" />
+                  Tìm Kiếm Phim Theo Thể Loại
+                </h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Chọn thể loại và các bộ lọc để tìm kiếm phim, sau đó chọn các phim bạn muốn crawl.
+                </p>
+
+                <div className="space-y-4">
+                  {/* Genre Selection */}
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                      Thể Loại *
+                    </label>
+                    <Select
+                      value={genreTypeList}
+                      onChange={setGenreTypeList}
+                      options={GENRE_OPTIONS}
+                      placeholder="-- Chọn thể loại --"
+                      bgColor="bg-black/20"
+                      bgDropdown="bg-bgColor"
+                      className="py-3"
+                    />
+                  </div>
+
+                  {/* Filters Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Trang
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={genrePage}
+                        onChange={(e) => setGenrePage(parseInt(e.target.value) || 1)}
+                        className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-primaryColor"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Sắp xếp theo
+                      </label>
+                      <Select
+                        value={genreSortField}
+                        onChange={setGenreSortField}
+                        options={[
+                          { value: "_id", label: "ID" },
+                          { value: "year", label: "Năm" },
+                          { value: "name", label: "Tên" },
+                          { value: "time", label: "Thời lượng" },
+                        ]}
+                        className="py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Thứ tự
+                      </label>
+                      <Select
+                        value={genreSortType}
+                        onChange={setGenreSortType}
+                        options={[
+                          { value: "asc", label: "Tăng dần" },
+                          { value: "desc", label: "Giảm dần" },
+                        ]}
+                        className="py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Giới hạn
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={genreLimit}
+                        onChange={(e) => setGenreLimit(parseInt(e.target.value) || 10)}
+                        className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-primaryColor"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Ngôn ngữ
+                      </label>
+                      <Select
+                        value={genreSortLang}
+                        onChange={setGenreSortLang}
+                        options={[
+                          { value: "", label: "Tất cả" },
+                          { value: "long-tieng", label: "Lồng tiếng" },
+                          { value: "thuyet-minh", label: "Thuyết minh" },
+                          { value: "vietsub", label: "Phụ đề" },
+                        ]}
+                        className="py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Quốc gia
+                      </label>
+                      <input
+                        type="text"
+                        value={genreCountry}
+                        onChange={(e) => setGenreCountry(e.target.value)}
+                        placeholder="vd: trung-quoc"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider mb-2 block">
+                        Năm
+                      </label>
+                      <input
+                        type="number"
+                        value={genreYear}
+                        onChange={(e) => setGenreYear(e.target.value)}
+                        placeholder="vd: 2024"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSearchByGenre}
+                    disabled={isSearchingGenre || !genreTypeList}
+                    className="w-full px-6 py-3 rounded-xl bg-primaryColor text-black font-bold hover:bg-primaryColor/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isSearchingGenre ? (
+                      <FiLoader className="animate-spin" size={20} />
+                    ) : (
+                      <FiSearch size={20} />
+                    )}
+                    <span>Tìm Kiếm</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Genre Search Results */}
+              {genreResults.length > 0 && (
+                <div className="bg-black/10 rounded-xl p-5 border border-white/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-bold flex items-center gap-2">
+                      <FiFilm className="text-primaryColor" />
+                      Kết Quả Tìm Kiếm ({genreResults.length})
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      {!isLoading && genreResults.length > 0 && (
+                        <>
+                          {selectedGenreMovies.size > 0 &&
+                          selectedGenreMovies.size ===
+                            genreResults.length - genreMoviesInDb.length ? (
+                            <button
+                              onClick={handleDeselectAllGenreMovies}
+                              className="px-4 py-2 rounded-lg bg-gray-500/20 border border-gray-500/50 text-gray-200 font-bold text-sm hover:bg-gray-500/30 transition-all flex items-center gap-2"
+                            >
+                              <FiSquare size={16} />
+                              <span>Bỏ chọn tất cả</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleSelectAllGenreMovies}
+                              className="px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-500/50 text-blue-200 font-bold text-sm hover:bg-blue-500/30 transition-all flex items-center gap-2"
+                            >
+                              <FiCheckCircle size={16} />
+                              <span>Chọn tất cả</span>
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {isLoading && (
+                        <button
+                          onClick={handleCancelCrawl}
+                          className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/50 text-red-200 font-bold text-sm hover:bg-red-500/30 transition-all flex items-center gap-2"
+                        >
+                          <FiSquare size={16} />
+                          <span>Hủy</span>
+                        </button>
+                      )}
+                      {selectedGenreMovies.size > 0 && !isLoading && (
+                        <button
+                          onClick={handleCrawlGenreSelected}
+                          disabled={isLoading}
+                          className="px-4 py-2 rounded-lg bg-primaryColor text-black font-bold text-sm hover:bg-primaryColor/90 transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
+                          <FiDownload size={16} />
+                          <span>Crawl {selectedGenreMovies.size} Phim</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto custom-scrollbar">
+                    {genreResults.map((movie, index) => {
+                      const isSelected = selectedGenreMovies.has(movie.slug);
+                      const isCrawling = crawlingGenreMovies.has(movie.slug);
+                      return (
+                        <CrawlResultCard
+                          key={movie.slug || index}
+                          movie={movie}
+                          isSelected={isSelected}
+                          isCrawling={isCrawling}
+                          onToggle={() => !isCrawling && toggleGenreMovieSelection(movie.slug)}
+                          showSimilarity={false}
+                        />
                       );
                     })}
                   </div>

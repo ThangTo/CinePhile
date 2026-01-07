@@ -349,21 +349,91 @@ const crawlMoviesByPage = async (req, res) => {
 
 /**
  * POST /admin/movies/crawl/search
- * Search movies by name
+ * Search movies by name (advanced filters)
  */
 const searchMoviesForCrawl = async (req, res) => {
   try {
-    const { movieName } = req.body;
+    const { movieName, page, sort_field, sort_type, sort_lang, category, country, year, limit } =
+      req.body;
     const { searchMovies } = require('../services/crawler.service');
 
     if (!movieName || !movieName.trim()) {
       return res.status(400).json({ message: 'Movie name is required' });
     }
 
-    const movies = await searchMovies(movieName.trim());
+    const options = {
+      page,
+      sort_field,
+      sort_type,
+      sort_lang,
+      category,
+      country,
+      year,
+      limit,
+    };
+
+    const movies = await searchMovies(movieName.trim(), options);
     res.json({ movies });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/movies/crawl/by-genre
+ * Search movies by genre/category
+ */
+const searchMoviesByGenre = async (req, res) => {
+  try {
+    const { type_list, page, sort_field, sort_type, sort_lang, country, year, limit } = req.body;
+    const { searchMoviesByGenre } = require('../services/crawler.service');
+
+    console.log('Search movies by genre request:', {
+      type_list,
+      page,
+      sort_field,
+      sort_type,
+      sort_lang,
+      country,
+      year,
+      limit,
+    });
+
+    if (!type_list || !type_list.trim()) {
+      return res.status(400).json({ message: 'Genre type_list is required' });
+    }
+
+    // Chỉ truyền các tham số có giá trị (không truyền undefined hoặc empty string)
+    const options = {
+      page: page || 1,
+      sort_field: sort_field || '_id',
+      sort_type: sort_type || 'asc',
+      limit: limit || 10,
+    };
+
+    // Chỉ thêm các tham số optional nếu có giá trị
+    if (sort_lang && sort_lang.trim()) {
+      options.sort_lang = sort_lang.trim();
+    }
+    if (country && country.trim()) {
+      options.country = country.trim();
+    }
+    if (year && year.toString().trim()) {
+      options.year = year.toString().trim();
+    }
+
+    const movies = await searchMoviesByGenre(type_list.trim(), options);
+
+    console.log(`Found ${movies?.length || 0} movies for genre "${type_list}"`);
+
+    res.json({ movies: movies || [] });
+  } catch (error) {
+    console.error('Error in searchMoviesByGenre controller:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      message: error.message || 'Failed to search movies by genre',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
   }
 };
 
@@ -503,6 +573,7 @@ module.exports = {
   // Crawl
   crawlMoviesByPage,
   searchMoviesForCrawl,
+  searchMoviesByGenre,
   crawlMovieBySlug,
   // Episodes
   getUpdatingMovies,

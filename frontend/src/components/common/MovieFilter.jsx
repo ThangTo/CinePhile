@@ -921,7 +921,7 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
             </p> */}
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-3">
           {activeFilterCount() > 0 && (
             <span className="bg-primaryColor text-black text-xs font-bold px-3 py-1 rounded-full shadow-lg shadow-primaryColor/20">
               {activeFilterCount()} Đã áp dụng

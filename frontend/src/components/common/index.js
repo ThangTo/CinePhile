@@ -8,6 +8,7 @@ export { default as SectionHeader } from "./SectionHeader";
 
 // UI Components
 export { default as ToastContainer } from "./ToastContainer";
+export { default as Select } from "./Select";
 
 // HOC
 export { default as WithHoverCard } from "./WithHoverCard";

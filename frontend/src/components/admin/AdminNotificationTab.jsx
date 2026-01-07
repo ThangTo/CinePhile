@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import notificationService from "services/notification.service";
 import { userAPI } from "services/admin.service";
+import Select from "components/common/Select";
 import {
   FiBell,
   FiType,
@@ -177,35 +178,22 @@ const AdminNotificationTab = () => {
                 </InputGroup>
 
                 <InputGroup label="Loại thông báo" icon={FiInfo}>
-                  <div className="relative">
-                    <select
-                      name="type"
-                      value={notificationForm.type}
-                      onChange={handleNotificationChange}
-                      className="w-full bg-bgColor border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor appearance-none cursor-pointer"
-                    >
-                      <option value="system">Hệ thống (System)</option>
-                      <option value="movie_update">Cập nhật phim (Movie Update)</option>
-                      <option value="new_episode">Tập mới (New Episode)</option>
-                      <option value="comment_reply">Phản hồi bình luận</option>
-                      <option value="payment">Thanh toán (Payment)</option>
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M19 9l-7 7-7-7"
-                        ></path>
-                      </svg>
-                    </div>
-                  </div>
+                  <Select
+                    name="type"
+                    value={notificationForm.type}
+                    onChange={(value) =>
+                      handleNotificationChange({ target: { name: "type", value } })
+                    }
+                    options={[
+                      { value: "system", label: "Hệ thống (System)" },
+                      { value: "movie_update", label: "Cập nhật phim (Movie Update)" },
+                      { value: "new_episode", label: "Tập mới (New Episode)" },
+                      { value: "comment_reply", label: "Phản hồi bình luận" },
+                      { value: "payment", label: "Thanh toán (Payment)" },
+                    ]}
+                    bgColor="bg-bgColor"
+                    className="py-3 border-white/10"
+                  />
                 </InputGroup>
               </div>
 

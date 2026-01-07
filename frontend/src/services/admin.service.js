@@ -190,14 +190,28 @@ export const movieAPI = {
   },
 
   /**
-   * Search movies for crawling
-   * @param {string} movieName - Movie name to search
+   * Search movies for crawling (by name) with advanced filters
+   * @param {Object} params - { movieName, page, sort_field, sort_type, sort_lang, category, country, year, limit }
    * @returns {Promise<Array>} Array of search results
    */
-  searchForCrawl: async (movieName) => {
+  searchForCrawl: async (params) => {
     const response = await apiRequest("/admin/movies/crawl/search", {
       method: "POST",
-      data: { movieName },
+      data: params,
+      requiresAuth: true,
+    });
+    return response.movies || [];
+  },
+
+  /**
+   * Search movies by genre/category for crawling
+   * @param {Object} params - { type_list, page, sort_field, sort_type, sort_lang, country, year, limit }
+   * @returns {Promise<Array>} Array of movies
+   */
+  searchByGenre: async (params) => {
+    const response = await apiRequest("/admin/movies/crawl/by-genre", {
+      method: "POST",
+      data: params,
       requiresAuth: true,
     });
     return response.movies || [];
