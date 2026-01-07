@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const Movie = require('../models/movie.model');
+const Genre = require('../models/genre.model');
+const Country = require('../models/country.model');
 const Episode = require('../models/episode.model');
 const Cast = require('../models/cast.model');
 const Comment = require('../models/comment.model');
@@ -198,10 +200,10 @@ const toPlain = (doc) => {
 const findMovie = async (identifier) => {
   if (!identifier) return null;
   if (isObjectId(identifier)) {
-    const movie = await Movie.findById(identifier);
+    const movie = await Movie.findById(identifier).lean();
     if (movie) return movie;
   }
-  return Movie.findOne({ slug: identifier });
+  return Movie.findOne({ slug: identifier }).lean();
 };
 
 /**
@@ -466,7 +468,7 @@ const createAudioTypeFilterPipeline = (baseQuery, audioTypes) => {
  */
 const paginate = async (builder, { page = 1, limit = 12, sort } = {}) => {
   const currentPage = Math.max(parseInt(page, 10) || 1, 1);
-  const perPage = Math.max(parseInt(limit, 10) || 12, 1);
+  const perPage = Math.min(Math.max(parseInt(limit, 10) || 12, 1), 100);
   const skip = (currentPage - 1) * perPage;
   const sortOptions = getSortOptions(sort);
 
@@ -701,43 +703,49 @@ const getByType = async (type, options = {}) => {
 
 /**
  * Get available filter options (genres & countries)
+ * Now đọc từ collection Genre/Country riêng thay vì aggregate trên Movie để tối ưu
+ * Cached in Redis for 1 hour (3600 seconds)
  */
 const getFilterOptions = async () => {
-  const [genresRaw, countriesRaw] = await Promise.all([
-    Movie.aggregate([
-      { $unwind: { path: '$categories', preserveNullAndEmptyArrays: false } },
-      { $match: { 'categories.slug': { $ne: null } } },
-      {
-        $group: {
-          _id: '$categories.slug',
-          name: { $first: '$categories.name' },
-        },
-      },
-      { $sort: { name: 1 } },
-    ]),
-    Movie.aggregate([
-      { $unwind: { path: '$country', preserveNullAndEmptyArrays: false } },
-      { $match: { 'country.slug': { $ne: null } } },
-      {
-        $group: {
-          _id: '$country.slug',
-          name: { $first: '$country.name' },
-        },
-      },
-      { $sort: { name: 1 } },
-    ]),
+  const cacheKey = 'movies:filter-options';
+
+  // Try cache first
+  if (redisService.isConnected) {
+    const cached = await redisService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  // Cache miss - fetch from DB
+  const [genres, countries] = await Promise.all([
+    Genre.find({ slug: { $ne: '' } })
+      .sort({ name: 1 })
+      .lean(),
+    Country.find({ slug: { $ne: '' } })
+      .sort({ name: 1 })
+      .lean(),
   ]);
 
-  return {
-    genres: genresRaw.map((item) => ({
-      slug: item._id,
-      name: item.name || item._id,
+  const result = {
+    genres: genres.map((g) => ({
+      slug: g.slug,
+      name: g.name,
+      count: g.count,
     })),
-    countries: countriesRaw.map((item) => ({
-      slug: item._id,
-      name: item.name || item._id,
+    countries: countries.map((c) => ({
+      slug: c.slug,
+      name: c.name,
+      count: c.count,
     })),
   };
+
+  // Cache for 1 hour (3600 seconds)
+  if (redisService.isConnected) {
+    await redisService.set(cacheKey, result, 3600);
+  }
+
+  return result;
 };
 
 /**

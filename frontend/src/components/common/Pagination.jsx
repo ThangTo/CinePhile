@@ -35,7 +35,7 @@ const Pagination = ({ page, totalPages, onPageChange, className }) => {
   };
 
   return (
-    <div className="flex items-center justify-center gap-4 mt-8 text-white">
+    <div className="flex items-center justify-center gap-4 mt-6 md:mt-8 text-white">
       {/* Nút Previous */}
       <button
         onClick={() => onPageChange(page - 1)}
@@ -62,7 +62,7 @@ const Pagination = ({ page, totalPages, onPageChange, className }) => {
 
       {/* Phần hiển thị Input + Tổng số trang */}
       <div
-        className={`flex items-center gap-2 bg-bgColor2 backdrop-blur px-5 py-2.5 rounded-3xl border border-white/10 shadow-sm ${className}`}
+        className={`flex items-center gap-2 bg-bgColor2 backdrop-blur px-5 py-2 rounded-3xl border border-white/10 shadow-sm ${className}`}
       >
         <span className="text-gray-300 text-sm whitespace-nowrap">Trang</span>
 

@@ -2,12 +2,65 @@ const axios = require('axios');
 const he = require('he'); // Import thư viện chuẩn hoá HTML Entities
 const MovieModel = require('../models/movie.model');
 const EpisodeModel = require('../models/episode.model');
+const GenreModel = require('../models/genre.model');
+const CountryModel = require('../models/country.model');
 const { ensureCastForNames } = require('../integrations/cast.service');
 const { slugify } = require('../utils/movieAdminUtils');
 const { createNotification } = require('../controllers/notification.controller');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
+const redisService = require('./redis.service');
 
 const API_BASE_URL = 'https://phimapi.com';
+
+// Upsert genres & countries into their own collections for efficient taxonomies
+async function upsertTaxonomies(categories = [], countries = []) {
+  const genreOps = [];
+  const countryOps = [];
+
+  for (const cat of categories || []) {
+    if (!cat || !cat.slug) continue;
+    genreOps.push({
+      updateOne: {
+        filter: { slug: cat.slug },
+        update: {
+          $setOnInsert: { name: cat.name || cat.slug },
+          $inc: { count: 1 },
+        },
+        upsert: true,
+      },
+    });
+  }
+
+  for (const c of countries || []) {
+    if (!c || !c.slug) continue;
+    countryOps.push({
+      updateOne: {
+        filter: { slug: c.slug },
+        update: {
+          $setOnInsert: { name: c.name || c.slug },
+          $inc: { count: 1 },
+        },
+        upsert: true,
+      },
+    });
+  }
+
+  if (genreOps.length) {
+    await GenreModel.bulkWrite(genreOps, { ordered: false });
+  }
+  if (countryOps.length) {
+    await CountryModel.bulkWrite(countryOps, { ordered: false });
+  }
+
+  // Invalidate filter options cache when taxonomies are updated
+  if (redisService.isConnected && (genreOps.length > 0 || countryOps.length > 0)) {
+    try {
+      await redisService.del('movies:filter-options');
+    } catch (cacheError) {
+      console.error('⚠️ Lỗi khi invalidate filter options cache:', cacheError.message);
+    }
+  }
+}
 
 /**
  * Hàm chính: Crawl phim từ trang phim mới cập nhật
@@ -53,7 +106,7 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
       try {
         // Nếu skipExisting = true, kiểm tra phim đã tồn tại chưa trước khi crawl
         if (skipExisting) {
-          const existingMovie = await MovieModel.findOne({ slug: slug });
+          const existingMovie = await MovieModel.findOne({ slug: slug }).select('_id').lean();
           if (existingMovie) {
             log(`⏭️  Bỏ qua phim đã tồn tại: ${slug}`);
             skippedCount++;
@@ -125,7 +178,14 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
         const savedMovie = await MovieModel.findOneAndUpdate({ slug: slug }, moviePayload, {
           upsert: true,
           new: true,
-        });
+        }).lean(false); // cần document để dùng _id
+
+        // 4b. Upsert genres & countries vào collection riêng (không block crawl nếu lỗi)
+        try {
+          await upsertTaxonomies(categories, countries);
+        } catch (taxError) {
+          console.error('⚠️  Lỗi khi upsert taxonomies:', taxError.message);
+        }
 
         // --- [THÊM MỚI] GỬI THÔNG BÁO ---
         // Logic: Gửi thông báo khi phim được cập nhật/thêm mới
@@ -413,8 +473,10 @@ const searchMoviesByGenre = async (typeList, options = {}) => {
     console.log(`Found ${movies.length} movies from API`);
 
     // Check existing movies in DB theo slug
-    const slugs = movies.map((m) => m.slug).filter(Boolean);
-    const existingMovies = await MovieModel.find({ slug: { $in: slugs } }, 'slug');
+    // Thu gọn slugs và loại bỏ null/undefined để giảm RAM
+    const slugs = Array.from(new Set(movies.map((m) => m.slug).filter(Boolean)));
+    // Chỉ lấy trường slug, dùng lean() để giảm overhead bộ nhớ
+    const existingMovies = await MovieModel.find({ slug: { $in: slugs } }, 'slug').lean();
     const existingSlugSet = new Set(existingMovies.map((m) => m.slug));
 
     return movies
@@ -521,8 +583,9 @@ const searchMovies = async (movieName, options = {}) => {
       };
 
       // Kiểm tra phim đã tồn tại trong DB theo slug
-      const slugs = movies.map((m) => m.slug).filter(Boolean);
-      const existingMovies = await MovieModel.find({ slug: { $in: slugs } }, 'slug');
+      // Thu gọn slugs và dùng lean() để giảm RAM
+      const slugs = Array.from(new Set(movies.map((m) => m.slug).filter(Boolean)));
+      const existingMovies = await MovieModel.find({ slug: { $in: slugs } }, 'slug').lean();
       const existingSlugSet = new Set(existingMovies.map((m) => m.slug));
 
       movies = movies.map((movie) => {
@@ -562,7 +625,7 @@ const crawlMovieBySlug = async (slug) => {
     const API_BASE_URL = 'https://phimapi.com';
 
     // Kiểm tra phim đã tồn tại chưa
-    const existingMovie = await MovieModel.findOne({ slug: slug });
+    const existingMovie = await MovieModel.findOne({ slug: slug }).select('_id').lean();
     const isUpdate = !!existingMovie;
 
     // Gọi API chi tiết phim
@@ -618,6 +681,13 @@ const crawlMovieBySlug = async (slug) => {
       upsert: true,
       new: true,
     });
+
+    // Upsert genres & countries vào collection riêng (không block nếu lỗi)
+    try {
+      await upsertTaxonomies(categories, countries);
+    } catch (taxError) {
+      console.error('⚠️  Lỗi khi upsert taxonomies:', taxError.message);
+    }
 
     // Gửi thông báo
     try {

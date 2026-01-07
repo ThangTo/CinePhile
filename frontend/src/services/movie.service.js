@@ -65,9 +65,76 @@ const movieService = {
 
   /**
    * Lấy metadata filter (genres & countries)
+   * Cached in localStorage for 1 hour
    * @returns {Promise<Object>} { genres: [], countries: [] }
    */
-  getFilterOptions: () => apiRequest("/movies/meta/filters"),
+  getFilterOptions: (() => {
+    const CACHE_KEY = "movie_filter_options_cache";
+    const CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour in milliseconds
+    let memoryCache = null;
+    let cacheTimestamp = 0;
+
+    const getCached = () => {
+      // Check memory cache first
+      const now = Date.now();
+      if (memoryCache && now - cacheTimestamp < CACHE_EXPIRY) {
+        return memoryCache;
+      }
+
+      // Check localStorage
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (!cached) return null;
+
+        const { data, timestamp } = JSON.parse(cached);
+        if (now - timestamp < CACHE_EXPIRY) {
+          // Update memory cache
+          memoryCache = data;
+          cacheTimestamp = timestamp;
+          return data;
+        }
+
+        // Cache expired, remove it
+        localStorage.removeItem(CACHE_KEY);
+        return null;
+      } catch (err) {
+        console.error("Error reading filter options cache:", err);
+        return null;
+      }
+    };
+
+    const setCached = (data) => {
+      try {
+        const cacheData = {
+          data,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        // Update memory cache
+        memoryCache = data;
+        cacheTimestamp = cacheData.timestamp;
+      } catch (err) {
+        console.error("Error saving filter options cache:", err);
+      }
+    };
+
+    return async () => {
+      // Check cache first
+      const cached = getCached();
+      if (cached) {
+        return cached;
+      }
+
+      // Cache miss - fetch from API
+      const response = await apiRequest("/movies/meta/filters");
+      const data = response?.data || response;
+
+      // Cache the response
+      setCached(data);
+
+      return data;
+    };
+  })(),
 
   /**
    * Lấy top genres theo tổng lượt xem

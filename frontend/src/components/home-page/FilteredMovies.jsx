@@ -16,6 +16,7 @@ import { preloadImages } from "utils/imagePreloader";
 import imageCache from "utils/imageCache";
 import apiCache from "utils/apiCache";
 import { getOptimizedImageUrl } from "constants/imageSizes";
+import useScrollToTop from "hooks/useScrollToTop";
 
 const PAGE_SIZE = 32;
 const TYPE_FILTERS = {
@@ -178,6 +179,12 @@ const FilteredMovies = ({ pageType = "genre" }) => {
 
     fetchFilteredMovies();
   }, [requestedKey, pageType, page, filters]);
+
+  useScrollToTop({
+    scrollOnPathname: false,
+    dependencies: [page],
+    skipInitialMount: true,
+  });
 
   // Preload images for next page after current page is loaded
   useEffect(() => {
@@ -394,7 +401,17 @@ const FilteredMovies = ({ pageType = "genre" }) => {
         ) : (
           <LazySection rootMargin="100px" minHeight="400px">
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+              {pagination.totalPages > 1 && (
+                <div className="md:hidden">
+                  <Pagination
+                    page={pagination.page}
+                    totalPages={pagination.totalPages}
+                    onPageChange={handlePageChange}
+                    className="mb-6"
+                  />
+                </div>
+              )}
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-1 sm:gap-2 md:gap-4">
                 {movies.map((movie) => (
                   <MovieCard
                     key={movie.id}

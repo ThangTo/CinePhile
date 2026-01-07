@@ -8,6 +8,7 @@ import EmptyState from "components/common/EmptyState";
 import ErrorState from "components/common/ErrorState";
 import movieService from "services/movie.service";
 import { groupSeriesMovies } from "utils/seriesGrouping";
+import useScrollToTop from "hooks/useScrollToTop";
 
 const PAGE_SIZE = 25;
 
@@ -30,6 +31,13 @@ const SearchResults = () => {
     setPage(1);
     setFilters({}); // Reset filters when query changes
   }, [query]);
+
+  // Scroll to top when page changes (not on pathname change, skip initial mount)
+  useScrollToTop({
+    scrollOnPathname: false,
+    dependencies: [page],
+    skipInitialMount: true,
+  });
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -114,6 +122,7 @@ const SearchResults = () => {
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
+    // Scroll to top is handled by useEffect when page state changes
   };
 
   if (!query) {
@@ -178,7 +187,17 @@ const SearchResults = () => {
           />
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            {pagination.totalPages > 1 && (
+              <div className="md:hidden">
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
+                  className="mb-6"
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 sm:gap-2 md:gap-4">
               {movies.map((movie) => (
                 <MovieCard
                   key={movie.id}

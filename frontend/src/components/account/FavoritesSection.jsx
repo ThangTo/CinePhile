@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import userService from "services/user.service";
 import { BarSpinner } from "components/common/LoadingState";
-import Pagination from "components/common/Pagination";
+import PaginationV2 from "components/common/PaginationV2";
 
 const FavoritesSection = ({ user }) => {
   const navigate = useNavigate();
@@ -109,7 +109,7 @@ const FavoritesSection = ({ user }) => {
 
   if (loading) {
     return (
-      <div className="bg-account-bg-secondary rounded-2xl p-6 shadow-sm">
+      <div className="bg-account-bg-secondary rounded-2xl p-3 sm:p-6 shadow-sm">
         <BarSpinner />
       </div>
     );
@@ -117,7 +117,7 @@ const FavoritesSection = ({ user }) => {
 
   if (error) {
     return (
-      <div className="bg-account-bg-secondary rounded-2xl p-6 shadow-sm text-center text-account-text-secondary">
+      <div className="bg-account-bg-secondary rounded-2xl p-3 sm:p-6 shadow-sm text-center text-account-text-secondary">
         {error}
       </div>
     );
@@ -125,7 +125,7 @@ const FavoritesSection = ({ user }) => {
 
   if (items.length === 0) {
     return (
-      <div className="bg-account-bg-secondary rounded-2xl p-6 shadow-sm text-center">
+      <div className="bg-account-bg-secondary rounded-2xl p-3 sm:p-6 shadow-sm text-center">
         <div className="text-5xl text-account-text-secondary mb-4">
           <i className="fa-solid fa-heart" />
         </div>
@@ -146,7 +146,7 @@ const FavoritesSection = ({ user }) => {
   }
 
   return (
-    <div className="bg-account-bg-secondary rounded-2xl p-6 shadow-sm">
+    <div className="bg-account-bg-secondary rounded-2xl p-3 sm:p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
           <p className="text-account-text-secondary">
@@ -155,7 +155,18 @@ const FavoritesSection = ({ user }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center mb-6 sm:hidden">
+          <PaginationV2
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            onPageChange={handlePageChange}
+            isMobile={true}
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
         {items.map((item) => {
           const title = item.title || item.movie?.name || item.movie?.title || "Không có tiêu đề";
           const engTitle =
@@ -216,11 +227,10 @@ const FavoritesSection = ({ user }) => {
 
       {pagination.totalPages > 1 && (
         <div className="flex justify-center mt-6">
-          <Pagination
+          <PaginationV2
             page={pagination.page}
             totalPages={pagination.totalPages}
             onPageChange={handlePageChange}
-            className="bg-bgColor3"
           />
         </div>
       )}

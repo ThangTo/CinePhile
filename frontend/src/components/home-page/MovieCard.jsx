@@ -104,8 +104,8 @@ const MovieCard = ({
             priority={false}
             sizeKey={compact ? "THUMBNAIL" : "CARD"}
           />
-          <div className="absolute left-2 top-1 z-10">
-            <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+          <div className="absolute left-2 md:top-1 top-0 z-10">
+            <span className="rounded bg-cyan-500 md:px-2 md:py-0.5 px-1 py-0.5 md:text-[10px] text-[8px] font-bold text-white shadow">
               {movie.quality || "HD"}
             </span>
           </div>

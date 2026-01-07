@@ -1,8 +1,17 @@
 import React from "react";
 import { GENRE_CATEGORIES, COUNTRY_CATEGORIES } from "./constants";
 import DropdownMenu from "./DropdownMenu";
-import useMovieTaxonomies from "hooks/useMovieTaxonomies";
+import useFilterOptions from "hooks/useFilterOptions";
 import { Link } from "react-router-dom";
+
+/**
+ * Helper function to map filter options to navigation items format
+ */
+const mapToNavItems = (items, basePath) =>
+  (items || []).map((item) => ({
+    label: item.name,
+    href: `${basePath}/${item.slug}`,
+  }));
 
 /**
  * Navigation Links Component - Flexible navigation for mobile and desktop
@@ -11,9 +20,13 @@ import { Link } from "react-router-dom";
  * @param {boolean} props.isMobile - Mobile or desktop layout
  */
 const NavigationLinks = ({ className = "", isMobile = false }) => {
-  const { genres, countries } = useMovieTaxonomies();
-  const genreItems = genres.length ? genres : GENRE_CATEGORIES;
-  const countryItems = countries.length ? countries : COUNTRY_CATEGORIES;
+  const { options } = useFilterOptions();
+  const genreItems = options.genres?.length
+    ? mapToNavItems(options.genres, "/genre")
+    : GENRE_CATEGORIES;
+  const countryItems = options.countries?.length
+    ? mapToNavItems(options.countries, "/country")
+    : COUNTRY_CATEGORIES;
 
   const links = [
     { label: "Phim Lẻ", href: "/type/phim-le", type: "link" },

@@ -74,7 +74,7 @@ const HoverCardHeader = ({
     };
   }, [useYouTubePlayer]);
 
-  // Hiển thị trailer sau 1 giây khi component mount (hover card đã hiện)
+  // Hiển thị trailer khi component mount (hover card đã hiện)
   useEffect(() => {
     const youtubeId = extractYouTubeId(trailerUrl);
 
@@ -99,7 +99,7 @@ const HoverCardHeader = ({
           setHidePoster(false);
           setTrailerReady(false);
         }, 8000);
-      }, 500); // 1 giây delay ban đầu
+      }, 500); // delay ban đầu
     }
 
     // Copy ref values for cleanup

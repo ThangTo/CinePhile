@@ -15,7 +15,6 @@ import {
   FiSearch,
 } from "react-icons/fi";
 import useFilterOptions from "hooks/useFilterOptions";
-import useMovieTaxonomies from "hooks/useMovieTaxonomies";
 import { COUNTRY_CATEGORIES } from "components/header/constants";
 
 /**
@@ -40,7 +39,6 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
   const location = useLocation();
   const isBrowsePage = location.pathname === "/filter";
   const { options: filterOptions, loading: optionsLoading } = useFilterOptions();
-  const { countries: taxonomyCountries, loading: taxonomyLoading } = useMovieTaxonomies();
   const [isExpanded, setIsExpanded] = useState(false); // For compact mode
   // Use localStorage to persist collapse state across filter changes and component remounts
   // This ensures the filter stays open/closed when filters are applied
@@ -83,15 +81,16 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
     }
   };
 
-  // Merge countries from taxonomies with fallback to COUNTRY_CATEGORIES
+  // Merge countries from filter options with fallback to COUNTRY_CATEGORIES
   // Format: { name: string, slug: string }
   const availableCountries = useMemo(() => {
-    // Use taxonomy countries if available, otherwise use COUNTRY_CATEGORIES
-    const countries = taxonomyCountries.length > 0 ? taxonomyCountries : COUNTRY_CATEGORIES;
+    // Use filter options countries if available, otherwise use COUNTRY_CATEGORIES
+    const countries =
+      filterOptions.countries?.length > 0 ? filterOptions.countries : COUNTRY_CATEGORIES;
 
     // Convert to format { name, slug } for consistency
     return countries.map((country) => {
-      // If it's already in { name, slug } format from taxonomy
+      // If it's already in { name, slug } format from filter options
       if (country.name && country.slug) {
         return country;
       }
@@ -109,7 +108,7 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
         slug: country.slug || country.href?.replace("/country/", "") || "",
       };
     });
-  }, [taxonomyCountries]);
+  }, [filterOptions.countries]);
 
   // Determine default type based on pageType and slug
   const getDefaultType = () => {
@@ -430,10 +429,10 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
         <label className="text-xs font-bold uppercase text-gray-400 tracking-wider flex items-center gap-1.5">
           <FiGlobe className="text-primaryColor" size={14} /> Quốc gia
         </label>
-        {taxonomyLoading ? (
+        {optionsLoading ? (
           <div className="h-10 w-full bg-white/5 animate-pulse rounded-lg"></div>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap max-h-52 md:max-h-96 overflow-y-auto custom-scrollbar gap-2">
             <button
               type="button"
               onClick={() => handleFilterChange("countries", [])}
@@ -447,13 +446,17 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
             </button>
             {availableCountries
               .filter((country) => {
-                const countryName = country.name || country.label || "";
+                const rawName = country.name ?? country.label ?? "";
+                const countryName =
+                  typeof rawName === "string" ? rawName.trim() : String(rawName || "").trim();
                 const countrySlug = country.slug || "";
-                return countryName.trim() && countrySlug;
+                return countryName && countrySlug;
               })
               .map((country) => {
-                const countryName = country.name || country.label || "Không có tên";
-                const countrySlug = country.slug || country.name || "";
+                const rawName = country.name ?? country.label ?? "Không có tên";
+                const countryName =
+                  typeof rawName === "string" ? rawName : String(rawName || "Không có tên");
+                const countrySlug = country.slug || countryName || "";
                 const isActive = localFilters.countries?.includes(countrySlug);
                 return (
                   <button
@@ -621,7 +624,7 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
         {optionsLoading ? (
           <div className="h-10 w-full bg-white/5 animate-pulse rounded-lg"></div>
         ) : (
-          <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+          <div className="flex flex-wrap gap-2 max-h-52 overflow-y-auto custom-scrollbar pr-2">
             <button
               type="button"
               onClick={() => handleFilterChange("genres", [])}
@@ -750,11 +753,13 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
                     : [...current, yearStr];
                   handleFilterChange("year", newValue);
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all flex items-center gap-1.5 ${
-                  isActive
-                    ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
-                    : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all items-center gap-1.5
+                  ${year < new Date().getFullYear() - 10 ? "hidden md:flex" : "flex"}
+                  ${
+                    isActive
+                      ? "bg-primaryColor text-black border-primaryColor shadow-lg shadow-primaryColor/20"
+                      : "bg-[#1a1a1a] text-gray-400 border-white/5 hover:border-white/20 hover:text-white hover:bg-white/5"
+                  }`}
               >
                 {isActive && <FiCheck size={12} />}
                 {year}
@@ -908,7 +913,7 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
       {/* Header */}
       <div
         onClick={handleToggleCollapse}
-        className="flex items-center cursor-pointer justify-between p-5 border-b border-white/5 bg-white/[0.02]"
+        className="flex items-center cursor-pointer justify-between md:p-5 p-3 border-b border-white/5 bg-white/[0.02]"
       >
         <div className="flex items-center gap-3">
           <div className="bg-primaryColor/10 p-2 rounded-lg text-primaryColor border-primaryColor/20">
@@ -951,7 +956,7 @@ const MovieFilter = ({ filters = {}, onFilterChange, options = {} }) => {
           isCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
         }`}
       >
-        <div className="p-5 md:p-6">{renderFilterContent()}</div>
+        <div className="p-3 md:p-6">{renderFilterContent()}</div>
       </div>
     </div>
   );

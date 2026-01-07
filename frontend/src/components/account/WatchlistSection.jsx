@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import userService from "services/user.service";
 import { BarSpinner } from "components/common/LoadingState";
-import Pagination from "components/common/Pagination";
+import PaginationV2 from "components/common/PaginationV2";
 
 const WatchlistSection = ({ user }) => {
   const navigate = useNavigate();
@@ -95,7 +95,7 @@ const WatchlistSection = ({ user }) => {
 
       // Remove item from local state
       setItems((prev) => prev.filter((item) => (item.movieId || item.id) !== targetMovieId));
-      
+
       // Update pagination total
       setPagination((prev) => ({
         ...prev,
@@ -130,9 +130,7 @@ const WatchlistSection = ({ user }) => {
           <i className="fa-solid fa-list" />
         </div>
         <h2 className="text-2xl font-semibold mb-2 text-account-text-primary">Danh sách trống</h2>
-        <p className="text-account-text-secondary mb-6">
-          Thêm phim vào danh sách để xem sau
-        </p>
+        <p className="text-account-text-secondary mb-6">Thêm phim vào danh sách để xem sau</p>
         <button
           className="bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText px-6 py-3 rounded-lg font-semibold transition-colors"
           onClick={() => navigate("/")}
@@ -144,7 +142,7 @@ const WatchlistSection = ({ user }) => {
   }
 
   return (
-    <div className="bg-account-bg-secondary rounded-2xl p-6 shadow-sm">
+    <div className="bg-account-bg-secondary rounded-2xl p-3 sm:p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
           <p className="text-account-text-secondary">
@@ -153,10 +151,22 @@ const WatchlistSection = ({ user }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center mb-6 sm:hidden">
+          <PaginationV2
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            onPageChange={handlePageChange}
+            isMobile={true}
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
         {items.map((item) => {
           const title = item.title || item.movie?.name || item.movie?.title || "Không có tiêu đề";
-          const engTitle = item.englishTitle || item.movie?.englishTitle || item.movie?.original_name;
+          const engTitle =
+            item.englishTitle || item.movie?.englishTitle || item.movie?.original_name;
           const poster = item.poster || item.movie?.poster_url || item.movie?.thumb_url || "";
           const rating = item.rating || item.movie?.rating || 0;
           const year = item.year || item.movie?.year || item.movie?.releaseYear;
@@ -200,9 +210,7 @@ const WatchlistSection = ({ user }) => {
               </div>
 
               <div className="mt-4 text-center">
-                {year && (
-                  <p className="text-[11px] text-account-text-secondary mb-1">{year}</p>
-                )}
+                {year && <p className="text-[11px] text-account-text-secondary mb-1">{year}</p>}
                 <h3 className="text-white font-semibold line-clamp-2">{title}</h3>
                 {engTitle && (
                   <p className="text-account-text-secondary text-sm line-clamp-1">{engTitle}</p>
@@ -215,11 +223,10 @@ const WatchlistSection = ({ user }) => {
 
       {pagination.totalPages > 1 && (
         <div className="flex justify-center mt-6">
-          <Pagination
+          <PaginationV2
             page={pagination.page}
             totalPages={pagination.totalPages}
             onPageChange={handlePageChange}
-            className="bg-bgColor3"
           />
         </div>
       )}
@@ -228,4 +235,3 @@ const WatchlistSection = ({ user }) => {
 };
 
 export default WatchlistSection;
-

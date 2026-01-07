@@ -177,24 +177,30 @@ const Header = () => {
 
       {/* Mobile Navigation Menu */}
       {showMobileMenu && (
-        <div className="absolute top-[62px] left-0 min-w-[360px] z-40 lg:hidden bg-[rgba(59,73,135,1)] rounded-2xl mx-2 md:mx-4">
-          <div className="w-full bg-transparent px-4 py-4">
-            <MobileUserMenu
-              user={user}
-              onLogout={handleLogout}
-              onOpenAuth={openAuthModal}
-              onClose={() => setShowMobileMenu(false)}
-            />
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setShowMobileMenu(false)}
+          />
+          <div className="fixed top-[62px] left-0 min-w-[360px] z-40 lg:hidden bg-[rgba(59,73,135,1)] rounded-2xl mx-2 md:mx-4">
+            <div className="w-full bg-transparent px-4 py-4">
+              <MobileUserMenu
+                user={user}
+                onLogout={handleLogout}
+                onOpenAuth={openAuthModal}
+                onClose={() => setShowMobileMenu(false)}
+              />
 
-            {/* Theme Selector - Mobile */}
-            <div className="lg:hidden mt-4 mb-4 flex items-center justify-between px-2">
-              <span className="text-sm text-gray-300">Theme</span>
-              <ThemeSelector />
+              {/* Theme Selector - Mobile */}
+              <div className="lg:hidden mt-4 mb-4 flex items-center justify-between px-2">
+                <span className="text-sm text-gray-300">Theme</span>
+                <ThemeSelector />
+              </div>
+
+              <NavigationLinks isMobile={true} />
             </div>
-
-            <NavigationLinks isMobile={true} />
           </div>
-        </div>
+        </>
       )}
     </>
   );

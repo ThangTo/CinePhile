@@ -23,6 +23,7 @@ import MainLayout from "layouts/MainLayout";
 import NotFoundPage from "./pages/NotFound";
 import GoogleAuthHandler from "pages/GoogleAuthHandler";
 import GoogleAuthHandlerWrapper from "components/common/GoogleAuthHandlerWrapper";
+import ScrollToTop from "components/common/ScrollToTop";
 
 function App() {
   // Khởi tạo listener một lần cho toàn bộ app để phát hiện user interaction (click/keydown/touch)
@@ -36,6 +37,7 @@ function App() {
         <AuthProvider>
           <NotificationProvider>
             <Router>
+              <ScrollToTop />
               <Routes>
                 <Route path="/auth/google/callback" element={<GoogleAuthHandler />} />
                 {/* Handle Google auth callback on homepage (when backend redirects to /?auth=google_success) */}

@@ -12,7 +12,7 @@ import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
  * @param {Function} props.onPageChange - Callback khi thay đổi trang
  * @param {string} props.className - CSS class tùy chỉnh
  */
-const PaginationV2 = ({ page, totalPages, onPageChange, className }) => {
+const PaginationV2 = ({ page, totalPages, onPageChange, className, isMobile = false }) => {
   const [inputVal, setInputVal] = useState(page);
 
   useEffect(() => {
@@ -89,6 +89,22 @@ const PaginationV2 = ({ page, totalPages, onPageChange, className }) => {
     <div
       className={`flex flex-col md:flex-row items-center justify-center gap-2 ${className || ""}`}
     >
+      {isMobile && totalPages > 5 && (
+        <div className="flex items-center gap-2 bg-[#1a1a1a] backdrop-blur px-4 py-2 rounded-xl border border-white/5 shadow-sm">
+          <span className="text-gray-300 text-sm whitespace-nowrap">Trang</span>
+          <input
+            type="number"
+            value={inputVal}
+            onChange={handleInputChange}
+            onBlur={handleCommit}
+            onKeyDown={handleKeyDown}
+            className="w-12 bg-bgColor3 px-1 py-1 rounded-lg text-white text-sm text-center shadow-inner outline-none focus:ring-2 focus:ring-primaryColor/50 border border-transparent transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            min="1"
+            max={totalPages}
+          />
+          <span className="text-gray-300 text-sm whitespace-nowrap">/ {totalPages}</span>
+        </div>
+      )}
       {/* Container với style giống NotificationsTab/CommentTable */}
       <div className="flex items-center bg-[#1a1a1a] p-1 rounded-xl border border-white/5 shadow-sm">
         {/* Nút Previous */}
@@ -178,20 +194,22 @@ const PaginationV2 = ({ page, totalPages, onPageChange, className }) => {
       </div>
 
       {/* Input nhập số trang */}
-      <div className="flex items-center gap-2 bg-[#1a1a1a] backdrop-blur px-4 py-2 rounded-xl border border-white/5 shadow-sm">
-        <span className="text-gray-300 text-sm whitespace-nowrap">Trang</span>
-        <input
-          type="number"
-          value={inputVal}
-          onChange={handleInputChange}
-          onBlur={handleCommit}
-          onKeyDown={handleKeyDown}
-          className="w-12 bg-bgColor3 px-1 py-1 rounded-lg text-white text-sm text-center shadow-inner outline-none focus:ring-2 focus:ring-primaryColor/50 border border-transparent transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          min="1"
-          max={totalPages}
-        />
-        <span className="text-gray-300 text-sm whitespace-nowrap">/ {totalPages}</span>
-      </div>
+      {!isMobile && totalPages > 5 && (
+        <div className="flex items-center gap-2 bg-[#1a1a1a] backdrop-blur px-4 py-2 rounded-xl border border-white/5 shadow-sm">
+          <span className="text-gray-300 text-sm whitespace-nowrap">Trang</span>
+          <input
+            type="number"
+            value={inputVal}
+            onChange={handleInputChange}
+            onBlur={handleCommit}
+            onKeyDown={handleKeyDown}
+            className="w-12 bg-bgColor3 px-1 py-1 rounded-lg text-white text-sm text-center shadow-inner outline-none focus:ring-2 focus:ring-primaryColor/50 border border-transparent transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            min="1"
+            max={totalPages}
+          />
+          <span className="text-gray-300 text-sm whitespace-nowrap">/ {totalPages}</span>
+        </div>
+      )}
     </div>
   );
 };

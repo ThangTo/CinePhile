@@ -9,6 +9,7 @@ import ErrorState from "components/common/ErrorState";
 import movieService from "services/movie.service";
 import { groupSeriesMovies } from "utils/seriesGrouping";
 import { FiFilter } from "react-icons/fi";
+import useScrollToTop from "hooks/useScrollToTop";
 
 const PAGE_SIZE = 32;
 
@@ -72,6 +73,13 @@ const BrowsePage = () => {
     setPage(parseInt(searchParams.get("page")) || 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Scroll to top when page changes (not on pathname change, skip initial mount)
+  useScrollToTop({
+    scrollOnPathname: false,
+    dependencies: [page],
+    skipInitialMount: true,
+  });
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -138,6 +146,7 @@ const BrowsePage = () => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", newPage.toString());
     setSearchParams(newParams);
+    // Scroll to top is handled by useEffect when page state changes
   };
 
   const handleFilterChange = (newFilters) => {
@@ -207,7 +216,17 @@ const BrowsePage = () => {
           />
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+            {pagination.totalPages > 1 && (
+              <div className="md:hidden">
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
+                  className="mb-6"
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 sm:gap-2 md:gap-4">
               {movies.map((movie) => (
                 <MovieCard
                   key={movie.id}
