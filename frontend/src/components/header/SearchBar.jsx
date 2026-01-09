@@ -31,10 +31,13 @@ const SearchBar = ({ className = "", placeholder = "Tìm kiếm phim, diễn vi�
 
     const handle = setTimeout(async () => {
       try {
-        const res = await movieService.search(query.trim(), { limit: 6, page: 1 });
+        // Tăng limit lên 15 để sau khi group series vẫn còn đủ ~6 phim hiển thị
+        const res = await movieService.search(query.trim(), { limit: 20, page: 1 });
         const movies = res?.data || [];
         const grouped = groupSeriesMovies(movies);
-        setResults(grouped);
+        // Giới hạn tối đa 6 phim hiển thị trong dropdown
+        const limitedResults = grouped.slice(0, 6);
+        setResults(limitedResults);
         setIsOpen(true);
       } catch (err) {
         console.error("Search error:", err);

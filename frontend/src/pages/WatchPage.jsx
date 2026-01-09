@@ -11,7 +11,7 @@ import { enrichMovieWithSeriesParts } from "utils/seriesGrouping";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
 import CastSection from "components/movie-detail/CastSection";
-import RecommendationsSection from "components/watch-page/RecommendationsSection";
+import RecommendationsSection from "components/general/RecommendationsSection";
 
 const WatchPage = () => {
   const navigate = useNavigate();
@@ -201,6 +201,7 @@ const WatchPage = () => {
           <div className="lg:hidden w-full space-y-6 mt-6">
             <RatingSidebar movie={movie} />
             <CastSection movie={movie} layout="vertical" />
+            <RecommendationsSection movie={movie} />
           </div>
 
           {/* Mobile/Tablet Comments below rating & cast */}

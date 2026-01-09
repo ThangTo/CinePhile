@@ -794,328 +794,273 @@ const getTopGenresByViews = async (limit = 10) => {
 };
 
 /**
- * Search movies using MongoDB $text search (BM25) for relevance scoring
- * Combines BM25 scoring with accent-insensitive regex matching
- * Falls back to regex search if text index is not available
- * Priority: Search first, then apply filters to search results
+ * Search movies using MongoDB Atlas Search
+ * Uses compound query with must (filters) and should (keyword search)
+ * Priority: Filters first (must), then keyword search (should)
  */
 const search = async (q, options = {}) => {
   const { page, limit, sort, ...filters } = options;
-  const pagination = { page, limit, sort };
-  const searchQuery = (q || '').trim();
-  if (!searchQuery) {
-    // Empty query: return all movies with filters, sorted
-    const queryFilters = { q: '', ...filters };
-    const builder = Movie.find(buildQuery(queryFilters, false));
-    const result = await paginate(builder, pagination);
-    return transformPaginatedResult(result);
-  }
-
+  const keyword = (q || '').trim();
   const currentPage = Math.max(parseInt(page, 10) || 1, 1);
   const perPage = Math.max(parseInt(limit, 10) || 12, 1);
   const skip = (currentPage - 1) * perPage;
 
-  // Normalize query for accent-insensitive search
-  const normalizedQuery = removeVietnameseAccents(searchQuery);
+  // CASE 1: KHÔNG CÓ KEYWORD -> Dùng Query thường (Fallback)
+  if (!keyword || keyword.length === 0) {
+    // Gọi lại logic query thường của bạn ở đây
+    const queryFilters = { q: '', ...filters };
+    // Giả sử bạn có hàm buildQuery và paginate cũ
+    const builder = Movie.find(buildQuery(queryFilters, false));
+    const result = await paginate(builder, { page, limit, sort });
+    return transformPaginatedResult(result);
+  }
 
-  // STEP 1: Search first (without filters) to get matching movie IDs
-  // This ensures search results are prioritized, then filters are applied to those results
-  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regexOriginal = new RegExp(escapeRegex(searchQuery), 'i');
-  const regexNormalized = new RegExp(escapeRegex(normalizedQuery), 'i');
-
-  // Try to use BM25 ($text search) with accent-insensitive support
-  // Since $text search doesn't handle accents well, we'll search with both original and normalized
+  // CASE 2: CÓ KEYWORD -> Dùng ATLAS SEARCH (Optimized)
   try {
-    // STEP 1A: Search without filters to get all matching movie IDs
-    const textQueries = [];
+    // --- BƯỚC 1: Xây dựng điều kiện Filter (MUST) ---
+    // Điều kiện bắt buộc: Phải đúng thể loại, năm, quốc gia...
+    const mustConditions = [];
 
-    // If query has accents, try both versions
-    if (normalizedQuery.toLowerCase() !== searchQuery.toLowerCase()) {
-      // Query has accents - try both original and normalized
-      textQueries.push(
-        { $text: { $search: searchQuery } }, // Original (có dấu)
-        { $text: { $search: normalizedQuery } }, // Normalized (không dấu)
+    // 1.1 Filter Genres (Slug - Token)
+    if (filters.genres && Array.isArray(filters.genres) && filters.genres.length > 0) {
+      // Logic: Phim phải chứa ÍT NHẤT 1 trong các genres truyền vào (Dùng compound should trong must hoặc query trực tiếp)
+      // Cách đơn giản nhất cho Token array: Dùng 'term' với operator 'in' nếu field là array,
+      // nhưng Atlas Search term mặc định là match exact.
+      // Để support filter mảng genres: Phim phải có genre A HOẶC genre B
+      const genreShoulds = filters.genres.map((g) => ({
+        term: { path: 'categories.slug', value: g },
+      }));
+      mustConditions.push({
+        compound: { should: genreShoulds, minimumShouldMatch: 1 },
+      });
+    } else if (filters.genre) {
+      mustConditions.push({ term: { path: 'categories.slug', value: filters.genre } });
+    }
+
+    // 1.2 Filter Countries (Slug - Token)
+    if (filters.countries && Array.isArray(filters.countries) && filters.countries.length > 0) {
+      const countryShoulds = filters.countries.map((c) => ({
+        term: { path: 'country.slug', value: c },
+      }));
+      mustConditions.push({
+        compound: { should: countryShoulds, minimumShouldMatch: 1 },
+      });
+    } else if (filters.country) {
+      mustConditions.push({ term: { path: 'country.slug', value: filters.country } });
+    }
+
+    // 1.3 Filter Type, Status, Quality, AgeRating (Token)
+    if (filters.type) mustConditions.push({ term: { path: 'type', value: filters.type } });
+    if (filters.status) mustConditions.push({ term: { path: 'status', value: filters.status } });
+    if (filters.quality) mustConditions.push({ term: { path: 'quality', value: filters.quality } });
+    if (filters.ageRating) {
+      if (Array.isArray(filters.ageRating)) {
+        const ratingShoulds = filters.ageRating.map((r) => ({
+          term: { path: 'age_rating', value: r },
+        }));
+        mustConditions.push({ compound: { should: ratingShoulds, minimumShouldMatch: 1 } });
+      } else {
+        mustConditions.push({ term: { path: 'age_rating', value: filters.ageRating } });
+      }
+    }
+
+    // 1.4 Filter Year (Number - Equals)
+    if (filters.year) {
+      if (Array.isArray(filters.year)) {
+        const yearShoulds = filters.year.map((y) => ({
+          equals: { path: 'year', value: parseInt(y, 10) },
+        }));
+        mustConditions.push({ compound: { should: yearShoulds, minimumShouldMatch: 1 } });
+      } else {
+        mustConditions.push({ equals: { path: 'year', value: parseInt(filters.year, 10) } });
+      }
+    }
+
+    // 1.5 Filter SubType (Logic số tập)
+    if (filters.subType) {
+      if (filters.subType === 'single') {
+        mustConditions.push({ equals: { path: 'totalEpisodes', value: 1 } });
+      } else if (filters.subType === 'series') {
+        mustConditions.push({ range: { path: 'totalEpisodes', gt: 1 } });
+      }
+    }
+
+    // --- BƯỚC 2: Xây dựng điều kiện Tìm kiếm (SHOULD) ---
+    // Logic thông minh để loại bỏ kết quả rác
+    const shouldConditions = [];
+    const isShortKeyword = keyword.length < 5; // Định nghĩa từ khóa ngắn
+
+    // 2.1 AUTocomplete SEARCH (Tên phim) - Boost cực cao (10)
+    // Sử dụng autocomplete cho name và original_name (edgeGram tokenization)
+    shouldConditions.push({
+      autocomplete: {
+        query: keyword,
+        path: 'name',
+        score: { boost: { value: 10 } },
+      },
+    });
+
+    // 2.2 AUTocomplete SEARCH (Tên gốc) - Boost cao (8)
+    shouldConditions.push({
+      autocomplete: {
+        query: keyword,
+        path: 'original_name',
+        score: { boost: { value: 8 } },
+      },
+    });
+
+    // 2.3 TEXT SEARCH (Slug) - Boost trung bình (3)
+    // Slug vẫn dùng text query vì là token type
+    shouldConditions.push({
+      text: {
+        query: keyword,
+        path: 'slug',
+        score: { boost: { value: 3 } },
+        fuzzy: { maxEdits: 1 },
+      },
+    });
+
+    // 2.4 TEXT SEARCH (Diễn viên, Đạo diễn) - Boost thấp (1.5)
+    shouldConditions.push({
+      text: {
+        query: keyword,
+        path: ['actor', 'director'],
+        score: { boost: { value: 1.5 } },
+      },
+    });
+
+    // 2.5 CONTENT SEARCH - CHỈ TÌM NẾU TỪ KHÓA ĐỦ DÀI
+    if (!isShortKeyword) {
+      shouldConditions.push({
+        text: {
+          query: keyword,
+          path: ['content', 'categories.name'],
+          score: { boost: { value: 0.5 } }, // Boost thấp để không làm loãng kết quả chính
+        },
+      });
+    }
+
+    // --- BƯỚC 3: Audio Type Lookup Logic ---
+    const audioTypes = filters.lang ? mapAudioTypeFilter(filters.lang) : [];
+    const hasAudioFilter = audioTypes.length > 0;
+
+    // --- BƯỚC 4: Ráp Pipeline ---
+    const pipeline = [
+      {
+        $search: {
+          index: 'default',
+          compound: {
+            must: mustConditions, // Phải thỏa mãn Filter
+            should: shouldConditions, // Nên thỏa mãn từ khóa
+            minimumShouldMatch: 1, // Bắt buộc match ít nhất 1 điều kiện should (Keyword)
+          },
+          count: { type: 'total' }, // Đếm tổng số kết quả
+        },
+      },
+      // Lấy Meta và Score
+      {
+        $addFields: {
+          searchMeta: '$$SEARCH_META',
+          score: { $meta: 'searchScore' },
+        },
+      },
+    ];
+
+    // --- BƯỚC 5: Xử lý Audio Filter (Nếu có) ---
+    // Lưu ý: Filter này chạy sau search nên tốn resource hơn, nhưng bắt buộc vì data nằm ở bảng khác
+    if (hasAudioFilter) {
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'episodes',
+            localField: '_id',
+            foreignField: 'movieId',
+            as: 'episodes', // Chỉ lookup field cần thiết nếu có thể để tối ưu
+          },
+        },
+        {
+          $match: { 'episodes.audioType': { $in: audioTypes } },
+        },
       );
+    }
+
+    // --- BƯỚC 6: Sắp xếp (Sort) ---
+    const sortStage = {};
+    // Ưu tiên Score trước (độ phù hợp)
+    sortStage.score = -1;
+
+    // Sau đó đến tiêu chí user chọn
+    if (sort === 'newest') sortStage.createdAt = -1;
+    else if (sort === 'updated') {
+      sortStage.updatedAt = -1;
+      sortStage.createdAt = -1;
+    } else if (sort === 'views') {
+      sortStage.viewCount = -1;
+    } else if (sort === 'imdb') {
+      sortStage.rating = -1;
     } else {
-      // No accents - just use normalized
-      textQueries.push({ $text: { $search: normalizedQuery } });
-    }
+      sortStage.year = -1;
+    } // Default
 
-    // STEP 1B: Get all matching movie IDs from search (without filters)
-    const allTextIds = new Set();
-    const allTextResults = [];
+    pipeline.push({ $sort: sortStage });
 
-    for (const textQuery of textQueries) {
-      try {
-        const textPipeline = [
-          {
-            $match: textQuery,
-          },
-          {
-            $addFields: {
-              textScore: { $meta: 'textScore' },
-            },
-          },
-          {
-            $project: {
-              _id: 1,
-              textScore: 1,
-              createdAt: 1,
-            },
-          },
-        ];
+    // --- BƯỚC 7: Phân trang & Clean Data ---
+    pipeline.push(
+      { $skip: skip },
+      { $limit: perPage },
+      {
+        $project: {
+          // Chỉ lấy field cần thiết
+          name: 1,
+          original_name: 1,
+          slug: 1,
+          thumb_url: 1,
+          poster_url: 1,
+          year: 1,
+          quality: 1,
+          lang: 1,
+          type: 1,
+          category: 1,
+          score: 1,
+          // Giữ lại meta count để return về controller
+          totalCount: '$searchMeta.count.total',
+        },
+      },
+    );
 
-        const results = await Movie.aggregate(textPipeline);
-        results.forEach((movie) => {
-          const id = movie._id.toString();
-          if (!allTextIds.has(id)) {
-            allTextIds.add(id);
-            allTextResults.push({
-              _id: movie._id,
-              textScore: movie.textScore || 0,
-              createdAt: movie.createdAt,
-              relevanceScore: 100 + (movie.textScore || 0) * 10,
-            });
-          } else {
-            // Update if this result has higher score
-            const existing = allTextResults.find((r) => r._id.toString() === id);
-            if (existing && (movie.textScore || 0) > (existing.textScore || 0)) {
-              existing.textScore = movie.textScore;
-              existing.relevanceScore = 100 + (movie.textScore || 0) * 10;
-            }
-          }
-        });
-      } catch (textError) {
-        // Continue with next query if this one fails
-        console.warn(`Text search failed for query: ${textError.message}`);
-      }
-    }
+    // Chạy Aggregation
+    const result = await Movie.aggregate(pipeline);
 
-    // Get regex results for accent-insensitive matching (excluding BM25 matches)
-    const regexSearchQuery = {
-      $or: [
-        { name: regexOriginal },
-        { name: regexNormalized },
-        { original_name: regexOriginal },
-        { original_name: regexNormalized },
-        { slug: regexOriginal },
-        { slug: regexNormalized },
-      ],
-      _id: { $nin: Array.from(allTextIds).map((id) => new mongoose.Types.ObjectId(id)) },
-    };
+    // Xử lý kết quả trả về
+    const movies = result || [];
+    // Lấy total từ record đầu tiên (do searchMeta được gắn vào từng docs)
+    // Lưu ý: Nếu có filter Audio (Lookup), totalCount của Atlas Search có thể bị lệch (lớn hơn thực tế).
+    // Nhưng chấp nhận được để đổi lấy hiệu năng. Nếu muốn chính xác 100% sau lookup thì phải dùng $facet nhưng sẽ chậm.
+    const total = movies.length > 0 ? movies[0].totalCount : 0;
 
-    const regexResults = await Movie.find(regexSearchQuery)
-      .select('_id createdAt')
-      .limit(1000) // Limit to avoid too many results
-      .lean();
-
-    // Add regex IDs to the set
-    regexResults.forEach((movie) => {
-      const id = movie._id.toString();
-      if (!allTextIds.has(id)) {
-        allTextIds.add(id);
-        allTextResults.push({
-          _id: movie._id,
-          textScore: 0,
-          createdAt: movie.createdAt,
-          relevanceScore: 10, // Lower score for regex matches
-        });
-      }
+    // Clean up response (bỏ field thừa)
+    const cleanedMovies = movies.map((m) => {
+      const { totalCount, searchMeta, ...rest } = m;
+      return rest;
     });
-
-    // STEP 2: Now apply filters to the search results
-    // Build filter query (without search and without lang filter)
-    const queryFilters = { ...filters };
-    const audioTypeFilter = filters.lang;
-    if (audioTypeFilter) {
-      delete queryFilters.lang;
-    }
-    const filterQuery = buildQuery({ q: '', ...queryFilters }, false);
-    // Remove _audioTypeFilter if it was added
-    if (filterQuery._audioTypeFilter) {
-      delete filterQuery._audioTypeFilter;
-    }
-
-    // Combine: search results + filters
-    const baseQuery = {
-      ...filterQuery,
-      _id: { $in: Array.from(allTextIds).map((id) => new mongoose.Types.ObjectId(id)) },
-    };
-
-    // STEP 3: Get full movie documents with filters applied
-    // If audioType filter is present, use aggregation to filter by episodes
-    let movies;
-    if (audioTypeFilter) {
-      // Map frontend values to database values
-      const audioTypes = mapAudioTypeFilter(audioTypeFilter);
-
-      // Use aggregation to filter by audioType
-      const aggregationPipeline = createAudioTypeFilterPipeline(baseQuery, audioTypes);
-
-      movies = await Movie.aggregate(aggregationPipeline);
-    } else {
-      // No audioType filter, use normal query
-      movies = await Movie.find(baseQuery).lean();
-    }
-
-    // STEP 4: Sort by relevance score (from search) first, then by sort option
-    const moviesWithScores = movies.map((movie) => {
-      const id = movie._id.toString();
-      const searchResult = allTextResults.find((r) => r._id.toString() === id);
-      return {
-        ...movie,
-        relevanceScore: searchResult ? searchResult.relevanceScore : 0,
-      };
-    });
-
-    // Sort: first by relevance score, then by year (giảm dần), then by sort option, finally by createdAt
-    moviesWithScores.sort((a, b) => {
-      // First priority: relevance score from search
-      if (b.relevanceScore !== a.relevanceScore) {
-        return b.relevanceScore - a.relevanceScore;
-      }
-      // Second priority: year giảm dần
-      const yearDiff = (b.year || 0) - (a.year || 0);
-      if (yearDiff !== 0) return yearDiff;
-      // Third priority: sort option
-      if (sort === 'newest') {
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      } else if (sort === 'updated') {
-        const updatedDiff =
-          new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
-        if (updatedDiff !== 0) return updatedDiff;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      } else if (sort === 'imdb') {
-        const ratingDiff = (b.rating || 0) - (a.rating || 0);
-        if (ratingDiff !== 0) return ratingDiff;
-        const totalRatingsDiff = (b.totalRatings || 0) - (a.totalRatings || 0);
-        if (totalRatingsDiff !== 0) return totalRatingsDiff;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      } else if (sort === 'views') {
-        const viewsDiff = (b.viewCount || 0) - (a.viewCount || 0);
-        if (viewsDiff !== 0) return viewsDiff;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      }
-      // Default: createdAt giảm dần
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
-
-    // STEP 5: Paginate
-    const paginatedResults = moviesWithScores.slice(skip, skip + perPage);
 
     return {
-      data: transformMovies(paginatedResults),
+      data: transformMovies(cleanedMovies), // Hàm transform của bạn
       pagination: {
         page: currentPage,
         limit: perPage,
-        total: moviesWithScores.length,
-        totalPages: Math.max(Math.ceil(moviesWithScores.length / perPage), 1),
+        total: hasAudioFilter ? movies.length : total, // Fix tạm total nếu có filter audio sau search
+        totalPages: Math.ceil((hasAudioFilter ? movies.length : total) / perPage),
       },
     };
   } catch (error) {
-    // Fallback to regex search if $text search fails (e.g., no text index)
-    console.warn('BM25 search failed, falling back to regex:', error.message);
-
-    // Fallback: Search with regex first, then apply filters
-    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regexOriginal = new RegExp(escapeRegex(searchQuery), 'i');
-    const normalizedQuery = removeVietnameseAccents(searchQuery);
-    const regexNormalized = new RegExp(escapeRegex(normalizedQuery), 'i');
-
-    // Search first (without filters)
-    const searchQueryOnly = {
-      $or: [
-        { name: regexOriginal },
-        { name: regexNormalized },
-        { original_name: regexOriginal },
-        { original_name: regexNormalized },
-        { slug: regexOriginal },
-        { slug: regexNormalized },
-      ],
-    };
-
-    const searchResults = await Movie.find(searchQueryOnly).select('_id').lean();
-    const searchIds = searchResults.map((m) => m._id);
-
-    // Apply filters to search results
-    const queryFilters = { ...filters };
-    const audioTypeFilter = filters.lang;
-    if (audioTypeFilter) {
-      delete queryFilters.lang;
-    }
-    const filterQuery = buildQuery({ q: '', ...queryFilters }, false);
-    // Remove _audioTypeFilter if it was added
-    if (filterQuery._audioTypeFilter) {
-      delete filterQuery._audioTypeFilter;
-    }
-
-    const baseQuery = {
-      ...filterQuery,
-      _id: { $in: searchIds },
-    };
-
-    // Get all matching movies with filters
-    // If audioType filter is present, use aggregation
-    let movies;
-    if (audioTypeFilter) {
-      // Map frontend values to database values
-      const audioTypes = mapAudioTypeFilter(audioTypeFilter);
-
-      const aggregationPipeline = createAudioTypeFilterPipeline(baseQuery, audioTypes);
-
-      movies = await Movie.aggregate(aggregationPipeline);
-    } else {
-      movies = await Movie.find(baseQuery).lean();
-    }
-
-    // Sort by relevance (all have same relevance in fallback) and then by sort option
-    const sortOptions = getSortOptions(sort);
-    const moviesWithScores = movies.map((movie) => ({
-      ...movie,
-      relevanceScore: 10, // Same relevance for all in fallback
-    }));
-
-    // Sort: first by year (giảm dần), then by sort option, finally by createdAt
-    moviesWithScores.sort((a, b) => {
-      // First priority: year giảm dần
-      const yearDiff = (b.year || 0) - (a.year || 0);
-      if (yearDiff !== 0) return yearDiff;
-      // Second priority: sort option
-      if (sort === 'newest') {
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      } else if (sort === 'updated') {
-        const updatedDiff =
-          new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
-        if (updatedDiff !== 0) return updatedDiff;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      } else if (sort === 'imdb') {
-        const ratingDiff = (b.rating || 0) - (a.rating || 0);
-        if (ratingDiff !== 0) return ratingDiff;
-        const totalRatingsDiff = (b.totalRatings || 0) - (a.totalRatings || 0);
-        if (totalRatingsDiff !== 0) return totalRatingsDiff;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      } else if (sort === 'views') {
-        const viewsDiff = (b.viewCount || 0) - (a.viewCount || 0);
-        if (viewsDiff !== 0) return viewsDiff;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      }
-      // Default: createdAt giảm dần
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
-
-    // Paginate
-    const paginatedResults = moviesWithScores.slice(skip, skip + perPage);
-
-    return {
-      data: transformMovies(paginatedResults),
-      pagination: {
-        page: currentPage,
-        limit: perPage,
-        total: moviesWithScores.length,
-        totalPages: Math.max(Math.ceil(moviesWithScores.length / perPage), 1),
-      },
-    };
+    console.error('Atlas Search Error:', error);
+    // --- FALLBACK VỀ MONGODB FIND THƯỜNG ---
+    console.warn('Fallback to standard query...');
+    const queryFilters = { q: keyword, ...filters };
+    const builder = Movie.find(buildQuery(queryFilters, false));
+    const result = await paginate(builder, { page, limit, sort });
+    return transformPaginatedResult(result);
   }
 };
 
@@ -1133,9 +1078,9 @@ const getEpisodes = async (identifier) => {
 
 /**
  * Get cast list for a movie
- * - Dựa trên danh sách tên actor trong movie
- * - Join với collection Cast (nếu đã được backfill từ TMDb)
- * - Giữ nguyên thứ tự theo movie.actor
+ * - Ưu tiên: Lấy từ castIds (relationship với Cast collection)
+ * - Fallback: Lấy từ actor array (backward compatibility)
+ * - Giữ nguyên thứ tự theo castIds.order hoặc actor array
  */
 const getCast = async (identifier) => {
   const movieDoc = await findMovie(identifier);
@@ -1143,6 +1088,49 @@ const getCast = async (identifier) => {
     throw new Error('Movie not found');
   }
 
+  // Ưu tiên: Lấy từ castIds nếu có
+  if (movieDoc.castIds && Array.isArray(movieDoc.castIds) && movieDoc.castIds.length > 0) {
+    const castIds = movieDoc.castIds
+      .map((item) => item.castId)
+      .filter((id) => id && mongoose.Types.ObjectId.isValid(id));
+
+    if (castIds.length > 0) {
+      // Populate Cast documents
+      const castDocs = await Cast.find({ _id: { $in: castIds } }).lean();
+
+      // Tạo Map để lookup nhanh
+      const castMap = new Map();
+      castDocs.forEach((doc) => {
+        castMap.set(doc._id.toString(), doc);
+      });
+
+      // Build kết quả theo thứ tự castIds (có order field)
+      const result = movieDoc.castIds
+        .map((item) => {
+          const castDoc = castMap.get(item.castId?.toString());
+          if (!castDoc) return null;
+
+          return {
+            id: castDoc._id?.toString() || null,
+            name: castDoc.name || 'Không rõ',
+            avatar: castDoc.profileUrl || castDoc.profilePath || null,
+            profileUrl: castDoc.profileUrl || null,
+            profilePath: castDoc.profilePath || null,
+            character: item.character || null, // Vai diễn từ castIds
+            order: item.order || 999,
+            tmdbId: castDoc.tmdbId || null,
+            knownForDepartment: castDoc.knownForDepartment || null,
+            popularity: castDoc.popularity || 0,
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => (a.order || 999) - (b.order || 999)); // Sort theo order
+
+      return result;
+    }
+  }
+
+  // Fallback: Lấy từ actor array (backward compatibility cho phim cũ)
   const actorNames = Array.isArray(movieDoc.actor)
     ? movieDoc.actor.map((n) => (n || '').trim()).filter(Boolean)
     : [];
@@ -1209,6 +1197,8 @@ const getCast = async (identifier) => {
       avatar,
       profileUrl: doc?.profileUrl || null,
       profilePath: doc?.profilePath || null,
+      character: null, // Không có character từ actor array
+      order: 999,
       tmdbId: doc?.tmdbId || null,
       knownForDepartment: doc?.knownForDepartment || null,
       popularity: doc?.popularity || 0,
@@ -1573,21 +1563,224 @@ const dislikeComment = async (
 };
 
 /**
- * Get recommended movies based on a movie
- * Logic: Same genre -> Trending -> Top Rated
+ * Get recommended movies based on a movie using Atlas Search
+ * Logic: Atlas Search (genre, director, actor, country) -> Fallback (trending, top rated, newest)
  * @param {string} movieId - Movie ID or slug
  * @param {number} limit - Maximum number of recommendations (default: 10)
  * @returns {Object} { data: Array }
  */
 const getRecommendations = async (movieId, limit = 10) => {
-  // Find the current movie
-  const currentMovie = await findMovie(movieId);
-  if (!currentMovie) {
-    throw new Error('Movie not found');
-  }
+  try {
+    // 1. Lấy thông tin phim hiện tại
+    const currentMovie = await findMovie(movieId);
+    if (!currentMovie) {
+      throw new Error('Movie not found');
+    }
 
-  const currentMovieId = currentMovie._id;
-  const excludedIds = [currentMovieId]; // Array of ObjectIds for MongoDB queries
+    const currentMovieId = currentMovie._id;
+
+    // 2. Chuẩn bị dữ liệu để tìm kiếm
+    const genreSlugs =
+      currentMovie.categories?.map((c) => (typeof c === 'object' ? c.slug : c)).filter(Boolean) ||
+      [];
+    const directors = Array.isArray(currentMovie.director)
+      ? currentMovie.director.map((d) => (d || '').trim()).filter(Boolean)
+      : [];
+    const countrySlugs =
+      currentMovie.country?.map((c) => (typeof c === 'object' ? c.slug : c)).filter(Boolean) || [];
+
+    // 3. Lấy tên diễn viên từ Cast collection nếu có castIds (ưu tiên)
+    let actorNames = [];
+    if (
+      currentMovie.castIds &&
+      Array.isArray(currentMovie.castIds) &&
+      currentMovie.castIds.length > 0
+    ) {
+      const castIds = currentMovie.castIds
+        .map((item) => item.castId)
+        .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+        .slice(0, 10); // Chỉ lấy 10 diễn viên đầu tiên để tối ưu
+
+      if (castIds.length > 0) {
+        const castDocs = await Cast.find({ _id: { $in: castIds } })
+          .select('name')
+          .lean();
+        actorNames = castDocs.map((doc) => doc.name).filter(Boolean);
+      }
+    }
+
+    // Fallback: Lấy từ actor array nếu không có castIds
+    if (actorNames.length === 0 && Array.isArray(currentMovie.actor)) {
+      actorNames = currentMovie.actor
+        .map((n) => (n || '').trim())
+        .filter(Boolean)
+        .slice(0, 10);
+    }
+
+    // 4. Xây dựng Pipeline Atlas Search
+    const shouldConditions = [];
+
+    // Ưu tiên 1: Cùng thể loại (Quan trọng nhất) - Boost x3
+    if (genreSlugs.length > 0) {
+      // Sử dụng text query cho slug để có thể boost (hoặc wrap term trong compound)
+      // Dùng text query vì slug thường là exact match và có thể search được
+      shouldConditions.push({
+        text: {
+          query: genreSlugs,
+          path: 'categories.slug',
+          score: { boost: { value: 3 } },
+        },
+      });
+    }
+
+    // Ưu tiên 2: Cùng đạo diễn - Boost x2
+    if (directors.length > 0) {
+      shouldConditions.push({
+        text: {
+          query: directors,
+          path: 'director',
+          score: { boost: { value: 2 } },
+        },
+      });
+    }
+
+    // Ưu tiên 3: Cùng diễn viên - Boost x1.5
+    if (actorNames.length > 0) {
+      shouldConditions.push({
+        text: {
+          query: actorNames,
+          path: 'actor',
+          score: { boost: { value: 1.5 } },
+        },
+      });
+    }
+
+    // Ưu tiên 4: Cùng quốc gia - Boost x1
+    if (countrySlugs.length > 0) {
+      shouldConditions.push({
+        text: {
+          query: countrySlugs,
+          path: 'country.slug',
+          score: { boost: { value: 1 } },
+        },
+      });
+    }
+
+    // Nếu không có điều kiện nào, fallback về logic cũ
+    if (shouldConditions.length === 0) {
+      return await getRecommendationsFallback(currentMovie, currentMovieId, limit);
+    }
+
+    // 5. Tạo Pipeline Atlas Search
+    const pipeline = [
+      {
+        $search: {
+          index: 'default',
+          compound: {
+            // Điều kiện SHOULD (Càng khớp nhiều càng lên đầu)
+            should: shouldConditions,
+            // Phải khớp ít nhất 1 tiêu chí mới lấy
+            minimumShouldMatch: 1,
+          },
+        },
+      },
+      // Loại trừ phim hiện tại (đảm bảo chắc chắn)
+      {
+        $match: {
+          _id: { $ne: currentMovieId },
+        },
+      },
+      // Lấy Score để sắp xếp
+      {
+        $addFields: {
+          score: { $meta: 'searchScore' },
+        },
+      },
+      // Sắp xếp: Score cao nhất, sau đó viewCount, rating
+      {
+        $sort: {
+          score: -1,
+          viewCount: -1,
+          rating: -1,
+          year: -1,
+        },
+      },
+      // Lấy dư ra một chút để có nhiều lựa chọn
+      { $limit: limit * 2 },
+      // Project các trường cần thiết
+      {
+        $project: {
+          name: 1,
+          original_name: 1,
+          slug: 1,
+          thumb_url: 1,
+          poster_url: 1,
+          year: 1,
+          quality: 1,
+          time: 1,
+          age_rating: 1,
+          lang: 1,
+          type: 1,
+          viewCount: 1,
+          rating: 1,
+          score: 1,
+        },
+      },
+    ];
+
+    // 6. Chạy Atlas Search
+    const relatedMovies = await Movie.aggregate(pipeline);
+
+    // 7. Transform dữ liệu
+    let recommendedMovies = transformMovies(relatedMovies);
+
+    // 8. Nếu không đủ kết quả, bổ sung bằng fallback logic
+    if (recommendedMovies.length < limit) {
+      const excludedIds = [currentMovieId, ...relatedMovies.map((m) => m._id).filter(Boolean)];
+      const additional = await getRecommendationsFallback(
+        currentMovie,
+        currentMovieId,
+        limit - recommendedMovies.length,
+        excludedIds,
+      );
+      recommendedMovies = [...recommendedMovies, ...additional.data];
+    }
+
+    // 9. Giới hạn và trả về
+    return {
+      data: recommendedMovies.slice(0, limit),
+    };
+  } catch (error) {
+    console.error('Get Recommendations Error (Atlas Search):', error);
+    // Fallback về logic cũ nếu Atlas Search lỗi
+    try {
+      const currentMovie = await findMovie(movieId);
+      if (!currentMovie) {
+        throw new Error('Movie not found');
+      }
+      return await getRecommendationsFallback(currentMovie, currentMovie._id, limit);
+    } catch (fallbackError) {
+      console.error('Get Recommendations Fallback Error:', fallbackError);
+      return { data: [] };
+    }
+  }
+};
+
+/**
+ * Fallback logic for recommendations when Atlas Search fails or returns insufficient results
+ * @param {Object} currentMovie - Current movie document
+ * @param {ObjectId} currentMovieId - Current movie ID
+ * @param {number} limit - Number of recommendations needed
+ * @param {Array} excludedIds - Array of movie IDs to exclude
+ * @returns {Object} { data: Array }
+ */
+const getRecommendationsFallback = async (
+  currentMovie,
+  currentMovieId,
+  limit,
+  excludedIds = [],
+) => {
+  const excluded = [currentMovieId, ...excludedIds];
   let recommendedMovies = [];
 
   // Priority 1: Get movies with same genre/category
@@ -1596,35 +1789,26 @@ const getRecommendations = async (movieId, limit = 10) => {
     Array.isArray(currentMovie.categories) &&
     currentMovie.categories.length > 0
   ) {
-    // Get first category/genre slug
-    const firstCategory = currentMovie.categories[0];
-    const genreSlug =
-      typeof firstCategory === 'object' && firstCategory.slug
-        ? firstCategory.slug
-        : typeof firstCategory === 'string'
-        ? firstCategory
-        : null;
+    const genreSlugs = currentMovie.categories
+      .map((c) => (typeof c === 'object' ? c.slug : c))
+      .filter(Boolean);
 
-    if (genreSlug) {
-      // Query movies with same genre, excluding current movie
+    if (genreSlugs.length > 0) {
       const sameGenreMovies = await Movie.find({
-        'categories.slug': genreSlug,
-        _id: { $ne: currentMovieId },
+        'categories.slug': { $in: genreSlugs },
+        _id: { $nin: excluded },
       })
-        .sort({ viewCount: -1, rating: -1 })
-        .limit(limit * 2) // Get more to have options
+        .sort({ viewCount: -1, rating: -1, year: -1 })
+        .limit(limit * 2)
         .lean();
 
       if (sameGenreMovies && sameGenreMovies.length > 0) {
-        // Store ObjectIds before transformation
         sameGenreMovies.forEach((movie) => {
           if (movie._id) {
-            excludedIds.push(movie._id);
+            excluded.push(movie._id);
           }
         });
-
-        const transformed = transformMovies(sameGenreMovies);
-        recommendedMovies = [...transformed];
+        recommendedMovies = transformMovies(sameGenreMovies);
       }
     }
   }
@@ -1633,20 +1817,18 @@ const getRecommendations = async (movieId, limit = 10) => {
   if (recommendedMovies.length < limit) {
     const needed = limit - recommendedMovies.length;
     const trendingMovies = await Movie.find({
-      _id: { $nin: excludedIds },
+      _id: { $nin: excluded },
     })
       .sort({ viewCount: -1, createdAt: -1 })
       .limit(needed * 2)
       .lean();
 
     if (trendingMovies && trendingMovies.length > 0) {
-      // Store ObjectIds before transformation
       trendingMovies.forEach((movie) => {
         if (movie._id) {
-          excludedIds.push(movie._id);
+          excluded.push(movie._id);
         }
       });
-
       const transformed = transformMovies(trendingMovies);
       const additional = transformed.slice(0, needed);
       recommendedMovies = [...recommendedMovies, ...additional];
@@ -1657,7 +1839,7 @@ const getRecommendations = async (movieId, limit = 10) => {
   if (recommendedMovies.length < limit) {
     const needed = limit - recommendedMovies.length;
     const topRatedMovies = await Movie.find({
-      _id: { $nin: excludedIds },
+      _id: { $nin: excluded },
     })
       .sort({ rating: -1, totalRatings: -1, viewCount: -1 })
       .limit(needed * 2)
@@ -1674,7 +1856,7 @@ const getRecommendations = async (movieId, limit = 10) => {
   if (recommendedMovies.length < limit) {
     const needed = limit - recommendedMovies.length;
     const newestMovies = await Movie.find({
-      _id: { $nin: excludedIds },
+      _id: { $nin: excluded },
     })
       .sort({ createdAt: -1 })
       .limit(needed)
@@ -1687,7 +1869,6 @@ const getRecommendations = async (movieId, limit = 10) => {
     }
   }
 
-  // Limit to requested number and return
   return {
     data: recommendedMovies.slice(0, limit),
   };

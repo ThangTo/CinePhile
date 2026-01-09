@@ -60,6 +60,15 @@ const castSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+
+    // Thông tin chi tiết từ TMDb
+    biography: { type: String },
+    birthday: { type: String }, // YYYY-MM-DD
+    deathday: { type: String }, // YYYY-MM-DD (nếu có)
+    place_of_birth: { type: String },
+    imdbId: { type: String }, // IMDb ID
+    gender: { type: Number }, // 0: Not specified, 1: Female, 2: Male, 3: Non-binary
+    images: [{ type: String }], // Array of profile image URLs
   },
   {
     timestamps: true,

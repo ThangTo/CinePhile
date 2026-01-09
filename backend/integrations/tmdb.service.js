@@ -62,6 +62,202 @@ async function searchPersonByName(name) {
   }
 }
 
+/**
+ * Lấy credits (cast & crew) từ TMDb movie/tv ID
+ * @param {number} tmdbId - TMDb movie/tv ID
+ * @param {string} type - "movie" hoặc "tv"
+ * @param {number} season - Season number (chỉ cho TV, optional)
+ * @returns {Promise<Object|null>} { cast: [...], crew: [...] }
+ */
+async function getCreditsFromTmdb(tmdbId, type = 'movie', season = null) {
+  if (!TMDB_API_KEY || !tmdbId) return null;
+
+  try {
+    let endpoint;
+    if (type === 'tv' && season !== null) {
+      endpoint = `${TMDB_BASE_URL}/tv/${tmdbId}/season/${season}/credits`;
+    } else if (type === 'tv') {
+      endpoint = `${TMDB_BASE_URL}/tv/${tmdbId}/credits`;
+    } else {
+      endpoint = `${TMDB_BASE_URL}/movie/${tmdbId}/credits`;
+    }
+
+    const response = await axios.get(endpoint, {
+      params: {
+        api_key: TMDB_API_KEY,
+        language: 'vi-VN',
+      },
+    });
+
+    const cast = (response.data?.cast || []).map((person) => ({
+      tmdbId: person.id,
+      name: person.name,
+      character: person.character || null, // Vai diễn
+      profilePath: person.profile_path || null,
+      profileUrl: person.profile_path ? `${TMDB_IMAGE_BASE}${person.profile_path}` : null,
+      knownForDepartment: person.known_for_department || 'Acting',
+      popularity: person.popularity || 0,
+      order: person.order || 999, // Thứ tự xuất hiện
+      alsoKnownAs: person.also_known_as || [],
+    }));
+
+    const crew = (response.data?.crew || []).map((person) => ({
+      tmdbId: person.id,
+      name: person.name,
+      job: person.job || null, // Vai trò (Director, Producer, etc.)
+      department: person.department || null,
+      profilePath: person.profile_path || null,
+      profileUrl: person.profile_path ? `${TMDB_IMAGE_BASE}${person.profile_path}` : null,
+      knownForDepartment: person.known_for_department || null,
+      popularity: person.popularity || 0,
+      alsoKnownAs: person.also_known_as || [],
+    }));
+
+    return { cast, crew };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(`❌ TMDb getCreditsFromTmdb error for ${type}/${tmdbId}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Lấy thông tin chi tiết của person từ TMDb
+ * @param {number} personId - TMDb person ID
+ * @returns {Promise<Object|null>} Person details
+ */
+async function getPersonDetails(personId) {
+  if (!TMDB_API_KEY || !personId) return null;
+
+  try {
+    const response = await axios.get(`${TMDB_BASE_URL}/person/${personId}`, {
+      params: {
+        api_key: TMDB_API_KEY,
+        language: 'vi-VN',
+        append_to_response: 'images,external_ids',
+      },
+    });
+
+    const person = response.data;
+    return {
+      tmdbId: person.id,
+      name: person.name,
+      biography: person.biography || null,
+      birthday: person.birthday || null,
+      deathday: person.deathday || null,
+      place_of_birth: person.place_of_birth || null,
+      profilePath: person.profile_path || null,
+      profileUrl: person.profile_path ? `${TMDB_IMAGE_BASE}${person.profile_path}` : null,
+      knownForDepartment: person.known_for_department || null,
+      popularity: person.popularity || 0,
+      gender: person.gender || 0,
+      alsoKnownAs: person.also_known_as || [],
+      images: person.images?.profiles || [],
+      imdbId: person.external_ids?.imdb_id || null,
+    };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(`❌ TMDb getPersonDetails error for person ${personId}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Lấy danh sách phim/TV shows mà person đã đóng
+ * @param {number} personId - TMDb person ID
+ * @returns {Promise<Object|null>} { cast: [...], crew: [...] }
+ */
+async function getPersonCredits(personId) {
+  if (!TMDB_API_KEY || !personId) return null;
+
+  try {
+    // Dùng combined_credits để lấy cả movies và TV shows
+    const response = await axios.get(`${TMDB_BASE_URL}/person/${personId}/combined_credits`, {
+      params: {
+        api_key: TMDB_API_KEY,
+        language: 'vi-VN',
+      },
+    });
+
+    const cast = (response.data?.cast || []).map((item) => ({
+      id: item.id,
+      title: item.title || item.name, // title cho movie, name cho TV
+      original_title: item.original_title || item.original_name,
+      character: item.character || null, // Vai diễn
+      release_date: item.release_date || item.first_air_date || null,
+      poster_path: item.poster_path || null,
+      poster_url: item.poster_path ? `${TMDB_IMAGE_BASE}${item.poster_path}` : null,
+      media_type: item.media_type, // "movie" hoặc "tv"
+      popularity: item.popularity || 0,
+      vote_average: item.vote_average || 0,
+      vote_count: item.vote_count || 0,
+    }));
+
+    const crew = (response.data?.crew || []).map((item) => ({
+      id: item.id,
+      title: item.title || item.name,
+      original_title: item.original_title || item.original_name,
+      job: item.job || null, // Vai trò (Director, Producer, etc.)
+      department: item.department || null,
+      release_date: item.release_date || item.first_air_date || null,
+      poster_path: item.poster_path || null,
+      poster_url: item.poster_path ? `${TMDB_IMAGE_BASE}${item.poster_path}` : null,
+      media_type: item.media_type,
+      popularity: item.popularity || 0,
+      vote_average: item.vote_average || 0,
+      vote_count: item.vote_count || 0,
+    }));
+
+    return { cast, crew };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(`❌ TMDb getPersonCredits error for person ${personId}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Lấy tất cả images (backdrops & posters) từ TMDb
+ * @param {number} tmdbId - TMDb movie/tv ID
+ * @param {string} type - "movie" hoặc "tv"
+ * @returns {Promise<Object|null>} { backdrops: [...], posters: [...] }
+ */
+async function getMovieImages(tmdbId, type = 'movie') {
+  if (!TMDB_API_KEY || !tmdbId) return null;
+
+  try {
+    const endpoint =
+      type === 'tv'
+        ? `${TMDB_BASE_URL}/tv/${tmdbId}/images`
+        : `${TMDB_BASE_URL}/movie/${tmdbId}/images`;
+
+    const response = await axios.get(endpoint, {
+      params: {
+        api_key: TMDB_API_KEY,
+        include_image_language: 'en,vi,null', // Lấy ảnh tiếng Anh, Việt và không có ngôn ngữ
+      },
+    });
+
+    const backdrops = (response.data?.backdrops || [])
+      .slice(0, 5) // Giới hạn 5 ảnh backdrop
+      .map((img) => `https://image.tmdb.org/t/p/original${img.file_path}`);
+
+    const posters = (response.data?.posters || [])
+      .slice(0, 5) // Giới hạn 5 ảnh poster
+      .map((img) => `https://image.tmdb.org/t/p/original${img.file_path}`);
+
+    return { backdrops, posters };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(`❌ TMDb getMovieImages error for ${type}/${tmdbId}:`, error.message);
+    return null;
+  }
+}
+
 module.exports = {
   searchPersonByName,
+  getCreditsFromTmdb,
+  getPersonDetails,
+  getPersonCredits,
+  getMovieImages,
 };

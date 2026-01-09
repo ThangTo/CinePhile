@@ -1,6 +1,8 @@
 import React from "react";
 import EpisodesSection from "./EpisodesSection";
 import CastSection from "./CastSection";
+import GallerySection from "./GallerySection";
+import RecommendationsSection from "../general/RecommendationsSection";
 
 const TabContent = ({ activeTab, movie, audioType, onAudioTypeChange, onPartChange }) => {
   const renderTabContent = () => {
@@ -19,20 +21,10 @@ const TabContent = ({ activeTab, movie, audioType, onAudioTypeChange, onPartChan
         return <CastSection movie={movie} title={false} layout="detail" />;
 
       case "gallery":
-        return (
-          <div>
-            <h3 className="text-2xl font-bold mb-6 text-gray-100">Gallery</h3>
-            <div className="text-gray-400">Gallery content coming soon...</div>
-          </div>
-        );
+        return <GallerySection movie={movie} />;
 
       case "recommendations":
-        return (
-          <div>
-            <h3 className="text-2xl font-bold mb-6 text-gray-100">Đề xuất</h3>
-            <div className="text-gray-400">Recommendations coming soon...</div>
-          </div>
-        );
+        return <RecommendationsSection movie={movie} />;
 
       default:
         return null;

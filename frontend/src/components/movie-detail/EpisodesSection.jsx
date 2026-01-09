@@ -126,7 +126,7 @@ const EpisodeSection = ({
                 onClick={() => handleSelectVersion(opt.key)}
                 className={`${
                   isActive ? "border border-primaryColor" : ""
-                } group relative h-12 overflow-hidden rounded-2xl ${bgClass} text-left text-white min-h-[180px] transition-transform duration-200 hover:-translate-y-1`}
+                } group relative h-12 overflow-hidden rounded-2xl ${bgClass} text-left text-white md:min-h-[180px] min-h-[110px] transition-transform duration-200 hover:-translate-y-1`}
               >
                 <div className="flex items-between gap-4">
                   {/* Left content */}
@@ -157,7 +157,7 @@ const EpisodeSection = ({
                     </div>
 
                     {/* Movie title */}
-                    <div className="space-y-1 mb-4">
+                    <div className="space-y-1 mb-4 hidden md:block">
                       <p className="text-base md:text-lg font-semibold line-clamp-2">
                         {movie.title}
                       </p>

@@ -44,9 +44,8 @@ const VideoPlayer = ({
   const isPremium = isPremiumActive(user);
   const isAdmin = user?.role === "admin";
   const isRegularUser = !isPremium && !isAdmin;
-  
-  const { toasts, showToast, removeToast } = useToast();
 
+  const { toasts, showToast, removeToast } = useToast();
 
   const videoRef = useRef(null);
   const containerRef = useRef(null);
@@ -164,7 +163,7 @@ const VideoPlayer = ({
     video.addEventListener("waiting", handleWaiting);
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("progress", handleProgress);
-    
+
     // Handle PiP return (Back to tab)
     const handleLeavePiP = () => {
       if (containerRef.current) {
@@ -204,46 +203,69 @@ const VideoPlayer = ({
     let shouldSeek = false;
     let seekTime = 0;
 
+    // 1. Lấy key hiện tại của session
+    const currentKey = window.history.state?.key || window.location.pathname;
+
+    // 2. Lấy key của lần xem trước được lưu trong Session Storage
+    const lastKey = sessionStorage.getItem("watchPageKey");
+
+    // 3. Logic so sánh
+    const isReload = lastKey === currentKey;
+
+    if (!isReload) {
+      localStorage.removeItem("resumeTime");
+
+      // Cập nhật key mới để lần sau refresh nó sẽ khớp
+      sessionStorage.setItem("watchPageKey", currentKey);
+    }
+
+    const resumeTimeRef = localStorage.getItem("resumeTime");
     const loadProgressAndSeek = async () => {
       try {
-        // Ưu tiên resumeTime từ location.state (từ ContinueWatching)
-        // Nếu resumeTime === 0, không seek và không load progress từ backend (bắt đầu từ đầu)
-        if (resumeTime === 0) {
-          shouldSeek = false; // Không seek, bắt đầu từ đầu
+        if (resumeTime === 0 && resumeTimeRef === null) {
+          shouldSeek = false;
           seekTime = 0;
-          // Không load progress từ backend khi bắt đầu từ đầu
+          localStorage.setItem("resumeTime", "1");
           return;
-        } else if (resumeTime !== null && resumeTime > 0) {
-          // Có resumeTime từ location.state và > 0
-          shouldSeek = true;
-          seekTime = Math.max(0, resumeTime - 3); // Seek về trước 3 giây
-        } else {
-          // Nếu không có từ location.state (resumeTime === null), load từ backend
-          const response = await userService.getProgress(movieId);
-          if (response?.success && response?.data) {
-            const progress = response.data;
+        }
 
-            // Chỉ auto-seek nếu progress < 95% và watchTime > 5
-            if (progress.progress < 95 && progress.watchTime > 5) {
-              // Kiểm tra episode nếu có (cho series)
-              if (episode?._id || episode?.id) {
-                const savedEpisodeId =
-                  progress.episodeId?._id || progress.episodeId?.id || progress.episodeId;
-                const currentEpisodeId = episode._id || episode.id;
-                if (savedEpisodeId && savedEpisodeId.toString() === currentEpisodeId.toString()) {
-                  shouldSeek = true;
-                  seekTime = Math.max(0, progress.watchTime - 3);
-                }
-              } else {
-                // Phim lẻ, không cần check episode
+        // Luôn load progress mới nhất từ backend để đảm bảo tiến trình cập nhật nhất khi refresh
+        const response = await userService.getProgress(movieId);
+
+        if (response?.success && response?.data) {
+          const progress = response.data;
+
+          // Chỉ auto-seek nếu progress < 95% và watchTime > 5
+          if (progress.progress < 95 && progress.watchTime > 5) {
+            // Kiểm tra episode nếu có (cho series)
+            if (episode?._id || episode?.id) {
+              const savedEpisodeId =
+                progress.episodeId?._id || progress.episodeId?.id || progress.episodeId;
+              const currentEpisodeId = episode._id || episode.id;
+              if (savedEpisodeId && savedEpisodeId.toString() === currentEpisodeId.toString()) {
                 shouldSeek = true;
                 seekTime = Math.max(0, progress.watchTime - 3);
               }
+            } else {
+              // Phim lẻ, không cần check episode
+              shouldSeek = true;
+              seekTime = Math.max(0, progress.watchTime - 3);
             }
+          }
+        } else {
+          // Không có progress từ backend
+          if (resumeTime !== null && resumeTime > 0) {
+            // Fallback: Dùng resumeTime từ state (khi navigate từ ContinueWatching)
+            shouldSeek = true;
+            seekTime = Math.max(0, resumeTime - 3);
           }
         }
       } catch (error) {
-        console.error("Failed to load progress for auto-seek:", error);
+        // Fallback: Nếu lỗi load progress
+        if (resumeTime !== null && resumeTime > 0) {
+          shouldSeek = true;
+          seekTime = Math.max(0, resumeTime - 3);
+        }
       }
     };
 
@@ -318,11 +340,7 @@ const VideoPlayer = ({
           watchTime: watchTime,
           duration: Math.floor(duration),
         });
-
-        console.log("[Resume Watch] Progress saved successfully");
-      } catch (error) {
-        console.error("[Resume Watch] Failed to save progress:", error);
-      }
+      } catch (error) {}
     };
 
     // Lưu mỗi 15 giây
@@ -355,9 +373,7 @@ const VideoPlayer = ({
           watchTime: watchTime,
           duration: Math.floor(duration),
         });
-      } catch (error) {
-        console.error("[Resume Watch] Failed to save progress on pause:", error);
-      }
+      } catch (error) {}
     };
 
     video.addEventListener("pause", handlePause);
@@ -522,9 +538,7 @@ const VideoPlayer = ({
           watchTime: Math.floor(newTime),
           duration: Math.floor(duration),
         });
-      } catch (error) {
-        console.error("[Resume Watch] Failed to save progress on seek:", error);
-      }
+      } catch (error) {}
     }
   };
 
@@ -816,9 +830,7 @@ const VideoPlayer = ({
       .sort((a, b) => b - a);
 
     // Fallback to standard qualities if no levels available
-    const sortedLevels = heightsFromLevels.length > 0 
-      ? heightsFromLevels 
-      : [1080, 720, 480, 360];
+    const sortedLevels = heightsFromLevels.length > 0 ? heightsFromLevels : [1080, 720, 480, 360];
 
     if (sortedLevels.length === 0) return null;
 
@@ -833,7 +845,7 @@ const VideoPlayer = ({
     if (isRegularUser && sortedLevels.length > 1) {
       // Tìm chất lượng cao nhất không phải premium (thường là 720p)
       // Nếu có 1080p thì chỉ cho xem 720p, nếu có 720p thì cho xem 480p
-      const maxRegularQuality = sortedLevels.find(h => h <= 720) || sortedLevels[1];
+      const maxRegularQuality = sortedLevels.find((h) => h <= 720) || sortedLevels[1];
       return maxRegularQuality;
     }
 
@@ -1124,7 +1136,7 @@ const VideoPlayer = ({
       }}
       onTouchStart={(e) => {
         // Prevent default touch behavior that might interfere with video controls
-        if (e.target.closest('.pointer-events-auto')) {
+        if (e.target.closest(".pointer-events-auto")) {
           e.stopPropagation();
         }
       }}
@@ -1230,10 +1242,7 @@ const VideoPlayer = ({
         setShowMoreMenu={setShowMoreMenu}
       />
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      <PremiumRequiredModal 
-        isOpen={showPremiumModal} 
-        onClose={() => setShowPremiumModal(false)} 
-      />
+      <PremiumRequiredModal isOpen={showPremiumModal} onClose={() => setShowPremiumModal(false)} />
     </div>
   );
 };

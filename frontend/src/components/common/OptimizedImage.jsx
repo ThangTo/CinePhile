@@ -211,9 +211,9 @@ const OptimizedImage = ({
       {/* Placeholder or loading state */}
       {!isLoaded && !hasError && (
         <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 animate-pulse flex items-center justify-center">
-          {placeholder || (
+          {/* {placeholder || (
             <div className="w-8 h-8 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-          )}
+          )} */}
         </div>
       )}
 

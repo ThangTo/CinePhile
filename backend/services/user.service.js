@@ -183,7 +183,9 @@ const getContinueWatching = async (userId, { page = 1, limit = 10 }) => {
  * @returns {Promise<Object|null>} Progress object hoặc null nếu chưa có
  */
 const getProgress = async (userId, movieId) => {
+  // Sort theo lastWatchedAt desc để đảm bảo lấy progress mới nhất (nếu có nhiều records)
   const history = await UserHistory.findOne({ userId, movieId })
+    .sort({ lastWatchedAt: -1 })
     .populate('movieId', 'name original_name slug thumb_url poster_url')
     .populate('episodeId', 'name slug filename episodeId');
 

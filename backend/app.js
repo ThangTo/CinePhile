@@ -178,6 +178,7 @@ const crawlerRoutes = require('./routes/crawler.routes');
 const commentRoutes = require('./routes/comment.routes');
 const chatRoutes = require('./routes/chat.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const castRoutes = require('./routes/cast.routes');
 
 const paymentRoutes = require('./routes/payment.routes');
 
@@ -195,6 +196,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/crawl', crawlerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/cast', castRoutes);
 // PayOS Routes (Payment)
 app.use('/api/v1', paymentRoutes);
 

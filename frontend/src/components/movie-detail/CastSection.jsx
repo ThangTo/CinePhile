@@ -7,6 +7,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
   const [cast, setCast] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     const fetchCast = async () => {
@@ -35,6 +36,17 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
     : [];
 
   const hasCastWithAvatar = castWithAvatar.length > 0;
+
+  // Số lượng cast hiển thị khi collapsed (chỉ trên mobile)
+  const MOBILE_COLLAPSED_COUNT = 6;
+  // Chỉ áp dụng collapse trên mobile (layout vertical và có nhiều hơn MOBILE_COLLAPSED_COUNT cast)
+  // Trên desktop (lg breakpoint), luôn hiển thị đầy đủ
+  const shouldShowToggle = layout === "vertical" && castWithAvatar.length > MOBILE_COLLAPSED_COUNT;
+  // Chỉ áp dụng slice trên mobile khi collapsed, desktop luôn hiển thị đầy đủ
+  const displayedCast =
+    shouldShowToggle && !isExpanded
+      ? castWithAvatar.slice(0, MOBILE_COLLAPSED_COUNT)
+      : castWithAvatar;
 
   // Grid classes for different layouts
   const gridClass =
@@ -90,7 +102,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
                     alt={actor.name || "Diễn viên"}
                     className="w-full h-full object-cover group-hover:opacity-80 transition-transform duration-300"
                     lazy={true}
-                    size="80"
+                    sizeKey="CARD"
                   />
                   <div className="absolute inset-0 z-0 bg-gradient-to-t from-bgColor via-bgColor/10 to-transparent" />
                 </div>
@@ -101,7 +113,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
                     {actor.name || "Không rõ"}
                   </div>
                   {actor.character && (
-                    <div className="text-xs text-gray-400 truncate">{actor.character}</div>
+                    <div className="text-xs text-gray-400 line-clamp-2">{actor.character}</div>
                   )}
                 </div>
               </div>
@@ -115,7 +127,22 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
   // Default/Vertical layout - circular avatars
   return (
     <div>
-      {title && <h3 className="text-xl font-bold mb-5 text-gray-100">Diễn viên:</h3>}
+      <div className="flex items-center justify-between mb-5">
+        {title && <h3 className="text-xl font-bold text-gray-100">Diễn viên:</h3>}
+        {shouldShowToggle && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="lg:hidden flex items-center gap-1 text-sm text-primaryColor hover:text-primaryColor/80 transition-colors"
+          >
+            <span>
+              {isExpanded
+                ? "Thu gọn"
+                : `Xem thêm (${castWithAvatar.length - MOBILE_COLLAPSED_COUNT})`}
+            </span>
+            <i className={`fa-solid fa-chevron-${isExpanded ? "up" : "down"} text-xs`} />
+          </button>
+        )}
+      </div>
 
       {loading && (
         <div className="flex items-center justify-center py-8">
@@ -126,22 +153,46 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
       {!loading && !error && !hasCastWithAvatar && <EmptyCastState />}
 
       {!loading && !error && hasCastWithAvatar && (
-        <div className={`grid ${gridClass} gap-6`}>
-          {castWithAvatar.map((actor, index) => (
-            <div key={actor.id || index} className="text-center">
-              <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-full ring-1 ring-white/10 bg-bgColor2">
-                <OptimizedImage
-                  src={actor.avatar}
-                  alt={actor.name || "Diễn viên"}
-                  className="h-full w-full object-cover"
-                  lazy={true}
-                  size="150"
-                />
+        <>
+          {/* Mobile: Hiển thị với collapse */}
+          <div className={`lg:hidden grid ${gridClass} gap-6 transition-all duration-300`}>
+            {displayedCast.map((actor, index) => (
+              <div key={actor.id || index} className="text-center">
+                <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-full ring-1 ring-white/10 bg-bgColor2">
+                  <OptimizedImage
+                    src={actor.avatar}
+                    alt={actor.name || "Diễn viên"}
+                    className="h-full w-full object-cover"
+                    lazy={true}
+                    sizeKey="CARD"
+                  />
+                </div>
+                <div className="text-sm font-semibold text-gray-200">
+                  {actor.name || "Không rõ"}
+                </div>
               </div>
-              <div className="text-sm font-semibold text-gray-200">{actor.name || "Không rõ"}</div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          {/* Desktop: Luôn hiển thị đầy đủ */}
+          <div className={`hidden lg:grid ${gridClass} gap-6`}>
+            {castWithAvatar.map((actor, index) => (
+              <div key={actor.id || index} className="text-center">
+                <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-full ring-1 ring-white/10 bg-bgColor2">
+                  <OptimizedImage
+                    src={actor.avatar}
+                    alt={actor.name || "Diễn viên"}
+                    className="h-full w-full object-cover"
+                    lazy={true}
+                    sizeKey="CARD"
+                  />
+                </div>
+                <div className="text-sm font-semibold text-gray-200">
+                  {actor.name || "Không rõ"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

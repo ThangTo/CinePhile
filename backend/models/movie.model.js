@@ -33,6 +33,12 @@ const movieSchema = new mongoose.Schema(
     thumb_url: { type: String },
     trailer_url: { type: String },
 
+    // Gallery images từ TMDb
+    images: {
+      backdrops: [{ type: String }], // Array các backdrop URLs
+      posters: [{ type: String }], // Array các poster URLs
+    },
+
     // --- THÔNG TIN CHI TIẾT ---
     time: { type: String },
     year: { type: Number, index: true },
@@ -53,6 +59,25 @@ const movieSchema = new mongoose.Schema(
     categories: [categorySchema],
 
     country: [subDataSchema],
+    // --- TMDb INFO ---
+    tmdb: {
+      type: {
+        type: String, // "movie" hoặc "tv"
+        enum: ['movie', 'tv'],
+      },
+      id: { type: Number, index: true },
+      season: { type: Number, default: null },
+      vote_average: { type: Number, default: 0 },
+      vote_count: { type: Number, default: 0 },
+    },
+    // --- CAST RELATIONSHIP ---
+    castIds: [
+      {
+        castId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cast' },
+        character: { type: String }, // Vai diễn
+        order: { type: Number }, // Thứ tự xuất hiện
+      },
+    ],
     // --- SERIES INFO ---
     season: { type: Number, default: 0 }, // Thêm field này theo Schema
     currentEpisode: { type: String },

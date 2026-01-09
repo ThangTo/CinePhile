@@ -127,9 +127,17 @@ const transformMovie = (movieDoc) => {
   if (transformed.currentEpisode !== undefined) {
     transformed.currentEpisode = parseEpisodeNumber(transformed.currentEpisode);
   }
-  // Cũng transform cho field name khác nếu có
   if (transformed.episode_current !== undefined) {
     transformed.episode_current = parseEpisodeNumber(transformed.episode_current);
+  }
+
+  // castIds sẽ được populate ở backend khi cần (trong getCast function)
+  if (transformed.castIds && Array.isArray(transformed.castIds)) {
+    transformed.castIds = transformed.castIds.map((item) => ({
+      castId: item.castId?.toString() || item.castId,
+      character: item.character || null,
+      order: item.order || 999,
+    }));
   }
 
   return transformed;

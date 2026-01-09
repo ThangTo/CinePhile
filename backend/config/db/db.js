@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
   try {
     const options = {
-      maxPoolSize: 50, // Tăng từ default 10 lên 50 connections
+      maxPoolSize: 30, // Tăng từ default 10 lên 50 connections
       minPoolSize: 10, // Giữ tối thiểu 10 connections
       serverSelectionTimeoutMS: 5000, // Timeout sau 5 giây
       socketTimeoutMS: 45000, // Socket timeout 45 giây

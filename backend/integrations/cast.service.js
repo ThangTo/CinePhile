@@ -1,5 +1,5 @@
 const Cast = require('../models/cast.model');
-const { searchPersonByName } = require('./tmdb.service');
+const { searchPersonByName, getCreditsFromTmdb } = require('./tmdb.service');
 
 /**
  * Kiểm tra xem tên có chứa ký tự tượng hình (CJK: Chinese, Japanese, Korean) không
@@ -68,6 +68,20 @@ async function upsertCastFromTmdb(tmdbPerson, role = null) {
     knownForDepartment: tmdbPerson.knownForDepartment,
     popularity: tmdbPerson.popularity,
   };
+
+  // Thêm thông tin chi tiết nếu có
+  if (tmdbPerson.biography) update.biography = tmdbPerson.biography;
+  if (tmdbPerson.birthday) update.birthday = tmdbPerson.birthday;
+  if (tmdbPerson.deathday) update.deathday = tmdbPerson.deathday;
+  if (tmdbPerson.place_of_birth) update.place_of_birth = tmdbPerson.place_of_birth;
+  if (tmdbPerson.imdbId) update.imdbId = tmdbPerson.imdbId;
+  if (tmdbPerson.gender !== undefined) update.gender = tmdbPerson.gender;
+  if (tmdbPerson.images && Array.isArray(tmdbPerson.images)) {
+    update.images = tmdbPerson.images.map((img) => {
+      if (typeof img === 'string') return img;
+      return img.file_path ? `https://image.tmdb.org/t/p/w500${img.file_path}` : img;
+    });
+  }
 
   // Xử lý tên Latin nếu tên gốc chứa ký tự tượng hình
   if (containsCJKCharacters(tmdbPerson.name)) {
@@ -326,8 +340,72 @@ async function ensureCastForNames(names, role) {
   return result;
 }
 
+/**
+ * Lấy và lưu cast từ TMDb movie/tv ID (ưu tiên hơn search bằng tên)
+ * @param {Object} movie - Movie document có tmdb.id
+ * @returns {Promise<Array>} Array of Cast documents
+ */
+async function ensureCastFromTmdbId(movie) {
+  if (!movie.tmdb || !movie.tmdb.id) {
+    // Fallback về search bằng tên nếu không có tmdb.id
+    return ensureCastForNames(movie.actor || [], 'actor');
+  }
+
+  const { tmdb } = movie;
+  const credits = await getCreditsFromTmdb(tmdb.id, tmdb.type || 'movie', tmdb.season);
+
+  if (!credits) {
+    // Fallback về search bằng tên
+    return ensureCastForNames(movie.actor || [], 'actor');
+  }
+
+  const castDocs = [];
+
+  // Lưu cast với đầy đủ thông tin (tên, vai diễn, hình ảnh)
+  for (const person of credits.cast) {
+    const castDoc = await upsertCastFromTmdb(
+      {
+        ...person,
+        alsoKnownAs: person.alsoKnownAs || [],
+      },
+      'actor',
+    );
+    if (castDoc) {
+      castDocs.push({
+        castDoc,
+        character: person.character,
+        order: person.order,
+      });
+    }
+  }
+
+  // Lưu crew (directors, producers, etc.)
+  const directors = credits.crew.filter(
+    (p) => p.department === 'Directing' || p.job?.toLowerCase().includes('director'),
+  );
+  for (const person of directors) {
+    const castDoc = await upsertCastFromTmdb(
+      {
+        ...person,
+        alsoKnownAs: person.alsoKnownAs || [],
+      },
+      'director',
+    );
+    if (castDoc) {
+      castDocs.push({
+        castDoc,
+        character: null,
+        order: 999,
+      });
+    }
+  }
+
+  return castDocs;
+}
+
 module.exports = {
   ensureCastForName,
   ensureCastForNames,
   upsertCastFromTmdb,
+  ensureCastFromTmdbId,
 };

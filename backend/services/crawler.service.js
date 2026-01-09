@@ -165,6 +165,17 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
           actor: actors,
           director: directors,
 
+          // TMDb data
+          ...(movieData.tmdb && {
+            tmdb: {
+              type: movieData.tmdb.type,
+              id: movieData.tmdb.id,
+              season: movieData.tmdb.season || null,
+              vote_average: movieData.tmdb.vote_average || 0,
+              vote_count: movieData.tmdb.vote_count || 0,
+            },
+          }),
+
           // ID gốc và Age Rating mới thêm
           source_id: movieData._id,
           age_rating: randomAge, // <--- Đã thêm vào đây
@@ -203,11 +214,54 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
         // 5. ĐẢM BẢO CAST (diễn viên/đạo diễn) ĐƯỢC LƯU TRONG COLLECTION CAST (TMDb)
         // Không block nếu TMDb lỗi; chỉ log và tiếp tục crawl.
         try {
-          if (Array.isArray(actors) && actors.length) {
-            await ensureCastForNames(actors, 'actor');
+          const { ensureCastFromTmdbId } = require('../integrations/cast.service');
+          const { getMovieImages } = require('../integrations/tmdb.service');
+          let castIds = [];
+
+          // Ưu tiên: Nếu có tmdb.id, lấy cast từ TMDb credits API
+          if (savedMovie.tmdb?.id) {
+            const castDocs = await ensureCastFromTmdbId(savedMovie);
+            castIds = castDocs.map(({ castDoc, character, order }) => ({
+              castId: castDoc._id,
+              character: character || null,
+              order: order || 999,
+            }));
+
+            // Lấy images gallery từ TMDb
+            const images = await getMovieImages(savedMovie.tmdb.id, savedMovie.tmdb.type);
+            if (images && (images.backdrops.length > 0 || images.posters.length > 0)) {
+              await MovieModel.updateOne({ _id: savedMovie._id }, { $set: { images } });
+              // eslint-disable-next-line no-console
+              console.log(
+                `  🖼️  Đã lưu ${images.backdrops.length} backdrops và ${images.posters.length} posters`,
+              );
+            }
+          } else {
+            // Fallback: Search bằng tên
+            if (Array.isArray(actors) && actors.length) {
+              const actorCasts = await ensureCastForNames(actors, 'actor');
+              castIds = actorCasts.map((castDoc, index) => ({
+                castId: castDoc._id,
+                character: null,
+                order: index,
+              }));
+            }
+            if (Array.isArray(directors) && directors.length) {
+              const directorCasts = await ensureCastForNames(directors, 'director');
+              castIds = [
+                ...castIds,
+                ...directorCasts.map((castDoc, index) => ({
+                  castId: castDoc._id,
+                  character: null,
+                  order: 999 + index,
+                })),
+              ];
+            }
           }
-          if (Array.isArray(directors) && directors.length) {
-            await ensureCastForNames(directors, 'director');
+
+          // Lưu castIds vào movie nếu có
+          if (castIds.length > 0) {
+            await MovieModel.updateOne({ _id: savedMovie._id }, { $set: { castIds } });
           }
         } catch (castError) {
           // eslint-disable-next-line no-console
@@ -620,7 +674,7 @@ const crawlMovieBySlug = async (slug) => {
   try {
     const axios = require('axios');
     const he = require('he');
-    const { ensureCastForNames } = require('../integrations/cast.service');
+    const { ensureCastForNames, ensureCastFromTmdbId } = require('../integrations/cast.service');
     const { createNotification } = require('../controllers/notification.controller');
     const API_BASE_URL = 'https://phimapi.com';
 
@@ -672,6 +726,16 @@ const crawlMovieBySlug = async (slug) => {
       country: countries,
       actor: actors,
       director: directors,
+      // TMDb data
+      ...(movieData.tmdb && {
+        tmdb: {
+          type: movieData.tmdb.type,
+          id: movieData.tmdb.id,
+          season: movieData.tmdb.season || null,
+          vote_average: movieData.tmdb.vote_average || 0,
+          vote_count: movieData.tmdb.vote_count || 0,
+        },
+      }),
       source_id: movieData._id,
       age_rating: randomAge,
     };
@@ -703,11 +767,52 @@ const crawlMovieBySlug = async (slug) => {
 
     // Đồng bộ Cast
     try {
-      if (Array.isArray(actors) && actors.length) {
-        await ensureCastForNames(actors, 'actor');
+      const { getMovieImages } = require('../integrations/tmdb.service');
+      let castIds = [];
+
+      // Ưu tiên: Nếu có tmdb.id, lấy cast từ TMDb credits API
+      if (savedMovie.tmdb?.id) {
+        const castDocs = await ensureCastFromTmdbId(savedMovie);
+        castIds = castDocs.map(({ castDoc, character, order }) => ({
+          castId: castDoc._id,
+          character: character || null,
+          order: order || 999,
+        }));
+
+        // Lấy images gallery từ TMDb
+        const images = await getMovieImages(savedMovie.tmdb.id, savedMovie.tmdb.type);
+        if (images && (images.backdrops.length > 0 || images.posters.length > 0)) {
+          await MovieModel.updateOne({ _id: savedMovie._id }, { $set: { images } });
+          console.log(
+            `  🖼️  Đã lưu ${images.backdrops.length} backdrops và ${images.posters.length} posters`,
+          );
+        }
+      } else {
+        // Fallback: Search bằng tên
+        if (Array.isArray(actors) && actors.length) {
+          const actorCasts = await ensureCastForNames(actors, 'actor');
+          castIds = actorCasts.map((castDoc, index) => ({
+            castId: castDoc._id,
+            character: null,
+            order: index,
+          }));
+        }
+        if (Array.isArray(directors) && directors.length) {
+          const directorCasts = await ensureCastForNames(directors, 'director');
+          castIds = [
+            ...castIds,
+            ...directorCasts.map((castDoc, index) => ({
+              castId: castDoc._id,
+              character: null,
+              order: 999 + index,
+            })),
+          ];
+        }
       }
-      if (Array.isArray(directors) && directors.length) {
-        await ensureCastForNames(directors, 'director');
+
+      // Lưu castIds vào movie nếu có
+      if (castIds.length > 0) {
+        await MovieModel.updateOne({ _id: savedMovie._id }, { $set: { castIds } });
       }
     } catch (castError) {
       console.error('⚠️  Lỗi khi đồng bộ cast từ TMDb:', castError.message);

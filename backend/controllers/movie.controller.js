@@ -481,20 +481,11 @@ const deleteComment = async (req, res) => {
  */
 const getRecommendations = async (req, res) => {
   try {
-    console.log('[Recommendations Controller] Request received:', {
-      id: req.params.id,
-      limit: req.query.limit,
-      url: req.url,
-      path: req.path,
-    });
     const limit = Number(req.query.limit) || 10;
     const result = await movieService.getRecommendations(req.params.id, limit);
-    console.log('[Recommendations Controller] Result:', {
-      moviesCount: result?.data?.length || 0,
-    });
+
     res.json(result);
   } catch (error) {
-    console.error('[Recommendations Controller] Error:', error.message);
     res.status(404).json({ message: error.message });
   }
 };

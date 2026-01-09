@@ -5,6 +5,7 @@ const DetailTabs = ({ activeTab, setActiveTab }) => {
     { id: "episodes", label: "Tập phim" },
     // { id: "gallery", label: "Gallery" },
     { id: "cast", label: "Diễn viên" },
+    { id: "gallery", label: "Gallery" },
     { id: "recommendations", label: "Đề xuất" },
   ];
 

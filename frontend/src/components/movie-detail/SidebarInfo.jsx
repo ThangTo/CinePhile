@@ -18,7 +18,7 @@ const SidebarInfo = ({ movie }) => {
             alt={movie.title}
             className="w-full h-full object-cover"
             priority={true}
-            sizeKey="SIDEBAR"
+            sizeKey="CARD"
           />
         </div>
         <StatusBadge
