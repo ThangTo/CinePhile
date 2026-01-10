@@ -10,9 +10,11 @@ import { FiChevronDown, FiCheck } from "react-icons/fi";
  * @param {string} props.placeholder - Placeholder text
  * @param {boolean} props.disabled - Disabled state
  * @param {string} props.className - Additional CSS classes
+ * @param {string} props.width - Width class (default: "w-full")
  * @param {string} props.name - Input name attribute
  * @param {string} props.id - Input id attribute
  * @param {string} props.bgColor - Background color class (default: "bg-black/20")
+ * @param {string} props.bgDropdown - Background color for dropdown (default: "bg-bgColor")
  * @param {string} props.size - Size: "sm" | "md" | "lg" (default: "md")
  * @param {boolean} props.searchable - Enable search functionality (default: false)
  */
@@ -23,6 +25,7 @@ const Select = ({
   placeholder = "Chọn...",
   disabled = false,
   className = "",
+  width = "w-full",
   name,
   id,
   bgColor = "bg-black/20",
@@ -160,15 +163,16 @@ const Select = ({
     lg: "py-4 px-5 text-lg",
   };
 
-  const baseClasses = `w-full ${bgColor} border border-white/10 rounded-2xl text-white transition-all duration-200 cursor-pointer relative`;
+  const baseClasses = `${bgColor} border border-white/10 rounded-2xl text-white transition-all duration-200 cursor-pointer relative`;
   const disabledClasses = disabled
     ? "opacity-50 cursor-not-allowed"
     : "hover:border-white/20 hover:bg-black/30";
   const openClasses = isOpen ? "border-primaryColor/50 ring-2 ring-primaryColor/20" : "";
-  const finalClassName = `${baseClasses} ${disabledClasses} ${openClasses} ${className}`.trim();
+  const finalClassName =
+    `${baseClasses} ${disabledClasses} ${openClasses} ${width} ${className}`.trim();
 
   return (
-    <div ref={wrapperRef} className="relative w-full" {...rest}>
+    <div ref={wrapperRef} className={`relative ${width}`} {...rest}>
       {/* Hidden input for form submission */}
       {name && <input type="hidden" name={name} value={value || ""} />}
 

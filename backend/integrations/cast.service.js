@@ -1,54 +1,11 @@
 const Cast = require('../models/cast.model');
 const { searchPersonByName, getCreditsFromTmdb } = require('./tmdb.service');
-
-/**
- * Kiểm tra xem tên có chứa ký tự tượng hình (CJK: Chinese, Japanese, Korean) không
- * @param {string} name
- * @returns {boolean}
- */
-function containsCJKCharacters(name) {
-  if (!name) return false;
-  // Unicode ranges: CJK Unified Ideographs, Hiragana, Katakana, Hangul
-  const cjkRegex = /[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/;
-  return cjkRegex.test(name);
-}
-
-/**
- * Tìm tên Latin từ alsoKnownAs (thường là tên được romanized)
- * @param {string[]} alsoKnownAs
- * @returns {string|null}
- */
-function findLatinName(alsoKnownAs) {
-  if (!Array.isArray(alsoKnownAs) || alsoKnownAs.length === 0) return null;
-
-  // Tìm tên chỉ chứa chữ Latin (a-z, A-Z, khoảng trắng, dấu gạch ngang)
-  const latinRegex = /^[a-zA-Z\s\-']+$/;
-  for (const alias of alsoKnownAs) {
-    if (alias && latinRegex.test(alias.trim())) {
-      return alias.trim();
-    }
-  }
-
-  return null;
-}
-
-/**
- * Chuẩn hoá roles (actor/director)
- * @param {string} role
- * @returns {'actor'|'director'|null}
- */
-function normalizeRole(role) {
-  if (!role) return null;
-  const lower = role.toLowerCase();
-  if (lower.includes('actor') || lower.includes('diễn') || lower.includes('dien')) return 'actor';
-  if (lower.includes('director') || lower.includes('đạo diễn') || lower.includes('dao dien')) {
-    return 'director';
-  }
-  if (lower === 'actor' || lower === 'cast') return 'actor';
-  if (lower === 'director') return 'director';
-  return null;
-}
-
+const {
+  isLatinName,
+  findLatinName,
+  containsCJKCharacters,
+  normalizeRole,
+} = require('../utils/castUtils');
 /**
  * Tạo hoặc cập nhật Cast document từ kết quả TMDb
  * @param {Object} tmdbPerson
@@ -83,19 +40,35 @@ async function upsertCastFromTmdb(tmdbPerson, role = null) {
     });
   }
 
-  // Xử lý tên Latin nếu tên gốc chứa ký tự tượng hình
-  if (containsCJKCharacters(tmdbPerson.name)) {
-    const latinName = findLatinName(tmdbPerson.alsoKnownAs);
-    if (latinName) {
-      update.nameLatin = latinName;
-      // eslint-disable-next-line no-console
-      console.log(`  📝 Chuẩn hóa tên: "${tmdbPerson.name}" → "${latinName}"`);
+  // Xử lý tên Latin: nếu name không phải Latin thì tìm tên Latin
+  if (!isLatinName(tmdbPerson.name)) {
+    // Lấy tên Latin đầu tiên từ alsoKnownAs
+    let latinName = findLatinName(tmdbPerson.alsoKnownAs || []);
+
+    // Nếu không có trong alsoKnownAs, lấy từ DB (nameLatin hiện có)
+    if (!latinName) {
+      const query = tmdbPerson.tmdbId
+        ? { tmdbId: tmdbPerson.tmdbId }
+        : {
+            name: tmdbPerson.name,
+          };
+      const existing = await Cast.findOne(query).lean();
+      if (existing && existing.nameLatin && isLatinName(existing.nameLatin)) {
+        latinName = existing.nameLatin;
+      }
     }
+
+    // Nếu vẫn không có, dùng lại name ban đầu
+    if (!latinName) {
+      latinName = tmdbPerson.name;
+    }
+
+    update.nameLatin = latinName;
+    // eslint-disable-next-line no-console
+    console.log(`  📝 Chuẩn hóa tên: "${tmdbPerson.name}" → "${latinName}"`);
   }
 
-  if (Array.isArray(tmdbPerson.alsoKnownAs) && tmdbPerson.alsoKnownAs.length > 0) {
-    update.alsoKnownAs = tmdbPerson.alsoKnownAs;
-  }
+  // Không ghi đè alsoKnownAs, sẽ merge bằng $addToSet ở dưới
 
   const query = tmdbPerson.tmdbId
     ? { tmdbId: tmdbPerson.tmdbId }
@@ -108,6 +81,13 @@ async function upsertCastFromTmdb(tmdbPerson, role = null) {
     {
       $set: update,
       ...(normalizedRole && { $addToSet: { roles: normalizedRole } }),
+      // Merge alsoKnownAs mới vào array cũ (không ghi đè)
+      ...(Array.isArray(tmdbPerson.alsoKnownAs) &&
+        tmdbPerson.alsoKnownAs.length > 0 && {
+          $addToSet: {
+            alsoKnownAs: { $each: tmdbPerson.alsoKnownAs },
+          },
+        }),
     },
     {
       upsert: true,
@@ -359,14 +339,39 @@ async function ensureCastFromTmdbId(movie) {
     return ensureCastForNames(movie.actor || [], 'actor');
   }
 
+  // Import getPersonDetails để lấy alsoKnownAs đầy đủ
+  const { getPersonDetails } = require('./tmdb.service');
+
   const castDocs = [];
 
-  // Lưu cast với đầy đủ thông tin (tên, vai diễn, hình ảnh)
+  // Lưu cast với đầy đủ thông tin (tên, vai diễn, hình ảnh, alsoKnownAs)
   for (const person of credits.cast) {
+    // Lấy thông tin chi tiết từ person API để có also_known_as đầy đủ
+    let personDetails = null;
+    if (person.tmdbId) {
+      try {
+        personDetails = await getPersonDetails(person.tmdbId);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn(`⚠️  Không thể lấy person details cho ${person.name}:`, error.message);
+      }
+    }
+
     const castDoc = await upsertCastFromTmdb(
       {
         ...person,
-        alsoKnownAs: person.alsoKnownAs || [],
+        // Ưu tiên alsoKnownAs từ person details (đầy đủ hơn từ credits API)
+        alsoKnownAs: personDetails?.alsoKnownAs || person.alsoKnownAs || [],
+        // Merge thêm các field chi tiết nếu có
+        ...(personDetails && {
+          biography: personDetails.biography,
+          birthday: personDetails.birthday,
+          deathday: personDetails.deathday,
+          place_of_birth: personDetails.place_of_birth,
+          imdbId: personDetails.imdbId,
+          gender: personDetails.gender,
+          images: personDetails.images,
+        }),
       },
       'actor',
     );
@@ -377,6 +382,9 @@ async function ensureCastFromTmdbId(movie) {
         order: person.order,
       });
     }
+
+    // Delay để tránh rate limit TMDb API
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
   // Lưu crew (directors, producers, etc.)
@@ -384,10 +392,30 @@ async function ensureCastFromTmdbId(movie) {
     (p) => p.department === 'Directing' || p.job?.toLowerCase().includes('director'),
   );
   for (const person of directors) {
+    // Lấy thông tin chi tiết từ person API
+    let personDetails = null;
+    if (person.tmdbId) {
+      try {
+        personDetails = await getPersonDetails(person.tmdbId);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn(`⚠️  Không thể lấy person details cho ${person.name}:`, error.message);
+      }
+    }
+
     const castDoc = await upsertCastFromTmdb(
       {
         ...person,
-        alsoKnownAs: person.alsoKnownAs || [],
+        alsoKnownAs: personDetails?.alsoKnownAs || person.alsoKnownAs || [],
+        ...(personDetails && {
+          biography: personDetails.biography,
+          birthday: personDetails.birthday,
+          deathday: personDetails.deathday,
+          place_of_birth: personDetails.place_of_birth,
+          imdbId: personDetails.imdbId,
+          gender: personDetails.gender,
+          images: personDetails.images,
+        }),
       },
       'director',
     );
@@ -398,6 +426,9 @@ async function ensureCastFromTmdbId(movie) {
         order: 999,
       });
     }
+
+    // Delay để tránh rate limit TMDb API
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
   return castDocs;

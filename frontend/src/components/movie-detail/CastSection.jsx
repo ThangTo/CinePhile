@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import OptimizedImage from "components/common/OptimizedImage";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
@@ -91,9 +92,10 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
         {!loading && !error && hasCastWithAvatar && (
           <div className={`grid ${gridClass} gap-4`}>
             {castWithAvatar.map((actor, index) => (
-              <div
+              <Link
                 key={actor.id || index}
-                className="bg-bgColor rounded-xl overflow-hidden transition-colors cursor-pointer"
+                to={actor.id ? `/cast/${actor.id}` : "#"}
+                className="bg-bgColor rounded-xl overflow-hidden transition-colors cursor-pointer group"
               >
                 {/* Actor Image */}
                 <div className="aspect-[3/4] overflow-hidden bg-bgColor relative group">
@@ -109,14 +111,14 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
 
                 {/* Actor Info */}
                 <div className="p-2 pt-1 text-center">
-                  <div className="font-medium text-white text-sm mb-1 truncate">
+                  <div className="font-medium text-white text-sm mb-1 truncate group-hover:text-primaryColor transition-colors">
                     {actor.name || "Không rõ"}
                   </div>
                   {actor.character && (
                     <div className="text-xs text-gray-400 line-clamp-2">{actor.character}</div>
                   )}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
@@ -157,7 +159,11 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
           {/* Mobile: Hiển thị với collapse */}
           <div className={`lg:hidden grid ${gridClass} gap-6 transition-all duration-300`}>
             {displayedCast.map((actor, index) => (
-              <div key={actor.id || index} className="text-center">
+              <Link
+                key={actor.id || index}
+                to={actor.id ? `/cast/${actor.id}` : "#"}
+                className="text-center hover:opacity-80 transition-opacity group"
+              >
                 <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-full ring-1 ring-white/10 bg-bgColor2">
                   <OptimizedImage
                     src={actor.avatar}
@@ -170,13 +176,17 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
                 <div className="text-sm font-semibold text-gray-200">
                   {actor.name || "Không rõ"}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
           {/* Desktop: Luôn hiển thị đầy đủ */}
           <div className={`hidden lg:grid ${gridClass} gap-6`}>
             {castWithAvatar.map((actor, index) => (
-              <div key={actor.id || index} className="text-center">
+              <Link
+                key={actor.id || index}
+                to={actor.id ? `/cast/${actor.id}` : "#"}
+                className="text-center hover:opacity-80 transition-opacity group"
+              >
                 <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-full ring-1 ring-white/10 bg-bgColor2">
                   <OptimizedImage
                     src={actor.avatar}
@@ -186,10 +196,10 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
                     sizeKey="CARD"
                   />
                 </div>
-                <div className="text-sm font-semibold text-gray-200">
+                <div className="text-sm font-semibold text-gray-200 transition-colors group-hover:text-primaryColor">
                   {actor.name || "Không rõ"}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </>

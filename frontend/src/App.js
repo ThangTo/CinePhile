@@ -18,6 +18,7 @@ import BrowsePage from "./pages/BrowsePage";
 import AdminDashboard from "./pages/AdminDashboard";
 import PremiumPage from "./pages/PremiumPage";
 import RechargeCoinPage from "./pages/RechargeCoinPage";
+import CastDetailPage from "./pages/CastDetailPage";
 import ProtectedRoute from "./components/general/ProtectedRoute";
 import MainLayout from "layouts/MainLayout";
 import NotFoundPage from "./pages/NotFound";
@@ -52,6 +53,7 @@ function App() {
                   <Route index element={<HomePage />} />
                   <Route path="/genre/:slug" element={<GenrePage />} />
                   <Route path="/movie/:id" element={<MovieDetail />} />
+                  <Route path="/cast/:id" element={<CastDetailPage />} />
                   <Route path="/country/:slug" element={<CountryPage />} />
                   <Route path="/type/:slug" element={<MovieTypePage />} />
                   <Route path="/search" element={<SearchResults />} />

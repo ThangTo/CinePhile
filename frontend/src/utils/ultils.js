@@ -42,6 +42,26 @@ export const normalizeArray = (value) => {
 //   return 0;
 // };
 
+export const formatDate = (dateString) => {
+  if (!dateString) return "";
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("vi-VN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch (error) {
+    return dateString;
+  }
+};
+
+export const isLatinName = (name) => {
+  if (!name) return false;
+  const latinRegex = /^[a-zA-Z\s\-']+$/;
+  return latinRegex.test(name.trim());
+};
+
 export const formatTime = (seconds) => {
   if (!seconds || isNaN(seconds)) return "00:00";
   const hours = Math.floor(seconds / 3600);

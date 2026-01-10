@@ -12,6 +12,7 @@ const {
   transformMovies,
   transformPaginatedResult,
 } = require('../utils/movieTransformer');
+const { isLatinName } = require('../utils/castUtils');
 
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -1088,6 +1089,17 @@ const getCast = async (identifier) => {
     throw new Error('Movie not found');
   }
 
+  // Redis cache key
+  const cacheKey = `movie:cast:${movieDoc._id}`;
+
+  // Try cache first
+  if (redisService.isConnected) {
+    const cached = await redisService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
   // Ưu tiên: Lấy từ castIds nếu có
   if (movieDoc.castIds && Array.isArray(movieDoc.castIds) && movieDoc.castIds.length > 0) {
     const castIds = movieDoc.castIds
@@ -1095,7 +1107,7 @@ const getCast = async (identifier) => {
       .filter((id) => id && mongoose.Types.ObjectId.isValid(id));
 
     if (castIds.length > 0) {
-      // Populate Cast documents
+      // Query Cast documents từ DB (chỉ query, không xử lý logic khác)
       const castDocs = await Cast.find({ _id: { $in: castIds } }).lean();
 
       // Tạo Map để lookup nhanh
@@ -1112,7 +1124,9 @@ const getCast = async (identifier) => {
 
           return {
             id: castDoc._id?.toString() || null,
-            name: castDoc.name || 'Không rõ',
+            name: isLatinName(castDoc.name)
+              ? castDoc.name
+              : castDoc.nameLatin || castDoc.name || 'Không rõ',
             avatar: castDoc.profileUrl || castDoc.profilePath || null,
             profileUrl: castDoc.profileUrl || null,
             profilePath: castDoc.profilePath || null,
@@ -1121,10 +1135,16 @@ const getCast = async (identifier) => {
             tmdbId: castDoc.tmdbId || null,
             knownForDepartment: castDoc.knownForDepartment || null,
             popularity: castDoc.popularity || 0,
+            alsoKnownAs: castDoc.alsoKnownAs || [],
           };
         })
         .filter(Boolean)
         .sort((a, b) => (a.order || 999) - (b.order || 999)); // Sort theo order
+
+      // Cache kết quả (30 phút)
+      if (redisService.isConnected) {
+        await redisService.set(cacheKey, result, 1800);
+      }
 
       return result;
     }
