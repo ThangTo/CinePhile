@@ -246,8 +246,6 @@ app.get('/api/v1/proxy-m3u8', async (req, res) => {
 
     // --- GIAI ĐOẠN 1: Xử lý Master Playlist (nếu có) ---
     if (content.includes('#EXT-X-STREAM-INF')) {
-      console.log('Detect: Master Playlist. Đang tìm luồng tốt nhất...');
-
       const lines = content.split('\n');
       let maxBandwidth = 0;
       let bestUri = '';
@@ -269,7 +267,6 @@ app.get('/api/v1/proxy-m3u8', async (req, res) => {
         // Cập nhật URL hiện tại sang link con
         // new URL() tự động xử lý việc ghép link tương đối/tuyệt đối
         currentFetchUrl = new URL(bestUri, currentFetchUrl).toString();
-        console.log(`Redirecting to: ${currentFetchUrl}`);
 
         // Tải nội dung của link con (Media Playlist thực sự)
         content = await fetchText(currentFetchUrl);
@@ -301,7 +298,6 @@ app.get('/api/v1/proxy-m3u8', async (req, res) => {
         if (nextLine && !nextLine.startsWith('#')) {
           const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
           if (isAd) {
-            console.log(`Đã chặn quảng cáo: ${nextLine}`);
             skipNext = true; // Đánh dấu bỏ qua URL bên dưới
             continue; // Bỏ qua dòng #EXTINF này
           }
