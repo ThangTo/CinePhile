@@ -229,4 +229,120 @@ app.get('/health', (req, res) => {
   });
 });
 
+async function fetchText(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Lỗi tải URL: ${url}`);
+  return await response.text();
+}
+
+app.get('/api/v1/proxy-m3u8', async (req, res) => {
+  try {
+    const originalUrl = req.query.url;
+    if (!originalUrl) return res.status(400).send('Thiếu URL');
+
+    // Biến theo dõi URL hiện tại (để tính baseUrl chính xác)
+    let currentFetchUrl = originalUrl;
+    let content = await fetchText(currentFetchUrl);
+
+    // --- GIAI ĐOẠN 1: Xử lý Master Playlist (nếu có) ---
+    if (content.includes('#EXT-X-STREAM-INF')) {
+      console.log('Detect: Master Playlist. Đang tìm luồng tốt nhất...');
+
+      const lines = content.split('\n');
+      let maxBandwidth = 0;
+      let bestUri = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('BANDWIDTH=')) {
+          const match = lines[i].match(/BANDWIDTH=(\d+)/);
+          const bandwidth = match ? parseInt(match[1]) : 0;
+
+          // Kiểm tra dòng tiếp theo có phải link không (không bắt đầu bằng #)
+          if (lines[i + 1] && !lines[i + 1].startsWith('#') && bandwidth > maxBandwidth) {
+            maxBandwidth = bandwidth;
+            bestUri = lines[i + 1].trim();
+          }
+        }
+      }
+
+      if (bestUri) {
+        // Cập nhật URL hiện tại sang link con
+        // new URL() tự động xử lý việc ghép link tương đối/tuyệt đối
+        currentFetchUrl = new URL(bestUri, currentFetchUrl).toString();
+        console.log(`Redirecting to: ${currentFetchUrl}`);
+
+        // Tải nội dung của link con (Media Playlist thực sự)
+        content = await fetchText(currentFetchUrl);
+      }
+    }
+
+    // --- GIAI ĐOẠN 2: Chuẩn bị Base URL mới ---
+    // BaseUrl phải được lấy từ link CUỐI CÙNG mà ta vừa tải (currentFetchUrl)
+    const baseUrl = currentFetchUrl.substring(0, currentFetchUrl.lastIndexOf('/') + 1);
+
+    // --- GIAI ĐOẠN 3: Lọc quảng cáo & Rewrite Link ---
+    const lines = content.split('\n');
+    const cleanLines = [];
+    let skipNext = false;
+
+    // Tinh chỉnh từ khóa (Bỏ 'segment_' để tránh xóa nhầm phim)
+    const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim();
+      if (!line) continue; // Bỏ dòng trống
+
+      // Xử lý logic lọc
+      if (line.startsWith('#EXTINF')) {
+        // Kiểm tra dòng URL ngay bên dưới (lines[i+1])
+        let nextLine = (lines[i + 1] || '').trim();
+
+        // Chỉ check quảng cáo nếu dòng dưới là link (không phải tag #)
+        if (nextLine && !nextLine.startsWith('#')) {
+          const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
+          if (isAd) {
+            console.log(`Đã chặn quảng cáo: ${nextLine}`);
+            skipNext = true; // Đánh dấu bỏ qua URL bên dưới
+            continue; // Bỏ qua dòng #EXTINF này
+          }
+        }
+      }
+
+      if (skipNext) {
+        skipNext = false;
+        continue; // Bỏ qua dòng URL quảng cáo
+      }
+
+      // Bỏ qua tag ngắt quãng (thường gây lag khi nối video)
+      if (line.includes('#EXT-X-DISCONTINUITY')) continue;
+
+      // Xử lý Rewriting (Quan trọng nhất)
+      // Nếu là dòng URL (không bắt đầu bằng #) và là link tương đối
+      if (!line.startsWith('#')) {
+        if (!line.startsWith('http')) {
+          // Ghép với baseUrl mới
+          line = new URL(line, baseUrl).toString();
+        }
+        // Nếu link đã tuyệt đối (http...) thì giữ nguyên
+        if (line.includes('convertv7/')) {
+          // Ví dụ: "convertv7/abc.ts" -> "abc.ts"
+          line = line.replace('convertv7/', '');
+        }
+      }
+
+      cleanLines.push(line);
+    }
+
+    // Trả về file m3u8 sạch
+    res.set({
+      'Content-Type': 'application/vnd.apple.mpegurl',
+      'Access-Control-Allow-Origin': '*', // Cho phép Frontend gọi thoải mái
+    });
+    res.send(cleanLines.join('\n'));
+  } catch (error) {
+    console.error('Proxy Error:', error.message);
+    res.status(500).send('Lỗi xử lý nguồn phim');
+  }
+});
+
 module.exports = app;

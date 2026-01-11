@@ -57,7 +57,9 @@ const VideoPlayer = ({
   const hlsRef = useRef(null);
 
   const hlsSource = useMemo(() => {
-    if (episode?.link_m3u8) return episode.link_m3u8;
+    if (episode?.link_m3u8) {
+      return `${process.env.REACT_APP_API_URL}/proxy-m3u8?url=${episode.link_m3u8}`;
+    }
     if (episode?.videoUrl && episode.videoUrl.includes(".m3u8")) return episode.videoUrl;
     if (videoUrl && videoUrl.includes(".m3u8")) return videoUrl;
     return null;

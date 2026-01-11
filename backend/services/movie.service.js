@@ -724,7 +724,7 @@ const getFilterOptions = async () => {
       .sort({ name: 1 })
       .lean(),
     Country.find({ slug: { $ne: '' } })
-      .sort({ name: 1 })
+      .sort({ count: -1, name: 1 })
       .lean(),
   ]);
 
