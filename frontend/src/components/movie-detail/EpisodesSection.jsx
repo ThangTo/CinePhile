@@ -14,22 +14,6 @@ const EpisodeSection = ({
 }) => {
   const navigate = useNavigate();
 
-  // If movie is hidden, don't show episodes
-  if (movie.isHidden) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between md:pb-4">
-          <h3 className="text-lg md:text-xl font-semibold text-white">Tập phim</h3>
-        </div>
-        <div className="text-center py-12 text-gray-400">
-          <i className="fa-solid fa-lock text-4xl mb-4" />
-          <p className="text-lg">Phim này hiện không có sẵn</p>
-          <p className="text-sm mt-2">Vui lòng xem trailer hoặc quay lại sau</p>
-        </div>
-      </div>
-    );
-  }
-
   // If no activeEpisode provided, default to first episode
   const defaultActiveEpisode = activeEpisode || 1;
   const [isCondensed, setIsCondensed] = useState(false);
@@ -53,6 +37,22 @@ const EpisodeSection = ({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
+
+  // If movie is hidden, don't show episodes (AFTER ALL HOOKS)
+  if (movie.isHidden) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between md:pb-4">
+          <h3 className="text-lg md:text-xl font-semibold text-white">Tập phim</h3>
+        </div>
+        <div className="text-center py-12 text-gray-400">
+          <i className="fa-solid fa-lock text-4xl mb-4" />
+          <p className="text-lg">Phim này hiện không có sẵn</p>
+          <p className="text-sm mt-2">Vui lòng xem trailer hoặc quay lại sau</p>
+        </div>
+      </div>
+    );
+  }
 
   // Tính tổng số tập để phân biệt phim lẻ / phim bộ
   const totalEpisodes = movie.totalEpisodes || movie.episodes?.length || 0;
