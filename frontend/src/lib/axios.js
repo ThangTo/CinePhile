@@ -59,11 +59,19 @@ http.interceptors.response.use(
   async (err) => {
     const originalRequest = err?.config || {};
     const status = err?.response?.status;
-    const isAuthPath =
-      typeof originalRequest.url === "string" && originalRequest.url.includes("/auth/");
+    const url = originalRequest.url || "";
+
+    // Check if this is a login/register request (should NOT auto-retry)
+    const isLoginOrRegister = url.includes("/auth/login") || url.includes("/auth/register");
 
     // Auto-refresh access token on 401 (once per request)
-    if (status === 401 && !originalRequest._retry && !originalRequest.__isRefreshCall) {
+    // BUT skip auto-retry for login/register endpoints
+    if (
+      status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.__isRefreshCall &&
+      !isLoginOrRegister
+    ) {
       originalRequest._retry = true;
 
       try {
@@ -99,12 +107,12 @@ http.interceptors.response.use(
       }
     }
 
+    // For login/register or any other error, return the original error message
     const message = err?.response?.data?.message || err?.message || "Có lỗi khi kết nối máy chủ";
     return Promise.reject({
       status: status || 0,
       message,
       raw: err,
-      isAuthPath,
     });
   }
 );

@@ -14,6 +14,7 @@ import {
   FiEdit2,
   FiTrash2,
   FiEye,
+  FiEyeOff,
   FiStar,
   FiFilm,
   FiCalendar,
@@ -25,6 +26,7 @@ const MovieTable = () => {
   const [movies, setMovies] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({});
+  const [showHiddenOnly, setShowHiddenOnly] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCrawlModalOpen, setIsCrawlModalOpen] = useState(false);
   const [isUpdateEpisodesModalOpen, setIsUpdateEpisodesModalOpen] = useState(false);
@@ -32,6 +34,8 @@ const MovieTable = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isHideAllModalOpen, setIsHideAllModalOpen] = useState(false);
+  const [isUnhideAllModalOpen, setIsUnhideAllModalOpen] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -58,6 +62,7 @@ const MovieTable = () => {
         ...(filterParams.status && { status: filterParams.status }),
         ...(filterParams.ratingMin && { ratingMin: filterParams.ratingMin }),
         ...(filterParams.ratingMax && { ratingMax: filterParams.ratingMax }),
+        ...(showHiddenOnly && { isHidden: true }),
       };
 
       const response = await movieAPI.getAll(params);
@@ -91,7 +96,7 @@ const MovieTable = () => {
       loadMovies(1, searchTerm, filters);
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, filters]);
+  }, [searchTerm, filters, showHiddenOnly]);
 
   const handleDelete = async (id) => {
     setIsDeleteModalOpen(false);
@@ -121,6 +126,53 @@ const MovieTable = () => {
       setError("Không thể tải thông tin phim: " + err.message);
       setSelectedMovie(movie);
       setIsModalOpen(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleHidden = async (movie) => {
+    setIsLoading(true);
+    try {
+      const result = await movieAPI.toggleHidden(movie.id);
+      // Update movie in list
+      setMovies((prev) =>
+        prev.map((m) => (m.id === movie.id ? { ...m, isHidden: result.isHidden } : m))
+      );
+      // Show success message (optional - you can add toast notification here)
+      console.log(result.message);
+    } catch (err) {
+      setError("Không thể thay đổi trạng thái ẩn: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleHideAll = async () => {
+    setIsHideAllModalOpen(false);
+    setIsLoading(true);
+    try {
+      const result = await movieAPI.hideAll();
+      // Reload movies to reflect changes
+      await loadMovies(pagination.currentPage, searchTerm, filters);
+      console.log(result.message);
+    } catch (err) {
+      setError("Không thể ẩn tất cả phim: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUnhideAll = async () => {
+    setIsUnhideAllModalOpen(false);
+    setIsLoading(true);
+    try {
+      const result = await movieAPI.unhideAll();
+      // Reload movies to reflect changes
+      await loadMovies(pagination.currentPage, searchTerm, filters);
+      console.log(result.message);
+    } catch (err) {
+      setError("Không thể hiện tất cả phim: " + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -174,6 +226,45 @@ const MovieTable = () => {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Hidden Movies Filter Toggle */}
+          <button
+            onClick={() => setShowHiddenOnly(!showHiddenOnly)}
+            className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap ${
+              showHiddenOnly
+                ? "bg-yellow-500 hover:bg-yellow-600 text-black shadow-yellow-500/20"
+                : "bg-bgColor3 hover:text-primaryColor text-gray-400 border border-white/10"
+            }`}
+            title={showHiddenOnly ? "Hiện tất cả phim" : "Chỉ xem phim đã ẩn"}
+          >
+            {showHiddenOnly ? <FiEye size={18} /> : <FiEyeOff size={18} />}
+            <span className="hidden sm:inline">{showHiddenOnly ? "Đang ẩn" : "Đã ẩn"}</span>
+          </button>
+
+          {/* Bulk Hide/Unhide Actions */}
+          <div className="relative group">
+            <button className="flex items-center gap-2 bg-bgColor3 hover:text-primaryColor text-gray-300 font-bold px-4 py-2.5 rounded-xl shadow-lg border border-white/10 transition-all whitespace-nowrap">
+              <FiEyeOff size={18} />
+              <span className="hidden sm:inline">Hành động</span>
+              <i className="fa-solid fa-caret-down text-xs" />
+            </button>
+            <div className="absolute right-0 mt-2 w-48 bg-bgColor3 border border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+              <button
+                onClick={() => setIsHideAllModalOpen(true)}
+                className="w-full text-left px-4 py-3 hover:bg-white/5 text-gray-300 hover:text-yellow-400 transition-colors flex items-center gap-2 rounded-t-xl"
+              >
+                <FiEyeOff size={16} />
+                <span>Ẩn tất cả phim</span>
+              </button>
+              <button
+                onClick={() => setIsUnhideAllModalOpen(true)}
+                className="w-full text-left px-4 py-3 hover:bg-white/5 text-gray-300 hover:text-green-400 transition-colors flex items-center gap-2 rounded-b-xl"
+              >
+                <FiEye size={16} />
+                <span>Hiện tất cả phim</span>
+              </button>
+            </div>
+          </div>
+
           {/* Search Box */}
           <div className="relative group flex-1 md:w-80">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -270,10 +361,17 @@ const MovieTable = () => {
 
                       {/* Movie Info */}
                       <td className="px-6 py-4 max-w-xs">
-                        <div className="flex flex-col">
-                          <span className="text-white font-bold text-base truncate pr-4 group-hover:text-primaryColor transition-colors">
-                            {movie.title}
-                          </span>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-start gap-2">
+                            <span className="text-white font-bold text-base line-clamp-1 flex-1 group-hover:text-primaryColor transition-colors">
+                              {movie.title}
+                            </span>
+                            {movie.isHidden && (
+                              <span className="flex-shrink-0 px-2 py-0.5 text-xs font-semibold bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30 whitespace-nowrap">
+                                Đã ẩn
+                              </span>
+                            )}
+                          </div>
                           <span className="text-sm text-gray-500 italic truncate">
                             {movie.englishTitle || "No English Title"}
                           </span>
@@ -313,6 +411,17 @@ const MovieTable = () => {
                             title="Chỉnh sửa"
                           >
                             <FiEdit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleToggleHidden(movie)}
+                            className={`p-2 rounded-lg transition-all ${
+                              movie.isHidden
+                                ? "text-green-400 hover:bg-green-500/10 hover:text-green-300"
+                                : "text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
+                            }`}
+                            title={movie.isHidden ? "Hiện phim" : "Ẩn phim"}
+                          >
+                            {movie.isHidden ? <FiEye size={18} /> : <FiEyeOff size={18} />}
                           </button>
                           <button
                             onClick={() => {
@@ -404,6 +513,28 @@ const MovieTable = () => {
         confirmText="Xóa ngay"
         cancelText="Giữ lại"
         isDanger={true}
+      />
+
+      <ConfirmDialog
+        isOpen={isHideAllModalOpen}
+        onClose={() => setIsHideAllModalOpen(false)}
+        onConfirm={handleHideAll}
+        title="Xác nhận ẩn tất cả phim"
+        message="Bạn có chắc chắn muốn ẩn TẤT CẢ phim? Người dùng sẽ chỉ có thể xem trailer."
+        confirmText="Ẩn tất cả"
+        cancelText="Hủy"
+        isDanger={true}
+      />
+
+      <ConfirmDialog
+        isOpen={isUnhideAllModalOpen}
+        onClose={() => setIsUnhideAllModalOpen(false)}
+        onConfirm={handleUnhideAll}
+        title="Xác nhận hiện tất cả phim"
+        message="Bạn có chắc chắn muốn hiện TẤT CẢ phim đã ẩn?"
+        confirmText="Hiện tất cả"
+        cancelText="Hủy"
+        isDanger={false}
       />
     </div>
   );

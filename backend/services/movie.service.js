@@ -243,6 +243,8 @@ const mapComment = (comment) => {
 /**
  * Helper: build Mongo filters from query params
  * Uses MongoDB $text search (BM25-like) for better relevance scoring
+ * @param {Object} filters - Filter parameters
+ * @param {boolean} useTextSearch - Whether to use MongoDB text search
  */
 const buildQuery = (filters = {}, useTextSearch = true) => {
   const query = {};
@@ -561,13 +563,26 @@ const getAll = async (filters = {}, pagination = {}) => {
 
 /**
  * Get movie by ID or slug with episodes
+ * @param {string} identifier - Movie ID or slug
+ * @param {Object} options - { isAdmin: boolean } - Whether requester is admin
  */
-const getById = async (identifier) => {
+const getById = async (identifier, options = {}) => {
+  const { isAdmin = false } = options;
+
   const movieDoc = await findMovie(identifier);
   if (!movieDoc) {
     throw new Error('Movie not found');
   }
+
   const movie = transformMovie(movieDoc);
+
+  // If movie is hidden and requester is not admin, return empty episodes
+  if (movie.isHidden && !isAdmin) {
+    movie.episodes = [];
+    return movie;
+  }
+
+  // Normal flow: fetch and return episodes
   const episodes = await Episode.find({ movieId: movieDoc._id }).sort({ episodeId: 1 }).lean();
   movie.episodes = episodes.map(mapEpisode);
   return movie;
@@ -690,7 +705,6 @@ const getByCountry = async (country, options = {}) => {
 const getByType = async (type, options = {}) => {
   const { page, limit, sort, ...filters } = options;
   const pagination = { page, limit, sort };
-  console.log('filters', type, filters);
 
   let builder;
 
@@ -1067,12 +1081,22 @@ const search = async (q, options = {}) => {
 
 /**
  * Get episodes for a movie
+ * @param {string} identifier - Movie ID or slug
+ * @param {Object} options - { isAdmin: boolean } - Whether requester is admin
  */
-const getEpisodes = async (identifier) => {
+const getEpisodes = async (identifier, options = {}) => {
+  const { isAdmin = false } = options;
+
   const movieDoc = await findMovie(identifier);
   if (!movieDoc) {
     throw new Error('Movie not found');
   }
+
+  // If movie is hidden and requester is not admin, return empty array
+  if (movieDoc.isHidden && !isAdmin) {
+    return [];
+  }
+
   const episodes = await Episode.find({ movieId: movieDoc._id }).sort({ episodeId: 1 }).lean();
   return episodes.map(mapEpisode);
 };
@@ -1517,7 +1541,6 @@ const likeComment = async (
       dislikes: Math.max(0, updatedComment.dislikes),
     };
   }
-  console.log(result);
 
   return result;
 };
@@ -1894,6 +1917,286 @@ const getRecommendationsFallback = async (
   };
 };
 
+/**
+ * Get personalized movie recommendations based on user's watch history
+ * @param {ObjectId} userId - User ID
+ * @param {number} limit - Number of recommendations (default: 20)
+ * @returns {Object} { data: Array }
+ */
+const getForYou = async (userId, limit = 20) => {
+  try {
+    const UserHistory = require('../models/user_history.model');
+
+    // 1. Lấy lịch sử xem của user (30 phim gần nhất)
+    const historyRecords = await UserHistory.find({ userId })
+      .sort({ lastWatchedAt: -1 })
+      .limit(30)
+      .populate('movieId')
+      .lean();
+
+    if (!historyRecords || historyRecords.length === 0) {
+      // Nếu chưa có lịch sử, trả về trending + top rated
+      const [trending, topRated] = await Promise.all([
+        getTrending(Math.ceil(limit / 2)),
+        getTopRated(Math.ceil(limit / 2)),
+      ]);
+
+      const combined = [...trending.data, ...topRated.data];
+      // Remove duplicates
+      const uniqueMovies = Array.from(new Map(combined.map((m) => [m.id, m])).values());
+
+      return {
+        data: uniqueMovies.slice(0, limit),
+      };
+    }
+
+    // 2. Phân tích lịch sử để tìm patterns (có trọng số theo progress)
+    const watchedMovies = historyRecords
+      .map((h) => ({
+        movie: h.movieId,
+        progress: h.progress || 0, // Phần trăm hoàn thành (0-100)
+      }))
+      .filter((item) => item.movie);
+
+    const watchedMovieIds = watchedMovies.map((item) => item.movie._id);
+
+    // Thu thập thể loại, đạo diễn, diễn viên, quốc gia từ lịch sử
+    // Trọng số dựa trên progress: progress càng cao thì trọng số càng lớn
+    const genreMap = new Map();
+    const directorMap = new Map();
+    const actorMap = new Map();
+    const countryMap = new Map();
+
+    watchedMovies.forEach(({ movie, progress }) => {
+      // Tính trọng số: progress / 100 (0.0 - 1.0)
+      // Phim xem 100% có trọng số = 1.0, phim xem 50% có trọng số = 0.5
+      // Thêm base weight 0.1 để phim xem ít cũng có ảnh hưởng
+      const weight = Math.max(0.1, progress / 100);
+
+      // Thể loại
+      if (movie.categories && Array.isArray(movie.categories)) {
+        movie.categories.forEach((cat) => {
+          const slug = typeof cat === 'object' ? cat.slug : cat;
+          if (slug) {
+            genreMap.set(slug, (genreMap.get(slug) || 0) + weight);
+          }
+        });
+      }
+
+      // Đạo diễn
+      if (movie.director && Array.isArray(movie.director)) {
+        movie.director.forEach((dir) => {
+          if (dir) {
+            directorMap.set(dir, (directorMap.get(dir) || 0) + weight);
+          }
+        });
+      }
+
+      // Diễn viên
+      if (movie.actor && Array.isArray(movie.actor)) {
+        movie.actor.slice(0, 5).forEach((actor) => {
+          // Chỉ lấy 5 diễn viên đầu
+          if (actor) {
+            actorMap.set(actor, (actorMap.get(actor) || 0) + weight);
+          }
+        });
+      }
+
+      // Quốc gia
+      if (movie.country && Array.isArray(movie.country)) {
+        movie.country.forEach((c) => {
+          const slug = typeof c === 'object' ? c.slug : c;
+          if (slug) {
+            countryMap.set(slug, (countryMap.get(slug) || 0) + weight);
+          }
+        });
+      }
+    });
+
+    // 3. Lấy top preferences (sắp xếp theo trọng số)
+    const topGenres = Array.from(genreMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([slug]) => slug);
+
+    const topDirectors = Array.from(directorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name]) => name);
+
+    const topActors = Array.from(actorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+
+    const topCountries = Array.from(countryMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([slug]) => slug);
+
+    // 4. Xây dựng Atlas Search query
+    const shouldConditions = [];
+
+    // Thể loại (Boost cao nhất x4)
+    if (topGenres.length > 0) {
+      shouldConditions.push({
+        text: {
+          query: topGenres,
+          path: 'categories.slug',
+          score: { boost: { value: 4 } },
+        },
+      });
+    }
+
+    // Đạo diễn (Boost x3)
+    if (topDirectors.length > 0) {
+      shouldConditions.push({
+        text: {
+          query: topDirectors,
+          path: 'director',
+          score: { boost: { value: 3 } },
+        },
+      });
+    }
+
+    // Diễn viên (Boost x2)
+    if (topActors.length > 0) {
+      shouldConditions.push({
+        text: {
+          query: topActors,
+          path: 'actor',
+          score: { boost: { value: 2 } },
+        },
+      });
+    }
+
+    // Quốc gia (Boost x1.5)
+    if (topCountries.length > 0) {
+      shouldConditions.push({
+        text: {
+          query: topCountries,
+          path: 'country.slug',
+          score: { boost: { value: 1.5 } },
+        },
+      });
+    }
+
+    // Nếu không có điều kiện nào, fallback
+    if (shouldConditions.length === 0) {
+      const [trending, topRated] = await Promise.all([
+        getTrending(Math.ceil(limit / 2)),
+        getTopRated(Math.ceil(limit / 2)),
+      ]);
+
+      const combined = [...trending.data, ...topRated.data];
+      const uniqueMovies = Array.from(new Map(combined.map((m) => [m.id, m])).values());
+
+      return {
+        data: uniqueMovies.slice(0, limit),
+      };
+    }
+
+    // 5. Tạo Pipeline Atlas Search
+    const pipeline = [
+      {
+        $search: {
+          index: 'default',
+          compound: {
+            should: shouldConditions,
+            minimumShouldMatch: 1,
+          },
+        },
+      },
+      // Loại trừ phim đã xem
+      {
+        $match: {
+          _id: { $nin: watchedMovieIds },
+        },
+      },
+      // Lấy Score
+      {
+        $addFields: {
+          score: { $meta: 'searchScore' },
+        },
+      },
+      // Sắp xếp: Score cao nhất, sau đó viewCount, rating, year
+      {
+        $sort: {
+          score: -1,
+          viewCount: -1,
+          rating: -1,
+          year: -1,
+        },
+      },
+      // Lấy dư ra để có nhiều lựa chọn
+      { $limit: limit * 2 },
+      // Project các trường cần thiết
+      {
+        $project: {
+          name: 1,
+          original_name: 1,
+          slug: 1,
+          thumb_url: 1,
+          poster_url: 1,
+          year: 1,
+          quality: 1,
+          time: 1,
+          age_rating: 1,
+          lang: 1,
+          type: 1,
+          viewCount: 1,
+          rating: 1,
+          score: 1,
+        },
+      },
+    ];
+
+    // 6. Chạy Atlas Search
+    const recommendedMovies = await Movie.aggregate(pipeline);
+
+    // 7. Transform và trả về
+    let result = transformMovies(recommendedMovies);
+
+    // 8. Nếu không đủ kết quả, bổ sung bằng trending/top rated
+    if (result.length < limit) {
+      const needed = limit - result.length;
+      const [trending, topRated] = await Promise.all([
+        getTrending(Math.ceil(needed / 2)),
+        getTopRated(Math.ceil(needed / 2)),
+      ]);
+
+      const additional = [...trending.data, ...topRated.data]
+        .filter((m) => !watchedMovieIds.some((id) => id.toString() === m.id))
+        .filter((m) => !result.some((r) => r.id === m.id));
+
+      result = [...result, ...additional];
+    }
+
+    return {
+      data: result.slice(0, limit),
+    };
+  } catch (error) {
+    console.error('Get For You Error:', error);
+    // Fallback về trending + top rated
+    try {
+      const [trending, topRated] = await Promise.all([
+        getTrending(Math.ceil(limit / 2)),
+        getTopRated(Math.ceil(limit / 2)),
+      ]);
+
+      const combined = [...trending.data, ...topRated.data];
+      const uniqueMovies = Array.from(new Map(combined.map((m) => [m.id, m])).values());
+
+      return {
+        data: uniqueMovies.slice(0, limit),
+      };
+    } catch (fallbackError) {
+      console.error('Get For You Fallback Error:', fallbackError);
+      return { data: [] };
+    }
+  }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -1917,4 +2220,5 @@ module.exports = {
   dislikeComment,
   deleteComment,
   getRecommendations,
+  getForYou,
 };

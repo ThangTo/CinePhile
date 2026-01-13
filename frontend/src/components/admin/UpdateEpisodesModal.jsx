@@ -21,6 +21,7 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [onlyNewEpisodes, setOnlyNewEpisodes] = useState(true); // Mặc định là true
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -177,6 +178,7 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
 
       await movieAPI.updateEpisodes(
         movieIds,
+        onlyNewEpisodes, // Truyền tham số onlyNewEpisodes
         (data) => {
           // Kiểm tra nếu đã bị hủy
           if (isCancelledRef.current) {
@@ -310,6 +312,19 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Checkbox chỉ cập nhật tập mới */}
+              {!isUpdating && (
+                <label className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm hover:bg-white/10 transition-all cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={onlyNewEpisodes}
+                    onChange={(e) => setOnlyNewEpisodes(e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-black/20 text-primaryColor focus:ring-primaryColor focus:ring-offset-0"
+                  />
+                  <span className="whitespace-nowrap">Chỉ tập mới</span>
+                </label>
+              )}
+              
               {selectedMovies.size > 0 && !isUpdating && (
                 <>
                   <button

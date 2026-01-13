@@ -160,18 +160,25 @@ const getContinueWatching = async (userId, { page = 1, limit = 10 }) => {
       .sort({ lastWatchedAt: -1 })
       .skip(skip)
       .limit(limitNum)
-      .populate('movieId', 'name original_name slug thumb_url poster_url durationMinutes')
+      .populate({
+        path: 'movieId',
+        select: 'name original_name slug thumb_url poster_url durationMinutes isHidden',
+        match: { isHidden: { $ne: true } }, // Filter out hidden movies
+      })
       .populate('episodeId', 'name slug filename episodeId audioType'),
     UserHistory.countDocuments(query),
   ]);
 
+  // Filter out entries where movieId is null (hidden movies)
+  const filteredHistory = history.filter((item) => item.movieId !== null);
+
   return {
-    data: transformHistoryItems(history),
+    data: transformHistoryItems(filteredHistory),
     pagination: {
       page: pageNum,
       limit: limitNum,
-      total,
-      totalPages: Math.ceil(total / limitNum),
+      total: filteredHistory.length, // Use filtered count
+      totalPages: Math.ceil(filteredHistory.length / limitNum),
     },
   };
 };

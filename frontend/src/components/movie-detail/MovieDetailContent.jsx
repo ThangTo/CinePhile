@@ -18,7 +18,7 @@ const MovieDetailContent = ({
 }) => {
   return (
     <>
-      <DetailTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+      <DetailTabs activeTab={activeTab} setActiveTab={setActiveTab} movie={movie} />
 
       <TabContent
         activeTab={activeTab}

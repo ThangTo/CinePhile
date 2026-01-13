@@ -74,9 +74,19 @@ const MobileMovieBanner = ({ movie, audioType }) => {
   } = useMovieRating(movie);
 
   const handleWatch = () => {
-    navigate(
-      `/watch/${movie.id}?ep=1${audioType ? `&audio=${encodeURIComponent(audioType)}` : ""}`
-    );
+    if (movie.isHidden) {
+      // If movie is hidden, open trailer
+      if (movie.trailer_url) {
+        window.open(movie.trailer_url, "_blank");
+      } else {
+        warning("Trailer chưa có sẵn");
+      }
+    } else {
+      // Normal watch flow
+      navigate(
+        `/watch/${movie.id}?ep=1${audioType ? `&audio=${encodeURIComponent(audioType)}` : ""}`
+      );
+    }
   };
 
   const handleToggleFavorite = async () => {
@@ -216,6 +226,7 @@ const MobileMovieBanner = ({ movie, audioType }) => {
                     status={movie.status}
                     currentEpisode={movie.currentEpisode}
                     totalEpisodes={movie.totalEpisodes}
+                    isHidden={movie.isHidden}
                     className="text-green-400"
                   />
                 </div>
@@ -254,13 +265,17 @@ const MobileMovieBanner = ({ movie, audioType }) => {
           </div>
         )}
 
-        {/* Watch Now Button */}
+        {/* Watch Now / Watch Trailer Button */}
         <button
           onClick={handleWatch}
-          className="w-[85%] max-w-xs bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-bold py-4 rounded-full flex items-center justify-center gap-3 shadow-lg transition-all hover:scale-105 mb-6"
+          className={`w-[85%] max-w-xs ${
+            movie.isHidden
+              ? "bg-yellow-600 hover:bg-yellow-700"
+              : "bg-primaryColor hover:bg-hoverPrimaryColor"
+          } text-primaryColorButtonText font-bold py-4 rounded-full flex items-center justify-center gap-3 shadow-lg transition-all hover:scale-105 mb-6`}
         >
-          <i className="fa-solid fa-play text-lg" />
-          <span className="text-lg">Xem Ngay</span>
+          <i className={`fa-solid ${movie.isHidden ? "fa-film" : "fa-play"} text-lg`} />
+          <span className="text-lg">{movie.isHidden ? "Xem Trailer" : "Xem Ngay"}</span>
         </button>
 
         {/* Action Buttons */}

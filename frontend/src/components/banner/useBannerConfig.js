@@ -112,11 +112,15 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
   const actionButtons = useMemo(
     () => [
       {
-        icon: "fa-play",
+        icon: movieData.isHidden ? "fa-film" : "fa-play",
         variant: "primary",
         size: "lg",
-        onClick: () => navigate(`/watch/${movieData.id}?ep=1`),
-        ariaLabel: "Play movie",
+        onClick: () => {
+          // Always navigate to watch page, even for hidden movies
+          navigate(`/watch/${movieData.id}?ep=1`);
+        },
+        ariaLabel: movieData.isHidden ? "Watch trailer" : "Play movie",
+        label: movieData.isHidden ? "Xem Trailer" : "Xem Ngay",
       },
       {
         icon: isFavorite ? "fa-heart" : "fa-heart",
@@ -134,7 +138,15 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
         ariaLabel: "Movie details",
       },
     ],
-    [movieData.id, navigate, isAuthenticated, isFavorite]
+    [
+      movieData.id,
+      movieData.isHidden,
+      movieData.trailer_url,
+      navigate,
+      isAuthenticated,
+      isFavorite,
+      warningToast,
+    ]
   );
 
   return { infoBadges, actionButtons };

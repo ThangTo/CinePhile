@@ -8,6 +8,7 @@ import CommentsSection from "components/movie-detail/CommentsSection";
 import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
 import { fetchMovieById, fetchEpisodes } from "services/movie.service";
 import { enrichMovieWithSeriesParts } from "utils/seriesGrouping";
+import { getYouTubeEmbedUrl } from "utils/videoUtils";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
 import CastSection from "components/movie-detail/CastSection";
@@ -115,10 +116,17 @@ const WatchPage = () => {
 
   // Find episode by episode number (not id)
   // Backend returns: { id: ObjectId, episode: episodeId (number), ... }
-  const currentEpisode =
-    filteredEpisodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
-    filteredEpisodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
-    filteredEpisodes[0];
+  // For hidden movies, create a fake episode with trailer
+  const currentEpisode = movie.isHidden
+    ? {
+        episode: 1,
+        episodeId: 1,
+        link_embed: getYouTubeEmbedUrl(movie.trailer_url || movie.trailerUrl || movie.trailer),
+        videoUrl: getYouTubeEmbedUrl(movie.trailer_url || movie.trailerUrl || movie.trailer),
+      }
+    : filteredEpisodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
+      filteredEpisodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
+      filteredEpisodes[0];
 
   return (
     <div className="min-h-screen bg-bgColor">
@@ -163,24 +171,26 @@ const WatchPage = () => {
               <MovieInfoBrief movie={movie} activeEp={activeEp} />
             </div>
 
-            {/* Episodes Section */}
-            <EpisodesSection
-              movie={{ ...movie, episodes: filteredEpisodes }}
-              activeEpisode={activeEp}
-              onEpisodeClick={handleEpisodeChange}
-              audioType={audioType}
-              onAudioTypeChange={setAudioType}
-              onPartChange={(partLabel) => {
-                if (!movie?.seriesParts || !Array.isArray(movie.seriesParts)) return;
-                const match = partLabel.match(/Phần\s*(\d+)/i);
-                const partNumber = match ? parseInt(match[1], 10) : 1;
-                const target = movie.seriesParts.find((p) => p.partNumber === partNumber);
-                if (!target) return;
+            {/* Episodes Section - Hidden for hidden movies */}
+            {!movie.isHidden && (
+              <EpisodesSection
+                movie={{ ...movie, episodes: filteredEpisodes }}
+                activeEpisode={activeEp}
+                onEpisodeClick={handleEpisodeChange}
+                audioType={audioType}
+                onAudioTypeChange={setAudioType}
+                onPartChange={(partLabel) => {
+                  if (!movie?.seriesParts || !Array.isArray(movie.seriesParts)) return;
+                  const match = partLabel.match(/Phần\s*(\d+)/i);
+                  const partNumber = match ? parseInt(match[1], 10) : 1;
+                  const target = movie.seriesParts.find((p) => p.partNumber === partNumber);
+                  if (!target) return;
 
-                const audioQuery = audioType ? `&audio=${encodeURIComponent(audioType)}` : "";
-                navigate(`/watch/${target.id}?ep=1${audioQuery}`);
-              }}
-            />
+                  const audioQuery = audioType ? `&audio=${encodeURIComponent(audioType)}` : "";
+                  navigate(`/watch/${target.id}?ep=1${audioQuery}`);
+                }}
+              />
+            )}
 
             {/* Comments - constrained to left grid column on desktop */}
             <div className="hidden lg:block mt-6">

@@ -53,6 +53,15 @@ router.put('/movies/:id', adminController.updateMovie);
 // DELETE /api/v1/admin/movies/:id - Delete movie
 router.delete('/movies/:id', adminController.deleteMovie);
 
+// PATCH /api/v1/admin/movies/:id/toggle-hidden - Toggle movie hidden status
+router.patch('/movies/:id/toggle-hidden', adminController.toggleMovieHidden);
+
+// POST /api/v1/admin/movies/hide-all - Hide all movies
+router.post('/movies/hide-all', adminController.hideAllMovies);
+
+// POST /api/v1/admin/movies/unhide-all - Unhide all movies
+router.post('/movies/unhide-all', adminController.unhideAllMovies);
+
 // ===== ADMIN USERS =====
 // GET /api/v1/admin/users - Get all users
 router.get('/users', adminController.getAllUsers);

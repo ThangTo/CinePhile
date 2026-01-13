@@ -68,7 +68,9 @@ const getAll = async (req, res) => {
  */
 const getById = async (req, res) => {
   try {
-    const movie = await movieService.getById(req.params.id);
+    // Check if user is admin
+    const isAdmin = req.user?.role === 'admin';
+    const movie = await movieService.getById(req.params.id, { isAdmin });
     res.json(movie);
   } catch (error) {
     res.status(404).json({ message: error.message });
@@ -225,7 +227,6 @@ const getByType = async (req, res) => {
     }
 
     const baseFilters = buildFiltersFromQuery(req.query);
-    console.log('baseFilters', baseFilters);
     const result = await movieService.getByType(typeParam, {
       page: req.query.page,
       limit: req.query.limit,
@@ -269,7 +270,9 @@ const search = async (req, res) => {
  */
 const getEpisodes = async (req, res) => {
   try {
-    const episodes = await movieService.getEpisodes(req.params.id, req.query.season);
+    // Check if user is admin
+    const isAdmin = req.user?.role === 'admin';
+    const episodes = await movieService.getEpisodes(req.params.id, { isAdmin });
     res.json({ data: episodes });
   } catch (error) {
     res.status(404).json({ message: error.message });
@@ -388,14 +391,6 @@ const getRatings = async (req, res) => {
  */
 const likeComment = async (req, res) => {
   try {
-    console.log('[Like Comment] Request:', {
-      commentId: req.params.commentId,
-      userId: req.user?._id,
-      body: req.body,
-      path: req.path,
-      url: req.url,
-    });
-
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
@@ -450,11 +445,6 @@ const dislikeComment = async (req, res) => {
  */
 const deleteComment = async (req, res) => {
   try {
-    console.log('[Delete Comment] Request:', {
-      commentId: req.params.commentId,
-      userId: req.user?._id,
-    });
-
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
@@ -490,6 +480,28 @@ const getRecommendations = async (req, res) => {
   }
 };
 
+/**
+ * GET /movies/for-you
+ * Get personalized movie recommendations based on user's watch history
+ * Requires authentication
+ * @param {number} req.query.limit - Limit number of results (default: 20)
+ * @returns {Object} { data: Array }
+ */
+const getForYou = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const limit = Number(req.query.limit) || 20;
+    const result = await movieService.getForYou(req.user._id, limit);
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -514,4 +526,5 @@ module.exports = {
   dislikeComment,
   deleteComment,
   getRecommendations,
+  getForYou,
 };

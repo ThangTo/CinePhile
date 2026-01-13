@@ -9,10 +9,12 @@ import { Link } from "react-router-dom";
  * @param {string} props.linkHref - Link URL (optional)
  * @param {string} props.className - Additional classes
  */
-const SectionHeader = ({ title, linkText, linkHref, className = "" }) => {
+const SectionHeader = ({ title, linkText, linkHref, isActive, className = "" }) => {
   return (
     <div className={`flex items-center justify-between mb-4 ${className}`}>
-      <h3 className="text-xl sm:text-2xl font-bold">{title}</h3>
+      <h3 className={`text-xl sm:text-2xl font-bold ${isActive ? "text-primaryColor" : ""}`}>
+        {title}
+      </h3>
       {linkText && linkHref && (
         <Link
           to={linkHref}

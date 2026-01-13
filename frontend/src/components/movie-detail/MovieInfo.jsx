@@ -20,6 +20,7 @@ const MovieInfo = ({ movie }) => {
               status={movie.status}
               currentEpisode={movie.currentEpisode}
               totalEpisodes={movie.totalEpisodes}
+              isHidden={movie.isHidden}
               className="absolute -top-2 -left-2"
             />
           </div>

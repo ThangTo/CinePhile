@@ -21,6 +21,17 @@ const GoogleAuthHandler = () => {
   const { getCurrentUser } = useAuth();
   const hasProcessedRef = useRef(false);
   const lastProcessedSearchRef = useRef(null); // Lưu location.search đã xử lý
+  const isMountedRef = useRef(true); // Track if component is mounted
+
+  useEffect(() => {
+    // Set mounted flag
+    isMountedRef.current = true;
+
+    // Cleanup function
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Bỏ qua nếu location.search rỗng (đã navigate về "/" không có params)
@@ -47,6 +58,8 @@ const GoogleAuthHandler = () => {
     hasProcessedRef.current = true;
 
     const handleCallback = async () => {
+      // Check if component is still mounted before proceeding
+      if (!isMountedRef.current) return;
       const isMobile = isMobileDevice();
 
       // 🔒 CHỈ xử lý tokens từ URL nếu là mobile device
@@ -76,6 +89,7 @@ const GoogleAuthHandler = () => {
       }
 
       if (status === "google_failed" || status === "failure") {
+        if (!isMountedRef.current) return;
         navigate("/", { replace: true, state: { authError: "Đăng nhập Google thất bại" } });
         return;
       }
@@ -154,6 +168,9 @@ const GoogleAuthHandler = () => {
                 await new Promise((resolve) => setTimeout(resolve, 100));
               }
 
+              // Check if still mounted before navigating
+              if (!isMountedRef.current) return;
+
               // Lấy location đã lưu và redirect về đó
               const returnLocation = getAndClearReturnLocation();
 
@@ -185,6 +202,9 @@ const GoogleAuthHandler = () => {
         // 💻 DESKTOP hoặc MOBILE fallback: Dùng cookies
         await getCurrentUser();
 
+        // Check if still mounted before navigating
+        if (!isMountedRef.current) return;
+
         // Lấy location đã lưu và redirect về đó
         const returnLocation = getAndClearReturnLocation();
 
@@ -202,6 +222,9 @@ const GoogleAuthHandler = () => {
           });
         }
       } catch (error) {
+        // Check if still mounted before navigating
+        if (!isMountedRef.current) return;
+
         // Navigate về homepage (xóa hết params để tránh vòng lặp)
         navigate("/", {
           replace: true,

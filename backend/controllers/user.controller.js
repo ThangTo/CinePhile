@@ -47,14 +47,12 @@ const updateProfile = async (req, res) => {
     if (req.body.email) updates.email = req.body.email;
     if (req.body.avatar) updates.avatar = req.body.avatar;
     if (req.body.gender) updates.gender = req.body.gender;
-    console.log(updates);
 
     const user = await User.findByIdAndUpdate(
       userId,
       { $set: updates },
       { new: true, runValidators: true },
     );
-    console.log('user', user);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

@@ -1,6 +1,12 @@
 import React from "react";
 
-const StatusBadge = ({ status, currentEpisode, totalEpisodes, className = "" }) => {
+const StatusBadge = ({
+  status,
+  currentEpisode,
+  totalEpisodes,
+  isHidden = false,
+  className = "",
+}) => {
   if (!totalEpisodes || totalEpisodes === 0) {
     return null;
   }
@@ -8,7 +14,11 @@ const StatusBadge = ({ status, currentEpisode, totalEpisodes, className = "" }) 
   let badgeContent = "";
   let badgeClass = "";
 
-  if (status === "upcoming") {
+  // If movie is hidden, always show "Sắp ra mắt" regardless of actual status
+  if (isHidden) {
+    badgeContent = "Sắp ra mắt";
+    badgeClass = "bg-purple-500/80 text-white";
+  } else if (status === "upcoming") {
     badgeContent = "Sắp ra mắt";
     badgeClass = "bg-purple-500/80 text-white";
   } else if (status === "completed" || (currentEpisode > 0 && currentEpisode === totalEpisodes)) {
@@ -36,10 +46,10 @@ const StatusBadge = ({ status, currentEpisode, totalEpisodes, className = "" }) 
     <div
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg ${badgeClass} ${className}`}
     >
-      {status === "completed" || (currentEpisode > 0 && currentEpisode === totalEpisodes) ? (
-        <i className="fa-solid fa-check" />
-      ) : status === "upcoming" ? (
+      {isHidden || status === "upcoming" ? (
         <i className="fa-solid fa-clock" />
+      ) : status === "completed" || (currentEpisode > 0 && currentEpisode === totalEpisodes) ? (
+        <i className="fa-solid fa-check" />
       ) : (
         <i className="fa-solid fa-spinner" />
       )}

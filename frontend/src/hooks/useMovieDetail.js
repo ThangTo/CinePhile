@@ -36,6 +36,11 @@ const useMovieDetail = (id) => {
         }
 
         setMovie(enriched);
+
+        // If movie is hidden, set default tab to "cast" instead of "episodes"
+        if (enriched.isHidden) {
+          setActiveTab("cast");
+        }
       } catch (err) {
         setError(err.message || "Error fetching movie");
         console.error("Error fetching movie:", err);
@@ -67,6 +72,13 @@ const useMovieDetail = (id) => {
       return;
     }
 
+    // Don't show resume modal for hidden movies
+    if (movie?.isHidden) {
+      setSavedProgress(null);
+      setShowResumeModal(false);
+      return;
+    }
+
     const loadProgress = async () => {
       try {
         const response = await userService.getProgress(movieId);
@@ -92,7 +104,7 @@ const useMovieDetail = (id) => {
     };
 
     loadProgress();
-  }, [isAuthenticated, user, movie?.id, movie?._id]);
+  }, [isAuthenticated, user, movie?.id, movie?._id, movie?.isHidden]);
 
   return {
     movie,

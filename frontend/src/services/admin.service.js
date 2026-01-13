@@ -78,6 +78,43 @@ export const movieAPI = {
   },
 
   /**
+   * Toggle movie hidden status (hide/unhide)
+   * @param {string|number} id - Movie ID
+   * @returns {Promise<Object>} { success: true, isHidden: boolean, message: string }
+   */
+  toggleHidden: async (id) => {
+    const response = await apiRequest(`/admin/movies/${id}/toggle-hidden`, {
+      method: "PATCH",
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Hide all movies
+   * @returns {Promise<Object>} { success: true, count: number, message: string }
+   */
+  hideAll: async () => {
+    const response = await apiRequest("/admin/movies/hide-all", {
+      method: "POST",
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Unhide all movies
+   * @returns {Promise<Object>} { success: true, count: number, message: string }
+   */
+  unhideAll: async () => {
+    const response = await apiRequest("/admin/movies/unhide-all", {
+      method: "POST",
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
    * Search movies
    * @param {string} query - Search query
    * @param {Object} params - { page?, limit? }
@@ -247,11 +284,12 @@ export const movieAPI = {
   /**
    * Update episodes for selected movies with Server-Sent Events
    * @param {Array<string>} movieIds - Array of movie IDs
+   * @param {Boolean} onlyNewEpisodes - If true, only update new episodes
    * @param {Function} onProgress - Callback for progress updates
    * @param {AbortController} abortController - Optional AbortController to cancel the request
    * @returns {Promise<Object>} Final result
    */
-  updateEpisodes: async (movieIds, onProgress, abortController = null) => {
+  updateEpisodes: async (movieIds, onlyNewEpisodes, onProgress, abortController = null) => {
     // Import axios để lấy baseURL
     const http = (await import("lib/axios")).default;
     const baseURL =
@@ -274,7 +312,7 @@ export const movieAPI = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ movieIds }),
+      body: JSON.stringify({ movieIds, onlyNewEpisodes }),
       credentials: "include",
       signal: abortController?.signal,
     });

@@ -25,6 +25,7 @@ const SidebarInfo = ({ movie }) => {
           status={movie.status}
           currentEpisode={movie.currentEpisode}
           totalEpisodes={movie.totalEpisodes}
+          isHidden={movie.isHidden}
           className="absolute -top-2 -right-2"
         />
       </div>
@@ -97,6 +98,7 @@ const SidebarInfo = ({ movie }) => {
               status={movie.status}
               currentEpisode={movie.currentEpisode}
               totalEpisodes={movie.totalEpisodes}
+              isHidden={movie.isHidden}
               className="text-green-400"
             />
           </div>

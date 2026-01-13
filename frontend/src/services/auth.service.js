@@ -24,17 +24,24 @@ const authService = {
         ? { username: usernameOrData, email, password }
         : usernameOrData;
 
-    const data = await apiRequest("/auth/register", {
-      method: "POST",
-      data: userData,
-    });
+    try {
+      const data = await apiRequest("/auth/register", {
+        method: "POST",
+        data: userData,
+      });
 
-    const user = data?.user || data;
-    if (user) {
-      setAuthData({ user });
+      const user = data?.user || data;
+      if (user) {
+        setAuthData({ user });
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Register error:", error);
+      // Axios interceptor returns { status, message, raw, isAuthPath }
+      // Just re-throw it as-is
+      throw error;
     }
-
-    return data;
   },
 
   /**
@@ -56,6 +63,8 @@ const authService = {
       return data;
     } catch (error) {
       console.error("Login error:", error);
+      // Axios interceptor returns { status, message, raw, isAuthPath }
+      // Just re-throw it as-is
       throw error;
     }
   },

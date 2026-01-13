@@ -17,15 +17,21 @@ const ContinueWatching = () => {
   const [showViewMore, setShowViewMore] = useState(false);
 
   useEffect(() => {
+    let isMounted = true; // Track if component is mounted
+
     if (!isAuthenticated) {
-      setContinueWatchingData([]);
-      setLoading(false);
+      if (isMounted) {
+        setContinueWatchingData([]);
+        setLoading(false);
+      }
       return;
     }
 
     const fetchContinueWatching = async () => {
       try {
-        setLoading(true);
+        if (isMounted) {
+          setLoading(true);
+        }
         const response = await userService.getContinueWatching({ limit: 6 });
         const historyData = response?.data || [];
 
@@ -55,16 +61,27 @@ const ContinueWatching = () => {
           };
         });
 
-        setContinueWatchingData(formattedData);
+        if (isMounted) {
+          setContinueWatchingData(formattedData);
+        }
       } catch (error) {
         console.error("Error fetching continue watching data:", error);
-        setContinueWatchingData([]);
+        if (isMounted) {
+          setContinueWatchingData([]);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchContinueWatching();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
   }, [isAuthenticated]);
 
   const handleMovieClick = (movie) => {

@@ -16,7 +16,20 @@ const register = async (req, res) => {
     attachAuthCookies(res, result);
     res.status(201).json({ user: result.user });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    // Map error messages to Vietnamese
+    let message = error.message;
+    if (message.includes('already exists')) {
+      if (message.includes('email')) {
+        message = 'Email này đã được sử dụng';
+      } else if (message.includes('Username')) {
+        message = 'Tên người dùng này đã tồn tại';
+      } else {
+        message = 'Tài khoản đã tồn tại';
+      }
+    } else if (message.includes('required')) {
+      message = 'Vui lòng điền đầy đủ thông tin';
+    }
+    res.status(400).json({ message });
   }
 };
 
@@ -35,7 +48,29 @@ const login = async (req, res) => {
       accessToken: result.token,
     });
   } catch (error) {
-    res.status(401).json({ message: error.message });
+    // Map error messages to Vietnamese
+    let message = error.message;
+
+    // Passport-local-mongoose error messages
+    if (
+      message.includes('Incorrect password') ||
+      message.includes('Invalid credentials') ||
+      message.includes('Password or username is incorrect') ||
+      message.includes('incorrect')
+    ) {
+      message = 'Email hoặc mật khẩu không chính xác';
+    } else if (
+      message.includes('No salt value stored') ||
+      message.includes('Authentication not possible')
+    ) {
+      message = 'Tài khoản này được tạo qua Google. Vui lòng đăng nhập bằng Google';
+    } else if (message.includes('Missing credentials') || message.includes('required')) {
+      message = 'Vui lòng nhập email và mật khẩu';
+    } else if (message.includes('not found') || message.includes('does not exist')) {
+      message = 'Tài khoản không tồn tại';
+    }
+
+    res.status(401).json({ message });
   }
 };
 
@@ -48,8 +83,7 @@ const login = async (req, res) => {
 const logout = async (req, res) => {
   try {
     // Get token from cookies or header
-    const token = req.cookies?.accessToken || 
-                  req.headers.authorization?.split(' ')[1];
+    const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
 
     // Blacklist token in Redis
     const result = await authService.logout(token);

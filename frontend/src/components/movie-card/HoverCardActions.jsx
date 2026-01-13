@@ -10,16 +10,24 @@ import ActionButton from "components/banner/ActionButton";
  * @param {Function} props.onAddToList - Add to watchlist button click handler (optional)
  * @param {Function} props.onInfo - Info button click handler
  * @param {boolean} props.isFavorite - Whether the movie is favorited
+ * @param {boolean} props.isHidden - Whether the movie is hidden (shows trailer instead)
  */
-const HoverCardActions = ({ onWatch, onLike, onAddToList, onInfo, isFavorite = false }) => (
+const HoverCardActions = ({
+  onWatch,
+  onLike,
+  onAddToList,
+  onInfo,
+  isFavorite = false,
+  isHidden = false,
+}) => (
   <div className="flex gap-2">
     {/* Watch Now Button - Custom gradient style */}
     <button
       onClick={onWatch}
       className="flex-1 flex items-center justify-center gap-2 bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-semibold rounded-lg py-2.5 px-4 text-sm transition-all shadow-lg"
     >
-      <i className="fa-solid fa-play text-sm" />
-      <span className="text-sm">Xem ngay</span>
+      <i className={`fa-solid ${isHidden ? "fa-film" : "fa-play"} text-sm`} />
+      <span className="text-sm">{isHidden ? "Xem Trailer" : "Xem ngay"}</span>
     </button>
 
     {/* Like Button - Reuse ActionButton */}

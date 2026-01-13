@@ -128,20 +128,25 @@ const ActionButtons = ({ movie, audioType }) => {
   return (
     <>
       <div className="flex items-center justify-between gap-6 py-6 px-4">
-        {/* Watch Now Button */}
+        {/* Watch Now / Watch Trailer Button */}
         <div className="flex items-center justify-start gap-6">
           <button
-            onClick={() =>
+            onClick={() => {
+              // Always navigate to watch page, even for hidden movies
               navigate(
                 `/watch/${movie.id}?ep=1${
                   audioType ? `&audio=${encodeURIComponent(audioType)}` : ""
                 }`
-              )
-            }
-            className="bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText px-8 py-3 rounded-full font-semibold flex items-center gap-2 transition-all shadow-lg"
+              );
+            }}
+            className={`${
+              movie.isHidden
+                ? "bg-yellow-600 hover:bg-yellow-700"
+                : "bg-primaryColor hover:bg-hoverPrimaryColor"
+            } text-primaryColorButtonText px-8 py-3 rounded-full font-semibold flex items-center gap-2 transition-all shadow-lg`}
           >
-            <i className="fa-solid fa-play text-lg" />
-            Xem Ngay
+            <i className={`fa-solid ${movie.isHidden ? "fa-film" : "fa-play"} text-lg`} />
+            {movie.isHidden ? "Xem Trailer" : "Xem Ngay"}
           </button>
 
           {/* Action Buttons */}

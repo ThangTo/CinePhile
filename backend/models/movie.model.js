@@ -49,7 +49,7 @@ const movieSchema = new mongoose.Schema(
 
     age_rating: {
       type: String,
-      enum: ['T12', 'T16', '18+'],
+      enum: ['T12', 'T14', 'T16', '18+'],
       default: 'T12',
       index: true,
     },
@@ -91,6 +91,7 @@ const movieSchema = new mongoose.Schema(
     totalRatings: { type: Number, default: 0 },
 
     isNewRelease: { type: Boolean, default: false },
+    isHidden: { type: Boolean, default: false, index: true }, // Admin có thể ẩn phim
   },
   {
     timestamps: true,

@@ -23,6 +23,17 @@ const HomePage = () => {
           <ContinueWatching />
         </LazySection>
 
+        {/* For You Section - Personalized recommendations based on watch history */}
+        <LazySection rootMargin="150px">
+          <SectionRow
+            title="Có Thể Bạn Sẽ Thích"
+            subtitle="Gợi ý dựa trên lịch sử xem của bạn"
+            sectionType="forYou"
+            linkHref="#"
+            isActive={true}
+          />
+        </LazySection>
+
         {/* Trending Section - Uses mock data */}
         <LazySection rootMargin="200px">
           <SectionRow title="Phim Đang Thịnh Hành" sectionType="trending" linkHref="/trending" />

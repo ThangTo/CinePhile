@@ -38,6 +38,7 @@ const buildAdminQuery = (filters = {}) => {
     status,
     ratingMin,
     ratingMax,
+    isHidden,
   } = filters;
 
   const query = {};
@@ -97,6 +98,11 @@ const buildAdminQuery = (filters = {}) => {
     if (ratingMax) query.rating.$lte = parseFloat(ratingMax);
   }
 
+  // Filter by hidden status
+  if (isHidden !== undefined && isHidden !== null) {
+    query.isHidden = isHidden === 'true' || isHidden === true;
+  }
+
   return query;
 };
 
@@ -132,7 +138,7 @@ const generateUniqueSlug = async (baseSlug, excludeId = null) => {
 
 /**
  * Get all movies with pagination and filters
- * @param {Object} options - { page, limit, search, genres, countries, year, yearFrom, yearTo, quality, type, ageRating, status, ratingMin, ratingMax }
+ * @param {Object} options - { page, limit, search, genres, countries, year, yearFrom, yearTo, quality, type, ageRating, status, ratingMin, ratingMax, isHidden }
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
 const getAllMovies = async ({
@@ -150,6 +156,7 @@ const getAllMovies = async ({
   status,
   ratingMin,
   ratingMax,
+  isHidden,
 }) => {
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 20;
@@ -169,6 +176,7 @@ const getAllMovies = async ({
     status,
     ratingMin,
     ratingMax,
+    isHidden,
   });
 
   // Gọi Database
@@ -363,6 +371,86 @@ const deleteMovie = async (id) => {
 
   return true;
 };
+
+/**
+ * Toggle movie hidden status (hide/unhide)
+ * @param {string|number} id - Movie ID
+ * @returns {Promise<Object>} Updated movie with new isHidden status
+ */
+const toggleMovieHidden = async (id) => {
+  const movie = await MovieModel.findById(id);
+  if (!movie) {
+    throw new Error('Phim không tồn tại');
+  }
+
+  // Toggle isHidden status
+  movie.isHidden = !movie.isHidden;
+  await movie.save();
+
+  // Invalidate movie cache after status change
+  invalidateMovieCache().catch((err) => {
+    console.error('Error invalidating cache:', err);
+  });
+
+  return {
+    success: true,
+    isHidden: movie.isHidden,
+    message: movie.isHidden ? 'Đã ẩn phim' : 'Đã hiện phim',
+  };
+};
+
+/**
+ * Hide all movies
+ * @returns {Promise<Object>} Result with count of hidden movies
+ */
+const hideAllMovies = async () => {
+  try {
+    const result = await MovieModel.updateMany(
+      { isHidden: { $ne: true } }, // Only update movies that are not already hidden
+      { $set: { isHidden: true } },
+    );
+
+    // Invalidate movie cache after bulk update
+    invalidateMovieCache().catch((err) => {
+      console.error('Error invalidating cache:', err);
+    });
+
+    return {
+      success: true,
+      count: result.modifiedCount,
+      message: `Đã ẩn ${result.modifiedCount} phim`,
+    };
+  } catch (error) {
+    throw new Error('Không thể ẩn tất cả phim: ' + error.message);
+  }
+};
+
+/**
+ * Unhide all movies
+ * @returns {Promise<Object>} Result with count of unhidden movies
+ */
+const unhideAllMovies = async () => {
+  try {
+    const result = await MovieModel.updateMany(
+      { isHidden: true }, // Only update movies that are hidden
+      { $set: { isHidden: false } },
+    );
+
+    // Invalidate movie cache after bulk update
+    invalidateMovieCache().catch((err) => {
+      console.error('Error invalidating cache:', err);
+    });
+
+    return {
+      success: true,
+      count: result.modifiedCount,
+      message: `Đã hiện ${result.modifiedCount} phim`,
+    };
+  } catch (error) {
+    throw new Error('Không thể hiện tất cả phim: ' + error.message);
+  }
+};
+
 /**
  * Search movies
  * @param {string} query - Search query
@@ -665,7 +753,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {Object} movie - Movie object with _id and slug
  * @returns {Promise<Object>} Update result
  */
-const updateEpisodesForMovie = async (movie) => {
+const updateEpisodesForMovie = async (movie, onlyNewEpisodes = false) => {
   const slug = movie.slug;
   if (!slug) return { updated: 0, skipped: true, error: 'No slug' };
 
@@ -718,6 +806,20 @@ const updateEpisodesForMovie = async (movie) => {
     );
 
     let updatedCount = 0;
+    let skippedCount = 0;
+
+    // Nếu chỉ cập nhật tập mới, lấy danh sách (episodeId, audioType) hiện có trong DB
+    let existingEpisodeAudioPairs = new Set();
+    if (onlyNewEpisodes) {
+      const existingEpisodes = await EpisodeModel.find({ movieId: movie._id })
+        .select('episodeId audioType')
+        .lean();
+
+      // Tạo Set chứa các cặp "episodeId-audioType" đã tồn tại
+      existingEpisodes.forEach((ep) => {
+        existingEpisodeAudioPairs.add(`${ep.episodeId}-${ep.audioType || 'unknown'}`);
+      });
+    }
 
     // Duyệt các server
     for (const server of episodesData) {
@@ -725,9 +827,20 @@ const updateEpisodesForMovie = async (movie) => {
       const audioType = detectAudioType(server.server_name);
 
       for (const ep of serverData) {
+        const episodeNumber = extractEpisodeNumber(ep.name);
+
+        // Nếu chỉ cập nhật tập mới, kiểm tra cặp (episodeId, audioType) đã tồn tại chưa
+        if (onlyNewEpisodes) {
+          const pairKey = `${episodeNumber}-${audioType || 'unknown'}`;
+          if (existingEpisodeAudioPairs.has(pairKey)) {
+            skippedCount++;
+            continue;
+          }
+        }
+
         const episodePayload = {
           movieId: movie._id,
-          episodeId: extractEpisodeNumber(ep.name),
+          episodeId: episodeNumber,
           slug: ep.slug,
           filename: ep.filename,
           serverName: server.server_name,
@@ -753,12 +866,14 @@ const updateEpisodesForMovie = async (movie) => {
     return {
       updated: updatedCount,
       skipped: false,
+      skippedEpisodes: skippedCount,
       prevCurrent,
       prevTotal,
       newCurrent: currentEp,
       newTotal: totalEp,
       movieSlug: slug,
       movieName: movie.name || movie.title,
+      onlyNewEpisodes,
     };
   } catch (error) {
     return {
@@ -775,9 +890,10 @@ const updateEpisodesForMovie = async (movie) => {
  * Update episodes for multiple movies
  * @param {Array<string>} movieIds - Array of movie IDs
  * @param {Function} onProgress - Optional callback for progress updates
+ * @param {Boolean} onlyNewEpisodes - If true, only update new episodes (skip existing ones)
  * @returns {Promise<Object>} Update results
  */
-const updateEpisodesForMovies = async (movieIds, onProgress = null) => {
+const updateEpisodesForMovies = async (movieIds, onProgress = null, onlyNewEpisodes = false) => {
   if (!Array.isArray(movieIds) || movieIds.length === 0) {
     throw new Error('Movie IDs array is required');
   }
@@ -805,21 +921,27 @@ const updateEpisodesForMovies = async (movieIds, onProgress = null) => {
 
   const results = [];
   let totalUpdated = 0;
+  let totalSkippedEpisodes = 0;
 
   // Send initial progress
   if (onProgress) {
     onProgress({
       type: 'progress',
-      message: `Bắt đầu cập nhật ${movies.length} phim...`,
+      message: `Bắt đầu cập nhật ${movies.length} phim${
+        onlyNewEpisodes ? ' (chỉ tập mới)' : ''
+      }...`,
       current: 0,
       total: movies.length,
+      onlyNewEpisodes,
     });
   }
 
   for (let idx = 0; idx < movies.length; idx++) {
     const movie = movies[idx];
-    const result = await updateEpisodesForMovie(movie);
+    const result = await updateEpisodesForMovie(movie, onlyNewEpisodes);
     totalUpdated += result.updated;
+    totalSkippedEpisodes += result.skippedEpisodes || 0;
+
     const resultData = {
       movieId: movie._id.toString(),
       movieName: movie.name || movie.title,
@@ -830,11 +952,17 @@ const updateEpisodesForMovies = async (movieIds, onProgress = null) => {
 
     // Send progress update
     if (onProgress) {
+      const message = onlyNewEpisodes
+        ? `[${idx + 1}/${movies.length}] ${movie.name || movie.title}: ${result.updated} tập mới, ${
+            result.skippedEpisodes || 0
+          } tập bỏ qua`
+        : `[${idx + 1}/${movies.length}] ${movie.name || movie.title}: ${
+            result.updated
+          } tập đã cập nhật`;
+
       onProgress({
         type: 'progress',
-        message: `[${idx + 1}/${movies.length}] ${movie.name || movie.title}: ${
-          result.updated
-        } tập đã cập nhật`,
+        message,
         current: idx + 1,
         total: movies.length,
         result: resultData,
@@ -850,6 +978,8 @@ const updateEpisodesForMovies = async (movieIds, onProgress = null) => {
   const finalResult = {
     total: movies.length,
     updated: totalUpdated,
+    skippedEpisodes: totalSkippedEpisodes,
+    onlyNewEpisodes,
     results,
   };
 
@@ -917,6 +1047,9 @@ module.exports = {
   createMovie,
   updateMovie,
   deleteMovie,
+  toggleMovieHidden,
+  hideAllMovies,
+  unhideAllMovies,
   searchMovies,
   // Episodes
   updateEpisodesForMovies,

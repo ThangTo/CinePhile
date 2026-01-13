@@ -37,6 +37,7 @@ const getAllMovies = async (req, res) => {
       status,
       ratingMin,
       ratingMax,
+      isHidden,
     } = req.query;
 
     // Parse array params (genres, countries)
@@ -58,6 +59,7 @@ const getAllMovies = async (req, res) => {
       status,
       ratingMin,
       ratingMax,
+      isHidden,
     });
     res.json(result);
   } catch (error) {
@@ -155,6 +157,46 @@ const deleteMovie = async (req, res) => {
     res.json({ success: true, message: 'Movie deleted successfully' });
   } catch (error) {
     res.status(404).json({ message: error.message });
+  }
+};
+
+/**
+ * PATCH /admin/movies/:id/toggle-hidden
+ * Toggle movie hidden status (hide/unhide)
+ */
+const toggleMovieHidden = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await adminService.toggleMovieHidden(id);
+    res.json(result);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/movies/hide-all
+ * Hide all movies
+ */
+const hideAllMovies = async (req, res) => {
+  try {
+    const result = await adminService.hideAllMovies();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/movies/unhide-all
+ * Unhide all movies
+ */
+const unhideAllMovies = async (req, res) => {
+  try {
+    const result = await adminService.unhideAllMovies();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -388,17 +430,6 @@ const searchMoviesByGenre = async (req, res) => {
     const { type_list, page, sort_field, sort_type, sort_lang, country, year, limit } = req.body;
     const { searchMoviesByGenre } = require('../services/crawler.service');
 
-    console.log('Search movies by genre request:', {
-      type_list,
-      page,
-      sort_field,
-      sort_type,
-      sort_lang,
-      country,
-      year,
-      limit,
-    });
-
     if (!type_list || !type_list.trim()) {
       return res.status(400).json({ message: 'Genre type_list is required' });
     }
@@ -423,8 +454,6 @@ const searchMoviesByGenre = async (req, res) => {
     }
 
     const movies = await searchMoviesByGenre(type_list.trim(), options);
-
-    console.log(`Found ${movies?.length || 0} movies for genre "${type_list}"`);
 
     res.json({ movies: movies || [] });
   } catch (error) {
@@ -522,7 +551,7 @@ const getUpdatingMovies = async (req, res) => {
  */
 const updateEpisodesForMovies = async (req, res) => {
   try {
-    const { movieIds } = req.body;
+    const { movieIds, onlyNewEpisodes = false } = req.body;
 
     if (!movieIds || !Array.isArray(movieIds) || movieIds.length === 0) {
       return res.status(400).json({ message: 'Movie IDs array is required' });
@@ -548,7 +577,7 @@ const updateEpisodesForMovies = async (req, res) => {
 
     // Run update in background
     adminService
-      .updateEpisodesForMovies(movieIds, onProgress)
+      .updateEpisodesForMovies(movieIds, onProgress, onlyNewEpisodes)
       .then((result) => {
         res.write(`data: ${JSON.stringify({ type: 'complete', ...result })}\n\n`);
         res.end();
@@ -569,6 +598,9 @@ module.exports = {
   createMovie,
   updateMovie,
   deleteMovie,
+  toggleMovieHidden,
+  hideAllMovies,
+  unhideAllMovies,
   searchMovies,
   // Crawl
   crawlMoviesByPage,

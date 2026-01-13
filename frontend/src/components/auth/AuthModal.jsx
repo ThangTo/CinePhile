@@ -89,6 +89,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
     }
 
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
     try {
       // Use email for login (backend expects email)
       await login({ email: formData.email, password: formData.password });
@@ -97,8 +98,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
       onClose();
     } catch (error) {
       console.error("Login error:", error);
+      // Axios interceptor returns { status, message, raw, isAuthPath }
+      const errorMessage = error?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
       setErrors({
-        general: error.message || "Có lỗi xảy ra. Vui lòng thử lại.",
+        general: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -114,6 +117,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
     }
 
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
     try {
       await register({
         username: formData.username,
@@ -125,8 +129,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
       onClose();
     } catch (error) {
       console.error("Register error:", error);
+      // Axios interceptor returns { status, message, raw, isAuthPath }
+      const errorMessage = error?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
       setErrors({
-        general: error.message || "Có lỗi xảy ra. Vui lòng thử lại.",
+        general: errorMessage,
       });
     } finally {
       setIsLoading(false);

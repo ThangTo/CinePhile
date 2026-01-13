@@ -82,6 +82,7 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]" }) => {
   // Handler functions
   const handleWatch = (e) => {
     e.stopPropagation();
+    // Always navigate to watch page, even for hidden movies
     navigate(`/watch/${movie.id}?ep=1`);
   };
 
@@ -143,6 +144,7 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]" }) => {
             onLike={handleToggleFavorite}
             onInfo={handleInfo}
             isFavorite={isFavorite}
+            isHidden={movie.isHidden}
           />
 
           {/* Movie Info Badges */}

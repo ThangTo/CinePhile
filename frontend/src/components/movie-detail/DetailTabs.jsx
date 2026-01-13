@@ -1,13 +1,13 @@
 import React from "react";
 
-const DetailTabs = ({ activeTab, setActiveTab }) => {
+const DetailTabs = ({ activeTab, setActiveTab, movie }) => {
   const tabs = [
-    { id: "episodes", label: "Tập phim" },
+    { id: "episodes", label: "Tập phim", hidden: movie?.isHidden }, // Hide if movie is hidden
     // { id: "gallery", label: "Gallery" },
     { id: "cast", label: "Diễn viên" },
     { id: "gallery", label: "Gallery" },
     { id: "recommendations", label: "Đề xuất" },
-  ];
+  ].filter((tab) => !tab.hidden); // Filter out hidden tabs
 
   return (
     <section className="container mx-auto px-4">

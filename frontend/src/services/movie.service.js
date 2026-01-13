@@ -1,9 +1,5 @@
 import apiRequest from "./utils/apiRequest";
 
-// ============================================================================
-// Movie Service
-// ============================================================================
-
 const movieService = {
   /**
    * Lấy tất cả movies với pagination và filters
@@ -39,6 +35,14 @@ const movieService = {
    * @returns {Promise<Object>} { data: [] }
    */
   getNewReleases: (limit = 10) => apiRequest("/movies/new/releases", { params: { limit } }),
+
+  /**
+   * Lấy personalized recommendations based on user's watch history
+   * Requires authentication
+   * @param {number} limit - Số lượng movies (default: 20)
+   * @returns {Promise<Object>} { data: [] }
+   */
+  getForYou: (limit = 20) => apiRequest("/movies/for-you", { params: { limit } }),
 
   /**
    * Lấy movies theo genre

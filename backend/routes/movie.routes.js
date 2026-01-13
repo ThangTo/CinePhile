@@ -18,6 +18,9 @@ router.get('/top/rated', movieController.getTopRated);
 // GET /api/v1/movies/new/releases - Get new releases (must be before /:id)
 router.get('/new/releases', movieController.getNewReleases);
 
+// GET /api/v1/movies/for-you - Get personalized recommendations (must be before /:id)
+router.get('/for-you', authMiddleware, movieController.getForYou);
+
 // GET /api/v1/movies/search/query - Search movies (must be before /:id)
 router.get('/search/query', movieController.search);
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "contexts/AuthContext";
 import SectionHeader from "components/common/SectionHeader";
 import ScrollContainer from "components/common/ScrollContainer";
 import MovieCard from "components/home-page/MovieCard";
@@ -12,20 +13,24 @@ import { slugify } from "utils/slugify";
  * Movie section with horizontal scrolling for ALL screen sizes
  * @param {Object} props
  * @param {string} props.title - Section title
+ * @param {string} props.subtitle - Section subtitle (optional)
  * @param {Array} props.movies - Array of movie objects (optional, fetches from API if not provided)
- * @param {string} props.sectionType - Type of section: 'trending' | 'newReleases'
+ * @param {string} props.sectionType - Type of section: 'trending' | 'newReleases' | 'forYou'
  * @param {string} props.linkHref - Optional "View all" link
  * @param {'single'|'series'|null} typeMovies - Filter by movie type: 'single' for phim lẻ, 'series' for phim bộ
  * @param {string|null} genre - Filter by genre name (e.g., 'Hành Động', 'Tình Cảm')
  */
 const SectionRow = ({
   title,
+  subtitle,
   movies,
   sectionType = "trending",
   linkHref = "#",
   typeMovies = null,
   genre = null,
+  isActive = false,
 }) => {
+  const { user } = useAuth();
   const [allMovies, setAllMovies] = useState(movies || []);
   const [loading, setLoading] = useState(!movies);
   const normalizedGenre = genre ? slugify(genre) : null;
@@ -68,18 +73,24 @@ const SectionRow = ({
   );
 
   useEffect(() => {
+    let isMounted = true; // Track if component is mounted
+
     // If movies prop is provided, use it directly (but still filter if needed)
     if (movies) {
       const filteredMovies = filterMovies(movies);
-      setAllMovies(filteredMovies);
-      setLoading(false);
+      if (isMounted) {
+        setAllMovies(filteredMovies);
+        setLoading(false);
+      }
       return;
     }
 
     // Otherwise, fetch from API based on sectionType
     const fetchMovies = async () => {
       try {
-        setLoading(true);
+        if (isMounted) {
+          setLoading(true);
+        }
         let response;
         // Fetch more movies to ensure we have enough after filtering
         // Increase limit if we have multiple filters
@@ -97,6 +108,9 @@ const SectionRow = ({
             case "newReleases":
               response = await movieService.getNewReleases(fetchLimit);
               break;
+            case "forYou":
+              response = await movieService.getForYou(fetchLimit);
+              break;
             default:
               response = await movieService.getAll({ limit: fetchLimit });
           }
@@ -107,42 +121,63 @@ const SectionRow = ({
         // Apply filters
         moviesData = filterMovies(moviesData);
 
-        setAllMovies(moviesData);
+        if (isMounted) {
+          setAllMovies(moviesData);
 
-        // Preload critical images (first 15 movies) in background
-        if (moviesData.length > 0) {
-          preloadCriticalImages(moviesData).catch((err) => {
-            console.warn("Failed to preload some images:", err);
-          });
+          // Preload critical images (first 15 movies) in background
+          if (moviesData.length > 0) {
+            preloadCriticalImages(moviesData).catch((err) => {
+              console.warn("Failed to preload some images:", err);
+            });
+          }
         }
       } catch (error) {
         console.error(`Error fetching ${sectionType} movies:`, error);
-        setAllMovies([]);
+        if (isMounted) {
+          setAllMovies([]);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchMovies();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
   }, [sectionType, movies, typeMovies, normalizedGenre, filterMovies]);
 
   const displayMovies = allMovies;
+
+  // Don't render forYou section if user is not logged in (check AFTER all hooks)
+  if (sectionType === "forYou" && !user) {
+    return null;
+  }
 
   if (loading) {
     return (
       <section className="w-full py-2 sm:py-6 overflow-visible">
         <div className="px-4">
-          <SectionHeader title={title} linkHref={linkHref} />
+          <SectionHeader title={title} subtitle={subtitle} linkHref={linkHref} />
         </div>
         <BarSpinner className="py-4" />
       </section>
     );
   }
 
+  // Don't render if no movies (for forYou section)
+  if (sectionType === "forYou" && displayMovies.length === 0) {
+    return null;
+  }
+
   return (
     <section className="w-full py-2 sm:py-6 overflow-visible">
       <div className="px-6">
-        <SectionHeader title={title} linkHref={linkHref} />
+        <SectionHeader title={title} subtitle={subtitle} linkHref={linkHref} isActive={isActive} />
       </div>
 
       {/* Mobile: Horizontal Scroll */}
