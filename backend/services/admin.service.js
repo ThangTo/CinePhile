@@ -13,6 +13,7 @@ const movieService = require('./movie.service');
 const notificationService = require('./notification.service');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
 const { parseEpisodeNumber } = require('../utils/movieTransformer');
+const { crawlMovieBySlug } = require('./crawler.service');
 
 /**
  * Admin Service
@@ -987,20 +988,175 @@ const updateEpisodesForMovies = async (movieIds, onProgress = null, onlyNewEpiso
 };
 
 /**
- * Get movies with ongoing/upcoming status for selection
- * @param {Object} options - { page?, limit?, search? }
+ * Update quality for movies by re-crawling them
+ * @param {Array<string>} movieIds - Array of movie IDs to update
+ * @param {Function} onProgress - Progress callback
+ * @returns {Promise<Object>} Update results
+ */
+const updateQualityForMovies = async (movieIds, onProgress = null) => {
+  if (!Array.isArray(movieIds) || movieIds.length === 0) {
+    throw new Error('Movie IDs array is required');
+  }
+
+  // Lấy thông tin phim từ database
+  const movies = await MovieModel.find({
+    _id: { $in: movieIds },
+  })
+    .select('_id slug name title quality')
+    .lean();
+
+  if (movies.length === 0) {
+    const result = {
+      total: 0,
+      updated: 0,
+      results: [],
+      message: 'No movies found',
+    };
+    if (onProgress) {
+      onProgress({ type: 'complete', ...result });
+    }
+    return result;
+  }
+
+  const results = [];
+  let totalUpdated = 0;
+
+  // Send initial progress
+  if (onProgress) {
+    onProgress({
+      type: 'progress',
+      message: `Bắt đầu cập nhật ${movies.length} phim...`,
+      current: 0,
+      total: movies.length,
+    });
+  }
+
+  for (let idx = 0; idx < movies.length; idx++) {
+    const movie = movies[idx];
+    const prevQuality = movie.quality || 'Unknown';
+
+    try {
+      // Crawl lại phim - hàm này sẽ tự động cập nhật tất cả thông tin bao gồm quality
+      const result = await crawlMovieBySlug(movie.slug);
+
+      if (!result.success) {
+        results.push({
+          movieId: movie._id.toString(),
+          movieName: movie.name || movie.title,
+          movieSlug: movie.slug,
+          error: result.message || 'Không thể crawl phim',
+          prevQuality,
+          newQuality: prevQuality,
+        });
+
+        if (onProgress) {
+          onProgress({
+            type: 'progress',
+            message: `[${idx + 1}/${movies.length}] ${movie.name || movie.title}: Lỗi`,
+            current: idx + 1,
+            total: movies.length,
+            result: results[results.length - 1],
+          });
+        }
+        continue;
+      }
+
+      // Lấy quality mới từ movie đã được cập nhật
+      const updatedMovie = await MovieModel.findById(movie._id).select('quality').lean();
+      const newQuality = updatedMovie?.quality || prevQuality;
+
+      totalUpdated++;
+
+      results.push({
+        movieId: movie._id.toString(),
+        movieName: movie.name || movie.title,
+        movieSlug: movie.slug,
+        prevQuality,
+        newQuality,
+        success: true,
+      });
+
+      if (onProgress) {
+        const qualityChanged = prevQuality !== newQuality;
+        const message = qualityChanged
+          ? `[${idx + 1}/${movies.length}] ${
+              movie.name || movie.title
+            }: ${prevQuality} → ${newQuality}`
+          : `[${idx + 1}/${movies.length}] ${
+              movie.name || movie.title
+            }: Đã cập nhật (${newQuality})`;
+
+        onProgress({
+          type: 'progress',
+          message,
+          current: idx + 1,
+          total: movies.length,
+          result: results[results.length - 1],
+        });
+      }
+    } catch (error) {
+      results.push({
+        movieId: movie._id.toString(),
+        movieName: movie.name || movie.title,
+        movieSlug: movie.slug,
+        error: error.message,
+        prevQuality,
+        newQuality: prevQuality,
+      });
+
+      if (onProgress) {
+        onProgress({
+          type: 'progress',
+          message: `[${idx + 1}/${movies.length}] ${movie.name || movie.title}: Lỗi - ${
+            error.message
+          }`,
+          current: idx + 1,
+          total: movies.length,
+          result: results[results.length - 1],
+        });
+      }
+    }
+
+    // Tránh spam API
+    if (idx < movies.length - 1) {
+      await sleep(500);
+    }
+  }
+
+  const finalResult = {
+    total: movies.length,
+    updated: totalUpdated,
+    results,
+  };
+
+  return finalResult;
+};
+
+/**
+ * Get movies for update modal
+ * - If quality param provided: show ALL movies with that quality (for quality tab)
+ * - If no quality param: show only ongoing/upcoming movies (for episodes tab)
+ * @param {Object} options - { page?, limit?, search?, quality? }
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
 const getUpdatingMovies = async (options = {}) => {
-  const { page = 1, limit = 50, search } = options;
+  const { page = 1, limit = 50, search, quality } = options;
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 50;
   const skip = (pageNum - 1) * limitNum;
 
-  const query = {
-    status: { $in: ['ongoing', 'upcoming'] },
-  };
+  const query = {};
 
+  // Filter by quality if provided (for quality tab - show ALL movies with that quality)
+  if (quality) {
+    query.quality = quality;
+    // KHÔNG filter theo status khi có quality parameter
+  } else {
+    // Default: ongoing/upcoming movies (for episodes tab)
+    query.status = { $in: ['ongoing', 'upcoming'] };
+  }
+
+  // Search filter
   if (search) {
     query.$or = [
       { name: { $regex: search, $options: 'i' } },
@@ -1011,7 +1167,7 @@ const getUpdatingMovies = async (options = {}) => {
 
   const [movies, total] = await Promise.all([
     MovieModel.find(query)
-      .select('_id slug name title status currentEpisode totalEpisodes poster_url')
+      .select('_id slug name title status currentEpisode totalEpisodes poster_url quality')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
@@ -1027,6 +1183,7 @@ const getUpdatingMovies = async (options = {}) => {
     currentEpisode: parseEpisodeNumber(movie.currentEpisode),
     totalEpisodes: movie.totalEpisodes,
     poster: movie.poster_url,
+    quality: movie.quality || 'HD',
   }));
 
   return {
@@ -1053,6 +1210,7 @@ module.exports = {
   searchMovies,
   // Episodes
   updateEpisodesForMovies,
+  updateQualityForMovies,
   getUpdatingMovies,
   // Users
   getAllUsers,

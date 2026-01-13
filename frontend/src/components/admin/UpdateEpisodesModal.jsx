@@ -12,8 +12,11 @@ import {
 import { movieAPI } from "services/admin.service";
 import OptimizedImage from "components/common/OptimizedImage";
 import PaginationV2 from "components/common/PaginationV2";
+import Select from "components/common/Select";
 
 const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
+  const [activeTab, setActiveTab] = useState("episodes"); // "episodes" or "quality"
+  const [selectedQuality, setSelectedQuality] = useState("CAM"); // For quality tab filter
   const [movies, setMovies] = useState([]);
   const [selectedMovies, setSelectedMovies] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +50,8 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
       isCancelledRef.current = false;
       hasLoadedRef.current = false;
 
+      setActiveTab("episodes");
+      setSelectedQuality("CAM");
       setMovies([]);
       setSelectedMovies(new Set());
       setSearchTerm("");
@@ -65,7 +70,7 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
     }
   }, [isOpen]);
 
-  // Load movies when modal opens or search term changes
+  // Load movies when modal opens or search term changes or tab changes or quality changes
   useEffect(() => {
     if (!isOpen) return;
 
@@ -82,17 +87,24 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [isOpen, searchTerm]);
+  }, [isOpen, searchTerm, activeTab, selectedQuality]);
 
   const loadMovies = async (page = 1, search = "") => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await movieAPI.getUpdatingMovies({
+      const params = {
         page,
         limit: 50,
         search: search || undefined,
-      });
+      };
+
+      // If on quality tab, filter by selected quality
+      if (activeTab === "quality") {
+        params.quality = selectedQuality;
+      }
+
+      const response = await movieAPI.getUpdatingMovies(params);
       console.log(response);
       if (response.data && response.pagination) {
         setMovies(response.data);
@@ -248,6 +260,93 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
     }
   };
 
+  // Handle update quality (for CAM movies)
+  const handleUpdateQuality = async () => {
+    if (selectedMovies.size === 0) {
+      setError("Vui lòng chọn ít nhất một phim");
+      return;
+    }
+
+    // Tạo AbortController mới
+    abortControllerRef.current = new AbortController();
+    isCancelledRef.current = false;
+
+    setIsUpdating(true);
+    setError(null);
+    setSuccess(null);
+    setUpdateLogs([]);
+    setUpdateProgress({ current: 0, total: selectedMovies.size });
+
+    try {
+      const movieIds = Array.from(selectedMovies);
+
+      await movieAPI.updateQuality(
+        movieIds,
+        (data) => {
+          // Kiểm tra nếu đã bị hủy
+          if (isCancelledRef.current) {
+            return;
+          }
+
+          if (data.type === "progress") {
+            setUpdateProgress({
+              current: data.current,
+              total: data.total,
+            });
+            if (data.message) {
+              setUpdateLogs((prev) => [
+                ...prev,
+                { type: "log", message: data.message, timestamp: new Date() },
+              ]);
+            }
+            if (data.result) {
+              const result = data.result;
+              const logMessage = result.error
+                ? `❌ ${result.movieName}: ${result.error}`
+                : `✅ ${result.movieName}: Đã nâng cấp từ ${result.prevQuality} lên ${result.newQuality}`;
+              setUpdateLogs((prev) => [
+                ...prev,
+                {
+                  type: result.error ? "error" : "success",
+                  message: logMessage,
+                  timestamp: new Date(),
+                },
+              ]);
+            }
+          } else if (data.type === "complete") {
+            setSuccess(
+              `Đã nâng cấp chất lượng thành công cho ${data.updated || 0}/${data.total || 0} phim`
+            );
+            setUpdateProgress(null);
+            setSelectedMovies(new Set());
+            if (onUpdateSuccess) {
+              onUpdateSuccess();
+            }
+            setIsUpdating(false);
+            abortControllerRef.current = null;
+            // Reload movies to show updated data
+            loadMovies(pagination.currentPage, searchTerm);
+          } else if (data.type === "error") {
+            setError(data.message || "Có lỗi xảy ra khi nâng cấp chất lượng");
+            setUpdateProgress(null);
+            setIsUpdating(false);
+            abortControllerRef.current = null;
+          }
+        },
+        abortControllerRef.current
+      );
+    } catch (err) {
+      if (isCancelledRef.current) {
+        // Đã bị hủy, không cần set error nữa
+        return;
+      }
+      setError(err?.message || "Có lỗi xảy ra khi nâng cấp chất lượng");
+      setUpdateProgress(null);
+      setIsUpdating(false);
+      abortControllerRef.current = null;
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -265,9 +364,11 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
               <FiRefreshCw size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Cập Nhật Tập Phim</h2>
+              <h2 className="text-xl font-bold text-white">Cập Nhật Phim</h2>
               <p className="text-xs text-gray-400">
-                Chọn các phim đang cập nhật để cập nhật danh sách tập
+                {activeTab === "episodes"
+                  ? "Chọn các phim đang cập nhật để cập nhật danh sách tập"
+                  : "Chọn các phim CAM để cập nhật chất lượng lên HD"}
               </p>
             </div>
           </div>
@@ -277,6 +378,48 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
           >
             <FiX size={24} />
           </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="px-6 pt-4 border-b border-white/5">
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setActiveTab("episodes");
+                setSelectedMovies(new Set());
+                setSearchTerm("");
+                hasLoadedRef.current = false;
+              }}
+              className={`px-6 py-3 rounded-t-xl font-medium transition-all ${
+                activeTab === "episodes"
+                  ? "bg-bgColor3 text-white border-t border-x border-white/10"
+                  : "bg-black/10 text-gray-400 hover:text-white hover:bg-black/20"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FiFilm size={18} />
+                <span>Cập nhật tập mới</span>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("quality");
+                setSelectedMovies(new Set());
+                setSearchTerm("");
+                hasLoadedRef.current = false;
+              }}
+              className={`px-6 py-3 rounded-t-xl font-medium transition-all ${
+                activeTab === "quality"
+                  ? "bg-bgColor3 text-white border-t border-x border-white/10"
+                  : "bg-black/10 text-gray-400 hover:text-white hover:bg-black/20"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FiCheckCircle size={18} />
+                <span>Cập nhật chất lượng</span>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -298,22 +441,47 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
 
           {/* Search and Actions */}
           <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="relative group flex-1 w-full sm:w-auto">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiSearch className="text-gray-500 group-focus-within:text-primaryColor transition-colors" />
+            <div className="flex flex-col sm:flex-row gap-4 flex-1 w-full">
+              {/* Quality Selector - Only show in quality tab */}
+              {activeTab === "quality" && (
+                <Select
+                  value={selectedQuality}
+                  onChange={(value) => {
+                    setSelectedQuality(value);
+                    setSelectedMovies(new Set());
+                    hasLoadedRef.current = false;
+                  }}
+                  options={[
+                    { value: "CAM", label: "CAM" },
+                    { value: "HD", label: "HD" },
+                    { value: "FHD", label: "FHD" },
+                    { value: "4K", label: "4K" },
+                  ]}
+                  disabled={isUpdating}
+                  width="w-full sm:w-48"
+                  size="md"
+                  placeholder="Chọn chất lượng"
+                />
+              )}
+
+              {/* Search Input */}
+              <div className="relative group flex-1 w-full sm:w-auto">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiSearch className="text-gray-500 group-focus-within:text-primaryColor transition-colors" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm phim..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="block w-full bg-black/20 border border-white/5 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor transition-all"
+                />
               </div>
-              <input
-                type="text"
-                placeholder="Tìm kiếm phim..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full bg-black/20 border border-white/5 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor transition-all"
-              />
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Checkbox chỉ cập nhật tập mới */}
-              {!isUpdating && (
+              {/* Checkbox chỉ cập nhật tập mới - chỉ hiện ở tab episodes */}
+              {!isUpdating && activeTab === "episodes" && (
                 <label className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm hover:bg-white/10 transition-all cursor-pointer">
                   <input
                     type="checkbox"
@@ -324,7 +492,7 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                   <span className="whitespace-nowrap">Chỉ tập mới</span>
                 </label>
               )}
-              
+
               {selectedMovies.size > 0 && !isUpdating && (
                 <>
                   <button
@@ -340,12 +508,16 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                     Bỏ chọn
                   </button>
                   <button
-                    onClick={handleUpdateEpisodes}
+                    onClick={activeTab === "episodes" ? handleUpdateEpisodes : handleUpdateQuality}
                     disabled={isUpdating}
                     className="px-6 py-2.5 rounded-xl bg-primaryColor text-black font-bold hover:bg-primaryColor/90 transition-all disabled:opacity-50 flex items-center gap-2"
                   >
                     <FiRefreshCw size={18} />
-                    <span>Cập Nhật {selectedMovies.size} Phim</span>
+                    <span>
+                      {activeTab === "episodes"
+                        ? `Cập Nhật ${selectedMovies.size} Phim`
+                        : `Nâng Cấp ${selectedMovies.size} Phim`}
+                    </span>
                   </button>
                 </>
               )}
@@ -433,8 +605,14 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                         <th className="px-4 py-3">Poster</th>
                         <th className="px-4 py-3">Tên Phim</th>
                         <th className="px-4 py-3 text-center">Trạng Thái</th>
-                        <th className="px-4 py-3 text-center">Tập Hiện Tại</th>
-                        <th className="px-4 py-3 text-center">Tổng Tập</th>
+                        {activeTab === "episodes" ? (
+                          <>
+                            <th className="px-4 py-3 text-center">Tập Hiện Tại</th>
+                            <th className="px-4 py-3 text-center">Tổng Tập</th>
+                          </>
+                        ) : (
+                          <th className="px-4 py-3 text-center">Chất Lượng</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -478,18 +656,40 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                                 className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
                                   movie.status === "ongoing"
                                     ? "bg-blue-500/20 text-blue-300"
-                                    : "bg-yellow-500/20 text-yellow-300"
+                                    : movie.status === "upcoming"
+                                    ? "bg-yellow-500/20 text-yellow-300"
+                                    : "bg-green-500/20 text-green-300"
                                 }`}
                               >
-                                {movie.status === "ongoing" ? "Đang cập nhật" : "Sắp chiếu"}
+                                {movie.status === "ongoing"
+                                  ? "Đang cập nhật"
+                                  : movie.status === "upcoming"
+                                  ? "Sắp chiếu"
+                                  : "Hoàn thành"}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-center text-gray-300">
-                              {movie.currentEpisode || "-"}
-                            </td>
-                            <td className="px-4 py-3 text-center text-gray-300">
-                              {movie.totalEpisodes || "-"}
-                            </td>
+                            {activeTab === "episodes" ? (
+                              <>
+                                <td className="px-4 py-3 text-center text-gray-300">
+                                  {movie.currentEpisode || "-"}
+                                </td>
+                                <td className="px-4 py-3 text-center text-gray-300">
+                                  {movie.totalEpisodes || "-"}
+                                </td>
+                              </>
+                            ) : (
+                              <td className="px-4 py-3 text-center">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                                    movie.quality === "CAM"
+                                      ? "bg-red-500/20 text-red-300"
+                                      : "bg-green-500/20 text-green-300"
+                                  }`}
+                                >
+                                  {movie.quality || "HD"}
+                                </span>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}

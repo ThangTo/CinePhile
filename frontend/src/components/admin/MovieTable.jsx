@@ -285,7 +285,7 @@ const MovieTable = () => {
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-blue-600/20 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap"
           >
             <FiRefreshCw size={20} />
-            <span className="hidden sm:inline">Cập Nhật Tập</span>
+            <span className="hidden sm:inline">Cập Nhật</span>
           </button>
 
           {/* Crawl Button - Replaced Add Button */}

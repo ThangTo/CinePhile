@@ -3,6 +3,7 @@ dotenv.config();
 const mongoose = require('mongoose');
 const { connectDB } = require('./config/db/db');
 const redisService = require('./services/redis.service');
+const { initCronJobs } = require('./services/cron.service');
 const app = require('./app');
 const PORT = process.env.PORT || 5000;
 // Connect to database
@@ -13,6 +14,9 @@ redisService.connect().catch((err) => {
   console.error('Redis connection error:', err.message);
   console.log('⚠️ Server will continue without Redis cache');
 });
+
+// Initialize cron jobs for automated tasks
+initCronJobs();
 
 // Start server
 const server = app.listen(PORT, () => {

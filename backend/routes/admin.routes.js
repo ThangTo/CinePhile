@@ -41,6 +41,9 @@ router.get('/movies/updating', adminController.getUpdatingMovies);
 // POST /api/v1/admin/movies/update-episodes - Update episodes for selected movies
 router.post('/movies/update-episodes', adminController.updateEpisodesForMovies);
 
+// POST /api/v1/admin/movies/update-quality - Update quality for CAM movies
+router.post('/movies/update-quality', adminController.updateQualityForMovies);
+
 // GET /api/v1/admin/movies/:id - Get movie by ID (Must be after /movies/crawl routes)
 router.get('/movies/:id', adminController.getMovieById);
 
