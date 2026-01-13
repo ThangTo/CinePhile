@@ -591,6 +591,7 @@ const getById = async (identifier, options = {}) => {
 /**
  * Get trending movies by view count
  * Cached for 10 minutes
+ * Automatically fetches logos for movies without them (if they have TMDB ID)
  */
 const getTrending = async (limit = 10) => {
   const cacheKey = `movies:trending:${limit}`;
@@ -605,6 +606,36 @@ const getTrending = async (limit = 10) => {
 
   // Cache miss - fetch from DB
   const data = await Movie.find().sort({ viewCount: -1 }).limit(limit).lean();
+
+  // Auto-fetch logos for movies without them (if they have TMDB ID)
+  const tmdbService = require('../integrations/tmdb.service');
+  const logoFetchPromises = data.map(async (movie) => {
+    // Skip if movie already has logo or doesn't have TMDB ID
+    if (movie.images?.logo || !movie.tmdb?.id) {
+      return;
+    }
+
+    try {
+      const tmdbId = movie.tmdb.id;
+      const tmdbType = movie.tmdb.type || 'movie';
+      const logoUrl = await tmdbService.getMovieLogo(tmdbId, tmdbType);
+
+      if (logoUrl) {
+        // Update movie in database with logo
+        await Movie.updateOne({ _id: movie._id }, { $set: { 'images.logo': logoUrl } });
+        // Update in-memory data for immediate response
+        if (!movie.images) movie.images = {};
+        movie.images.logo = logoUrl;
+        console.log(`✅ Auto-fetched logo for: ${movie.name || movie.title}`);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to fetch logo for ${movie.name || movie.title}:`, error.message);
+    }
+  });
+
+  // Wait for all logo fetches to complete (with timeout to avoid blocking)
+  await Promise.allSettled(logoFetchPromises);
+
   const result = {
     data: transformMovies(data),
   };

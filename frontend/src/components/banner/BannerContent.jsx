@@ -9,10 +9,14 @@ import { MovieTitle, MovieInfo, GenreList, MovieDescription, ActionButtons } fro
  * @param {Array} props.actionButtons - Action buttons configuration
  */
 const BannerContent = ({ movieData, infoBadges, actionButtons }) => (
-  <div className="absolute inset-0 sm:relative flex justify-center items-center mt-16 sm:block z-10 w-full mx-auto px-4 py-8 sm:mt-28 md:mt-20">
-    <div className="max-w-3xl flex flex-col justify-center items-center sm:items-start py-12 pb-4 px-4 lg:px-8 lg:py-12">
+  <div className="absolute inset-0 sm:relative flex justify-center items-center mt-16 sm:block z-10 w-full mx-auto px-4 py-8 sm:mt-28 md:mt-20 lg:mt-10">
+    <div className="max-w-3xl flex flex-col justify-center items-center sm:items-start py-12 sm:py-10 pb-4 px-4 lg:px-8 lg:py-4">
       {/* Movie Title */}
-      <MovieTitle title={movieData.title} englishTitle={movieData.englishTitle} />
+      <MovieTitle
+        title={movieData.title}
+        englishTitle={movieData.englishTitle}
+        logo={movieData.images?.logo}
+      />
 
       {/* Info Badges */}
       <MovieInfo badges={infoBadges} />

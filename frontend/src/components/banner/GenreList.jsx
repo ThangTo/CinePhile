@@ -7,12 +7,17 @@ import GenreTag from "./GenreTag";
  * @param {Object} props
  * @param {Array<string>} props.genres - Array of genre names
  */
-const GenreList = ({ genres }) => (
-  <div className="hidden sm:mt-2 lg:mt-4 sm:flex flex-wrap gap-2">
-    {genres.map((genre) => (
-      <GenreTag key={genre} genre={genre} />
-    ))}
-  </div>
-);
+const GenreList = ({ genres }) => {
+  // Remove duplicates to avoid React key warnings
+  const uniqueGenres = [...new Set(genres)];
+
+  return (
+    <div className="hidden sm:mt-2 lg:mt-4 sm:flex flex-wrap gap-2">
+      {uniqueGenres.map((genre, index) => (
+        <GenreTag key={`${genre}-${index}`} genre={genre} />
+      ))}
+    </div>
+  );
+};
 
 export default GenreList;

@@ -37,6 +37,7 @@ const movieSchema = new mongoose.Schema(
     images: {
       backdrops: [{ type: String }], // Array các backdrop URLs
       posters: [{ type: String }], // Array các poster URLs
+      logo: { type: String }, // Logo URL từ TMDB
     },
 
     // --- THÔNG TIN CHI TIẾT ---

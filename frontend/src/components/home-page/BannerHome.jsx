@@ -94,7 +94,7 @@ const BannerHome = ({ movie }) => {
   }
 
   return (
-    <section className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[250px] md:h-[600px]">
+    <section className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[250px] md:h-[600px] lg:h-[700px]">
       {/* Background with gradients */}
       <BannerBackground
         backgroundImage={currentMovie.backgroundImage || currentMovie.poster}

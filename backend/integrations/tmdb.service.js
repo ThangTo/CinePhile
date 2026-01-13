@@ -254,10 +254,61 @@ async function getMovieImages(tmdbId, type = 'movie') {
   }
 }
 
+/**
+ * Lấy logo từ TMDB với ưu tiên ngôn ngữ
+ * @param {number} tmdbId - TMDB ID
+ * @param {string} type - "movie" hoặc "tv"
+ * @returns {Promise<string|null>} Logo URL hoặc null
+ */
+async function getMovieLogo(tmdbId, type = 'movie') {
+  if (!TMDB_API_KEY || !tmdbId) return null;
+
+  try {
+    const endpoint =
+      type === 'tv'
+        ? `${TMDB_BASE_URL}/tv/${tmdbId}/images`
+        : `${TMDB_BASE_URL}/movie/${tmdbId}/images`;
+
+    const response = await axios.get(endpoint, {
+      params: {
+        api_key: TMDB_API_KEY,
+        include_image_language: 'vi,en,null', // Lấy logo tiếng Việt, Anh và không có ngôn ngữ
+      },
+    });
+
+    const logos = response.data?.logos || [];
+
+    if (logos.length === 0) {
+      return null;
+    }
+
+    // Ưu tiên 1: Tìm logo Tiếng Việt
+    const viLogo = logos.find((logo) => logo.iso_639_1 === 'vi');
+    if (viLogo) {
+      return `https://image.tmdb.org/t/p/original${viLogo.file_path}`;
+    }
+
+    // Ưu tiên 2: Tìm logo Tiếng Anh
+    const enLogo = logos.find((logo) => logo.iso_639_1 === 'en');
+    if (enLogo) {
+      return `https://image.tmdb.org/t/p/original${enLogo.file_path}`;
+    }
+
+    // Đường cùng: Lấy logo đầu tiên
+    const firstLogo = logos[0];
+    return `https://image.tmdb.org/t/p/original${firstLogo.file_path}`;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(`❌ TMDb getMovieLogo error for ${type}/${tmdbId}:`, error.message);
+    return null;
+  }
+}
+
 module.exports = {
   searchPersonByName,
   getCreditsFromTmdb,
   getPersonDetails,
   getPersonCredits,
   getMovieImages,
+  getMovieLogo,
 };

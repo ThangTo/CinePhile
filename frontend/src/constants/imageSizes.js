@@ -29,8 +29,8 @@ export const IMAGE_SIZES = {
 
   // Banner - Large background images
   BANNER: {
-    size: "1200",
-    quality: "85",
+    size: "1400",
+    quality: "100",
     description: "Banner background images",
   },
 
