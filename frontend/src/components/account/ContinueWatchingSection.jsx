@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import userService from "services/user.service";
 import { BarSpinner } from "components/common/LoadingState";
 import PaginationV2 from "components/common/PaginationV2";
+import OptimizedImage from "components/common/OptimizedImage";
 
 const ContinueWatchingSection = ({ user }) => {
   const navigate = useNavigate();
@@ -192,14 +193,11 @@ const ContinueWatchingSection = ({ user }) => {
             >
               <div className="relative rounded-2xl overflow-hidden">
                 {poster ? (
-                  <img
+                  <OptimizedImage
                     src={poster}
                     alt={title}
                     className="w-full aspect-[2/3] object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.target.src = "https://via.placeholder.com/300x450?text=No+Image";
-                    }}
+                    sizeKey="CARD_DETAIL"
                   />
                 ) : (
                   <div className="w-full aspect-[2/3] bg-gray-800 flex items-center justify-center">

@@ -236,7 +236,11 @@ const GoogleAuthHandler = () => {
     handleCallback();
   }, [location.search, navigate, getCurrentUser]);
 
-  return <BarSpinner />;
+  return (
+    <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <BarSpinner />;
+    </div>
+  );
 };
 
 export default GoogleAuthHandler;

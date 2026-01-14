@@ -20,6 +20,12 @@ export const IMAGE_SIZES = {
     description: "Standard movie card poster",
   },
 
+  CARD_DETAIL: {
+    size: "600",
+    quality: "100",
+    description: "Standard movie card detail poster",
+  },
+
   // Detail - Medium size for detail pages, hover cards
   DETAIL: {
     size: "400",

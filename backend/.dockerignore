@@ -1,0 +1,53 @@
+# Node modules
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development files
+nodemon.json
+.vscode
+.idea
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Test files
+test
+tests
+*.test.js
+*.spec.js
+
+# Logs
+logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# PM2
+.pm2
+ecosystem.config.js
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Coverage
+coverage
+.nyc_output
+
+# Scripts (optional - remove if needed in production)
+scripts/test*.js
+scripts/*.ps1
