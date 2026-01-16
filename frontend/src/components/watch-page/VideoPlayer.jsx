@@ -520,13 +520,34 @@ const VideoPlayer = ({
     }
   };
 
-  const handleSeek = async (e) => {
+  const handleSeek = async (timeOrEvent) => {
     const video = videoRef.current;
     if (!video) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const newTime = (clickX / rect.width) * duration;
+    let newTime;
+
+    // Kiểm tra xem tham số là số (time) hay event object
+    if (typeof timeOrEvent === "number") {
+      // Được gọi từ ProgressBar với time trực tiếp
+      newTime = timeOrEvent;
+    } else if (timeOrEvent?.currentTarget) {
+      // Được gọi từ event click trực tiếp trên progress bar (legacy)
+      const rect = timeOrEvent.currentTarget.getBoundingClientRect();
+      const clickX = timeOrEvent.clientX - rect.left;
+      newTime = (clickX / rect.width) * duration;
+    } else {
+      // Không hợp lệ
+      console.warn("[VideoPlayer] handleSeek called with invalid argument:", timeOrEvent);
+      return;
+    }
+
+    // Đảm bảo newTime hợp lệ
+    if (isNaN(newTime) || newTime < 0) {
+      newTime = 0;
+    } else if (newTime > duration) {
+      newTime = duration;
+    }
+
     video.currentTime = newTime;
 
     // Lưu progress khi seek
