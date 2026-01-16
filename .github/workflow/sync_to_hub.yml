@@ -1,7 +1,7 @@
 name: Sync Backend to Hugging Face
 on:
   push:
-    branches: [main]
+    branches: [dev]
     paths:
       - 'backend/**' # Chỉ chạy khi sửa backend
 
