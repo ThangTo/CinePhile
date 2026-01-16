@@ -3,8 +3,7 @@ on:
   push:
     branches: [dev]
     paths:
-      - 'backend/**' # Chỉ chạy khi sửa backend
-
+      - 'backend/**'
   workflow_dispatch:
 
 jobs:
@@ -15,12 +14,27 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
-
+      
       - name: Push backend folder to HF
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ThangTo
+          HF_USERNAME: ThangTo 
           HF_SPACE_NAME: CinePhine
         run: |
-          # Lệnh này sẽ bóc tách thư mục 'backend' và đẩy nó thành root bên HF
-          git push https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME `git subtree split --prefix backend main`:main --force
+          # 1. Chui vào thư mục backend
+          cd backend
+          
+          # 2. Khởi tạo một kho git mới tinh ngay tại đây
+          git init
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          
+          # 3. Tạo nhánh main (Hugging Face bắt buộc nhánh chính là main)
+          git checkout -b main
+          
+          # 4. Add tất cả code trong thư mục backend này
+          git add .
+          git commit -m "Deploy from GitHub Actions"
+          
+          # 5. Đẩy thẳng lên Hugging Face (Ghi đè - Force)
+          git push https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME main --force
