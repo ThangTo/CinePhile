@@ -533,6 +533,114 @@ export const movieAPI = {
       processStream();
     });
   },
+
+  /**
+   * Process movies: Download video from m3u8 and generate thumbnails
+   * @param {Array<string>} movieIds - Array of movie IDs
+   * @param {boolean} force - Force regenerate thumbnails
+   * @param {Function} onProgress - Progress callback
+   * @param {AbortController} abortController - Optional abort controller
+   * @returns {Promise<Object>} Final result
+   */
+  processThumbnails: async (movieIds, force = false, onProgress, abortController = null) => {
+    // Import axios để lấy baseURL
+    const http = (await import("lib/axios")).default;
+    const baseURL = http.defaults.baseURL;
+
+    // Lấy token từ auth-storage
+    let token = null;
+    try {
+      const authStorage = require("lib/auth-storage");
+      token = authStorage.getToken();
+    } catch (e) {
+      token = localStorage.getItem("token");
+    }
+
+    return new Promise(async (resolve, reject) => {
+      // Kiểm tra abort ngay từ đầu
+      if (abortController?.signal.aborted) {
+        reject(new Error("Request was cancelled"));
+        return;
+      }
+
+      try {
+        const response = await fetch(`${baseURL}/admin/thumbnails/process`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ movieIds, force }),
+          credentials: "include",
+          signal: abortController?.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        const processStream = async () => {
+          try {
+            while (true) {
+              // Kiểm tra abort trước mỗi lần đọc
+              if (abortController?.signal.aborted) {
+                reader.cancel();
+                reject(new Error("Request was cancelled"));
+                return;
+              }
+
+              const { done, value } = await reader.read();
+
+              if (done) {
+                break;
+              }
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
+
+              for (const line of lines) {
+                if (line.trim() && line.startsWith("data: ")) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (onProgress) {
+                      onProgress(data);
+                    }
+                    if (data.type === "complete") {
+                      resolve(data);
+                      return;
+                    } else if (data.type === "error") {
+                      reject(new Error(data.message));
+                      return;
+                    }
+                  } catch (err) {
+                    console.error("Error parsing SSE data:", err, "Line:", line);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            if (error.name === "AbortError" || abortController?.signal.aborted) {
+              return;
+            }
+            reject(error);
+          }
+        };
+
+        processStream();
+      } catch (error) {
+        if (error.name === "AbortError" || abortController?.signal.aborted) {
+          reject(new Error("Request was cancelled"));
+          return;
+        }
+        reject(error);
+      }
+    });
+  },
 };
 
 /**

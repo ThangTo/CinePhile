@@ -37,6 +37,13 @@ const episodeSchema = new mongoose.Schema(
     link_m3u8: {
       type: String, // Link m3u8 (HLS stream)
     },
+    // Thumbnail preview (sprite + vtt)
+    thumbnail_sprite: {
+      type: String, // URL của sprite image (grid thumbnails)
+    },
+    thumbnail_vtt: {
+      type: String, // URL của VTT file (WebVTT format)
+    },
   },
   {
     timestamps: true, // Tự động thêm createdAt và updatedAt

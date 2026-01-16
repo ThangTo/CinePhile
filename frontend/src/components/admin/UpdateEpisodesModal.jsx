@@ -15,8 +15,9 @@ import PaginationV2 from "components/common/PaginationV2";
 import Select from "components/common/Select";
 
 const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
-  const [activeTab, setActiveTab] = useState("episodes"); // "episodes" or "quality"
+  const [activeTab, setActiveTab] = useState("episodes"); // "episodes", "quality", or "thumbnails"
   const [selectedQuality, setSelectedQuality] = useState("CAM"); // For quality tab filter
+  const [forceRegenerate, setForceRegenerate] = useState(false); // For thumbnails tab
   const [movies, setMovies] = useState([]);
   const [selectedMovies, setSelectedMovies] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +98,7 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
         page,
         limit: 50,
         search: search || undefined,
+        tab: activeTab, // Truyền tab hiện tại
       };
 
       // If on quality tab, filter by selected quality
@@ -347,6 +349,93 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
     }
   };
 
+  // Handle process thumbnails (download video + generate thumbnails)
+  const handleProcessThumbnails = async () => {
+    if (selectedMovies.size === 0) {
+      setError("Vui lòng chọn ít nhất một phim");
+      return;
+    }
+
+    // Tạo AbortController mới
+    abortControllerRef.current = new AbortController();
+    isCancelledRef.current = false;
+
+    setIsUpdating(true);
+    setError(null);
+    setSuccess(null);
+    setUpdateLogs([]);
+    setUpdateProgress({ current: 0, total: selectedMovies.size });
+
+    try {
+      const movieIds = Array.from(selectedMovies);
+
+      await movieAPI.processThumbnails(
+        movieIds,
+        forceRegenerate,
+        (data) => {
+          // Kiểm tra nếu đã bị hủy
+          if (isCancelledRef.current) {
+            return;
+          }
+
+          if (data.type === "progress") {
+            setUpdateProgress({
+              current: data.current,
+              total: data.total,
+            });
+            if (data.result) {
+              const result = data.result;
+              const logMessage = result.error
+                ? `❌ ${result.movieName}: ${result.error}`
+                : result.skipped
+                ? `⏭️  ${result.movieName}: Đã có thumbnails (bỏ qua)`
+                : `✅ ${result.movieName}: Đã tạo thumbnails (${result.episodesUpdated} episodes)`;
+              setUpdateLogs((prev) => [
+                ...prev,
+                {
+                  type: result.error ? "error" : result.skipped ? "log" : "success",
+                  message: logMessage,
+                  timestamp: new Date(),
+                },
+              ]);
+            }
+          } else if (data.type === "log") {
+            console.log("[THUMBNAIL LOG]", data.message); // Debug log
+            setUpdateLogs((prev) => [
+              ...prev,
+              { type: "log", message: data.message, timestamp: new Date() },
+            ]);
+          } else if (data.type === "complete") {
+            setSuccess(`Đã xử lý thành công ${data.total || 0} phim`);
+            setUpdateProgress(null);
+            setSelectedMovies(new Set());
+            if (onUpdateSuccess) {
+              onUpdateSuccess();
+            }
+            setIsUpdating(false);
+            abortControllerRef.current = null;
+            // Reload movies to show updated data
+            loadMovies(pagination.currentPage, searchTerm);
+          } else if (data.type === "error") {
+            setError(data.message || "Có lỗi xảy ra khi xử lý thumbnails");
+            setUpdateProgress(null);
+            setIsUpdating(false);
+            abortControllerRef.current = null;
+          }
+        },
+        abortControllerRef.current
+      );
+    } catch (err) {
+      if (isCancelledRef.current) {
+        return;
+      }
+      setError(err?.message || "Có lỗi xảy ra khi xử lý thumbnails");
+      setUpdateProgress(null);
+      setIsUpdating(false);
+      abortControllerRef.current = null;
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -368,7 +457,9 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
               <p className="text-xs text-gray-400">
                 {activeTab === "episodes"
                   ? "Chọn các phim đang cập nhật để cập nhật danh sách tập"
-                  : "Chọn các phim CAM để cập nhật chất lượng lên HD"}
+                  : activeTab === "quality"
+                  ? "Chọn các phim CAM để cập nhật chất lượng lên HD"
+                  : "Chọn phim để tải video và tạo thumbnails cho thanh tiến trình"}
               </p>
             </div>
           </div>
@@ -417,6 +508,24 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
               <div className="flex items-center gap-2">
                 <FiCheckCircle size={18} />
                 <span>Cập nhật chất lượng</span>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("thumbnails");
+                setSelectedMovies(new Set());
+                setSearchTerm("");
+                hasLoadedRef.current = false;
+              }}
+              className={`px-6 py-3 rounded-t-xl font-medium transition-all ${
+                activeTab === "thumbnails"
+                  ? "bg-bgColor3 text-white border-t border-x border-white/10"
+                  : "bg-black/10 text-gray-400 hover:text-white hover:bg-black/20"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FiFilm size={18} />
+                <span>Tạo Thumbnails</span>
               </div>
             </button>
           </div>
@@ -493,6 +602,19 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                 </label>
               )}
 
+              {/* Checkbox force regenerate - chỉ hiện ở tab thumbnails */}
+              {!isUpdating && activeTab === "thumbnails" && (
+                <label className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm hover:bg-white/10 transition-all cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={forceRegenerate}
+                    onChange={(e) => setForceRegenerate(e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-black/20 text-primaryColor focus:ring-primaryColor focus:ring-offset-0"
+                  />
+                  <span className="whitespace-nowrap">Tạo lại</span>
+                </label>
+              )}
+
               {selectedMovies.size > 0 && !isUpdating && (
                 <>
                   <button
@@ -508,7 +630,13 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                     Bỏ chọn
                   </button>
                   <button
-                    onClick={activeTab === "episodes" ? handleUpdateEpisodes : handleUpdateQuality}
+                    onClick={
+                      activeTab === "episodes"
+                        ? handleUpdateEpisodes
+                        : activeTab === "quality"
+                        ? handleUpdateQuality
+                        : handleProcessThumbnails
+                    }
                     disabled={isUpdating}
                     className="px-6 py-2.5 rounded-xl bg-primaryColor text-black font-bold hover:bg-primaryColor/90 transition-all disabled:opacity-50 flex items-center gap-2"
                   >
@@ -516,7 +644,9 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                     <span>
                       {activeTab === "episodes"
                         ? `Cập Nhật ${selectedMovies.size} Phim`
-                        : `Nâng Cấp ${selectedMovies.size} Phim`}
+                        : activeTab === "quality"
+                        ? `Nâng Cấp ${selectedMovies.size} Phim`
+                        : `Xử Lý ${selectedMovies.size} Phim`}
                     </span>
                   </button>
                 </>
@@ -610,6 +740,8 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                             <th className="px-4 py-3 text-center">Tập Hiện Tại</th>
                             <th className="px-4 py-3 text-center">Tổng Tập</th>
                           </>
+                        ) : activeTab === "thumbnails" ? (
+                          <th className="px-4 py-3 text-center">Thumbnails</th>
                         ) : (
                           <th className="px-4 py-3 text-center">Chất Lượng</th>
                         )}
@@ -677,6 +809,20 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
                                   {movie.totalEpisodes || "-"}
                                 </td>
                               </>
+                            ) : activeTab === "thumbnails" ? (
+                              <td className="px-4 py-3 text-center">
+                                {movie.hasThumbnails ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-green-500/20 text-green-300">
+                                    <FiCheckCircle size={14} />
+                                    Đã có
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-500/20 text-gray-400">
+                                    <FiAlertCircle size={14} />
+                                    Chưa có
+                                  </span>
+                                )}
+                              </td>
                             ) : (
                               <td className="px-4 py-3 text-center">
                                 <span

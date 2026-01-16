@@ -533,12 +533,12 @@ const setTheme = async (req, res) => {
 
 /**
  * GET /admin/movies/updating
- * Get movies for update modal (episodes or quality tab)
+ * Get movies for update modal (episodes, quality, or thumbnails tab)
  */
 const getUpdatingMovies = async (req, res) => {
   try {
-    const { page = 1, limit = 50, search, quality } = req.query;
-    const result = await adminService.getUpdatingMovies({ page, limit, search, quality });
+    const { page = 1, limit = 50, search, quality, tab } = req.query;
+    const result = await adminService.getUpdatingMovies({ page, limit, search, quality, tab });
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -73,6 +73,7 @@ const VideoControls = ({
         bufferedPercentage={bufferedPercentage}
         onSeek={onSeek}
         videoRef={videoRef}
+        episode={episode}
       />
 
       {/* Control Buttons */}

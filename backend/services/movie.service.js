@@ -221,6 +221,8 @@ const mapEpisode = (episode) => ({
   link_embed: episode.link_embed,
   link_m3u8: episode.link_m3u8,
   videoUrl: episode.link_m3u8 || episode.link_embed,
+  thumbnail_sprite: episode.thumbnail_sprite,
+  thumbnail_vtt: episode.thumbnail_vtt,
 });
 
 /**

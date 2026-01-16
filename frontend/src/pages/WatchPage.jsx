@@ -42,6 +42,14 @@ const WatchPage = () => {
         setMovie(enrichedMovie);
         const episodesData = eps?.data || eps || [];
         const normalizedEpisodes = Array.isArray(episodesData) ? episodesData : [];
+
+        console.log("🎬 [WatchPage] Episodes loaded:", {
+          count: normalizedEpisodes.length,
+          firstEpisode: normalizedEpisodes[0],
+          hasThumbnails:
+            normalizedEpisodes[0]?.thumbnail_vtt && normalizedEpisodes[0]?.thumbnail_sprite,
+        });
+
         setEpisodes(normalizedEpisodes);
 
         // Ưu tiên audio từ URL (?audio=), nếu không có thì lấy audioType của tập đầu tiên
@@ -127,6 +135,12 @@ const WatchPage = () => {
     : filteredEpisodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
       filteredEpisodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
       filteredEpisodes[0];
+
+  console.log("🎬 [WatchPage] Current episode:", {
+    activeEp,
+    currentEpisode,
+    hasThumbnails: currentEpisode?.thumbnail_vtt && currentEpisode?.thumbnail_sprite,
+  });
 
   return (
     <div className="min-h-screen bg-bgColor">

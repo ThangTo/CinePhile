@@ -136,6 +136,14 @@ export function groupSeriesMovies(movies) {
 export async function enrichMovieWithSeriesParts(movie) {
   if (!movie) return movie;
 
+  console.log("🎬 [enrichMovieWithSeriesParts] Input movie:", {
+    id: movie.id,
+    title: movie.title,
+    hasEpisodes: !!movie.episodes,
+    episodesCount: movie.episodes?.length || 0,
+    firstEpisode: movie.episodes?.[0],
+  });
+
   const info = extractPartInfo(movie);
   const baseQuery = info.baseSlug || info.baseTitle || movie.title || movie.slug || "";
 
@@ -159,13 +167,25 @@ export async function enrichMovieWithSeriesParts(movie) {
       group.seriesParts[0];
     const currentPartLabel = currentPart ? `Phần ${currentPart.partNumber}` : group.part;
 
-    return {
+    const enrichedMovie = {
       ...movie,
       title: group.title || movie.title,
       part: currentPartLabel,
       parts: group.parts,
       seriesParts: group.seriesParts,
+      // Ensure episodes are preserved
+      episodes: movie.episodes || [],
     };
+
+    console.log("✅ [enrichMovieWithSeriesParts] Output enriched movie:", {
+      id: enrichedMovie.id,
+      title: enrichedMovie.title,
+      hasEpisodes: !!enrichedMovie.episodes,
+      episodesCount: enrichedMovie.episodes?.length || 0,
+      firstEpisode: enrichedMovie.episodes?.[0],
+    });
+
+    return enrichedMovie;
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Failed to enrich movie with series parts:", error);

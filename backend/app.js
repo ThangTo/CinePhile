@@ -19,7 +19,31 @@ const { getGoogleCallbackUrl } = require('./utils/authUtils');
 const { optionalAuth } = require('./middleware/auth.middleware');
 
 // Compression middleware - Nén responses để giảm bandwidth
-app.use(compression());
+// Skip compression for SSE (Server-Sent Events) endpoints
+app.use(
+  compression({
+    filter: (req, res) => {
+      // Don't compress SSE responses
+      if (req.headers.accept === 'text/event-stream') {
+        return false;
+      }
+      if (req.path.includes('/thumbnails/process')) {
+        return false;
+      }
+      if (req.path.includes('/update-episodes')) {
+        return false;
+      }
+      if (req.path.includes('/update-quality')) {
+        return false;
+      }
+      if (req.path.includes('/crawl/by-page')) {
+        return false;
+      }
+      // Use default filter for other requests
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 // Trust proxy - for rate limiting by IP
 app.set('trust proxy', true);

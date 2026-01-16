@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
+const thumbnailController = require('../controllers/thumbnail.controller');
 
 const authMiddleware = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/admin.middleware');
@@ -43,6 +44,10 @@ router.post('/movies/update-episodes', adminController.updateEpisodesForMovies);
 
 // POST /api/v1/admin/movies/update-quality - Update quality for CAM movies
 router.post('/movies/update-quality', adminController.updateQualityForMovies);
+
+// ===== ADMIN THUMBNAILS =====
+// POST /api/v1/admin/thumbnails/process - Process movies (download video + generate thumbnails)
+router.post('/thumbnails/process', thumbnailController.processMovies);
 
 // GET /api/v1/admin/movies/:id - Get movie by ID (Must be after /movies/crawl routes)
 router.get('/movies/:id', adminController.getMovieById);

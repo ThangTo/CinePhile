@@ -1135,24 +1135,28 @@ const updateQualityForMovies = async (movieIds, onProgress = null) => {
 /**
  * Get movies for update modal
  * - If quality param provided: show ALL movies with that quality (for quality tab)
+ * - If tab=thumbnails: show ALL movies (for thumbnails tab)
  * - If no quality param: show only ongoing/upcoming movies (for episodes tab)
- * @param {Object} options - { page?, limit?, search?, quality? }
+ * @param {Object} options - { page?, limit?, search?, quality?, tab? }
  * @returns {Promise<Object>} { data: Array, pagination: Object }
  */
 const getUpdatingMovies = async (options = {}) => {
-  const { page = 1, limit = 50, search, quality } = options;
+  const { page = 1, limit = 50, search, quality, tab } = options;
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 50;
   const skip = (pageNum - 1) * limitNum;
 
   const query = {};
 
-  // Filter by quality if provided (for quality tab - show ALL movies with that quality)
-  if (quality) {
+  // Filter based on tab
+  if (tab === 'thumbnails') {
+    // Thumbnails tab: show ALL movies (no status filter)
+    // No additional filters
+  } else if (quality) {
+    // Quality tab: filter by quality
     query.quality = quality;
-    // KHÔNG filter theo status khi có quality parameter
   } else {
-    // Default: ongoing/upcoming movies (for episodes tab)
+    // Episodes tab: ongoing/upcoming movies
     query.status = { $in: ['ongoing', 'upcoming'] };
   }
 
@@ -1167,13 +1171,27 @@ const getUpdatingMovies = async (options = {}) => {
 
   const [movies, total] = await Promise.all([
     MovieModel.find(query)
-      .select('_id slug name title status currentEpisode totalEpisodes poster_url quality')
       .sort({ createdAt: -1 })
+      // Only sort if not thumbnails tab (to avoid memory issues with large datasets)
       .skip(skip)
       .limit(limitNum)
+      .select('_id slug name title status currentEpisode totalEpisodes poster_url quality')
       .lean(),
     MovieModel.countDocuments(query),
   ]);
+
+  // Get thumbnail status for each movie
+  const movieIds = movies.map((m) => m._id);
+  const episodesWithThumbnails = await EpisodeModel.find({
+    movieId: { $in: movieIds },
+    thumbnail_sprite: { $exists: true, $ne: null },
+    thumbnail_vtt: { $exists: true, $ne: null },
+  })
+    .select('movieId')
+    .lean();
+
+  // Create a Set of movie IDs that have thumbnails
+  const moviesWithThumbnails = new Set(episodesWithThumbnails.map((ep) => ep.movieId.toString()));
 
   const transformedMovies = movies.map((movie) => ({
     id: movie._id.toString(),
@@ -1184,6 +1202,7 @@ const getUpdatingMovies = async (options = {}) => {
     totalEpisodes: movie.totalEpisodes,
     poster: movie.poster_url,
     quality: movie.quality || 'HD',
+    hasThumbnails: moviesWithThumbnails.has(movie._id.toString()),
   }));
 
   return {
