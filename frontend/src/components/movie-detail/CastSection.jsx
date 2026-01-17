@@ -93,7 +93,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
           <div className={`grid ${gridClass} gap-4`}>
             {castWithAvatar.map((actor, index) => (
               <Link
-                key={actor.id || index}
+                key={`detail-${actor.id}-${index}`}
                 to={actor.id ? `/cast/${actor.id}` : "#"}
                 className="bg-bgColor rounded-xl overflow-hidden transition-colors cursor-pointer group"
               >
@@ -160,7 +160,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
           <div className={`lg:hidden grid ${gridClass} gap-6 transition-all duration-300`}>
             {displayedCast.map((actor, index) => (
               <Link
-                key={actor.id || index}
+                key={`mobile-${actor.id}-${index}`}
                 to={actor.id ? `/cast/${actor.id}` : "#"}
                 className="text-center hover:opacity-80 transition-opacity group"
               >
@@ -183,7 +183,7 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
           <div className={`hidden lg:grid ${gridClass} gap-6`}>
             {castWithAvatar.map((actor, index) => (
               <Link
-                key={actor.id || index}
+                key={`desktop-${actor.id}-${index}`}
                 to={actor.id ? `/cast/${actor.id}` : "#"}
                 className="text-center hover:opacity-80 transition-opacity group"
               >

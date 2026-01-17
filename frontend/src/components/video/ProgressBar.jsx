@@ -6,7 +6,7 @@ import { formatTime } from "utils/ultils";
 
 const SCALE_DESKTOP = 1.0;
 
-const SCALE_MOBILE = 0.6;
+const SCALE_MOBILE = 0.4;
 
 const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoRef, episode }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -273,23 +273,18 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
     if (isDragging) return;
 
     // 🛡️ Kiểm tra ref trước khi hover
-
     if (!progressBarRef.current) return;
-
     const result = calculateProgress(e.clientX);
 
     if (result) {
       setHoverTime(result.time);
-
       setHoverPosition(result.percent);
     }
   };
 
   const handleProgressLeave = () => {
     if (isDragging) return;
-
     setHoverTime(null);
-
     setHoverPosition(0);
   };
 
@@ -297,10 +292,8 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
     e.stopPropagation(); // Ngăn event bubbling
 
     // 🛡️ Kiểm tra ref trước khi sử dụng
-
     if (!progressBarRef.current) {
       console.warn("[ProgressBar] Ref not available on click");
-
       return;
     }
 
@@ -308,9 +301,7 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
 
     if (result) {
       // Giữ vị trí mới cho đến khi video seek xong
-
       setSeekingTime(result.time);
-
       onSeek(result.time);
     }
   };
@@ -318,16 +309,14 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
   // Tính toán displayTime: ưu tiên dragTime > seekingTime > currentTime
 
   const displayTime = isDragging ? dragTime : seekingTime !== null ? seekingTime : currentTime;
-
   const displayPercent = duration ? (displayTime / duration) * 100 : 0;
-
   const currentThumbnail = hoverTime !== null ? getThumbnailForTime(hoverTime) : null;
 
   return (
     <div className="mb-2 pointer-events-auto relative select-none touch-none">
       <div
         ref={progressBarRef}
-        className="group/seek w-full h-1 bg-white/20 rounded-full cursor-pointer hover:h-1.5 transition-all duration-200 relative flex items-center py-2"
+        className="group/seek w-full h-1 bg-white/20 rounded-full cursor-pointer hover:h-1.5 transition-all duration-200 relative flex items-center py-1"
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
         onMouseMove={handleProgressHover}
@@ -344,13 +333,11 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
         </div>
 
         {/* Active Progress Bar */}
-
         <div
           className="absolute h-1 group-hover/seek:h-1.5 top-1/2 -translate-y-1/2 bg-gradient-to-r from-primaryColor to-red-500 rounded-full pointer-events-none z-10"
           style={{ width: `${displayPercent}%` }}
         >
           {/* Nút Tròn (Seek Handle) */}
-
           <div
             className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 md:w-4 md:h-4 bg-white rounded-full transition-transform duration-200 shadow-[0_0_10px_rgba(255,255,255,0.5)] z-20 
 
@@ -371,9 +358,6 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
             className="absolute bottom-full mb-4 z-[100] pointer-events-none transition-transform duration-75 ease-out will-change-transform"
             style={{
               left: `${hoverPosition}%`,
-
-              // Transform dựa vào vị trí: rìa trái, rìa phải, hoặc giữa
-
               transform:
                 hoverPosition < 10
                   ? `translateX(0)` // Rìa trái: không dịch
@@ -384,12 +368,11 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
           >
             {currentThumbnail && thumbnailData ? (
               <div className="flex flex-col items-center">
-                <div className="bg-black/80 backdrop-blur-sm p-1.5 rounded-xl border border-white/10 shadow-lg ring-1 ring-white/5">
+                <div className="bg-black/80 backdrop-blur-sm p-0.5 md:p-1 rounded-xl border border-white/10 shadow-lg ring-1 ring-white/5">
                   <div
                     className="relative overflow-hidden rounded-lg bg-black"
                     style={{
                       width: `${currentThumbnail.w * currentScale}px`,
-
                       height: `${currentThumbnail.h * currentScale}px`,
                     }}
                   >
@@ -397,15 +380,10 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
                       className="absolute top-0 left-0 origin-top-left"
                       style={{
                         width: `${currentThumbnail.w}px`,
-
                         height: `${currentThumbnail.h}px`,
-
                         backgroundImage: `url(${thumbnailData.sprite})`,
-
                         backgroundPosition: `-${currentThumbnail.x}px -${currentThumbnail.y}px`,
-
                         backgroundRepeat: "no-repeat",
-
                         transform: `scale(${currentScale})`,
                       }}
                     />
@@ -413,8 +391,8 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
                     <div className="absolute inset-0 z-10 flex flex-col justify-end">
                       <div className="h-1/2 w-full bg-gradient-to-t from-black/90 to-transparent" />
 
-                      <div className="absolute bottom-0 w-full text-center pb-1">
-                        <span className="text-white font-bold text-sm font-mono drop-shadow-md">
+                      <div className="absolute bottom-0 w-full text-center pb-0 md:pb-1">
+                        <span className="text-white font-bold text-[10px] md:text-sm font-mono drop-shadow-md">
                           {formatTime(hoverTime)}
                         </span>
                       </div>

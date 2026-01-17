@@ -145,7 +145,7 @@ const WatchPage = () => {
   return (
     <div className="min-h-screen bg-bgColor">
       {/* Top Bar */}
-      <div className="w-full pt-16 md:pt-20 px-4">
+      <div className="w-full pt-16 md:pt-20 px-2">
         <div className="container mx-auto flex items-center gap-3 text-white">
           <button
             onClick={() => navigate(-1)}
@@ -160,8 +160,8 @@ const WatchPage = () => {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-3 md:py-6">
-        <div className="grid lg:grid-cols-12 gap-4 md:gap-6">
+      <div className="container mx-auto px-2 py-3 md:py-6">
+        <div className="flex lg:grid flex-col lg:grid-cols-12 gap-4 md:gap-6">
           {/* Video Player - Full width on all screens */}
           <div className="lg:col-span-12 w-full">
             <VideoPlayer
@@ -222,7 +222,7 @@ const WatchPage = () => {
           </div>
 
           {/* Mobile/Tablet Layout: Rating + Cast below Episodes (sm and below) */}
-          <div className="lg:hidden w-full space-y-6 mt-6">
+          <div className="lg:hidden w-full space-y-6 mt-6 ">
             <RatingSidebar movie={movie} />
             <CastSection movie={movie} layout="vertical" />
             <RecommendationsSection movie={movie} />

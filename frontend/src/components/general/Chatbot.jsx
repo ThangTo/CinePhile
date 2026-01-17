@@ -474,7 +474,7 @@ const Chatbot = () => {
           {/* File Upload Preview Area - Đặt ở đây để đẩy input xuống */}
           <div className="file-upload-preview" ref={fileUploadWrapperRef}>
             <div className="preview-container">
-              <img src="" alt="preview" />
+              <img alt="preview" />
               <button type="button" className="cancel-file-btn" ref={fileCancelButtonRef}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
