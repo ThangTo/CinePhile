@@ -104,10 +104,15 @@ const MovieCard = ({
             priority={false}
             sizeKey={compact ? "THUMBNAIL" : "CARD"}
           />
-          <div className="absolute left-2 md:top-1 top-0 z-10">
+          <div className="absolute left-2 md:top-1 top-0 z-10 flex gap-1">
             <span className="rounded bg-cyan-500 md:px-2 md:py-0.5 px-1 py-0.5 md:text-[10px] text-[8px] font-bold text-white shadow">
               {movie.quality || "HD"}
             </span>
+            {/* {movie.totalEpisodes > 1 && movie.currentEpisode && (
+              <span className="rounded bg-orange-500 md:px-2 md:py-0.5 px-1 py-0.5 md:text-[10px] text-[8px] font-bold text-white shadow">
+                Tập {movie.currentEpisode}
+              </span>
+            )} */}
           </div>
         </div>
 

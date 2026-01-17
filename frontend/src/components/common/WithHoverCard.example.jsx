@@ -84,10 +84,15 @@ export const DetailedMovieCard = ({ movie }) => {
           <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
 
           {/* Quality Badge */}
-          <div className="absolute top-2 left-2">
+          <div className="absolute top-2 left-2 flex gap-1">
             <span className="bg-cyan-500 text-white text-xs px-2 py-1 rounded">
               {movie.quality || "HD"}
             </span>
+            {movie.totalEpisodes > 1 && movie.currentEpisode && (
+              <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded">
+                Tập {movie.currentEpisode}
+              </span>
+            )}
           </div>
 
           {/* Gradient Overlay */}

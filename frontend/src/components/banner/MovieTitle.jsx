@@ -30,7 +30,7 @@ const MovieTitle = ({ title, englishTitle, logo }) => (
     {/* Text title - always visible on small screens, visible on lg+ only if no logo */}
     <h1
       className={`text-2xl line-clamp-1 md:line-clamp-2 overflow-hidden sm:text-3xl font-bold md:mb-2 text-start lg:text-4xl pb-1 ${
-        logo ? "lg:hidden" : "lg:mt-36"
+        logo ? "lg:hidden" : ""
       }`}
     >
       {title}

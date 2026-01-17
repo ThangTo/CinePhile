@@ -61,6 +61,11 @@ const Top10Card = ({ movie, rank }) => {
                 {movie.quality}
               </span>
             )}
+            {movie.totalEpisodes > 1 && movie.currentEpisode && (
+              <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded text-[10px] font-semibold">
+                Tập {movie.currentEpisode}
+              </span>
+            )}
             {movie.ageRating && (
               <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded text-[10px] font-semibold">
                 {movie.ageRating}

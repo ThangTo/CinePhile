@@ -74,6 +74,9 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
       { label: movieData.duration },
       { label: movieData.quality },
       { label: movieData.country },
+      ...(movieData.totalEpisodes > 1 && movieData.currentEpisode
+        ? [{ label: `Tập ${movieData.currentEpisode}` }]
+        : []),
     ],
     [movieData]
   );
