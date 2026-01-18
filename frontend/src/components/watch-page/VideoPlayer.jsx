@@ -8,6 +8,7 @@ import useToast from "hooks/useToast";
 import ToastContainer from "../common/ToastContainer";
 import PremiumRequiredModal from "../common/PremiumRequiredModal";
 import { isPremiumActive } from "utils/premiumUtils";
+import { getVideoSource } from "config/video.config";
 
 const VideoPlayer = ({
   movie,
@@ -59,7 +60,8 @@ const VideoPlayer = ({
 
   const hlsSource = useMemo(() => {
     if (episode?.link_m3u8) {
-      return `${process.env.REACT_APP_API_URL}/proxy-m3u8?url=${episode.link_m3u8}`;
+      const proxyEndpoint = `${process.env.REACT_APP_API_URL}/proxy-m3u8`;
+      return getVideoSource(episode.link_m3u8, proxyEndpoint);
     }
     if (episode?.videoUrl && episode.videoUrl.includes(".m3u8")) return episode.videoUrl;
     if (videoUrl && videoUrl.includes(".m3u8")) return videoUrl;
