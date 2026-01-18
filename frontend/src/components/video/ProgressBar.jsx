@@ -4,11 +4,19 @@ import { formatTime } from "utils/ultils";
 
 // CONFIG
 
-const SCALE_DESKTOP = 1.0;
+const SCALE_DESKTOP = 0.8;
 
 const SCALE_MOBILE = 0.4;
 
-const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoRef, episode }) => {
+const ProgressBar = ({
+  currentTime,
+  duration,
+  bufferedPercentage,
+  onSeek,
+  videoRef,
+  episode,
+  onDragStateChange,
+}) => {
   const [isDragging, setIsDragging] = useState(false);
 
   const [dragTime, setDragTime] = useState(0);
@@ -22,6 +30,8 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
   const [thumbnailData, setThumbnailData] = useState(null);
 
   const [currentScale, setCurrentScale] = useState(SCALE_DESKTOP);
+
+  const [isMobile, setIsMobile] = useState(false);
 
   // Khởi tạo null để tránh lỗi undefined ban đầu
 
@@ -43,7 +53,9 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
 
   useEffect(() => {
     const handleResize = () => {
-      setCurrentScale(window.innerWidth < 768 ? SCALE_MOBILE : SCALE_DESKTOP);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setCurrentScale(mobile ? SCALE_MOBILE : SCALE_DESKTOP);
     };
 
     handleResize();
@@ -186,7 +198,17 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
       return;
     }
 
+    // Haptic feedback trên mobile (rung nhẹ)
+    if (isMobile && navigator.vibrate) {
+      navigator.vibrate(10); // Rung 10ms
+    }
+
     setIsDragging(true);
+
+    // Thông báo cho parent component (VideoPlayer) rằng đang kéo
+    if (onDragStateChange) {
+      onDragStateChange(true);
+    }
 
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
 
@@ -244,6 +266,11 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
       setIsDragging(false);
 
       setHoverTime(null);
+
+      // Thông báo cho parent component rằng đã kéo xong
+      if (onDragStateChange) {
+        onDragStateChange(false);
+      }
     };
 
     if (isDragging) {
@@ -316,7 +343,9 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
     <div className="mb-2 pointer-events-auto relative select-none touch-none">
       <div
         ref={progressBarRef}
-        className="group/seek w-full h-1 bg-white/20 rounded-full cursor-pointer hover:h-1.5 transition-all duration-200 relative flex items-center py-1"
+        className={`group/seek w-full bg-white/20 rounded-full cursor-pointer transition-all duration-200 relative flex items-center
+          ${isMobile ? "h-2 py-1" : "h-1 hover:h-1.5 py-1"}
+        `}
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
         onMouseMove={handleProgressHover}
@@ -325,7 +354,11 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
       >
         {/* Background Bar */}
 
-        <div className="absolute w-full h-1 bg-white/20 rounded-full group-hover/seek:h-1.5 transition-all top-1/2 -translate-y-1/2 pointer-events-none">
+        <div
+          className={`absolute w-full bg-white/20 rounded-full transition-all top-1/2 -translate-y-1/2 pointer-events-none
+          ${isMobile ? "h-2" : "h-1 group-hover/seek:h-1.5"}
+        `}
+        >
           <div
             className="absolute left-0 h-full bg-white/30 rounded-full"
             style={{ width: `${bufferedPercentage}%` }}
@@ -334,17 +367,23 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
 
         {/* Active Progress Bar */}
         <div
-          className="absolute h-1 group-hover/seek:h-1.5 top-1/2 -translate-y-1/2 bg-gradient-to-r from-primaryColor to-red-500 rounded-full pointer-events-none z-10"
+          className={`absolute top-1/2 -translate-y-1/2 bg-gradient-to-r from-primaryColor to-red-500 rounded-full pointer-events-none z-10
+            ${isMobile ? "h-2" : "h-1 group-hover/seek:h-1.5"}
+          `}
           style={{ width: `${displayPercent}%` }}
         >
-          {/* Nút Tròn (Seek Handle) */}
+          {/* Nút Tròn (Seek Handle) - Luôn hiển thị trên mobile khi controls hiện */}
           <div
-            className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 md:w-4 md:h-4 bg-white rounded-full transition-transform duration-200 shadow-[0_0_10px_rgba(255,255,255,0.5)] z-20 
+            className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 bg-white rounded-full transition-transform duration-200 shadow-[0_0_10px_rgba(255,255,255,0.5)] z-20 
 
               ${
-                isDragging
-                  ? "scale-150 opacity-100"
-                  : "opacity-0 group-hover/seek:opacity-100 scale-0 group-hover/seek:scale-100"
+                isMobile
+                  ? "w-5 h-5 opacity-100 scale-100" // Mobile: luôn hiển thị, to hơn để dễ chạm
+                  : `w-3 h-3 md:w-4 md:h-4 ${
+                      isDragging
+                        ? "scale-150 opacity-100"
+                        : "opacity-0 group-hover/seek:opacity-100 scale-0 group-hover/seek:scale-100"
+                    }`
               }
 
             `}
@@ -359,11 +398,13 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
             style={{
               left: `${hoverPosition}%`,
               transform:
-                hoverPosition < 10
-                  ? `translateX(0)` // Rìa trái: không dịch
-                  : hoverPosition > 90
-                  ? `translateX(-100%)` // Rìa phải: dịch hết sang trái
-                  : `translateX(-50%)`, // Giữa: căn giữa
+                currentThumbnail && thumbnailData
+                  ? hoverPosition < 10
+                    ? `translateX(0)` // Rìa trái: không dịch
+                    : hoverPosition > 90
+                      ? `translateX(-100%)` // Rìa phải: dịch hết sang trái
+                      : `translateX(-50%)` // Giữa: căn giữa
+                  : `translateX(-50%)`,
             }}
           >
             {currentThumbnail && thumbnailData ? (
@@ -411,8 +452,8 @@ const ProgressBar = ({ currentTime, duration, bufferedPercentage, onSeek, videoR
                       hoverPosition < 10
                         ? `translateX(-${(currentThumbnail.w * currentScale) / 2 - 10}px)` // Rìa trái
                         : hoverPosition > 90
-                        ? `translateX(${(currentThumbnail.w * currentScale) / 2 - 10}px)` // Rìa phải
-                        : `none`, // Giữa
+                          ? `translateX(${(currentThumbnail.w * currentScale) / 2 - 10}px)` // Rìa phải
+                          : `none`, // Giữa
                   }}
                 >
                   <div className="absolute -top-[7px] -left-[6px] w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-black/80"></div>

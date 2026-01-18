@@ -16,6 +16,7 @@ const VideoControls = ({
   bufferedPercentage,
   onSeek,
   videoRef,
+  onDragStateChange,
   // Play/Pause
   isPlaying,
   onPlayPause,
@@ -74,6 +75,7 @@ const VideoControls = ({
         onSeek={onSeek}
         videoRef={videoRef}
         episode={episode}
+        onDragStateChange={onDragStateChange}
       />
 
       {/* Control Buttons */}
@@ -131,8 +133,8 @@ const VideoControls = ({
                     isMuted || volume === 0
                       ? "fa-volume-xmark"
                       : volume < 0.5
-                      ? "fa-volume-low"
-                      : "fa-volume-high"
+                        ? "fa-volume-low"
+                        : "fa-volume-high"
                   } text-white text-sm md:text-base lg:text-xl`}
                 />
               </button>

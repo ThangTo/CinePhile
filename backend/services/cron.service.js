@@ -80,7 +80,7 @@ const scheduleMovieCrawling = () => {
         };
 
         // Crawl trang 1 - 5 (phim mới nhất)
-        const result = await runPageRange(1, 5, onProgress, true);
+        const result = await runPageRange(5, 1, onProgress, true);
 
         console.log(
           `✅ [CRON] Movie crawling completed: ${result.created} new movies, ${result.updated} updated`,

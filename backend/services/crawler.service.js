@@ -361,6 +361,9 @@ const detectAudioType = (serverName = '') => {
  */
 const runPageRange = async (startPage, endPage = null, onProgress = null, skipExisting = false) => {
   let totalMovies = 0;
+
+  // Xác định hướng crawl: nếu startPage > endPage thì crawl ngược
+  const isReverse = endPage !== null && startPage > endPage;
   let currentPage = startPage;
   let hasMorePages = true;
 
@@ -409,15 +412,28 @@ const runPageRange = async (startPage, endPage = null, onProgress = null, skipEx
         );
       }
 
-      // Nếu đã đến trang kết thúc (nếu có), dừng lại
-      if (endPage && currentPage >= endPage) {
-        hasMorePages = false;
-        break;
+      // Kiểm tra điều kiện dừng dựa trên hướng crawl
+      if (endPage !== null) {
+        if (isReverse) {
+          // Crawl ngược: dừng khi currentPage <= endPage
+          if (currentPage <= endPage) {
+            hasMorePages = false;
+            break;
+          }
+        } else {
+          // Crawl thuận: dừng khi currentPage >= endPage
+          if (currentPage >= endPage) {
+            hasMorePages = false;
+            break;
+          }
+        }
       }
 
       // Nghỉ 1 chút (0.5s) để tránh spam API
       await new Promise((resolve) => setTimeout(resolve, 500));
-      currentPage++;
+
+      // Tăng hoặc giảm page dựa trên hướng crawl
+      currentPage = isReverse ? currentPage - 1 : currentPage + 1;
     } catch (error) {
       logError(`❌ Lỗi trang ${currentPage}: ${error.message}`);
       // Nếu lỗi nghiêm trọng, dừng lại
@@ -426,13 +442,13 @@ const runPageRange = async (startPage, endPage = null, onProgress = null, skipEx
         hasMorePages = false;
         break;
       }
-      currentPage++;
+      currentPage = isReverse ? currentPage - 1 : currentPage + 1;
     }
   }
 
   const message = endPage
     ? `✅ Hoàn thành quét từ trang ${startPage} đến ${endPage}.`
-    : `✅ Hoàn thành quét từ trang ${startPage} đến trang ${currentPage - 1}.`;
+    : `✅ Hoàn thành quét từ trang ${startPage} đến trang ${isReverse ? currentPage + 1 : currentPage - 1}.`;
 
   log(message);
   log(`📊 Tổng số phim đã crawl: ${totalMovies}`);
@@ -441,7 +457,7 @@ const runPageRange = async (startPage, endPage = null, onProgress = null, skipEx
     status: 'success',
     message,
     movies_count: totalMovies,
-    pages_crawled: currentPage - startPage,
+    pages_crawled: Math.abs(currentPage - startPage),
   };
 };
 

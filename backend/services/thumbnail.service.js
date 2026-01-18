@@ -5,7 +5,7 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
 
-// Configuration
+// 1. CONFIGURATION (CẤU HÌNH)
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY;
 const R2_SECRET_KEY = process.env.R2_SECRET_KEY;
@@ -14,10 +14,15 @@ const PUBLIC_DOMAIN = process.env.PUBLIC_DOMAIN;
 
 const VIDEO_FOLDER = 'F:/Movie';
 const INTERVAL = 10;
-const THUMB_WIDTH = 320;
+const THUMB_WIDTH = 480; // Kích thước ảnh to để scale xuống cho nét
+
+const IMAGE_FORMAT = 'webp'; // 'webp' hoặc 'jpg'
+const JPEG_QUALITY_SCALE = 2; // Cho JPG: 1-31 (1 là tốt nhất, 2 là rất tốt)
+const WEBP_QUALITY_SCALE = 90; // Cho WebP: 0-100 (100 là tốt nhất, để 90 là cực nét)
+
 const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
 
-// S3 Client
+// 2. S3 CLIENT
 const s3Client = new S3Client({
   region: 'auto',
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -43,6 +48,7 @@ async function uploadToR2(filePath, fileName, contentType, folderPath = '') {
   return `${PUBLIC_DOMAIN}/${key}`;
 }
 
+// 3. HELPER FUNCTIONS
 // Fetch text from URL
 async function fetchText(url) {
   const response = await fetch(url);
@@ -211,20 +217,22 @@ function createVTTFile(duration, columns, rows, thumbWidth, thumbHeight, spriteN
   fs.writeFileSync(outputPath, vttContent);
 }
 
-// Generate thumbnails
+// 4. MAIN GENERATION LOGIC
+
 async function generateThumbnails(
   movieSlug,
   videoPath,
   sendProgress,
   episodeNumber = null,
   totalEpisodes = null,
+  force = false,
 ) {
   const outputFolder = './temp_output';
   if (!fs.existsSync(outputFolder)) fs.mkdirSync(outputFolder);
 
   // For TV series, include episode number in filename
   const filePrefix = episodeNumber ? `${movieSlug}-tap-${episodeNumber}` : movieSlug;
-  const spriteFileName = `${filePrefix}-sprite.jpg`;
+  const spriteFileName = `${filePrefix}-sprite.${IMAGE_FORMAT}`;
   const vttFileName = `${filePrefix}.vtt`;
   const spriteOutputPath = path.join(outputFolder, spriteFileName);
   const vttOutputPath = path.join(outputFolder, vttFileName);
@@ -233,7 +241,31 @@ async function generateThumbnails(
   const spriteExists = fs.existsSync(spriteOutputPath);
   const vttExists = fs.existsSync(vttOutputPath);
 
-  if (!spriteExists || !vttExists) {
+  // If force=true, delete existing files to regenerate
+  if (force && spriteExists) {
+    try {
+      fs.unlinkSync(spriteOutputPath);
+      if (sendProgress) {
+        const episodeInfo = episodeNumber ? ` Tập ${episodeNumber}/${totalEpisodes}` : '';
+        sendProgress({
+          type: 'log',
+          message: `🗑️  Deleted existing sprite for regeneration${episodeInfo}`,
+        });
+      }
+    } catch (err) {
+      // Ignore delete error
+    }
+  }
+
+  if (force && vttExists) {
+    try {
+      fs.unlinkSync(vttOutputPath);
+    } catch (err) {
+      // Ignore delete error
+    }
+  }
+
+  if (!spriteExists || !vttExists || force) {
     if (sendProgress) {
       const episodeInfo = episodeNumber ? ` Tập ${episodeNumber}/${totalEpisodes}` : '';
       sendProgress({
@@ -279,19 +311,39 @@ async function generateThumbnails(
     }
 
     await new Promise((resolve, reject) => {
+      // 🔥 FIX: Tách biệt cấu hình JPEG và WebP
+      const outputOptions = ['-map [sprite]', '-vframes 1'];
+
+      if (IMAGE_FORMAT === 'webp') {
+        // Cấu hình tối ưu cho WebP
+        outputOptions.push(
+          '-c:v libwebp',
+          `-quality ${WEBP_QUALITY_SCALE}`, // Dùng thang đo 0-100 (90 là rất nét)
+          '-compression_level 6', // Nén chậm nhưng tốt
+          '-pix_fmt yuva420p',
+        );
+      } else {
+        // Cấu hình tối ưu cho JPEG
+        outputOptions.push(
+          `-q:v ${JPEG_QUALITY_SCALE}`, // Dùng thang đo 1-31 (2 là rất nét)
+          '-pix_fmt yuvj420p',
+        );
+      }
+
       ffmpeg(videoPath)
         .complexFilter([
-          `fps=1/${INTERVAL},scale=${THUMB_WIDTH}:${thumbHeight}[thumbs]`,
+          // Sử dụng lanczos scaling algorithm cho chất lượng tốt nhất
+          `fps=1/${INTERVAL},scale=${THUMB_WIDTH}:${thumbHeight}:flags=lanczos[thumbs]`,
           `[thumbs]tile=${columns}x${rows}[sprite]`,
         ])
-        .outputOptions(['-map [sprite]', '-vframes 1'])
+        .outputOptions(outputOptions)
         .output(spriteOutputPath)
         .on('progress', (progress) => {
           if (progress.percent && sendProgress) {
             const episodeInfo = episodeNumber ? ` Tập ${episodeNumber}/${totalEpisodes}` : '';
             sendProgress({
               type: 'log',
-              message: `   ⏳ Sprite: ${progress.percent.toFixed(1)}%${episodeInfo}`,
+              message: `  ⏳ Sprite: ${progress.percent.toFixed(1)}%${episodeInfo}`,
             });
           }
         })
@@ -344,7 +396,8 @@ async function generateThumbnails(
   }
 
   const folderPath = episodeNumber ? movieSlug : '';
-  const spriteUrl = await uploadToR2(spriteOutputPath, spriteFileName, 'image/jpeg', folderPath);
+  const contentType = IMAGE_FORMAT === 'webp' ? 'image/webp' : 'image/jpeg';
+  const spriteUrl = await uploadToR2(spriteOutputPath, spriteFileName, contentType, folderPath);
   const vttUrl = await uploadToR2(vttOutputPath, vttFileName, 'text/vtt', folderPath);
 
   if (sendProgress) {
@@ -460,6 +513,7 @@ async function processSingleEpisode(
       sendProgress,
       episodeNumber,
       totalEpisodes,
+      force,
     );
 
     // Update database for this episode
@@ -511,51 +565,221 @@ async function processTVSeries(movie, force, sendProgress) {
     message: `\n📺 [${movie.name}] - Phim bộ (${movie.totalEpisodes} tập)`,
   });
 
-  // Get all episodes with priority: long-tieng -> thuyet-minh -> vietsub
-  const priority = ['long-tieng', 'thuyet-minh', 'vietsub'];
-  let selectedAudioType = null;
-  let episodes = [];
+  // Get ALL episodes (all audioTypes) for this movie
+  const allEpisodes = await Episode.find({
+    movieId: movie._id,
+  }).sort({ episodeId: 1, audioType: 1 });
 
-  for (const audioType of priority) {
-    episodes = await Episode.find({
-      movieId: movie._id,
-      audioType: audioType,
-      link_m3u8: { $exists: true, $ne: null },
-    }).sort({ episodeNumber: 1 });
+  if (allEpisodes.length === 0) {
+    throw new Error('No episodes found');
+  }
 
-    if (episodes.length > 0) {
-      selectedAudioType = audioType;
+  // Group episodes by episodeId
+  const episodesByNumber = {};
+  allEpisodes.forEach((ep) => {
+    const epNum = ep.episodeId || 1;
+    if (!episodesByNumber[epNum]) {
+      episodesByNumber[epNum] = [];
+    }
+    episodesByNumber[epNum].push(ep);
+  });
+
+  const episodeNumbers = Object.keys(episodesByNumber).sort((a, b) => parseInt(a) - parseInt(b));
+  const totalEpisodes = episodeNumbers.length;
+
+  sendProgress({
+    type: 'log',
+    message: `📊 Tìm thấy ${totalEpisodes} tập với ${allEpisodes.length} phiên bản`,
+  });
+
+  // Priority for audioType
+  const priority = ['long-tieng', 'thuyet-minh', 'vietsub', 'khac'];
+
+  const episodesToProcess = [];
+
+  // Check each episode number
+  for (const epNum of episodeNumbers) {
+    const versions = episodesByNumber[epNum];
+
+    // Check if ALL versions have thumbnails
+    const allHaveThumbnails = versions.every((v) => v.thumbnail_sprite && v.thumbnail_vtt);
+
+    if (allHaveThumbnails && !force) {
       sendProgress({
         type: 'log',
-        message: `✅ Chọn audioType: ${audioType} (${episodes.length} tập)`,
+        message: `⏭️  Tập ${epNum}: Tất cả phiên bản đã có thumbnail (bỏ qua)`,
       });
-      break;
+      continue;
+    }
+
+    // If force=true and all have thumbnails, still need to regenerate
+    if (allHaveThumbnails && force) {
+      sendProgress({
+        type: 'log',
+        message: `🔄 Tập ${epNum}: Force regenerate - Tạo lại thumbnail`,
+      });
+      // Don't skip, continue to regenerate
+    }
+
+    // Find version with thumbnail (to copy from)
+    const versionWithThumbnail = versions.find((v) => v.thumbnail_sprite && v.thumbnail_vtt);
+
+    // Find versions without thumbnail
+    const versionsWithoutThumbnail = versions.filter(
+      (v) => !v.thumbnail_sprite || !v.thumbnail_vtt,
+    );
+
+    // If force=true, treat all versions as needing regeneration
+    if (force) {
+      // Select best version to generate from (by priority and has m3u8)
+      let selectedVersion = null;
+      for (const audioType of priority) {
+        selectedVersion = versions.find((v) => v.audioType === audioType && v.link_m3u8);
+        if (selectedVersion) break;
+      }
+
+      if (!selectedVersion) {
+        selectedVersion = versions.find((v) => v.link_m3u8);
+      }
+
+      if (selectedVersion) {
+        sendProgress({
+          type: 'log',
+          message: `🎬 Tập ${epNum}: Force regenerate (chọn ${selectedVersion.audioType})`,
+        });
+        episodesToProcess.push({
+          episode: selectedVersion,
+          episodeNumber: parseInt(epNum),
+          allVersions: versions,
+        });
+      } else {
+        sendProgress({
+          type: 'log',
+          message: `⚠️  Tập ${epNum}: Không tìm thấy link m3u8 hợp lệ`,
+        });
+      }
+      continue; // Skip the rest of the logic for this episode
+    }
+
+    if (versionWithThumbnail && versionsWithoutThumbnail.length > 0) {
+      // Copy thumbnail from existing version
+      sendProgress({
+        type: 'log',
+        message: `📋 Tập ${epNum}: Copy thumbnail từ ${versionWithThumbnail.audioType} sang ${versionsWithoutThumbnail.length} phiên bản khác`,
+      });
+
+      for (const targetVersion of versionsWithoutThumbnail) {
+        await Episode.updateOne(
+          { _id: targetVersion._id },
+          {
+            $set: {
+              thumbnail_sprite: versionWithThumbnail.thumbnail_sprite,
+              thumbnail_vtt: versionWithThumbnail.thumbnail_vtt,
+            },
+          },
+        );
+        sendProgress({
+          type: 'log',
+          message: `  ✅ Đã copy sang ${targetVersion.audioType}`,
+        });
+      }
+    } else if (versionsWithoutThumbnail.length > 0) {
+      // No version has thumbnail, need to generate
+      // Select best version to generate from (by priority and has m3u8)
+      let selectedVersion = null;
+      for (const audioType of priority) {
+        selectedVersion = versions.find((v) => v.audioType === audioType && v.link_m3u8);
+        if (selectedVersion) break;
+      }
+
+      if (!selectedVersion) {
+        selectedVersion = versions.find((v) => v.link_m3u8);
+      }
+
+      if (selectedVersion) {
+        sendProgress({
+          type: 'log',
+          message: `🎬 Tập ${epNum}: Cần tạo thumbnail mới (chọn ${selectedVersion.audioType})`,
+        });
+        episodesToProcess.push({
+          episode: selectedVersion,
+          episodeNumber: parseInt(epNum),
+          allVersions: versions, // Store all versions to update later
+        });
+      } else {
+        sendProgress({
+          type: 'log',
+          message: `⚠️  Tập ${epNum}: Không tìm thấy link m3u8 hợp lệ`,
+        });
+      }
     }
   }
 
-  if (episodes.length === 0) {
-    throw new Error('No episodes found with m3u8 links');
+  if (episodesToProcess.length === 0) {
+    sendProgress({
+      type: 'log',
+      message: `✅ Tất cả tập đã có thumbnail!`,
+    });
+    return {
+      success: true,
+      movieId: movie._id,
+      movieName: movie.name,
+      totalEpisodes: totalEpisodes,
+      successCount: 0,
+      skippedCount: totalEpisodes,
+      failedCount: 0,
+    };
   }
 
-  const totalEpisodes = episodes.length;
-
-  // Process all episodes in parallel
+  // Process episodes that need thumbnail generation
   sendProgress({
     type: 'log',
-    message: `🚀 Bắt đầu xử lý ${totalEpisodes} tập song song...\n`,
+    message: `\n🚀 Bắt đầu xử lý ${episodesToProcess.length} tập cần tạo thumbnail...\n`,
   });
 
   const results = await Promise.allSettled(
-    episodes.map((episode, index) =>
-      processSingleEpisode(
+    episodesToProcess.map(async ({ episode, episodeNumber, allVersions }) => {
+      const result = await processSingleEpisode(
         movie,
         episode,
-        episode.episodeNumber || index + 1,
+        episodeNumber,
         totalEpisodes,
         force,
         sendProgress,
-      ),
-    ),
+      );
+
+      // If successful, copy thumbnail to all other versions of this episode
+      if (result.success && !result.skipped && result.spriteUrl && result.vttUrl) {
+        const otherVersions = allVersions.filter(
+          (v) => v._id.toString() !== episode._id.toString(),
+        );
+
+        if (otherVersions.length > 0) {
+          sendProgress({
+            type: 'log',
+            message: `📋 Tập ${episodeNumber}: Copy thumbnail sang ${otherVersions.length} phiên bản khác`,
+          });
+
+          for (const targetVersion of otherVersions) {
+            await Episode.updateOne(
+              { _id: targetVersion._id },
+              {
+                $set: {
+                  thumbnail_sprite: result.spriteUrl,
+                  thumbnail_vtt: result.vttUrl,
+                },
+              },
+            );
+            sendProgress({
+              type: 'log',
+              message: `  ✅ Đã copy sang ${targetVersion.audioType}`,
+            });
+          }
+        }
+      }
+
+      return result;
+    }),
   );
 
   // Count results
@@ -734,7 +958,14 @@ async function processMovie(movieId, force, sendProgress) {
     }
 
     // Generate thumbnails
-    const { spriteUrl, vttUrl } = await generateThumbnails(movie.slug, videoPath, sendProgress);
+    const { spriteUrl, vttUrl } = await generateThumbnails(
+      movie.slug,
+      videoPath,
+      sendProgress,
+      null,
+      null,
+      force,
+    );
 
     // Update database
     sendProgress({

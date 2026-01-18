@@ -25,6 +25,7 @@ const VideoPlayer = ({
   const [volume, setVolume] = useState(0.75);
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [isDraggingProgress, setIsDraggingProgress] = useState(false); // Đang kéo progress bar
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
@@ -509,6 +510,29 @@ const VideoPlayer = ({
     };
   }, []);
 
+  // Handle isDraggingProgress state changes
+  useEffect(() => {
+    if (isDraggingProgress) {
+      // Khi bắt đầu kéo: clear timeout và giữ controls hiện
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      setShowControls(true);
+    } else {
+      // Khi kéo xong: set timeout để tự động ẩn
+      if (isPlaying && hasNativePlayer) {
+        const delay = isFullscreen ? 2000 : 3000;
+        controlsTimeoutRef.current = setTimeout(() => {
+          setShowControls(false);
+          setShowMoreMenu(false);
+          setShowSpeedMenu(false);
+          setShowQualityMenu(false);
+          setShowAudioMenu(false);
+        }, delay);
+      }
+    }
+  }, [isDraggingProgress, isPlaying, isFullscreen, hasNativePlayer]);
+
   const handlePlayPause = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -517,6 +541,32 @@ const VideoPlayer = ({
       video.play();
     } else {
       video.pause();
+    }
+  };
+
+  // Handler riêng cho click vào video - toggle controls thay vì play/pause
+  const handleVideoClick = (e) => {
+    // Nếu click vào controls area, không làm gì
+    if (e.target.closest(".pointer-events-auto")) {
+      return;
+    }
+
+    if (showControls) {
+      // Nếu controls đang hiện → Play/Pause video
+      handlePlayPause();
+    } else {
+      // Nếu controls đang ẩn → Hiện controls
+      setShowControls(true);
+      // Tự động ẩn sau 3s
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      const delay = isFullscreen ? 2000 : 3000;
+      controlsTimeoutRef.current = setTimeout(() => {
+        if (!isDraggingProgress && isPlaying) {
+          setShowControls(false);
+        }
+      }, delay);
     }
   };
 
@@ -696,20 +746,25 @@ const VideoPlayer = ({
 
     setShowControls(true);
 
+    // Clear timeout cũ
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
     }
 
-    const delay = isFullscreen ? 2000 : 3000; // 2s khi fullscreen, 3s bình thường
-
-    controlsTimeoutRef.current = setTimeout(() => {
-      setShowControls(false);
-      // Ẩn luôn các menu phụ khi auto-hide
-      setShowMoreMenu(false);
-      setShowSpeedMenu(false);
-      setShowQualityMenu(false);
-      setShowAudioMenu(false);
-    }, delay);
+    // Chỉ set timeout mới nếu KHÔNG đang kéo
+    if (!isDraggingProgress) {
+      const delay = isFullscreen ? 2000 : 3000;
+      controlsTimeoutRef.current = setTimeout(() => {
+        // Double check trước khi ẩn
+        if (!isDraggingProgress && isPlaying) {
+          setShowControls(false);
+          setShowMoreMenu(false);
+          setShowSpeedMenu(false);
+          setShowQualityMenu(false);
+          setShowAudioMenu(false);
+        }
+      }, delay);
+    }
   };
 
   const handleNextEpisode = () => {
@@ -1170,7 +1225,7 @@ const VideoPlayer = ({
           ref={videoRef}
           className="w-full h-full cursor-pointer rounded-lg"
           src={!hlsSource ? fileSource : undefined}
-          onClick={handlePlayPause}
+          onClick={handleVideoClick}
           playsInline
           webkit-playsinline="true"
           x5-playsinline="true"
@@ -1220,6 +1275,7 @@ const VideoPlayer = ({
         bufferedPercentage={bufferedPercentage}
         onSeek={handleSeek}
         videoRef={videoRef}
+        onDragStateChange={setIsDraggingProgress}
         // Play/Pause
         isPlaying={isPlaying}
         onPlayPause={handlePlayPause}
