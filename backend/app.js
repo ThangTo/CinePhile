@@ -18,32 +18,43 @@ const authService = require('./services/auth.service');
 const { getGoogleCallbackUrl } = require('./utils/authUtils');
 const { optionalAuth } = require('./middleware/auth.middleware');
 
-// Thêm dòng này nếu chưa có
-const { exec } = require('child_process'); 
+async function testConnection() {
+  console.log("🚀 ĐANG TEST KẾT NỐI TỪ HUGGING FACE...");
+  
+  const targetUrl = "https://s6.kkphimplayer6.com/20251204/wM0RTCwd/index.m3u8";
+  
+  try {
+      const response = await fetch(targetUrl, {
+          method: 'GET',
+          headers: {
+              // Giả lập Chrome xịn
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              // Thử Referer chính chủ
+              "Referer": "https://kkphim.vip/",
+              "Origin": "https://kkphim.vip"
+          }
+      });
 
-// --- ĐOẠN CODE TEST KẾT NỐI ---
-console.log("🚀 ĐANG TEST CURL ĐẾN SERVER PHIM...");
+      console.log("----------------------------------------");
+      console.log(`📡 TRẠNG THÁI: ${response.status} ${response.statusText}`);
+      console.log("HEADER TRẢ VỀ:", response.headers.get('content-type'));
+      
+      if (response.status === 200) {
+          console.log("✅ KẾT QUẢ: IP SẠCH! Có thể lấy được phim.");
+          const text = await response.text();
+          console.log("Nội dung (preview):", text.substring(0, 100));
+      } else {
+          console.log("❌ KẾT QUẢ: BỊ CHẶN! (Khả năng cao do IP Datacenter)");
+      }
+      console.log("----------------------------------------");
 
-// Lệnh Curl giả lập trình duyệt (Có User-Agent và Referer xịn)
-const cmd = `curl -I -v -L \
-  -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-  -H "Referer: https://kkphim.vip" \ 
-  "https://s6.kkphimplayer6.com/20251204/wM0RTCwd/index.m3u8"`;
+  } catch (error) {
+      console.error("❌ LỖI KẾT NỐI:", error.message);
+  }
+}
 
-exec(cmd, (error, stdout, stderr) => {
-    console.log("----------------------------------------");
-    console.log("📡 KẾT QUẢ CURL:");
-    
-    if (error) {
-        console.error(`❌ Lỗi thực thi lệnh: ${error.message}`);
-        return;
-    }
-    
-    // In ra output (Header trả về)
-    console.log(stdout || stderr); 
-    console.log("----------------------------------------");
-});
-// ------------------------------
+// Chạy test ngay lập tức
+testConnection();
 
 
 // Compression middleware - Nén responses để giảm bandwidth
