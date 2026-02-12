@@ -18,6 +18,33 @@ const authService = require('./services/auth.service');
 const { getGoogleCallbackUrl } = require('./utils/authUtils');
 const { optionalAuth } = require('./middleware/auth.middleware');
 
+// Thêm dòng này nếu chưa có
+const { exec } = require('child_process'); 
+
+// --- ĐOẠN CODE TEST KẾT NỐI ---
+console.log("🚀 ĐANG TEST CURL ĐẾN SERVER PHIM...");
+
+// Lệnh Curl giả lập trình duyệt (Có User-Agent và Referer xịn)
+const cmd = `curl -I -v -L \
+  -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+  -H "Referer: https://kkphim.vip" \ 
+  "https://s6.kkphimplayer6.com/20251204/wM0RTCwd/index.m3u8"`;
+
+exec(cmd, (error, stdout, stderr) => {
+    console.log("----------------------------------------");
+    console.log("📡 KẾT QUẢ CURL:");
+    
+    if (error) {
+        console.error(`❌ Lỗi thực thi lệnh: ${error.message}`);
+        return;
+    }
+    
+    // In ra output (Header trả về)
+    console.log(stdout || stderr); 
+    console.log("----------------------------------------");
+});
+// ------------------------------
+
 
 // Compression middleware - Nén responses để giảm bandwidth
 // Skip compression for SSE (Server-Sent Events) endpoints
@@ -252,7 +279,7 @@ app.get('/health', (req, res) => {
     memory: process.memoryUsage(),
     pid: process.pid,
   });
-});
+}); 
 
 async function fetchText(targetUrl) {
   try {
