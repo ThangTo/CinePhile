@@ -8,7 +8,7 @@ import useToast from "hooks/useToast";
 import ToastContainer from "../common/ToastContainer";
 import PremiumRequiredModal from "../common/PremiumRequiredModal";
 import { isPremiumActive } from "utils/premiumUtils";
-import { getVideoSource } from "config/video.config";
+// import { getVideoSource } from "config/video.config"; // Có thể bỏ dòng này nếu không dùng nữa
 
 const VideoPlayer = ({
   movie,
@@ -26,7 +26,7 @@ const VideoPlayer = ({
   const [volume, setVolume] = useState(0.75);
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [isDraggingProgress, setIsDraggingProgress] = useState(false); // Đang kéo progress bar
+  const [isDraggingProgress, setIsDraggingProgress] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
@@ -36,12 +36,11 @@ const VideoPlayer = ({
   const [quality, setQuality] = useState("Auto");
   const [isBuffering, setIsBuffering] = useState(false);
   const [availableLevels, setAvailableLevels] = useState([]);
-  const [currentActualQuality, setCurrentActualQuality] = useState(null); // Chất lượng thực tế đang phát
-  const [bufferedPercentage, setBufferedPercentage] = useState(0); // Phần trăm video đã buffered
-  const [hasAutoPlayed, setHasAutoPlayed] = useState(false); // Đánh dấu đã auto-play chưa
+  const [currentActualQuality, setCurrentActualQuality] = useState(null);
+  const [bufferedPercentage, setBufferedPercentage] = useState(0);
+  const [hasAutoPlayed, setHasAutoPlayed] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
-  // Check user role and premium status
   const { user } = useAuth();
   const isPremium = isPremiumActive(user);
   const isAdmin = user?.role === "admin";
@@ -53,15 +52,16 @@ const VideoPlayer = ({
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
   const saveProgressIntervalRef = useRef(null);
-  const hasAutoSeekedRef = useRef(false); // Đánh dấu đã auto-seek chưa
-  const lastEpisodeIdRef = useRef(null); // Lưu episode ID cuối cùng để detect thay đổi
+  const hasAutoSeekedRef = useRef(false);
+  const lastEpisodeIdRef = useRef(null);
 
   const hlsRef = useRef(null);
+  const blobUrlRef = useRef(null); // Ref để lưu Blob URL và dọn dẹp sau này
 
+  // 1. SỬA ĐỔI: Lấy link m3u8 trực tiếp, KHÔNG qua Proxy Backend
   const hlsSource = useMemo(() => {
     if (episode?.link_m3u8) {
-      const proxyEndpoint = `${process.env.REACT_APP_API_URL}/proxy-m3u8`;
-      return getVideoSource(episode.link_m3u8, proxyEndpoint);
+      return episode.link_m3u8; // Trả về link gốc
     }
     if (episode?.videoUrl && episode.videoUrl.includes(".m3u8")) return episode.videoUrl;
     if (videoUrl && videoUrl.includes(".m3u8")) return videoUrl;
@@ -84,7 +84,7 @@ const VideoPlayer = ({
 
   const hasNativePlayer = Boolean(hlsSource || fileSource);
 
-  // Parse available audio options from movie.lang (e.g. "Vietsub+Thuyết Minh+Lồng Tiếng")
+  // Parse available audio options
   const audioOptions = useMemo(() => {
     const rawLang = (movie?.lang || "").toLowerCase();
     const parts = rawLang
@@ -107,7 +107,6 @@ const VideoPlayer = ({
         addIfNotExists("long-tieng", "Lồng tiếng");
     });
 
-    // Nếu lang trống hoặc không parse được, mặc định có Vietsub
     if (opts.length === 0) {
       addIfNotExists("vietsub", "Vietsub");
     }
@@ -117,10 +116,9 @@ const VideoPlayer = ({
 
   const currentAudioLabel = audioOptions.find((o) => o.key === audioType)?.label || "Âm thanh";
 
-  // Update video time and buffered percentage
+  // --- Logic Video Event Listeners (Giữ nguyên) ---
   useEffect(() => {
     const video = videoRef.current;
-    // video.focus();
     if (!video || !hasNativePlayer) return;
 
     const updateBufferedPercentage = () => {
@@ -138,27 +136,24 @@ const VideoPlayer = ({
 
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
-      // Update buffered percentage mỗi khi time update
       updateBufferedPercentage();
     };
 
     const handleDurationChange = () => {
       setDuration(video.duration);
-      // Update buffered when duration changes
       updateBufferedPercentage();
     };
 
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
-    const handleWaiting = () => {
-      setIsBuffering(true);
-    };
-
+    const handleWaiting = () => setIsBuffering(true);
     const handleCanPlay = () => setIsBuffering(false);
+    const handleProgress = () => updateBufferedPercentage();
 
-    const handleProgress = () => {
-      // Update buffered percentage on progress (khi có thêm data được load)
-      updateBufferedPercentage();
+    const handleLeavePiP = () => {
+      if (containerRef.current) {
+        containerRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
@@ -168,13 +163,6 @@ const VideoPlayer = ({
     video.addEventListener("waiting", handleWaiting);
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("progress", handleProgress);
-
-    // Handle PiP return (Back to tab)
-    const handleLeavePiP = () => {
-      if (containerRef.current) {
-        containerRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    };
     video.addEventListener("leavepictureinpicture", handleLeavePiP);
 
     return () => {
@@ -189,7 +177,7 @@ const VideoPlayer = ({
     };
   }, [hasNativePlayer, episode, duration]);
 
-  // Reset auto-play/seek state when episode changes
+  // Reset auto-play/seek state
   useEffect(() => {
     const currentEpisodeId = episode?._id || episode?.id;
     if (lastEpisodeIdRef.current !== currentEpisodeId) {
@@ -199,7 +187,7 @@ const VideoPlayer = ({
     }
   }, [episode?._id, episode?.id]);
 
-  // Load progress and auto-seek when video is ready
+  // Load progress and auto-seek logic (Giữ nguyên)
   useEffect(() => {
     const video = videoRef.current;
     const movieId = movie?._id || movie?.id;
@@ -208,19 +196,12 @@ const VideoPlayer = ({
     let shouldSeek = false;
     let seekTime = 0;
 
-    // 1. Lấy key hiện tại của session
     const currentKey = window.history.state?.key || window.location.pathname;
-
-    // 2. Lấy key của lần xem trước được lưu trong Session Storage
     const lastKey = sessionStorage.getItem("watchPageKey");
-
-    // 3. Logic so sánh
     const isReload = lastKey === currentKey;
 
     if (!isReload) {
       localStorage.removeItem("resumeTime");
-
-      // Cập nhật key mới để lần sau refresh nó sẽ khớp
       sessionStorage.setItem("watchPageKey", currentKey);
     }
 
@@ -234,15 +215,11 @@ const VideoPlayer = ({
           return;
         }
 
-        // Luôn load progress mới nhất từ backend để đảm bảo tiến trình cập nhật nhất khi refresh
         const response = await userService.getProgress(movieId);
 
         if (response?.success && response?.data) {
           const progress = response.data;
-
-          // Chỉ auto-seek nếu progress < 95% và watchTime > 5
           if (progress.progress < 95 && progress.watchTime > 5) {
-            // Kiểm tra episode nếu có (cho series)
             if (episode?._id || episode?.id) {
               const savedEpisodeId =
                 progress.episodeId?._id || progress.episodeId?.id || progress.episodeId;
@@ -252,21 +229,17 @@ const VideoPlayer = ({
                 seekTime = Math.max(0, progress.watchTime - 3);
               }
             } else {
-              // Phim lẻ, không cần check episode
               shouldSeek = true;
               seekTime = Math.max(0, progress.watchTime - 3);
             }
           }
         } else {
-          // Không có progress từ backend
           if (resumeTime !== null && resumeTime > 0) {
-            // Fallback: Dùng resumeTime từ state (khi navigate từ ContinueWatching)
             shouldSeek = true;
             seekTime = Math.max(0, resumeTime - 3);
           }
         }
       } catch (error) {
-        // Fallback: Nếu lỗi load progress
         if (resumeTime !== null && resumeTime > 0) {
           shouldSeek = true;
           seekTime = Math.max(0, resumeTime - 3);
@@ -275,35 +248,28 @@ const VideoPlayer = ({
     };
 
     const handleCanPlayThrough = async () => {
-      // Load progress trước
       await loadProgressAndSeek();
 
-      // Auto-seek nếu cần (và không phải bắt đầu từ đầu)
       if (shouldSeek && !hasAutoSeekedRef.current) {
         video.currentTime = seekTime;
         setCurrentTime(seekTime);
         hasAutoSeekedRef.current = true;
       } else if (resumeTime === 0 && !hasAutoSeekedRef.current) {
-        // Đảm bảo video bắt đầu từ 0 khi resumeTime === 0
         video.currentTime = 0;
         setCurrentTime(0);
         hasAutoSeekedRef.current = true;
       }
 
-      // Auto-play video
       try {
         await video.play();
         setIsPlaying(true);
         setHasAutoPlayed(true);
       } catch (error) {
         console.error("Auto-play failed:", error);
-        // Một số browser chặn auto-play, không sao
       }
     };
 
-    // Nếu video đã sẵn sàng, thực hiện ngay
     if (video.readyState >= 3) {
-      // HAVE_FUTURE_DATA hoặc cao hơn
       handleCanPlayThrough();
     } else {
       video.addEventListener("canplaythrough", handleCanPlayThrough);
@@ -323,7 +289,7 @@ const VideoPlayer = ({
     episode?.id,
   ]);
 
-  // Auto-save progress periodically
+  // Save progress logic (Giữ nguyên)
   useEffect(() => {
     const movieId = movie?._id || movie?.id;
     if (!user || !movieId || !hasNativePlayer) return;
@@ -333,12 +299,10 @@ const VideoPlayer = ({
       if (!video || video.paused || !duration || duration <= 0) return;
 
       const watchTime = Math.floor(video.currentTime);
-      // Chỉ lưu nếu đã xem ít nhất 5 giây
       if (watchTime < 5) return;
 
       try {
         const episodeId = episode?._id || episode?.id || null;
-
         await userService.saveProgress({
           movieId: movieId,
           episodeId: episodeId,
@@ -348,7 +312,6 @@ const VideoPlayer = ({
       } catch (error) {}
     };
 
-    // Lưu mỗi 15 giây
     saveProgressIntervalRef.current = setInterval(saveProgress, 15000);
 
     return () => {
@@ -358,7 +321,6 @@ const VideoPlayer = ({
     };
   }, [user, movie?._id, movie?.id, episode?._id, episode?.id, duration, hasNativePlayer]);
 
-  // Save progress on pause
   useEffect(() => {
     const video = videoRef.current;
     const movieId = movie?._id || movie?.id;
@@ -371,7 +333,6 @@ const VideoPlayer = ({
 
       try {
         const episodeId = episode?._id || episode?.id || null;
-
         await userService.saveProgress({
           movieId: movieId,
           episodeId: episodeId,
@@ -387,7 +348,7 @@ const VideoPlayer = ({
     };
   }, [user, movie?._id, movie?.id, episode?._id, episode?.id, duration, hasNativePlayer]);
 
-  // Initialize HLS / regular sources when episode changes
+  // 2. SỬA ĐỔI: Client-side HLS Fetching & Processing (Đã fix lỗi Master Playlist)
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -403,99 +364,190 @@ const VideoPlayer = ({
       return;
     }
 
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        // --- CHIẾN THUẬT BUFFER CHO MẠNG LAG ---
+    const initHlsPlayer = async () => {
+        if (Hls.isSupported()) {
+          const hls = new Hls({
+            maxBufferLength: 60,
+            maxMaxBufferLength: 120,
+            startFragPrefetch: true,
+            manifestLoadingTimeOut: 20000,
+            fragLoadingTimeOut: 25000,
+            manifestLoadingMaxRetry: 5,
+            fragLoadingMaxRetry: 5,
+            levelLoadingMaxRetry: 5,
+          });
 
-        // 1. Tăng bộ nhớ đệm lên mức cao (mặc định chỉ 30s)
-        // Nếu mạng rớt 1 phút, user vẫn xem được nhờ buffer này.
-        maxBufferLength: 60,
-        maxMaxBufferLength: 120, // Cho phép buffer tới 2 phút video
+          try {
+              console.log("🚀 Bắt đầu tải M3U8:", hlsSource);
+              
+              // 1. Fetch file gốc
+              let currentUrl = hlsSource;
+              let response = await fetch(currentUrl);
+              let content = await response.text();
 
-        // 2. Tải trước đoạn video (Start Fragment)
-        // Giúp video chạy nhanh hơn khi vừa bấm play
-        startFragPrefetch: true,
+              // --- GIAI ĐOẠN 1: XỬ LÝ MASTER PLAYLIST (QUAN TRỌNG: Mới thêm vào) ---
+              // Nếu file này chỉ là danh sách chọn độ phân giải, ta phải lấy link file thật
+              if (content.includes('#EXT-X-STREAM-INF')) {
+                  console.log("⚠️ Phát hiện Master Playlist -> Đang tìm luồng chất lượng cao nhất...");
+                  
+                  const lines = content.split('\n');
+                  let maxBandwidth = 0;
+                  let bestUri = '';
 
-        // 3. Cấu hình Timeout (Rất quan trọng với link phim lậu/crawl)
-        // Mặc định Hls.js đợi rất ngắn, server phim lag chút là nó báo lỗi ngay.
-        // Ta tăng thời gian chờ lên để nó "kiên nhẫn" tải cho xong.
-        manifestLoadingTimeOut: 20000, // Chờ file m3u8 tối đa 20s
-        fragLoadingTimeOut: 25000, // Chờ file .ts tối đa 25s
+                  for (let i = 0; i < lines.length; i++) {
+                      if (lines[i].includes('BANDWIDTH=')) {
+                          const match = lines[i].match(/BANDWIDTH=(\d+)/);
+                          const bandwidth = match ? parseInt(match[1]) : 0;
+                          
+                          // Dòng tiếp theo là link m3u8 con
+                          const nextLine = (lines[i + 1] || '').trim();
+                          if (nextLine && !nextLine.startsWith('#') && bandwidth > maxBandwidth) {
+                              maxBandwidth = bandwidth;
+                              bestUri = nextLine;
+                          }
+                      }
+                  }
 
-        // 4. Số lần thử lại nếu lỗi (Retry)
-        manifestLoadingMaxRetry: 5, // Thử lại 5 lần nếu lỗi kết nối
-        fragLoadingMaxRetry: 5,
-        levelLoadingMaxRetry: 5,
-      });
+                  if (bestUri) {
+                      // Cập nhật URL mới để tải file con
+                      // new URL() sẽ tự xử lý việc nối link tương đối/tuyệt đối
+                      currentUrl = new URL(bestUri, currentUrl).toString();
+                      console.log("👉 Chuyển hướng sang Media Playlist:", currentUrl);
+                      
+                      // Tải nội dung của link con (Đây mới là file chứa quảng cáo)
+                      response = await fetch(currentUrl);
+                      content = await response.text();
+                  }
+              }
 
-      hls.loadSource(hlsSource);
-      hls.attachMedia(video);
-      hlsRef.current = hls;
+              // --- GIAI ĐOẠN 2: LỌC QUẢNG CÁO & REWRITE LINK ---
+              // BaseURL phải lấy từ cái link cuối cùng mình vừa tải (currentUrl)
+              const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+              
+              const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+              const lines = content.split('\n');
+              const cleanLines = [];
+              let skipNext = false;
 
-      // Lắng nghe khi manifest được load để lấy danh sách levels
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        const levels = hls.levels || [];
-        setAvailableLevels(levels);
+              for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line) continue;
 
-        // Set chất lượng thực tế ban đầu
-        if (hls.currentLevel >= 0 && hls.currentLevel < levels.length) {
-          const currentLevel = levels[hls.currentLevel];
-          const actualHeight = currentLevel?.height || null;
-          setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
-        } else if (levels.length > 0) {
-          // Nếu đang ở Auto mode, lấy level đầu tiên làm mặc định
-          const firstLevel = levels[0];
-          const actualHeight = firstLevel?.height || null;
-          setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
-        }
-      });
+                // A. Check Quảng Cáo
+                if (line.startsWith('#EXTINF')) {
+                    let nextLine = (lines[i + 1] || '').trim();
+                    if (nextLine && !nextLine.startsWith('#')) {
+                        const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
+                        if (isAd) {
+                            console.log("🚫 Đã chặn 1 quảng cáo:", nextLine); // Log để kiểm chứng
+                            skipNext = true;
+                            continue;
+                        }
+                    }
+                }
 
-      // Lắng nghe khi có fragment được load để đảm bảo video sẵn sàng
-      hls.on(Hls.Events.FRAG_LOADED, () => {
-        // Video đã có data, có thể phát được
-        setIsBuffering(false);
-      });
+                if (skipNext) {
+                    skipNext = false;
+                    continue;
+                }
 
-      // Lắng nghe khi level thay đổi
-      hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-        const currentLevel = hls.levels[data.level];
-        const actualHeight = currentLevel?.height || null;
-        setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
-      });
+                if (line.includes('#EXT-X-DISCONTINUITY')) continue;
 
-      // Lắng nghe lỗi và tự động recover
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              console.error("HLS Network Error, attempting recovery...");
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              console.error("HLS Media Error, attempting recovery...");
-              hls.recoverMediaError();
-              break;
-            default:
-              console.error("HLS Fatal Error:", data);
-              hls.destroy();
-              break;
+                // B. Rewrite Link & ConvertV7 (Áp dụng cho mọi dòng link video)
+                if (!line.startsWith('#')) {
+                    // 1. Chuyển link tương đối -> Tuyệt đối
+                    if (!line.startsWith('http')) {
+                        line = new URL(line, baseUrl).toString();
+                    }
+                    
+                    // 2. Fix lỗi convertv7 (như backend cũ)
+                    if (line.includes('convertv7/')) {
+                        line = line.replace('convertv7/', '');
+                    }
+                }
+                cleanLines.push(line);
+              }
+
+              const cleanM3u8Content = cleanLines.join('\n');
+
+              // 3. Tạo Blob URL
+              const blob = new Blob([cleanM3u8Content], { type: 'application/vnd.apple.mpegurl' });
+              
+              if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+              blobUrlRef.current = URL.createObjectURL(blob);
+              
+              console.log("✅ Client-side Adblock Active (Blob Created)");
+              hls.loadSource(blobUrlRef.current);
+
+          } catch (err) {
+              console.error("❌ Lỗi xử lý M3U8:", err);
+              // Fallback về link gốc (hlsSource) nếu lỗi, chấp nhận có ads
+              hls.loadSource(hlsSource);
           }
+
+          hls.attachMedia(video);
+          hlsRef.current = hls;
+
+          // ... (Giữ nguyên phần Event Listeners bên dưới) ...
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+             // ... Logic quality cũ ...
+             const levels = hls.levels || [];
+             setAvailableLevels(levels);
+             if (levels.length > 0) {
+                 const currentLevel = hls.currentLevel >= 0 ? levels[hls.currentLevel] : levels[0];
+                 const actualHeight = currentLevel?.height || null;
+                 setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+            }
+          });
+
+          hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false));
+          
+          // ... (Các event error, level switched giữ nguyên) ...
+           hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+            const currentLevel = hls.levels[data.level];
+            const actualHeight = currentLevel?.height || null;
+            setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+          });
+
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  hls.destroy();
+                  break;
+              }
+            }
+          });
+
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          // Safari Native
+           try {
+              // Với Safari, logic Drill down này phức tạp hơn vì Safari không hỗ trợ Blob URL tốt cho stream dài
+              // Nên tạm thời fallback về source gốc
+              video.src = hlsSource; 
+           } catch(e) {
+              video.src = hlsSource;
+           }
         }
-      });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Safari native HLS - không hỗ trợ quality control qua JS
-      video.src = hlsSource;
-      console.warn("Safari native HLS - Quality control không khả dụng");
-    } else {
-      console.warn("Trình duyệt không hỗ trợ phát HLS, sẽ dùng link nhúng nếu có.");
-    }
+    };
+
+    initHlsPlayer();
 
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
-      // Cleanup progress saving interval
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
       if (saveProgressIntervalRef.current) {
         clearInterval(saveProgressIntervalRef.current);
         saveProgressIntervalRef.current = null;
@@ -503,6 +555,8 @@ const VideoPlayer = ({
     };
   }, [hlsSource, fileSource]);
 
+  // --- Các helper function xử lý giao diện (Controls, Menu...) giữ nguyên ---
+  
   // Clear timeout on unmount
   useEffect(() => {
     return () => {
@@ -512,16 +566,11 @@ const VideoPlayer = ({
     };
   }, []);
 
-  // Handle isDraggingProgress state changes
   useEffect(() => {
     if (isDraggingProgress) {
-      // Khi bắt đầu kéo: clear timeout và giữ controls hiện
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       setShowControls(true);
     } else {
-      // Khi kéo xong: set timeout để tự động ẩn
       if (isPlaying && hasNativePlayer) {
         const delay = isFullscreen ? 2000 : 3000;
         controlsTimeoutRef.current = setTimeout(() => {
@@ -538,36 +587,20 @@ const VideoPlayer = ({
   const handlePlayPause = () => {
     const video = videoRef.current;
     if (!video) return;
-
-    if (video.paused) {
-      video.play();
-    } else {
-      video.pause();
-    }
+    if (video.paused) video.play();
+    else video.pause();
   };
 
-  // Handler riêng cho click vào video - toggle controls thay vì play/pause
   const handleVideoClick = (e) => {
-    // Nếu click vào controls area, không làm gì
-    if (e.target.closest(".pointer-events-auto")) {
-      return;
-    }
-
+    if (e.target.closest(".pointer-events-auto")) return;
     if (showControls) {
-      // Nếu controls đang hiện → Play/Pause video
       handlePlayPause();
     } else {
-      // Nếu controls đang ẩn → Hiện controls
       setShowControls(true);
-      // Tự động ẩn sau 3s
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       const delay = isFullscreen ? 2000 : 3000;
       controlsTimeoutRef.current = setTimeout(() => {
-        if (!isDraggingProgress && isPlaying) {
-          setShowControls(false);
-        }
+        if (!isDraggingProgress && isPlaying) setShowControls(false);
       }, delay);
     }
   };
@@ -575,34 +608,20 @@ const VideoPlayer = ({
   const handleSeek = async (timeOrEvent) => {
     const video = videoRef.current;
     if (!video) return;
-
     let newTime;
-
-    // Kiểm tra xem tham số là số (time) hay event object
     if (typeof timeOrEvent === "number") {
-      // Được gọi từ ProgressBar với time trực tiếp
       newTime = timeOrEvent;
     } else if (timeOrEvent?.currentTarget) {
-      // Được gọi từ event click trực tiếp trên progress bar (legacy)
       const rect = timeOrEvent.currentTarget.getBoundingClientRect();
       const clickX = timeOrEvent.clientX - rect.left;
       newTime = (clickX / rect.width) * duration;
-    } else {
-      // Không hợp lệ
-      console.warn("[VideoPlayer] handleSeek called with invalid argument:", timeOrEvent);
-      return;
-    }
+    } else return;
 
-    // Đảm bảo newTime hợp lệ
-    if (isNaN(newTime) || newTime < 0) {
-      newTime = 0;
-    } else if (newTime > duration) {
-      newTime = duration;
-    }
+    if (isNaN(newTime) || newTime < 0) newTime = 0;
+    else if (newTime > duration) newTime = duration;
 
     video.currentTime = newTime;
 
-    // Lưu progress khi seek
     const movieId = movie?._id || movie?.id;
     if (user && movieId && duration > 0) {
       try {
@@ -630,7 +649,6 @@ const VideoPlayer = ({
   const toggleMute = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-
     if (isMuted) {
       video.volume = volume;
       setIsMuted(false);
@@ -643,7 +661,6 @@ const VideoPlayer = ({
   const handleSkip = (seconds) => {
     const video = videoRef.current;
     if (!video) return;
-
     video.currentTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
   };
 
@@ -652,22 +669,17 @@ const VideoPlayer = ({
     const video = videoRef.current;
     if (!container) return;
 
-    // Detect iOS
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-      // iOS Safari/Chrome: Use native video fullscreen
       if (isIOS && video && video.webkitEnterFullscreen) {
         try {
           video.webkitEnterFullscreen();
           setIsFullscreen(true);
           return;
-        } catch (err) {
-          console.log("iOS fullscreen not available, trying standard API");
-        }
+        } catch (err) {}
       }
 
-      // Try different fullscreen APIs for cross-browser support
       const requestFullscreen =
         container.requestFullscreen ||
         container.webkitRequestFullscreen ||
@@ -675,25 +687,14 @@ const VideoPlayer = ({
         container.msRequestFullscreen;
 
       if (requestFullscreen) {
-        requestFullscreen
-          .call(container)
-          .then(() => {
+        requestFullscreen.call(container).then(() => {
             setIsFullscreen(true);
-
-            // On mobile, try to lock orientation to landscape for better viewing
-            if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
-              window.screen.orientation.lock("landscape").catch((err) => {
-                // Orientation lock may fail on some devices, ignore error
-                console.log("Orientation lock not supported or failed:", err);
-              });
+            if (window.screen?.orientation?.lock) {
+              window.screen.orientation.lock("landscape").catch(() => {});
             }
-          })
-          .catch((err) => {
-            console.error("Error attempting to enable fullscreen:", err);
-          });
+          }).catch((err) => console.error(err));
       }
     } else {
-      // Exit fullscreen
       const exitFullscreen =
         document.exitFullscreen ||
         document.webkitExitFullscreen ||
@@ -701,19 +702,12 @@ const VideoPlayer = ({
         document.msExitFullscreen;
 
       if (exitFullscreen) {
-        exitFullscreen
-          .call(document)
-          .then(() => {
+        exitFullscreen.call(document).then(() => {
             setIsFullscreen(false);
-
-            // Unlock orientation when exiting fullscreen
-            if (window.screen && window.screen.orientation && window.screen.orientation.unlock) {
+            if (window.screen?.orientation?.unlock) {
               window.screen.orientation.unlock();
             }
-          })
-          .catch((err) => {
-            console.error("Error attempting to exit fullscreen:", err);
-          });
+          }).catch((err) => console.error(err));
       }
     }
   }, []);
@@ -721,7 +715,6 @@ const VideoPlayer = ({
   const handleSpeedChange = (speed) => {
     const video = videoRef.current;
     if (!video) return;
-
     video.playbackRate = speed;
     setPlaybackRate(speed);
     setShowSpeedMenu(false);
@@ -731,33 +724,19 @@ const VideoPlayer = ({
   const handlePictureInPicture = async () => {
     const video = videoRef.current;
     if (!video) return;
-
     try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else {
-        await video.requestPictureInPicture();
-      }
-    } catch (err) {
-      console.error("PiP error:", err);
-    }
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else await video.requestPictureInPicture();
+    } catch (err) { console.error(err); }
   };
 
   const handleMouseMove = () => {
     if (!hasNativePlayer) return;
-
     setShowControls(true);
-
-    // Clear timeout cũ
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-
-    // Chỉ set timeout mới nếu KHÔNG đang kéo
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     if (!isDraggingProgress) {
       const delay = isFullscreen ? 2000 : 3000;
       controlsTimeoutRef.current = setTimeout(() => {
-        // Double check trước khi ẩn
         if (!isDraggingProgress && isPlaying) {
           setShowControls(false);
           setShowMoreMenu(false);
@@ -777,343 +756,153 @@ const VideoPlayer = ({
   };
 
   const handleAudioChange = (type) => {
-    if (onAudioTypeChange) {
-      onAudioTypeChange(type);
-    }
+    if (onAudioTypeChange) onAudioTypeChange(type);
     setShowAudioMenu(false);
     setShowMoreMenu(false);
   };
 
   const toggleAudioMenu = () => {
     setShowAudioMenu((prev) => {
-      const next = !prev;
-      if (next) {
-        setShowSpeedMenu(false);
-        setShowQualityMenu(false);
-      }
-      return next;
+      if (!prev) { setShowSpeedMenu(false); setShowQualityMenu(false); }
+      return !prev;
     });
   };
 
   const toggleSpeedMenu = () => {
     setShowSpeedMenu((prev) => {
-      const next = !prev;
-      if (next) {
-        setShowAudioMenu(false);
-        setShowQualityMenu(false);
-      }
-      return next;
+      if (!prev) { setShowAudioMenu(false); setShowQualityMenu(false); }
+      return !prev;
     });
   };
 
   const toggleQualityMenu = () => {
     setShowQualityMenu((prev) => {
-      const next = !prev;
-      if (next) {
-        setShowAudioMenu(false);
-        setShowSpeedMenu(false);
-      }
-      return next;
+      if (!prev) { setShowAudioMenu(false); setShowSpeedMenu(false); }
+      return !prev;
     });
   };
 
-  // Helper: Build quality options list (luôn có đầy đủ options)
   const qualityOptions = useMemo(() => {
     const standardOptions = ["Auto", "1080p", "720p", "480p", "360p"];
-
-    // Đảm bảo availableLevels là array
     const levels = Array.isArray(availableLevels) ? availableLevels : [];
-
-    // Nếu có available levels, merge với standard options và loại bỏ duplicate
     if (levels.length > 0) {
-      const heightsFromLevels = [...new Set(levels.map((l) => l?.height).filter(Boolean))].sort(
-        (a, b) => b - a
-      );
-
+      const heightsFromLevels = [...new Set(levels.map((l) => l?.height).filter(Boolean))].sort((a, b) => b - a);
       const options = ["Auto"];
       heightsFromLevels.forEach((h) => {
         const label = `${h}p`;
-        if (!options.includes(label)) {
-          options.push(label);
-        }
+        if (!options.includes(label)) options.push(label);
       });
-
-      // Thêm các standard options nếu chưa có
       standardOptions.slice(1).forEach((opt) => {
-        if (!options.includes(opt)) {
-          options.push(opt);
-        }
+        if (!options.includes(opt)) options.push(opt);
       });
-
-      const sorted = options.sort((a, b) => {
+      return options.sort((a, b) => {
         if (a === "Auto") return -1;
         if (b === "Auto") return 1;
-        const heightA = parseInt(a.replace("p", ""), 10) || 0;
-        const heightB = parseInt(b.replace("p", ""), 10) || 0;
-        return heightB - heightA;
+        return parseInt(b) - parseInt(a);
       });
-
-      // Đảm bảo luôn trả về array
-      return Array.isArray(sorted) ? sorted : standardOptions;
     }
-
-    // Fallback: luôn trả về standardOptions
-    return Array.isArray(standardOptions) ? standardOptions : ["Auto", "720p", "480p", "360p"];
+    return standardOptions;
   }, [availableLevels]);
 
-  // Helper: Map quality string to HLS level index
   const getLevelIndexForQuality = (qualityStr, levels) => {
-    if (!levels || levels.length === 0) {
-      console.warn("⚠️ No HLS levels available");
-      return -1;
-    }
-    if (qualityStr === "Auto") return -1;
-
+    if (!levels || levels.length === 0 || qualityStr === "Auto") return -1;
     const targetHeight = parseInt(qualityStr.replace("p", ""), 10);
-    if (isNaN(targetHeight)) {
-      console.warn(`⚠️ Invalid quality string: ${qualityStr}`);
-      return -1;
-    }
-
-    // Tìm level có height gần nhất với target
-    let bestMatch = -1;
-    let minDiff = Infinity;
-
+    if (isNaN(targetHeight)) return -1;
+    let bestMatch = -1, minDiff = Infinity;
     for (let i = 0; i < levels.length; i++) {
       const level = levels[i];
       if (!level.height) continue;
-
       const diff = Math.abs(level.height - targetHeight);
-      if (diff < minDiff) {
-        minDiff = diff;
-        bestMatch = i;
-      }
+      if (diff < minDiff) { minDiff = diff; bestMatch = i; }
     }
-
-    // Nếu chênh lệch quá lớn (> 100px), không match
-    if (minDiff > 100) {
-      console.warn(`⚠️ No level found close to ${targetHeight}px (min diff: ${minDiff}px)`);
-      return -1;
-    }
-
-    return bestMatch;
+    return minDiff > 100 ? -1 : bestMatch;
   };
 
-  // Helper: Get maximum allowed quality based on user role
   const getMaxAllowedQuality = useCallback(() => {
     if (!availableLevels || availableLevels.length === 0) return null;
-
-    // Get actual available heights from HLS levels
-    const heightsFromLevels = [...availableLevels]
-      .map((l) => l?.height)
-      .filter(Boolean)
-      .sort((a, b) => b - a);
-
-    // Fallback to standard qualities if no levels available
+    const heightsFromLevels = [...availableLevels].map((l) => l?.height).filter(Boolean).sort((a, b) => b - a);
     const sortedLevels = heightsFromLevels.length > 0 ? heightsFromLevels : [1080, 720, 480, 360];
-
     if (sortedLevels.length === 0) return null;
-
-    const highestQuality = sortedLevels[0];
-
-    // Premium và Admin: có thể xem chất lượng cao nhất (1080p, 4K, etc.)
-    if (isPremium || isAdmin) {
-      return highestQuality; // Unlock tất cả chất lượng
-    }
-
-    // User thường: chỉ xem được chất lượng thấp hơn 1 bậc (720p max)
+    if (isPremium || isAdmin) return sortedLevels[0];
     if (isRegularUser && sortedLevels.length > 1) {
-      // Tìm chất lượng cao nhất không phải premium (thường là 720p)
-      // Nếu có 1080p thì chỉ cho xem 720p, nếu có 720p thì cho xem 480p
       const maxRegularQuality = sortedLevels.find((h) => h <= 720) || sortedLevels[1];
       return maxRegularQuality;
     }
-
-    // Fallback: nếu chỉ có 1 level, user thường vẫn xem được
     return sortedLevels[0];
   }, [availableLevels, isPremium, isAdmin, isRegularUser]);
 
-  // Helper: Check if quality requires premium
-  const isQualityPremium = useCallback(
-    (qualityStr) => {
-      if (qualityStr === "Auto") return false;
-      const height = parseInt(qualityStr.replace("p", ""), 10);
-      if (isNaN(height)) return false;
+  const isQualityPremium = useCallback((qualityStr) => {
+    if (qualityStr === "Auto") return false;
+    const height = parseInt(qualityStr.replace("p", ""), 10);
+    if (isNaN(height) || isPremium || isAdmin) return false;
+    return height > 720;
+  }, [isPremium, isAdmin]);
 
-      // Premium và Admin: có thể xem tất cả chất lượng (không cần premium)
-      if (isPremium || isAdmin) return false;
-
-      // User thường: chỉ xem được chất lượng <= 720p
-      // Chất lượng > 720p (như 1080p, 4K) yêu cầu premium
-      return height > 720;
-    },
-    [isPremium, isAdmin]
-  );
-
-  // Apply quality level to HLS instance
   const applyQualityLevel = useCallback((hls, qualityStr) => {
-    // Get max allowed quality for validation
-    const maxAllowed = getMaxAllowedQuality();
-    if (!hls) {
-      console.warn("⚠️ HLS instance not available");
-      return;
-    }
-    if (!hls.levels || hls.levels.length === 0) {
-      console.warn("⚠️ HLS levels not loaded yet");
-      return;
-    }
-
+    if (!hls || !hls.levels || hls.levels.length === 0) return;
     if (qualityStr === "Auto") {
-      // Auto mode logic based on user role
-      if (isAdmin || isPremium) {
-        // Admin và Premium: chất lượng cao nhất (unlock tất cả)
-        hls.currentLevel = -1; // Auto (HLS sẽ chọn cao nhất)
-      } else if (isRegularUser) {
-        // User thường: chỉ xem được 720p trở xuống
+      if (isAdmin || isPremium) hls.currentLevel = -1;
+      else if (isRegularUser) {
         const level720Index = hls.levels.findIndex((l) => l?.height && l.height <= 720);
-        if (level720Index >= 0) {
-          hls.currentLevel = level720Index;
-        } else {
-          // Nếu không có 720p, chọn level thấp nhất
-          hls.currentLevel = hls.levels.length > 0 ? hls.levels.length - 1 : -1;
-        }
-      } else {
-        // Fallback: auto
-        hls.currentLevel = -1;
-      }
-
-      // Force reload để áp dụng ngay
-      if (hls.media && hls.media.readyState >= 2) {
-        hls.startLoad();
-      }
+        hls.currentLevel = level720Index >= 0 ? level720Index : (hls.levels.length - 1);
+      } else hls.currentLevel = -1;
+      if (hls.media && hls.media.readyState >= 2) hls.startLoad();
       return;
     }
-
     const levelIndex = getLevelIndexForQuality(qualityStr, hls.levels);
     if (levelIndex >= 0 && levelIndex < hls.levels.length) {
       const selectedLevel = hls.levels[levelIndex];
       const selectedHeight = selectedLevel?.height;
-
-      // Validate: User thường không được xem chất lượng cao hơn 720p
       if (isRegularUser && selectedHeight > 720) {
-        console.warn(
-          `⚠️ User thường không thể xem chất lượng ${selectedHeight}p, giới hạn là 720p. Vui lòng nâng cấp Premium.`
-        );
-        // Tìm level 720p hoặc thấp hơn
         const allowedLevelIndex = hls.levels.findIndex((l) => l?.height && l.height <= 720);
-        if (allowedLevelIndex >= 0) {
-          hls.currentLevel = allowedLevelIndex;
-        } else {
-          // Nếu không có 720p, chọn level thấp nhất
-          hls.currentLevel = hls.levels.length - 1;
-        }
+        hls.currentLevel = allowedLevelIndex >= 0 ? allowedLevelIndex : (hls.levels.length - 1);
       } else {
-        const previousLevel = hls.currentLevel;
-        // Chỉ đổi nếu level khác
-        if (previousLevel !== levelIndex) {
-          hls.currentLevel = levelIndex;
-        }
+        if (hls.currentLevel !== levelIndex) hls.currentLevel = levelIndex;
       }
-
-      // Force reload để áp dụng quality mới ngay lập tức
-      if (hls.media && hls.media.readyState >= 2) {
-        hls.startLoad();
-      }
-    } else {
-      console.warn(`⚠️ Could not find matching level for ${qualityStr}, keeping current level`);
-      // Nếu không tìm được level matching, vẫn cập nhật currentActualQuality từ level hiện tại
-      if (hls.currentLevel >= 0 && hls.currentLevel < hls.levels.length) {
-        const currentLevel = hls.levels[hls.currentLevel];
-        const actualHeight = currentLevel?.height || null;
-        setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
-      }
+      if (hls.media && hls.media.readyState >= 2) hls.startLoad();
     }
-  }, []);
+  }, [isRegularUser, isAdmin, isPremium]);
 
-  // Handle quality change
   const handleQualityChange = (newQuality) => {
-    // Check premium requirement
     if (isQualityPremium(newQuality) && !isPremium) {
       setShowPremiumModal(true);
       setShowQualityMenu(false);
       setShowMoreMenu(false);
       return;
     }
-
     setQuality(newQuality);
     setShowQualityMenu(false);
     setShowMoreMenu(false);
-
-    // Apply quality change to HLS if available
-    if (hlsRef.current) {
-      if (hlsRef.current.levels && hlsRef.current.levels.length > 0) {
-        applyQualityLevel(hlsRef.current, newQuality);
-      } else {
-        console.warn("⚠️ HLS levels not ready, will apply when ready");
-      }
-    } else {
-      console.warn("⚠️ HLS instance not available");
-    }
   };
 
-  // Update quality when HLS instance changes
   useEffect(() => {
     if (hlsRef.current && hlsRef.current.levels && availableLevels.length > 0) {
       applyQualityLevel(hlsRef.current, quality);
     }
   }, [quality, availableLevels.length, applyQualityLevel]);
 
-  // Tính toán độ blur dựa trên sự chênh lệch chất lượng
-  // Logic: Nếu chất lượng thực tế > chất lượng đã chọn → làm mờ để "giả lập" chất lượng thấp hơn
   const blurAmount = useMemo(() => {
     if (quality === "Auto" || !currentActualQuality) return 0;
-
     const selectedHeight = parseInt(quality.replace("p", ""), 10);
     const actualHeight = parseInt(currentActualQuality.replace("p", ""), 10);
-
-    if (isNaN(selectedHeight) || isNaN(actualHeight)) return 0;
-    if (actualHeight <= selectedHeight) return 0; // Không cần blur nếu chất lượng thực tế <= chất lượng đã chọn
-
-    // Tính độ chênh lệch phần trăm (khi actualHeight > selectedHeight)
+    if (isNaN(selectedHeight) || isNaN(actualHeight) || actualHeight <= selectedHeight) return 0;
     const diffPercent = ((actualHeight - selectedHeight) / actualHeight) * 100;
-
-    // Áp dụng blur dựa trên độ chênh lệch:
-    // - Chênh lệch 20-40%: blur nhẹ (0.5px)
-    // - Chênh lệch 40-60%: blur vừa (1px)
-    // - Chênh lệch >60%: blur mạnh (2px)
     if (diffPercent >= 60) return 2;
     if (diffPercent >= 40) return 1;
     if (diffPercent >= 20) return 0.5;
     return 0;
   }, [quality, currentActualQuality]);
 
-  // Handle fullscreen changes (e.g., user presses ESC or rotates screen)
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen =
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement;
-
+      const isCurrentlyFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
       setIsFullscreen(!!isCurrentlyFullscreen);
-
-      // If exited fullscreen, unlock orientation
-      if (
-        !isCurrentlyFullscreen &&
-        window.screen &&
-        window.screen.orientation &&
-        window.screen.orientation.unlock
-      ) {
-        window.screen.orientation.unlock();
-      }
+      if (!isCurrentlyFullscreen && window.screen?.orientation?.unlock) window.screen.orientation.unlock();
     };
-
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
     document.addEventListener("mozfullscreenchange", handleFullscreenChange);
     document.addEventListener("MSFullscreenChange", handleFullscreenChange);
-
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
@@ -1122,73 +911,31 @@ const VideoPlayer = ({
     };
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       const video = videoRef.current;
       if (!video) return;
-
-      // Ignore shortcuts if user is typing in an input/textarea
-      const activeElement = document.activeElement;
-      const isTyping =
-        activeElement.tagName === "INPUT" ||
-        activeElement.tagName === "TEXTAREA" ||
-        activeElement.isContentEditable;
-
-      if (isTyping) return;
-
-      // Prevent default behavior for handled keys
-      if (["Space", "ArrowLeft", "ArrowRight", "KeyF", "KeyM", "KeyK"].includes(e.code)) {
-        e.preventDefault();
-      }
-
+      if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
+      if (["Space", "ArrowLeft", "ArrowRight", "KeyF", "KeyM", "KeyK"].includes(e.code)) e.preventDefault();
       switch (e.code) {
-        case "Space":
-        case "KeyK":
-          if (video.paused) {
-            video.play();
-          } else {
-            video.pause();
-          }
-          break;
-        case "ArrowLeft":
-          video.currentTime = Math.max(0, video.currentTime - 10);
-          break;
-        case "ArrowRight":
-          video.currentTime = Math.min(duration, video.currentTime + 10);
-          break;
-        case "KeyF":
-          toggleFullscreen();
-          break;
-        case "KeyM":
-          toggleMute();
-          break;
-        default:
-          break;
+        case "Space": case "KeyK": video.paused ? video.play() : video.pause(); break;
+        case "ArrowLeft": video.currentTime = Math.max(0, video.currentTime - 10); break;
+        case "ArrowRight": video.currentTime = Math.min(duration, video.currentTime + 10); break;
+        case "KeyF": toggleFullscreen(); break;
+        case "KeyM": toggleMute(); break;
+        default: break;
       }
     };
-
     document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [duration, toggleFullscreen, toggleMute]);
 
-  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (showMoreMenu && !e.target.closest(".more-menu-container")) {
-        setShowMoreMenu(false);
-      }
-      if (showSpeedMenu && !e.target.closest(".speed-menu-container")) {
-        setShowSpeedMenu(false);
-      }
-      if (showQualityMenu && !e.target.closest(".quality-menu-container")) {
-        setShowQualityMenu(false);
-      }
-      if (showAudioMenu && !e.target.closest(".audio-menu-container")) {
-        setShowAudioMenu(false);
-      }
+      if (showMoreMenu && !e.target.closest(".more-menu-container")) setShowMoreMenu(false);
+      if (showSpeedMenu && !e.target.closest(".speed-menu-container")) setShowSpeedMenu(false);
+      if (showQualityMenu && !e.target.closest(".quality-menu-container")) setShowQualityMenu(false);
+      if (showAudioMenu && !e.target.closest(".audio-menu-container")) setShowAudioMenu(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -1215,13 +962,9 @@ const VideoPlayer = ({
         setShowAudioMenu(false);
       }}
       onTouchStart={(e) => {
-        // Prevent default touch behavior that might interfere with video controls
-        if (e.target.closest(".pointer-events-auto")) {
-          e.stopPropagation();
-        }
+        if (e.target.closest(".pointer-events-auto")) e.stopPropagation();
       }}
     >
-      {/* Actual Video Element */}
       {hasNativePlayer ? (
         <video
           ref={videoRef}
@@ -1257,7 +1000,6 @@ const VideoPlayer = ({
         </div>
       )}
 
-      {/* Video Overlays (Poster, Buffering, Play Button) */}
       <VideoOverlays
         hasNativePlayer={hasNativePlayer}
         isBuffering={isBuffering}
@@ -1267,44 +1009,35 @@ const VideoPlayer = ({
         onPlayPause={handlePlayPause}
       />
 
-      {/* Video Controls Overlay */}
       <VideoControls
         showControls={showControls}
         hasNativePlayer={hasNativePlayer}
-        // Progress Bar
         currentTime={currentTime}
         duration={duration}
         bufferedPercentage={bufferedPercentage}
         onSeek={handleSeek}
         videoRef={videoRef}
         onDragStateChange={setIsDraggingProgress}
-        // Play/Pause
         isPlaying={isPlaying}
         onPlayPause={handlePlayPause}
-        // Skip
         onSkip={handleSkip}
-        // Volume
         volume={volume}
         isMuted={isMuted}
         onVolumeChange={handleVolumeChange}
         onToggleMute={toggleMute}
-        // Next Episode
         episode={episode}
         totalEpisodes={totalEpisodes}
         onNextEpisode={handleNextEpisode}
-        // Audio
         audioOptions={audioOptions}
         audioType={audioType}
         currentAudioLabel={currentAudioLabel}
         showAudioMenu={showAudioMenu}
         onToggleAudioMenu={toggleAudioMenu}
         onAudioChange={handleAudioChange}
-        // Speed
         playbackRate={playbackRate}
         showSpeedMenu={showSpeedMenu}
         onToggleSpeedMenu={toggleSpeedMenu}
         onSpeedChange={handleSpeedChange}
-        // Quality
         quality={quality}
         qualityOptions={qualityOptions}
         showQualityMenu={showQualityMenu}
@@ -1312,12 +1045,9 @@ const VideoPlayer = ({
         onQualityChange={handleQualityChange}
         isPremium={isPremium}
         isQualityPremium={isQualityPremium}
-        // Fullscreen
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
-        // Picture in Picture
         onPictureInPicture={handlePictureInPicture}
-        // Mobile More Menu
         showMoreMenu={showMoreMenu}
         onToggleMoreMenu={() => setShowMoreMenu(!showMoreMenu)}
         setShowMoreMenu={setShowMoreMenu}
