@@ -90,7 +90,7 @@ const SectionRow = ({
       try {
         if (isMounted) {
           setLoading(true);
-        }
+        } 
         let response;
         // Fetch more movies to ensure we have enough after filtering
         // Increase limit if we have multiple filters

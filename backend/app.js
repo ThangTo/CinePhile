@@ -254,9 +254,39 @@ app.get('/health', (req, res) => {
 });
 
 async function fetchText(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Lỗi tải URL: ${url}`);
-  return await response.text();
+  try {
+    // 1. Cấu hình Headers để "cải trang" thành trình duyệt Chrome
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
+      'Connection': 'keep-alive',
+      // // QUAN TRỌNG: Referer và Origin giúp đánh lừa server là bạn đang xem từ trang web của họ
+      // // Nếu biết chính xác nguồn phim (VD: kkphim), hãy điền domain của họ vào đây
+      // 'Referer': 'https://kkphim.com/', 
+      // 'Origin': 'https://kkphim.com/'
+    };
+
+    // 2. Thực hiện request
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: headers,
+      redirect: 'follow' // Tự động đi theo nếu có chuyển hướng
+    });
+
+    // 3. Kiểm tra lỗi kỹ hơn
+    if (!response.ok) {
+      // Log ra console server để bạn dễ debug
+      console.error(`[Proxy Error] URL: ${url} | Status: ${response.status} ${response.statusText}`);
+      throw new Error(`Lỗi tải URL: ${url} (HTTP ${response.status})`);
+    }
+
+    return await response.text();
+
+  } catch (error) {
+    // Ném lỗi ra ngoài để hàm gọi nó xử lý tiếp
+    throw error;
+  }
 }
 
 app.get('/api/v1/proxy-m3u8', async (req, res) => {
