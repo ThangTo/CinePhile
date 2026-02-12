@@ -18,6 +18,7 @@ const authService = require('./services/auth.service');
 const { getGoogleCallbackUrl } = require('./utils/authUtils');
 const { optionalAuth } = require('./middleware/auth.middleware');
 
+
 // Compression middleware - Nén responses để giảm bandwidth
 // Skip compression for SSE (Server-Sent Events) endpoints
 app.use(
@@ -253,38 +254,52 @@ app.get('/health', (req, res) => {
   });
 });
 
-async function fetchText(url) {
+async function fetchText(targetUrl) {
   try {
-    // 1. Cấu hình Headers để "cải trang" thành trình duyệt Chrome
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': '*/*',
-      'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
-      'Connection': 'keep-alive',
-      // // QUAN TRỌNG: Referer và Origin giúp đánh lừa server là bạn đang xem từ trang web của họ
-      // // Nếu biết chính xác nguồn phim (VD: kkphim), hãy điền domain của họ vào đây
-      // 'Referer': 'https://kkphim.com/', 
-      // 'Origin': 'https://kkphim.com/'
-    };
+    const { gotScraping } = await import('got-scraping');
+    // 1. Phân tích URL để lấy domain gốc (Origin)
+    // Ví dụ targetUrl = "https://s6.kkphim.com/abc/index.m3u8"
+    // -> urlObj.origin = "https://s6.kkphim.com"
+    const urlObj = new URL(targetUrl);
+    const dynamicOrigin = urlObj.origin;
 
-    // 2. Thực hiện request
-    const response = await fetch(url, {
+    // 2. Cấu hình request giả lập Chrome
+    const response = await gotScraping({
+      url: targetUrl,
       method: 'GET',
-      headers: headers,
-      redirect: 'follow' // Tự động đi theo nếu có chuyển hướng
+      headerGeneratorOptions: {
+        browsers: [{ name: 'chrome', minVersion: 110 }],
+        devices: ['desktop'],
+        operatingSystems: ['windows'],
+      },
+      headers: {
+        'Referer': dynamicOrigin + '/', 
+        'Origin': dynamicOrigin,
+        // Các header phụ trợ
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'cross-site',
+      },
+      // Tự động xử lý HTTP/2 và TLS Fingerprint (Cực quan trọng để fix lỗi 404 giả)
+      http2: true,
+      
+      // Tăng timeout lên chút phòng khi server phim lag
+      timeout: { request: 10000 },
+      retry: { limit: 2 } // Thử lại 2 lần nếu lỗi mạng
     });
 
-    // 3. Kiểm tra lỗi kỹ hơn
-    if (!response.ok) {
-      // Log ra console server để bạn dễ debug
-      console.error(`[Proxy Error] URL: ${url} | Status: ${response.status} ${response.statusText}`);
-      throw new Error(`Lỗi tải URL: ${url} (HTTP ${response.status})`);
+    // 3. Xử lý kết quả
+    if (response.statusCode !== 200) {
+       console.error(`[Proxy Error] URL: ${targetUrl} | Status: ${response.statusCode}`);
+       throw new Error(`Lỗi tải URL: ${targetUrl} (HTTP ${response.statusCode})`);
     }
 
-    return await response.text();
+    return response.body;
 
   } catch (error) {
-    // Ném lỗi ra ngoài để hàm gọi nó xử lý tiếp
+    console.error(`[Fetch Error] ${error.message}`);
     throw error;
   }
 }
