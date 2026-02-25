@@ -3,6 +3,7 @@ import { useTheme } from "contexts/ThemeContext";
 import Header from "components/general/Header";
 import SiteFooter from "components/general/SiteFooter";
 import Chatbot from "components/general/Chatbot";
+import GuestNotification from "components/general/GuestNotification";
 import ThemeDecorations from "components/common/ThemeDecorations";
 
 const MainLayout = () => {
@@ -28,6 +29,7 @@ const MainLayout = () => {
       </main>
       <SiteFooter />
       <Chatbot />
+      <GuestNotification />
     </div>
   );
 };

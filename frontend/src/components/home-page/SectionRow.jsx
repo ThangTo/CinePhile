@@ -184,7 +184,7 @@ const SectionRow = ({
       <div className="lg:hidden pl-4">
         <ScrollContainer gap="gap-2" showArrows={false}>
           {displayMovies.map((movie) => (
-            <div key={movie.id} className="flex-shrink-0 w-[140px] sm:w-[160px]">
+            <div key={movie.id} className="flex-shrink-0 w-[150px] sm:w-[160px]">
               <MovieCard movie={movie} />
             </div>
           ))}
