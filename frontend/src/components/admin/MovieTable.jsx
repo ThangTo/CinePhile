@@ -20,6 +20,7 @@ import {
   FiCalendar,
   FiDownload,
   FiRefreshCw,
+  FiAward,
 } from "react-icons/fi";
 
 const MovieTable = () => {
@@ -27,6 +28,7 @@ const MovieTable = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({});
   const [showHiddenOnly, setShowHiddenOnly] = useState(false);
+  const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCrawlModalOpen, setIsCrawlModalOpen] = useState(false);
   const [isUpdateEpisodesModalOpen, setIsUpdateEpisodesModalOpen] = useState(false);
@@ -63,6 +65,7 @@ const MovieTable = () => {
         ...(filterParams.ratingMin && { ratingMin: filterParams.ratingMin }),
         ...(filterParams.ratingMax && { ratingMax: filterParams.ratingMax }),
         ...(showHiddenOnly && { isHidden: true }),
+        ...(showFeaturedOnly && { isFeatured: true }),
       };
 
       const response = await movieAPI.getAll(params);
@@ -96,7 +99,7 @@ const MovieTable = () => {
       loadMovies(1, searchTerm, filters);
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, filters, showHiddenOnly]);
+  }, [searchTerm, filters, showHiddenOnly, showFeaturedOnly]);
 
   const handleDelete = async (id) => {
     setIsDeleteModalOpen(false);
@@ -139,10 +142,24 @@ const MovieTable = () => {
       setMovies((prev) =>
         prev.map((m) => (m.id === movie.id ? { ...m, isHidden: result.isHidden } : m))
       );
-      // Show success message (optional - you can add toast notification here)
       console.log(result.message);
     } catch (err) {
       setError("Không thể thay đổi trạng thái ẩn: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleFeatured = async (movie) => {
+    setIsLoading(true);
+    try {
+      const result = await movieAPI.toggleFeatured(movie.id);
+      setMovies((prev) =>
+        prev.map((m) => (m.id === movie.id ? { ...m, isFeatured: result.isFeatured } : m))
+      );
+      console.log(result.message);
+    } catch (err) {
+      setError("Không thể thay đổi trạng thái banner: " + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -226,19 +243,58 @@ const MovieTable = () => {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* Hidden Movies Filter Toggle */}
-          <button
-            onClick={() => setShowHiddenOnly(!showHiddenOnly)}
-            className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap ${
-              showHiddenOnly
-                ? "bg-yellow-500 hover:bg-yellow-600 text-black shadow-yellow-500/20"
-                : "bg-bgColor3 hover:text-primaryColor text-gray-400 border border-white/10"
-            }`}
-            title={showHiddenOnly ? "Hiện tất cả phim" : "Chỉ xem phim đã ẩn"}
-          >
-            {showHiddenOnly ? <FiEye size={18} /> : <FiEyeOff size={18} />}
-            <span className="hidden sm:inline">{showHiddenOnly ? "Đang ẩn" : "Đã ẩn"}</span>
-          </button>
+          {/* Filter Dropdown - Đã ẩn / Banner */}
+          <div className="relative group">
+            <button
+              className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all whitespace-nowrap ${
+                showHiddenOnly || showFeaturedOnly
+                  ? "bg-primaryColor text-black shadow-primaryColor/20"
+                  : "bg-bgColor3 hover:text-primaryColor text-gray-400 border border-white/10"
+              }`}
+            >
+              <FiEye size={18} />
+              <span className="hidden sm:inline">
+                {showFeaturedOnly ? "Banner" : showHiddenOnly ? "Đã ẩn" : "Bộ lọc"}
+              </span>
+              <i className="fa-solid fa-caret-down text-xs" />
+            </button>
+            <div className="absolute right-0 mt-2 w-52 bg-bgColor3 border border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+              <button
+                onClick={() => {
+                  setShowHiddenOnly(!showHiddenOnly);
+                  if (!showHiddenOnly) setShowFeaturedOnly(false);
+                }}
+                className={`w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 rounded-t-xl ${
+                  showHiddenOnly
+                    ? "text-yellow-400 font-semibold"
+                    : "text-gray-300 hover:text-yellow-400"
+                }`}
+              >
+                {showHiddenOnly ? <FiEye size={16} /> : <FiEyeOff size={16} />}
+                <span>Phim đã ẩn</span>
+                {showHiddenOnly && (
+                  <span className="ml-auto text-xs bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full">ON</span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowFeaturedOnly(!showFeaturedOnly);
+                  if (!showFeaturedOnly) setShowHiddenOnly(false);
+                }}
+                className={`w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 rounded-b-xl ${
+                  showFeaturedOnly
+                    ? "text-amber-400 font-semibold"
+                    : "text-gray-300 hover:text-amber-400"
+                }`}
+              >
+                <FiAward size={16} />
+                <span>Phim trên Banner</span>
+                {showFeaturedOnly && (
+                  <span className="ml-auto text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full">ON</span>
+                )}
+              </button>
+            </div>
+          </div>
 
           {/* Bulk Hide/Unhide Actions */}
           <div className="relative group">
@@ -366,6 +422,11 @@ const MovieTable = () => {
                             <span className="text-white font-bold text-base line-clamp-1 flex-1 group-hover:text-primaryColor transition-colors">
                               {movie.title}
                             </span>
+                            {movie.isFeatured && (
+                              <span className="flex-shrink-0 px-2 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-400 rounded-full border border-amber-500/30 whitespace-nowrap">
+                                ⭐ Banner
+                              </span>
+                            )}
                             {movie.isHidden && (
                               <span className="flex-shrink-0 px-2 py-0.5 text-xs font-semibold bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30 whitespace-nowrap">
                                 Đã ẩn
@@ -411,6 +472,17 @@ const MovieTable = () => {
                             title="Chỉnh sửa"
                           >
                             <FiEdit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleToggleFeatured(movie)}
+                            className={`p-2 rounded-lg transition-all ${
+                              movie.isFeatured
+                                ? "text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                                : "text-gray-500 hover:bg-gray-500/10 hover:text-gray-300"
+                            }`}
+                            title={movie.isFeatured ? "Gỡ khỏi banner" : "Đưa lên banner"}
+                          >
+                            <FiAward size={18} />
                           </button>
                           <button
                             onClick={() => handleToggleHidden(movie)}

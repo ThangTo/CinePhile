@@ -592,6 +592,7 @@ const getById = async (identifier, options = {}) => {
 
 /**
  * Get trending movies by view count
+ * Featured movies (isFeatured: true) are prioritized first, then sorted by viewCount
  * Cached for 10 minutes
  * Automatically fetches logos for movies without them (if they have TMDB ID)
  */
@@ -607,7 +608,27 @@ const getTrending = async (limit = 10) => {
   }
 
   // Cache miss - fetch from DB
-  const data = await Movie.find().sort({ viewCount: -1 }).limit(limit).lean();
+  // Step 1: Get featured movies first (admin-pinned to banner)
+  const featuredMovies = await Movie.find({ isFeatured: true, isHidden: { $ne: true } })
+    .sort({ viewCount: -1 })
+    .limit(limit)
+    .lean();
+
+  // Step 2: Fill remaining slots with non-featured movies sorted by viewCount
+  const remaining = limit - featuredMovies.length;
+  let regularMovies = [];
+  if (remaining > 0) {
+    const featuredIds = featuredMovies.map((m) => m._id);
+    regularMovies = await Movie.find({
+      _id: { $nin: featuredIds },
+      isHidden: { $ne: true },
+    })
+      .sort({ viewCount: -1 })
+      .limit(remaining)
+      .lean();
+  }
+
+  const data = [...featuredMovies, ...regularMovies];
 
   // Auto-fetch logos for movies without them (if they have TMDB ID)
   const tmdbService = require('../integrations/tmdb.service');

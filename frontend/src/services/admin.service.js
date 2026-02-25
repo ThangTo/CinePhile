@@ -91,6 +91,19 @@ export const movieAPI = {
   },
 
   /**
+   * Toggle movie featured status (pin/unpin to banner)
+   * @param {string|number} id - Movie ID
+   * @returns {Promise<Object>} { success: true, isFeatured: boolean, message: string }
+   */
+  toggleFeatured: async (id) => {
+    const response = await apiRequest(`/admin/movies/${id}/toggle-featured`, {
+      method: "PATCH",
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
    * Hide all movies
    * @returns {Promise<Object>} { success: true, count: number, message: string }
    */

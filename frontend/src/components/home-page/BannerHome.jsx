@@ -68,9 +68,9 @@ const BannerHome = ({ movie }) => {
       const fetchBannerMovies = async () => {
         try {
           setLoading(true);
-          const response = await movieService.getTrending(5);
+          const response = await movieService.getTrending(6);
           const list = response?.data || [];
-          const moviesData = Array.isArray(list) ? list.slice(0, 5) : [];
+          const moviesData = Array.isArray(list) ? list.slice(0, 6) : [];
 
           if (moviesData.length === 0) {
             setMovies([]);

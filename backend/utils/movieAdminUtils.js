@@ -124,6 +124,7 @@ const transformMovieData = (movieData, isUpdate = false) => {
     comments: 'commentCount',
     ageRating: 'age_rating',
     isNew: 'isNewRelease',
+    isFeatured: 'isFeatured',
   };
 
   // Apply field mappings

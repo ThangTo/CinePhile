@@ -38,6 +38,7 @@ const getAllMovies = async (req, res) => {
       ratingMin,
       ratingMax,
       isHidden,
+      isFeatured,
     } = req.query;
 
     // Parse array params (genres, countries)
@@ -60,6 +61,7 @@ const getAllMovies = async (req, res) => {
       ratingMin,
       ratingMax,
       isHidden,
+      isFeatured,
     });
     res.json(result);
   } catch (error) {
@@ -168,6 +170,20 @@ const toggleMovieHidden = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await adminService.toggleMovieHidden(id);
+    res.json(result);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
+};
+
+/**
+ * PATCH /admin/movies/:id/toggle-featured
+ * Toggle movie featured status (pin/unpin to banner)
+ */
+const toggleMovieFeatured = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await adminService.toggleMovieFeatured(id);
     res.json(result);
   } catch (error) {
     res.status(404).json({ message: error.message });
@@ -645,6 +661,7 @@ module.exports = {
   updateMovie,
   deleteMovie,
   toggleMovieHidden,
+  toggleMovieFeatured,
   hideAllMovies,
   unhideAllMovies,
   searchMovies,

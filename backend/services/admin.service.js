@@ -104,6 +104,11 @@ const buildAdminQuery = (filters = {}) => {
     query.isHidden = isHidden === 'true' || isHidden === true;
   }
 
+  // Filter by featured status (banner)
+  if (filters.isFeatured !== undefined && filters.isFeatured !== null) {
+    query.isFeatured = filters.isFeatured === 'true' || filters.isFeatured === true;
+  }
+
   return query;
 };
 
@@ -158,6 +163,7 @@ const getAllMovies = async ({
   ratingMin,
   ratingMax,
   isHidden,
+  isFeatured,
 }) => {
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 20;
@@ -178,6 +184,7 @@ const getAllMovies = async ({
     ratingMin,
     ratingMax,
     isHidden,
+    isFeatured,
   });
 
   // Gọi Database
@@ -397,6 +404,33 @@ const toggleMovieHidden = async (id) => {
     success: true,
     isHidden: movie.isHidden,
     message: movie.isHidden ? 'Đã ẩn phim' : 'Đã hiện phim',
+  };
+};
+
+/**
+ * Toggle movie featured status (pin/unpin to banner)
+ * @param {string|number} id - Movie ID
+ * @returns {Promise<Object>} Updated movie with new isFeatured status
+ */
+const toggleMovieFeatured = async (id) => {
+  const movie = await MovieModel.findById(id);
+  if (!movie) {
+    throw new Error('Phim không tồn tại');
+  }
+
+  // Toggle isFeatured status
+  movie.isFeatured = !movie.isFeatured;
+  await movie.save();
+
+  // Invalidate movie cache after status change
+  invalidateMovieCache().catch((err) => {
+    console.error('Error invalidating cache:', err);
+  });
+
+  return {
+    success: true,
+    isFeatured: movie.isFeatured,
+    message: movie.isFeatured ? 'Đã đưa phim lên banner' : 'Đã gỡ phim khỏi banner',
   };
 };
 
@@ -1224,6 +1258,7 @@ module.exports = {
   updateMovie,
   deleteMovie,
   toggleMovieHidden,
+  toggleMovieFeatured,
   hideAllMovies,
   unhideAllMovies,
   searchMovies,

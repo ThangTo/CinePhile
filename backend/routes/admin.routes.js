@@ -64,6 +64,9 @@ router.delete('/movies/:id', adminController.deleteMovie);
 // PATCH /api/v1/admin/movies/:id/toggle-hidden - Toggle movie hidden status
 router.patch('/movies/:id/toggle-hidden', adminController.toggleMovieHidden);
 
+// PATCH /api/v1/admin/movies/:id/toggle-featured - Toggle movie featured/banner status
+router.patch('/movies/:id/toggle-featured', adminController.toggleMovieFeatured);
+
 // POST /api/v1/admin/movies/hide-all - Hide all movies
 router.post('/movies/hide-all', adminController.hideAllMovies);
 

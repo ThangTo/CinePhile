@@ -14,7 +14,8 @@ import {
   FiMonitor,
   FiCalendar,
   FiCheck,
-  FiLink, // Thêm icon Link và Check
+  FiLink,
+  FiEye,
 } from "react-icons/fi";
 
 // --- UI COMPONENTS ---
@@ -112,6 +113,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     poster: "",
     backgroundImage: "",
     trailer: "",
+    views: 0,
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -134,6 +136,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         poster: movie.poster || movie.poster_url || "",
         backgroundImage: movie.backgroundImage || movie.thumb_url || "",
         trailer: movie.trailer || movie.trailerUrl || movie.trailer_url || "",
+        views: movie.views ?? movie.viewCount ?? 0,
       });
     } else {
       setFormData({
@@ -150,6 +153,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         poster: "",
         backgroundImage: "",
         trailer: "",
+        views: 0,
       });
     }
     setErrors({});
@@ -205,6 +209,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         poster: formData.poster || "",
         backgroundImage: formData.backgroundImage || "",
         trailer: formData.trailer || "",
+        views: parseInt(formData.views) || 0,
       };
       await onSave(movieData);
       onClose();
@@ -331,6 +336,15 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                       value={formData.rating}
                       onChange={handleChange}
                       error={errors.rating}
+                    />
+                    <FormField
+                      label="Lượt xem"
+                      name="views"
+                      type="number"
+                      icon={FiEye}
+                      value={formData.views}
+                      onChange={handleChange}
+                      placeholder="0"
                     />
                   </div>
 

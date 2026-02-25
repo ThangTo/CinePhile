@@ -42,6 +42,7 @@ const transformMovie = (movieDoc) => {
     // Other
     age_rating: 'ageRating',
     isNewRelease: 'isNew',
+    isFeatured: 'isFeatured',
   };
 
   // Apply transformations - add frontend fields while keeping original fields

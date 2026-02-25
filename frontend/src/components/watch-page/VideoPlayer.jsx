@@ -953,6 +953,7 @@ const VideoPlayer = ({
     <div
       ref={containerRef}
       className="relative w-full bg-black rounded-lg aspect-[16/9] max-w-full touch-none"
+      style={{ cursor: isFullscreen && !showControls ? 'none' : 'default' }}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
         if (isPlaying) setShowControls(false);
@@ -968,7 +969,7 @@ const VideoPlayer = ({
       {hasNativePlayer ? (
         <video
           ref={videoRef}
-          className="w-full h-full cursor-pointer rounded-lg"
+          className="w-full h-full rounded-lg"
           src={!hlsSource ? fileSource : undefined}
           onClick={handleVideoClick}
           playsInline
@@ -978,6 +979,7 @@ const VideoPlayer = ({
             width: "100%",
             height: "100%",
             objectFit: "contain",
+            cursor: isFullscreen && !showControls ? 'none' : 'pointer',
             filter: blurAmount > 0 ? `blur(${blurAmount}px)` : "none",
             transition: "filter 0.3s ease-in-out",
             WebkitTouchCallout: "none",

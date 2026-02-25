@@ -93,6 +93,7 @@ const movieSchema = new mongoose.Schema(
 
     isNewRelease: { type: Boolean, default: false },
     isHidden: { type: Boolean, default: false, index: true }, // Admin có thể ẩn phim
+    isFeatured: { type: Boolean, default: false, index: true }, // Admin đưa phim lên banner
   },
   {
     timestamps: true,
