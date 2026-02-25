@@ -13,9 +13,9 @@ const { runPageRange } = require('./crawler.service');
  * Runs every Sunday at 2:00 AM
  */
 const scheduleEpisodeUpdates = () => {
-  // Cron expression: "0 20 * * 5" = 20:00 (8 PM) vào Thứ 6 hàng tuần
+  // Cron expression: "0 20 * * *" = 20:00 (8 PM) hàng ngày
   cron.schedule(
-    '0 20 * * 5',
+    '0 20 * * *',
     async () => {
       console.log('🔄 [CRON] Starting automatic episode update for ongoing movies...');
 
@@ -65,9 +65,9 @@ const scheduleEpisodeUpdates = () => {
  * Runs every 2 days at 3:00 AM (Vietnam Time)
  */
 const scheduleMovieCrawling = () => {
-  // Cron expression: "0 3 */2 * *" = 3:00 AM vào mỗi 2 ngày
+  // Cron expression: "0 3 * * *" = 3:00 hàng ngày
   cron.schedule(
-    '0 3 */2 * *',
+    '0 3 * * *',
     async () => {
       console.log('🔄 [CRON] Starting automatic movie crawling...');
 

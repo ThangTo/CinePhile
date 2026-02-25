@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { USER_MENU_ITEMS, MOBILE_MENU_ITEM_CLASS } from "./constants";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
+import { handleAvatarError } from "utils/avatarUtils";
 
 const UserInfoCard = ({ user }) => {
   const isPremium = isPremiumActive(user);
@@ -10,9 +11,10 @@ const UserInfoCard = ({ user }) => {
     <div className="bg-gradient-to-br from-[#4a5a7f] to-[#3b4d6f] rounded-xl p-4 mb-4">
       <div className="flex items-center gap-3 mb-3">
         <img
-          src={user.avatar || "https://i.pravatar.cc/150?img=68"}
+          src={user.avatar}
           alt={user.username}
           className="w-12 h-12 rounded-full object-cover border-2 border-white/30"
+          onError={handleAvatarError}
         />
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">

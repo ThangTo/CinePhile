@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import useToast from "hooks/useToast";
 import ToastContainer from "components/common/ToastContainer";
 import { cardStyles, buttonStyles } from "./shared-styles";
+import { handleAvatarError } from "utils/avatarUtils";
 
 const MAX_AVATAR_SIZE_MB = 5;
 
@@ -63,9 +64,10 @@ const ProfileCard = ({ user, onUpdate }) => {
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-6 text-center md:text-left">
           <div className="text-center">
             <img
-              src={user.avatar || "https://i.pravatar.cc/150?img=68"}
+              src={user.avatar}
               alt="Ảnh đại diện"
               className="w-[100px] h-[100px] rounded-full border-[3px] border-account-border mb-3 object-cover"
+              onError={handleAvatarError}
             />
             <div className="flex gap-2.5 justify-center">
               <button

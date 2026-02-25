@@ -1,5 +1,6 @@
 import React from "react";
 import useAuth from "hooks/useAuth";
+import { handleAvatarError } from "utils/avatarUtils";
 
 const CommentInput = ({
   commentText,
@@ -35,9 +36,10 @@ const CommentInput = ({
         {isAuthenticated && user && (
           <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/10">
             <img
-              src={user.avatar || "https://i.pravatar.cc/150?img=68"}
+              src={user.avatar}
               alt={user.username || "User"}
               className="w-10 h-10 rounded-full ring-2 ring-white/20"
+              onError={handleAvatarError}
             />
             <div className="flex-1">
               <div className="flex items-center gap-2">

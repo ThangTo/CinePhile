@@ -30,13 +30,17 @@ http.interceptors.request.use((config) => {
       if (token) {
         // Validate token format
         if (typeof token !== "string" || token.length < 10) {
-          throw new Error("Token không hợp lệ");
+          // Fix 3: Token không hợp lệ → xóa và dùng cookies thay thế
+          authStorage.setToken(null);
+          return config;
         }
 
         // Validate JWT format
         const tokenParts = token.split(".");
         if (tokenParts.length !== 3) {
-          throw new Error("Token không đúng format JWT");
+          // Fix 3: Token sai format → xóa và dùng cookies thay thế
+          authStorage.setToken(null);
+          return config;
         }
 
         config.headers = config.headers || {};
@@ -44,6 +48,7 @@ http.interceptors.request.use((config) => {
         const bearerToken = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
         config.headers.Authorization = bearerToken;
       }
+      // Không có token trong localStorage → request sẽ dùng cookies (withCredentials: true)
     } catch (e) {
       // Bỏ qua nếu không tìm thấy file auth-storage
     }
@@ -87,12 +92,20 @@ http.interceptors.response.use(
         await refreshPromise;
         refreshPromise = null;
 
-        // Retry the original request with credentials
-        return http({
-          ...originalRequest,
-          __isRefreshCall: false,
-          withCredentials: true,
-        });
+        // Fix 2: Xóa token cũ trong localStorage (nếu có) để tránh gửi
+        // Bearer header với token hết hạn khi retry
+        try {
+          const authStorage = require("./auth-storage");
+          authStorage.setToken(null);
+          authStorage.setRefreshToken(null);
+        } catch (e) {}
+
+        // Retry — xóa Authorization header cũ, dùng cookies mới từ refresh
+        const retryConfig = { ...originalRequest, __isRefreshCall: false, withCredentials: true };
+        if (retryConfig.headers) {
+          delete retryConfig.headers.Authorization;
+        }
+        return http(retryConfig);
       } catch (refreshError) {
         refreshPromise = null;
         // Bubble up refresh failure

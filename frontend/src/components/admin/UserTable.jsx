@@ -5,6 +5,7 @@ import { BarSpinner } from "components/common/LoadingState";
 import PaginationV2 from "components/common/PaginationV2";
 import ConfirmDialog from "components/common/ConfirmDialog";
 import { formatTimeAgo } from "utils/dateUtils";
+import { handleAvatarError } from "utils/avatarUtils";
 import { FiSearch, FiPlus, FiTrash2, FiUsers, FiMail, FiCalendar, FiUser } from "react-icons/fi";
 
 const UserTable = () => {
@@ -231,6 +232,7 @@ const UserTable = () => {
                                 src={user.avatar}
                                 alt={user.name || user.username || "User"}
                                 className="w-full h-full object-cover"
+                                onError={handleAvatarError}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-white font-semibold text-lg">

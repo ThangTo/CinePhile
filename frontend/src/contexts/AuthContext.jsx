@@ -44,20 +44,21 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
           }
         } catch (apiError) {
-          //  Chỉ clear auth nếu là 401 (Unauthorized)
-          // Giữ lại cached user nếu là lỗi mạng tạm thời
-          if (apiError?.status === 401) {
-            console.warn("⚠️ 401 Unauthorized, clearing auth data");
+          // Xác định loại lỗi:
+          // - status 401: Token hết hạn và refresh cũng thất bại
+          // - status 0 hoặc undefined: Refresh token thất bại (axios interceptor trả status 0)
+          // - Các status khác (500, 503...): Lỗi server/mạng tạm thời → giữ cached user
+          const status = apiError?.status;
+          const isAuthExpired = status === 401 || status === 0 || status === undefined;
+          const isServerError = status >= 500;
+
+          if (isAuthExpired && !isServerError) {
+            console.warn("⚠️ Auth expired (status:", status, "), clearing auth data");
             authService.clearAuthData();
             setUser(null);
           } else {
-            // Lỗi mạng tạm thời, giữ lại cached user
-            console.warn("⚠️ Network error, keeping cached user:", apiError?.message);
-            // Không clear user, giữ lại cached data
-          }
-
-          if (apiError?.status && apiError.status !== 401) {
-            console.error("Unexpected error in loadUser:", apiError);
+            // Lỗi mạng/server tạm thời, giữ lại cached user
+            console.warn("⚠️ Server/network error, keeping cached user:", apiError?.message);
           }
         }
       } catch (error) {
@@ -74,6 +75,42 @@ export const AuthProvider = ({ children }) => {
 
     loadUser();
   }, []);
+
+  // Fix 4: Kiểm tra lại auth state khi user quay lại tab/app
+  // Giải quyết trường hợp token hết hạn khi app ở background
+  useEffect(() => {
+    let isChecking = false;
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== "visible" || !user || isChecking) return;
+      isChecking = true;
+
+      try {
+        const currentUser = await authService.getCurrentUser();
+        const userData = currentUser?.data || currentUser;
+        if (userData) {
+          setUser(userData);
+          authService.setAuthData(null, userData);
+        }
+      } catch (error) {
+        // Auth đã hết hạn khi tab/app ở background
+        const status = error?.status;
+        const isAuthExpired = status === 401 || status === 0 || status === undefined;
+        const isServerError = status >= 500;
+
+        if (isAuthExpired && !isServerError) {
+          console.warn("⚠️ Auth expired while inactive, logging out");
+          authService.clearAuthData();
+          setUser(null);
+        }
+      } finally {
+        isChecking = false;
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [user]);
 
   /**
    * Open authentication modal

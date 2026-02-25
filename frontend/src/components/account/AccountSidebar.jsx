@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
+import { handleAvatarError } from "utils/avatarUtils";
 
 const DEFAULT_TAB = "profile";
 
@@ -85,9 +86,10 @@ const AccountSidebar = ({ user, onLogout }) => {
       <div className="mt-auto border-t border-account-border pt-5">
         <div className="md:flex items-center mb-4 hidden">
           <img
-            src={user.avatar || "https://i.pravatar.cc/150?img=68"}
+            src={user.avatar}
             alt={user.username}
             className="w-10 h-10 rounded-full mr-3 object-cover"
+            onError={handleAvatarError}
           />
           <div className="overflow-hidden">
             <div className="font-semibold text-account-text-primary whitespace-nowrap overflow-hidden text-ellipsis">

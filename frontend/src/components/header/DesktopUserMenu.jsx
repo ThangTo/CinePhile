@@ -4,6 +4,7 @@ import { DESKTOP_MENU_ITEMS, DESKTOP_MENU_ITEM_CLASS } from "./constants";
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationPanel from "components/notifications/NotificationPanel";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
+import { handleAvatarError } from "utils/avatarUtils";
 
 const PremiumBanner = ({ username, user }) => {
   const isPremium = isPremiumActive(user);
@@ -100,9 +101,10 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
           <img
-            src={user.avatar || "https://i.pravatar.cc/150?img=68"}
+            src={user.avatar}
             alt={user.username}
             className="w-10 h-10 rounded-full object-cover border-2 border-white/20"
+            onError={handleAvatarError}
           />
           <i
             className={`fa-solid fa-chevron-down text-gray-300 text-sm transition-transform ${
@@ -118,9 +120,10 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
             <div className="p-4 border-b border-white/10 bg-gradient-to-br from-[#2d3b52] to-[#1e293b]">
               <div className="flex items-center gap-3 mb-3">
                 <img
-                  src={user.avatar || "https://i.pravatar.cc/150?img=68"}
+                  src={user.avatar}
                   alt={user.username}
                   className="w-12 h-12 rounded-full object-cover border-2 border-cyan-400/50"
+                  onError={handleAvatarError}
                 />
                 <div>
                   <div className="text-white font-semibold">{user.username}</div>
