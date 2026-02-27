@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { BarSpinner } from "components/common/LoadingState";
 import { statsAPI } from "services/admin.service";
-import { Bar, Doughnut } from "react-chartjs-2";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
 import { Chart, registerables } from "chart.js";
 import { getOptimizedImageUrl } from "constants/imageSizes";
 import {
@@ -14,6 +14,8 @@ import {
   FiBarChart2,
   FiArrowUp,
   FiArrowDown,
+  FiGlobe,
+  FiMonitor,
 } from "react-icons/fi";
 
 Chart.register(...registerables);
@@ -61,6 +63,12 @@ const AdminOverviewTab = () => {
   const [isLoadingChart, setIsLoadingChart] = useState(true);
   const [genresChart, setGenresChart] = useState({ labels: [], data: [] });
   const [isLoadingGenresChart, setIsLoadingGenresChart] = useState(true);
+
+  // Realtime Analytics States
+  const [activeUsersHistory, setActiveUsersHistory] = useState([]);
+  const [currentActiveUsers, setCurrentActiveUsers] = useState(0);
+  const [visitsStats, setVisitsStats] = useState({ today: 0, week: 0, month: 0 });
+  const activeUsersHistoryRef = useRef([]); // To keep track inside setInterval
 
   useEffect(() => {
     const loadStats = async () => {
@@ -119,6 +127,53 @@ const AdminOverviewTab = () => {
       }
     };
     loadGenresChart();
+
+    // Fetch Visits stats on mount
+    const loadVisits = async () => {
+      try {
+        const vStats = await statsAPI.getRealtimeVisits();
+        setVisitsStats({
+          today: vStats?.today || 0,
+          week: vStats?.week || 0,
+          month: vStats?.month || 0,
+        });
+      } catch (err) {
+        console.error("Failed to load visit stats", err);
+      }
+    };
+    loadVisits();
+
+    // Poll Realtime Active Users every 5 seconds
+    const pollActiveUsers = async () => {
+      try {
+        const countData = await statsAPI.getRealtimeActiveUsers();
+        const activeCount = countData?.count ?? countData ?? 0;
+        
+        setCurrentActiveUsers(activeCount);
+        
+        const now = new Date();
+        const timeLabel = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        
+        activeUsersHistoryRef.current = [
+          ...activeUsersHistoryRef.current,
+          { time: timeLabel, users: activeCount }
+        ];
+
+        // Keep last 12 points (60 seconds worth of data)
+        if (activeUsersHistoryRef.current.length > 12) {
+          activeUsersHistoryRef.current.shift();
+        }
+        
+        setActiveUsersHistory([...activeUsersHistoryRef.current]);
+      } catch (err) {
+        console.error("Polling error", err);
+      }
+    };
+
+    pollActiveUsers(); // Initial fetch
+    const intervalId = setInterval(pollActiveUsers, 5000);
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   const barPosterPlugin = useMemo(() => {
@@ -304,6 +359,61 @@ const AdminOverviewTab = () => {
     );
   }
 
+  // Realtime line chart data
+  const realtimeLineData = {
+    labels: activeUsersHistory.map(d => d.time),
+    datasets: [
+      {
+        label: "Người dùng online",
+        data: activeUsersHistory.map(d => d.users),
+        borderColor: "#10b981", // emerald-500
+        backgroundColor: "rgba(16, 185, 129, 0.1)",
+        borderWidth: 2,
+        tension: 0.4, // smooth line
+        fill: true,
+        pointBackgroundColor: "#10b981",
+        pointBorderColor: "#fff",
+        pointHoverBackgroundColor: "#fff",
+        pointHoverBorderColor: "#10b981",
+        pointRadius: 4,
+        pointHoverRadius: 6,
+      }
+    ]
+  };
+
+  const realtimeLineOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "rgba(0,0,0,0.8)",
+        titleColor: "#fff",
+        bodyColor: "#10b981",
+        padding: 10,
+        boxPadding: 4,
+        usePointStyle: true,
+        callbacks: {
+          label: (ctx) => `${ctx.raw} online`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false, drawBorder: false },
+        ticks: { color: "#6b7280", font: { size: 10 } }
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: "rgba(255,255,255,0.05)", borderDash: [5, 5] },
+        ticks: { color: "#6b7280", font: { size: 10 }, stepSize: 1 }
+      }
+    },
+    animation: {
+      duration: 500, // Smooth transition for realtime feel
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in pb-10 w-full">
       {/* 1. Header Section */}
@@ -360,6 +470,61 @@ const AdminOverviewTab = () => {
           trend={stats.trends.newUsers}
           suffix="(7 ngày qua)"
         />
+      </div>
+
+      {/* Realtime Traffic View */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-[#ffffff05] rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="flex items-center justify-between mb-4 z-10">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
+                <FiActivity size={20} className="animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Lưu lượng truy cập (Realtime)</h3>
+                <p className="text-xs text-emerald-400 font-medium tracking-wide">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+                  {currentActiveUsers} ĐANG TRỰC TUYẾN
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="h-[250px] w-full z-10 mt-2">
+            <Line data={realtimeLineData} options={realtimeLineOptions} />
+          </div>
+        </div>
+
+        {/* Visits Summary */}
+        <div className="lg:col-span-1 flex flex-col gap-4">
+          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-5 border border-white/5 shadow-xl flex items-center gap-4">
+            <div className="p-4 bg-blue-500/10 rounded-xl text-blue-400">
+              <FiMonitor size={28} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Truy cập hôm nay</p>
+              <h4 className="text-2xl font-bold text-white">{visitsStats.today.toLocaleString()}</h4>
+            </div>
+          </div>
+          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-5 border border-white/5 shadow-xl flex items-center gap-4">
+            <div className="p-4 bg-purple-500/10 rounded-xl text-purple-400">
+              <FiGlobe size={28} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Trong tuần này</p>
+              <h4 className="text-2xl font-bold text-white">{visitsStats.week.toLocaleString()}</h4>
+            </div>
+          </div>
+          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-5 border border-white/5 shadow-xl flex items-center gap-4">
+            <div className="p-4 bg-pink-500/10 rounded-xl text-pink-400">
+              <FiBarChart2 size={28} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Trong tháng này</p>
+              <h4 className="text-2xl font-bold text-white">{visitsStats.month.toLocaleString()}</h4>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 3. Charts Section */}

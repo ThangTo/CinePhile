@@ -1,4 +1,5 @@
 const adminService = require('../services/admin.service');
+const analyticsService = require('../services/analytics.service');
 const { transformMovieData, slugify } = require('../utils/movieAdminUtils');
 const { transformMovie } = require('../utils/movieTransformer');
 
@@ -353,7 +354,30 @@ const getChartData = async (req, res) => {
     const chartData = await adminService.getChartData(type);
     res.json(chartData);
   } catch (error) {
+    console.error(`Error in getChartData (${req.params.type}):`, error);
     res.status(500).json({ message: error.message });
+  }
+};
+
+// GET /admin/analytics/realtime
+const getRealtimeActiveUsers = async (req, res) => {
+  try {
+    const count = await analyticsService.getRealtimeActiveUsers();
+    res.status(200).json({ success: true, count });
+  } catch (error) {
+    console.error('Error fetching realtime active users:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /admin/analytics/visits
+const getRealtimeVisits = async (req, res) => {
+  try {
+    const data = await analyticsService.getVisitsStats();
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error('Error fetching realtime visits:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -665,15 +689,10 @@ module.exports = {
   hideAllMovies,
   unhideAllMovies,
   searchMovies,
-  // Crawl
-  crawlMoviesByPage,
-  searchMoviesForCrawl,
-  searchMoviesByGenre,
-  crawlMovieBySlug,
-  // Episodes
   getUpdatingMovies,
   updateEpisodesForMovies,
   updateQualityForMovies,
+
   // Users
   getAllUsers,
   getUserById,
@@ -681,9 +700,19 @@ module.exports = {
   updateUser,
   deleteUser,
   toggleUserStatus,
+
   // Stats
   getStats,
   getChartData,
+  getRealtimeActiveUsers,
+  getRealtimeVisits,
+
+  // Crawl
+  crawlMoviesByPage,
+  searchMoviesForCrawl,
+  searchMoviesByGenre,
+  crawlMovieBySlug,
+
   // Settings
   getTheme,
   setTheme,

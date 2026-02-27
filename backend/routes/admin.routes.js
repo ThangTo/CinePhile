@@ -99,6 +99,12 @@ router.get('/stats', adminController.getStats);
 // GET /api/v1/admin/stats/charts/:type - Get chart data
 router.get('/stats/charts/:type', adminController.getChartData);
 
+// GET /api/v1/admin/analytics/realtime - Get realtime active users
+router.get('/analytics/realtime', adminController.getRealtimeActiveUsers);
+
+// GET /api/v1/admin/analytics/visits - Get today/week/month visits
+router.get('/analytics/visits', adminController.getRealtimeVisits);
+
 // ===== ADMIN SETTINGS =====
 // GET /api/v1/admin/settings/theme - Get current theme
 router.get('/settings/theme', adminController.getTheme);

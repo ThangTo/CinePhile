@@ -838,6 +838,28 @@ export const statsAPI = {
     });
     return response;
   },
+
+  /**
+   * Get real-time active users count
+   * @returns {Promise<Object>} Active users count
+   */
+  getRealtimeActiveUsers: async () => {
+    const response = await apiRequest("/admin/analytics/realtime", {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Get total visit stats
+   * @returns {Promise<Object>} Visits object {today, week, month}
+   */
+  getRealtimeVisits: async () => {
+    const response = await apiRequest("/admin/analytics/visits", {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };
 
 /**

@@ -17,6 +17,7 @@ const cookieParser = require('cookie-parser');
 const authService = require('./services/auth.service');
 const { getGoogleCallbackUrl } = require('./utils/authUtils');
 const { optionalAuth } = require('./middleware/auth.middleware');
+const { trackingMiddleware } = require('./middleware/analytics.middleware');
 
 // Compression middleware - Nén responses để giảm bandwidth
 app.use(
@@ -69,6 +70,9 @@ app.use(cookieParser());
 
 // Optional auth middleware
 app.use(optionalAuth);
+
+// Analytics tracking middleware (should run AFTER optionalAuth to identify user)
+app.use(trackingMiddleware);
 
 // Rate limiting
 const createRateLimiter = (windowMs, max, message) => {

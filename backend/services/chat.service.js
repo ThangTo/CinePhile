@@ -201,12 +201,36 @@ async function callOpenRouter({ userQuery, dbContext, history = [], model = null
   const models = model
     ? [model]
     : [
-        'openai/gpt-4o-mini', // Fast and cheap
-        'anthropic/claude-3.5-sonnet', // High quality
-        'google/gemini-2.0-flash-exp', // Fast
-        'meta-llama/llama-3.1-70b-instruct', // Open source
-        'mistralai/mistral-large', // Good balance
-        'openai/gpt-3.5-turbo', // Fallback
+      'qwen/qwen3-4b:free',
+      'qwen/qwen3-next-80b-a3b-instruct:free',
+      'qwen/qwen3-coder:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'meta-llama/llama-3.2-3b-instruct:free',
+      'openai/gpt-oss-120b:free',
+      'openai/gpt-oss-20b:free',
+      'google/gemma-3-4b-it:free',
+      'google/gemma-3-12b-it:free',
+      'google/gemma-3-27b-it:free',
+      'google/gemma-3n-e2b-it:free',
+      'google/gemma-3n-e4b-it:free',
+      'stepfun/step-3.5-flash:free',
+      'arcee-ai/trinity-large-preview:free',
+      'liquid/lfm-2.5-1.2b-thinking:free',
+      'liquid/lfm-2.5-1.2b-instruct:free',
+      'arcee-ai/trinity-mini:free',
+      'nvidia/nemotron-3-nano-30b-a3b:free',
+      'nvidia/nemotron-nano-12b-v2-vl:free',
+      'nvidia/nemotron-nano-9b-v2:free',
+      'z-ai/glm-4.5-air:free',
+      'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+      'mistralai/mistral-small-3.1-24b-instruct:free',
+      'nousresearch/hermes-3-llama-3.1-405b:free',
+      // 'openai/gpt-4o-mini', // Fast and cheap
+      // 'anthropic/claude-3.5-sonnet', // High quality
+      'google/gemini-2.0-flash-exp', // Fast
+      'meta-llama/llama-3.1-70b-instruct', // Open source
+      'mistralai/mistral-large', // Good balance
+      // 'openai/gpt-3.5-turbo', // Fallback
       ];
 
   const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
@@ -237,7 +261,7 @@ async function callOpenRouter({ userQuery, dbContext, history = [], model = null
           'Content-Type': 'application/json',
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           'HTTP-Referer': process.env.CLIENT_URL || 'https://cinephile.app',
-          'X-Title': 'CinePhile Chatbot',
+          'X-Title': 'CinePhine Chatbot',
         },
         body: JSON.stringify({
           model: modelName,
