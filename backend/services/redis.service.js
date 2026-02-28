@@ -10,7 +10,7 @@ class RedisService {
     this.client = null;
     this.isConnected = false;
     this.connectionAttempts = 0;
-    this.maxConnectionAttempts = 3;
+    this.maxConnectionAttempts = 5; // Increased from 3 to 5 for production cloud environments
   }
 
   /**
@@ -40,11 +40,13 @@ class RedisService {
               this.isConnected = false;
               return new Error('Too many retries');
             }
-            const delay = Math.min(retries * 100, 3000);
-            console.log(`🔄 Redis: Reconnecting in ${delay}ms (attempt ${retries})`);
+            // Exponential backoff with jitter: 500ms, 1000ms, 2000ms...
+            const delay = Math.min(retries * 500 + Math.random() * 100, 5000);
+            console.log(`🔄 Redis: Reconnecting in ${Math.round(delay)}ms (attempt ${retries})`);
             return delay;
           },
-          connectTimeout: 5000,
+          connectTimeout: 10000, // Increased to 10 seconds for Upstash
+          keepAlive: 5000,       // Helps keep the connection open
         },
       });
 
