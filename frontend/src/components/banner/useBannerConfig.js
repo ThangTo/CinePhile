@@ -115,15 +115,15 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
   const actionButtons = useMemo(
     () => [
       {
-        icon: movieData.isHidden ? "fa-film" : "fa-play",
+        icon: movieData.isHidden || !movieData.currentEpisode || movieData.currentEpisode === 0 ? "fa-film" : "fa-play",
         variant: "primary",
         size: "lg",
         onClick: () => {
           // Always navigate to watch page, even for hidden movies
           navigate(`/watch/${movieData.id}?ep=1`);
         },
-        ariaLabel: movieData.isHidden ? "Watch trailer" : "Play movie",
-        label: movieData.isHidden ? "Xem Trailer" : "Xem Ngay",
+        ariaLabel: movieData.isHidden || !movieData.currentEpisode || movieData.currentEpisode === 0 ? "Watch trailer" : "Play movie",
+        label: movieData.isHidden || !movieData.currentEpisode || movieData.currentEpisode === 0 ? "Xem Trailer" : "Xem Ngay",
       },
       {
         icon: isFavorite ? "fa-heart" : "fa-heart",
@@ -144,6 +144,7 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
     [
       movieData.id,
       movieData.isHidden,
+      movieData.currentEpisode,
       movieData.trailer_url,
       navigate,
       isAuthenticated,

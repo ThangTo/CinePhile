@@ -190,6 +190,13 @@ const BannerHome = ({ movie }) => {
         backgroundImage={
           randomBackgrounds[currentMovie.id] || currentMovie.backgroundImage || currentMovie.poster
         }
+        fallbackSrcs={[
+          currentMovie.backgroundImage,
+          currentMovie.poster,
+          ...(currentMovie.images?.backdrops || []),
+          currentMovie.thumb_url,
+          currentMovie.poster_url,
+        ]}
         title={currentMovie.title}
       />
 
@@ -215,6 +222,7 @@ const BannerHome = ({ movie }) => {
               >
                 <OptimizedImage
                   src={m.poster}
+                  fallbackSrcs={[m.backgroundImage, m.thumb_url, m.poster_url]}
                   alt={m.title}
                   className="w-14 h-20 lg:w-16 lg:h-24 object-cover"
                   priority={index === 0}

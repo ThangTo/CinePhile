@@ -19,15 +19,19 @@ const HoverCardActions = ({
   onInfo,
   isFavorite = false,
   isHidden = false,
-}) => (
+  currentEpisode = 1 // default safely
+}) => {
+  const isTrailerOnly = isHidden || !currentEpisode || currentEpisode === 0;
+
+  return (
   <div className="flex gap-2">
     {/* Watch Now Button - Custom gradient style */}
     <button
       onClick={onWatch}
       className="flex-1 flex items-center justify-center gap-2 bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-semibold rounded-lg py-2.5 px-4 text-sm transition-all shadow-lg"
     >
-      <i className={`fa-solid ${isHidden ? "fa-film" : "fa-play"} text-sm`} />
-      <span className="text-sm">{isHidden ? "Xem Trailer" : "Xem ngay"}</span>
+      <i className={`fa-solid ${isTrailerOnly ? "fa-film" : "fa-play"} text-sm`} />
+      <span className="text-sm">{isTrailerOnly ? "Xem Trailer" : "Xem ngay"}</span>
     </button>
 
     {/* Like Button - Reuse ActionButton */}
@@ -67,5 +71,6 @@ const HoverCardActions = ({
     </div>
   </div>
 );
+};
 
 export default HoverCardActions;

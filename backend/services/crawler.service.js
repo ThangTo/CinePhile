@@ -63,6 +63,30 @@ async function upsertTaxonomies(categories = [], countries = []) {
 }
 
 /**
+ * Chuẩn hóa trạng thái phim từ API ngoại sang chuẩn DB (upcoming, ongoing, completed)
+ * @param {string} rawStatus - Trạng thái gốc từ API
+ * @returns {string} Trạng thái chuẩn
+ */
+const normalizeStatus = (rawStatus = '') => {
+  const status = rawStatus.toLowerCase().trim();
+  
+  if (status.includes('trailer') || status.includes('sắp chiếu')) {
+    return 'upcoming';
+  }
+  
+  if (
+    status.includes('completed') || 
+    status.includes('hoàn tất') || 
+    status.includes('full')
+  ) {
+    return 'completed';
+  }
+  
+  // Mặc định hoặc "ongoing", "đang chiếu"
+  return 'ongoing';
+};
+
+/**
  * Hàm chính: Crawl phim từ trang phim mới cập nhật
  * @param {number} page - Trang cần crawl (mặc định trang 1)
  * @param {Function} onProgress - Callback để gửi log real-time (optional)
@@ -137,6 +161,18 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
         const ageGroups = ['T12', 'T14', 'T16', '18+'];
         const randomAge = ageGroups[Math.floor(Math.random() * ageGroups.length)];
 
+        // --- KIỂM TRA M3U8 CÓ KHẢ DỤNG KHÔNG ---
+        let hasValidEpisodes = false;
+        if (episodesData && episodesData.length > 0) {
+          for (const server of episodesData) {
+            const serverData = server.server_data || [];
+            if (serverData.some((ep) => ep.link_m3u8)) {
+              hasValidEpisodes = true;
+              break;
+            }
+          }
+        }
+
         // C. Mapping dữ liệu (Có dùng he.decode và thêm age_rating)
         const moviePayload = {
           // Dùng he.decode để sửa lỗi font chữ (vd: &amp; -> &)
@@ -146,7 +182,7 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
           content: he.decode(movieData.content || ''),
 
           type: movieData.type,
-          status: movieData.status,
+          status: hasValidEpisodes ? normalizeStatus(movieData.status) : 'upcoming',
           thumb_url: movieData.thumb_url,
           poster_url: movieData.poster_url,
           trailer_url: movieData.trailer_url,
@@ -156,8 +192,8 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
           quality: movieData.quality,
 
           // Các field thống kê tập phim
-          currentEpisode: movieData.episode_current,
-          totalEpisodes: movieData.episode_total,
+          currentEpisode: hasValidEpisodes ? movieData.episode_current : "0",
+          totalEpisodes: hasValidEpisodes ? movieData.episode_total : 0,
 
           // Mảng dữ liệu phụ
           categories: categories,
@@ -721,6 +757,18 @@ const crawlMovieBySlug = async (slug) => {
     const ageGroups = ['T12', 'T14', 'T16', '18+'];
     const randomAge = ageGroups[Math.floor(Math.random() * ageGroups.length)];
 
+    // KIỂM TRA M3U8 CÓ KHẢ DỤNG KHÔNG
+    let hasValidEpisodes = false;
+    if (episodesData && episodesData.length > 0) {
+      for (const server of episodesData) {
+        const serverData = server.server_data || [];
+        if (serverData.some((ep) => ep.link_m3u8)) {
+          hasValidEpisodes = true;
+          break;
+        }
+      }
+    }
+
     // Mapping dữ liệu
     const moviePayload = {
       name: he.decode(movieData.name || ''),
@@ -728,7 +776,7 @@ const crawlMovieBySlug = async (slug) => {
       original_name: he.decode(movieData.origin_name || ''),
       content: he.decode(movieData.content || ''),
       type: movieData.type,
-      status: movieData.status,
+      status: hasValidEpisodes ? normalizeStatus(movieData.status) : 'upcoming',
       thumb_url: movieData.thumb_url,
       poster_url: movieData.poster_url,
       trailer_url: movieData.trailer_url,
@@ -736,8 +784,8 @@ const crawlMovieBySlug = async (slug) => {
       year: movieData.year,
       lang: movieData.lang,
       quality: movieData.quality,
-      currentEpisode: movieData.episode_current,
-      totalEpisodes: movieData.episode_total,
+      currentEpisode: hasValidEpisodes ? movieData.episode_current : "0",
+      totalEpisodes: hasValidEpisodes ? movieData.episode_total : 0,
       categories: categories,
       country: countries,
       actor: actors,

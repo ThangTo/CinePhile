@@ -9,6 +9,7 @@ import OptimizedImage from "components/common/OptimizedImage";
  */
 const BannerBackground = ({
   backgroundImage,
+  fallbackSrcs = [],
   title,
   classNameOverlay = "from-bgColor via-bgColor/10 to-transparent",
   overlayTop = false,
@@ -20,6 +21,7 @@ const BannerBackground = ({
     <div className={`relative inset-0 z-0 ${className}`}>
       <OptimizedImage
         src={backgroundImage}
+        fallbackSrcs={fallbackSrcs}
         alt={title}
         className="h-full w-full object-cover object-right aspect-[16/9]"
         priority={true}

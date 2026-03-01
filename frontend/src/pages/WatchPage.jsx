@@ -124,8 +124,10 @@ const WatchPage = () => {
 
   // Find episode by episode number (not id)
   // Backend returns: { id: ObjectId, episode: episodeId (number), ... }
-  // For hidden movies, create a fake episode with trailer
-  const currentEpisode = movie.isHidden
+  // For hidden movies or movies lacking playable episodes, create a fake episode with trailer
+  const isTrailerOnly = movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0;
+  
+  const currentEpisode = isTrailerOnly
     ? {
         episode: 1,
         episodeId: 1,
@@ -185,8 +187,8 @@ const WatchPage = () => {
               <MovieInfoBrief movie={movie} activeEp={activeEp} />
             </div>
 
-            {/* Episodes Section - Hidden for hidden movies */}
-            {!movie.isHidden && (
+            {/* Episodes Section - Hidden for hidden/trailer-only movies */}
+            {!isTrailerOnly && (
               <EpisodesSection
                 movie={{ ...movie, episodes: filteredEpisodes }}
                 activeEpisode={activeEp}

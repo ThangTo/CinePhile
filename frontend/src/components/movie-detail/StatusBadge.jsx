@@ -18,8 +18,8 @@ const StatusBadge = ({
   if (isHidden) {
     badgeContent = "Sắp ra mắt";
     badgeClass = "bg-purple-500/80 text-white";
-  } else if (status === "upcoming") {
-    badgeContent = "Sắp ra mắt";
+  } else if (status === "upcoming" || (status === "ongoing" && (!currentEpisode || currentEpisode === 0))) {
+    badgeContent = "Sắp chiếu";
     badgeClass = "bg-purple-500/80 text-white";
   } else if (status === "completed" || (currentEpisode > 0 && currentEpisode === totalEpisodes)) {
     badgeContent =
@@ -32,7 +32,7 @@ const StatusBadge = ({
       currentEpisode > 1 ? `Đang cập nhật ${currentEpisode}/${totalEpisodes} tập` : `Đang cập nhật`;
     badgeClass = "bg-orange-500/80 text-white";
   } else if (status === "ongoing" && totalEpisodes > 0) {
-    // Fallback cho ongoing nhưng chưa có currentEpisode
+    // Fallback cho ongoing
     badgeContent =
       currentEpisode > 1
         ? `Đang cập nhật ${currentEpisode || 0}/${totalEpisodes} tập`
@@ -46,7 +46,7 @@ const StatusBadge = ({
     <div
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg ${badgeClass} ${className}`}
     >
-      {isHidden || status === "upcoming" ? (
+      {isHidden || status === "upcoming" || (status === "ongoing" && (!currentEpisode || currentEpisode === 0)) ? (
         <i className="fa-solid fa-clock" />
       ) : status === "completed" || (currentEpisode > 0 && currentEpisode === totalEpisodes) ? (
         <i className="fa-solid fa-check" />

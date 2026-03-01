@@ -140,13 +140,13 @@ const ActionButtons = ({ movie, audioType }) => {
               );
             }}
             className={`${
-              movie.isHidden
+              movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0
                 ? "bg-yellow-600 hover:bg-yellow-700"
                 : "bg-primaryColor hover:bg-hoverPrimaryColor"
             } text-primaryColorButtonText px-8 py-3 rounded-full font-semibold flex items-center gap-2 transition-all shadow-lg`}
           >
-            <i className={`fa-solid ${movie.isHidden ? "fa-film" : "fa-play"} text-lg`} />
-            {movie.isHidden ? "Xem Trailer" : "Xem Ngay"}
+            <i className={`fa-solid ${movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0 ? "fa-film" : "fa-play"} text-lg`} />
+            {movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0 ? "Xem Trailer" : "Xem Ngay"}
           </button>
 
           {/* Action Buttons */}

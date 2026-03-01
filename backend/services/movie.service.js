@@ -469,6 +469,32 @@ const createAudioTypeFilterPipeline = (baseQuery, audioTypes) => {
 };
 
 /**
+ * Helper: Validate and attach episode information to movies
+ * Sets currentEpisode to 0 and status to 'upcoming' if no valid m3u8 exists
+ */
+const attachEpisodeValidation = async (docs) => {
+  if (!docs || docs.length === 0) return docs;
+  
+  const movieIds = docs.map((d) => d._id);
+  
+  const validMovies = await Episode.aggregate([
+    { $match: { movieId: { $in: movieIds }, link_m3u8: { $ne: '', $exists: true } } },
+    { $group: { _id: '$movieId' } }
+  ]);
+  
+  const validMovieIdsScope = new Set(validMovies.map((idObj) => idObj._id.toString()));
+  
+  return docs.map((doc) => {
+    if (!validMovieIdsScope.has(doc._id.toString())) {
+      doc.status = 'upcoming';
+      doc.currentEpisode = 0;
+      doc.totalEpisodes = 0;
+    }
+    return doc;
+  });
+};
+
+/**
  * Helper: paginate a query builder
  */
 const paginate = async (builder, { page = 1, limit = 12, sort } = {}) => {
@@ -483,6 +509,7 @@ const paginate = async (builder, { page = 1, limit = 12, sort } = {}) => {
       .skip(skip)
       .limit(perPage)
       .lean()
+      .then(attachEpisodeValidation)
       .then((docs) => transformMovies(docs)),
     Movie.countDocuments(builder.getFilter()),
   ]);
@@ -544,10 +571,11 @@ const getAll = async (filters = {}, pagination = {}) => {
 
     const [result] = await Movie.aggregate(pipeline);
     const movies = result?.data || [];
+    const validMovies = await attachEpisodeValidation(movies);
     const total = result?.total[0]?.count || 0;
 
     return {
-      data: transformMovies(movies),
+      data: transformMovies(validMovies),
       pagination: {
         page: currentPage,
         limit: perPage,
@@ -571,12 +599,13 @@ const getAll = async (filters = {}, pagination = {}) => {
 const getById = async (identifier, options = {}) => {
   const { isAdmin = false } = options;
 
-  const movieDoc = await findMovie(identifier);
-  if (!movieDoc) {
+  const movieDocRaw = await findMovie(identifier);
+  if (!movieDocRaw) {
     throw new Error('Movie not found');
   }
 
-  const movie = transformMovie(movieDoc);
+  const validatedDocs = await attachEpisodeValidation([movieDocRaw]);
+  const movie = transformMovie(validatedDocs[0]);
 
   // If movie is hidden and requester is not admin, return empty episodes
   if (movie.isHidden && !isAdmin) {
@@ -585,7 +614,7 @@ const getById = async (identifier, options = {}) => {
   }
 
   // Normal flow: fetch and return episodes
-  const episodes = await Episode.find({ movieId: movieDoc._id }).sort({ episodeId: 1 }).lean();
+  const episodes = await Episode.find({ movieId: movie.id }).sort({ episodeId: 1 }).lean();
   movie.episodes = episodes.map(mapEpisode);
   return movie;
 };
@@ -629,10 +658,11 @@ const getTrending = async (limit = 10) => {
   }
 
   const data = [...featuredMovies, ...regularMovies];
+  const validatedData = await attachEpisodeValidation(data);
 
   // Auto-fetch logos for movies without them (if they have TMDB ID)
   const tmdbService = require('../integrations/tmdb.service');
-  const logoFetchPromises = data.map(async (movie) => {
+  const logoFetchPromises = validatedData.map(async (movie) => {
     // Skip if movie already has logo or doesn't have TMDB ID
     if (movie.images?.logo || !movie.tmdb?.id) {
       return;
@@ -660,7 +690,7 @@ const getTrending = async (limit = 10) => {
   await Promise.allSettled(logoFetchPromises);
 
   const result = {
-    data: transformMovies(data),
+    data: transformMovies(validatedData),
   };
 
   // Cache for 10 minutes
@@ -688,8 +718,9 @@ const getTopRated = async (limit = 10) => {
 
   // Cache miss - fetch from DB
   const data = await Movie.find().sort({ rating: -1, totalRatings: -1 }).limit(limit).lean();
+  const validatedData = await attachEpisodeValidation(data);
   const result = {
-    data: transformMovies(data),
+    data: transformMovies(validatedData),
   };
 
   // Cache for 10 minutes
@@ -717,8 +748,9 @@ const getNewReleases = async (limit = 10) => {
 
   // Cache miss - fetch from DB
   const data = await Movie.find().sort({ createdAt: -1 }).limit(limit).lean();
+  const validatedData = await attachEpisodeValidation(data);
   const result = {
-    data: transformMovies(data),
+    data: transformMovies(validatedData),
   };
 
   // Cache for 5 minutes
@@ -1832,8 +1864,8 @@ const getRecommendations = async (movieId, limit = 10) => {
     // 6. Chạy Atlas Search
     const relatedMovies = await Movie.aggregate(pipeline);
 
-    // 7. Transform dữ liệu
-    let recommendedMovies = transformMovies(relatedMovies);
+    // 7. Transform dữ liệu (with episode validation)
+    let recommendedMovies = transformMovies(await attachEpisodeValidation(relatedMovies));
 
     // 8. Nếu không đủ kết quả, bổ sung bằng fallback logic
     if (recommendedMovies.length < limit) {
@@ -1909,7 +1941,7 @@ const getRecommendationsFallback = async (
             excluded.push(movie._id);
           }
         });
-        recommendedMovies = transformMovies(sameGenreMovies);
+        recommendedMovies = transformMovies(await attachEpisodeValidation(sameGenreMovies));
       }
     }
   }
@@ -1930,7 +1962,7 @@ const getRecommendationsFallback = async (
           excluded.push(movie._id);
         }
       });
-      const transformed = transformMovies(trendingMovies);
+      const transformed = transformMovies(await attachEpisodeValidation(trendingMovies));
       const additional = transformed.slice(0, needed);
       recommendedMovies = [...recommendedMovies, ...additional];
     }
@@ -1947,7 +1979,7 @@ const getRecommendationsFallback = async (
       .lean();
 
     if (topRatedMovies && topRatedMovies.length > 0) {
-      const transformed = transformMovies(topRatedMovies);
+      const transformed = transformMovies(await attachEpisodeValidation(topRatedMovies));
       const additional = transformed.slice(0, needed);
       recommendedMovies = [...recommendedMovies, ...additional];
     }
@@ -1964,7 +1996,7 @@ const getRecommendationsFallback = async (
       .lean();
 
     if (newestMovies && newestMovies.length > 0) {
-      const transformed = transformMovies(newestMovies);
+      const transformed = transformMovies(await attachEpisodeValidation(newestMovies));
       const additional = transformed.slice(0, needed);
       recommendedMovies = [...recommendedMovies, ...additional];
     }
@@ -2261,7 +2293,7 @@ const getForYou = async (userId, limit = 20) => {
     }
 
     // 8. Transform và trả về
-    let result = transformMovies(diverseMovies);
+    let result = transformMovies(await attachEpisodeValidation(diverseMovies));
 
     // 9. Nếu không đủ kết quả, bổ sung bằng trending/top rated (loại trừ đã xem gần đây)
     if (result.length < limit) {

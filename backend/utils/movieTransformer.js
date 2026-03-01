@@ -125,11 +125,18 @@ const transformMovie = (movieDoc) => {
 
   // Transform currentEpisode: parse và normalize thành number
   // Xử lý các format như "Hoàn tất (3/3)", "Tập 10", "10", etc.
-  if (transformed.currentEpisode !== undefined) {
+  if (transformed.episode_current !== undefined) {
+    transformed.currentEpisode = parseEpisodeNumber(transformed.episode_current);
+    delete transformed.episode_current;
+  } else if (transformed.currentEpisode !== undefined) {
     transformed.currentEpisode = parseEpisodeNumber(transformed.currentEpisode);
   }
-  if (transformed.episode_current !== undefined) {
-    transformed.episode_current = parseEpisodeNumber(transformed.episode_current);
+
+  if (transformed.episode_total !== undefined) {
+    transformed.totalEpisodes = parseEpisodeNumber(transformed.episode_total);
+    delete transformed.episode_total;
+  } else if (transformed.totalEpisodes !== undefined) {
+    transformed.totalEpisodes = parseEpisodeNumber(transformed.totalEpisodes);
   }
 
   // castIds sẽ được populate ở backend khi cần (trong getCast function)
@@ -173,7 +180,16 @@ const transformPaginatedResult = (result) => {
 const parseEpisodeNumber = (ep) => {
   if (ep === undefined || ep === null || ep === '') return 0;
   if (typeof ep === 'number') return ep;
+
   if (typeof ep === 'string') {
+    const lowerEp = ep.toLowerCase();
+    if (lowerEp.includes('trailer') || lowerEp.includes('sắp chiếu')) return 0;
+    
+    // Nếu là phim hoàn tất/full
+    if (lowerEp.includes('full') || lowerEp.includes('hoàn tất') || lowerEp === 'hoan tat' || lowerEp === 'vietsub' || lowerEp === 'thuyết minh' || lowerEp === 'hd') {
+      return 'Full';
+    }
+
     // Xử lý format "Hoàn tất (3/3)" hoặc "Đang cập nhật (5/10)" - lấy số đầu tiên trong ngoặc
     // Pattern: (X/Y) hoặc (X/Y) - lấy X (số tập hiện tại)
     const bracketMatch = ep.match(/\((\d+)\/(\d+)\)/);
@@ -185,7 +201,12 @@ const parseEpisodeNumber = (ep) => {
     // Fallback: lấy tất cả số từ chuỗi (cho các format khác như "Tập 10", "10", etc.)
     const numStr = ep.replace(/\D/g, '');
     const num = parseInt(numStr, 10);
-    return isNaN(num) ? 1 : num;
+    
+    // Nếu không có số nào, giữ lại chuỗi gốc nếu nó không trống
+    if (isNaN(num)) {
+       return ep.trim() !== '' ? ep : 0;
+    }
+    return num; 
   }
   return 0;
 };

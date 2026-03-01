@@ -15,6 +15,7 @@ import { getOptimizedImageUrl } from "constants/imageSizes";
  */
 const OptimizedImage = ({
   src,
+  fallbackSrcs = [],
   alt = "",
   className = "",
   placeholder = null,
@@ -31,21 +32,30 @@ const OptimizedImage = ({
   // Check if section is visible (from LazySection context)
   const sectionVisible = useSectionVisible();
 
+  const allSrcs = useMemo(() => [src, ...(fallbackSrcs || [])].filter(Boolean), [src, fallbackSrcs]);
+  const [currentSrcIndex, setCurrentSrcIndex] = useState(0);
+  const activeSrc = allSrcs[currentSrcIndex] || null;
+
+  // Reset index when root src changes
+  useEffect(() => {
+    setCurrentSrcIndex(0);
+  }, [src]);
+
   // Generate optimized URL once using useMemo
   // Priority: sizeKey > size/quality (backward compatible)
   const optimizedUrl = useMemo(() => {
-    if (!src) return null;
+    if (!activeSrc) return null;
 
     if (sizeKey) {
       // Use standardized size from constants
-      return getOptimizedImageUrl(src, sizeKey);
+      return getOptimizedImageUrl(activeSrc, sizeKey);
     } else {
       // Use custom size/quality (backward compatible)
       const finalSize = size || 400;
       const finalQuality = quality || 100;
-      return `https://images.weserv.nl/?url=${src}&w=${finalSize}&q=${finalQuality}&output=webp`;
+      return `https://images.weserv.nl/?url=${activeSrc}&w=${finalSize}&q=${finalQuality}&output=webp`;
     }
-  }, [src, sizeKey, size, quality]);
+  }, [activeSrc, sizeKey, size, quality]);
 
   // If lazy is false or priority is true, or section is visible, load immediately
   const shouldLoadImmediately = !lazy || priority || sectionVisible;
@@ -131,8 +141,12 @@ const OptimizedImage = ({
       if (onLoad) onLoad();
     };
     img.onerror = () => {
-      setHasError(true);
-      if (onError) onError();
+      if (currentSrcIndex < allSrcs.length - 1) {
+        setCurrentSrcIndex((prev) => prev + 1);
+      } else {
+        setHasError(true);
+        if (onError) onError();
+      }
     };
     img.src = imageSrc;
   }, [imageSrc, onLoad, onError, priority]);
@@ -182,6 +196,9 @@ const OptimizedImage = ({
     testImg.onerror = () => {
       // Image failed to load, don't mark as loaded
       isHandled = true;
+      if (currentSrcIndex < allSrcs.length - 1) {
+        setCurrentSrcIndex((prev) => prev + 1);
+      }
     };
 
     testImg.src = imageSrc;
@@ -257,6 +274,10 @@ const OptimizedImage = ({
             }
           }}
           onError={() => {
+            if (currentSrcIndex < allSrcs.length - 1) {
+              setCurrentSrcIndex((prev) => prev + 1);
+              return;
+            }
             setHasError(true);
             // Mark as failed to avoid retrying
             if (imageSrc) {

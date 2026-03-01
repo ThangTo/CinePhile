@@ -162,6 +162,7 @@ const LandscapeCard = ({ movie, onClick }) => {
       <div className="relative">
         <OptimizedImage
           src={movie.backgroundImage || movie.poster}
+          fallbackSrcs={[movie.poster, movie.thumb_url, movie.poster_url]}
           alt={movie.title}
           className="w-full aspect-video object-cover transition-transform duration-500 group-hover:scale-105"
           sizeKey="DETAIL"
@@ -178,13 +179,19 @@ const LandscapeCard = ({ movie, onClick }) => {
         </div>
 
         {/* Episode badge */}
-        {movie.totalEpisodes > 1 && movie.currentEpisode && (
+        {movie.totalEpisodes === 1 && (movie.currentEpisode === 1 || movie.currentEpisode === "1" || movie.currentEpisode === "Full") ? (
+          <div className="absolute top-2 right-2">
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-orange-500 text-white rounded shadow-sm">
+              Full
+            </span>
+          </div>
+        ) : movie.totalEpisodes > 1 && movie.currentEpisode ? (
           <div className="absolute top-2 right-2">
             <span className="px-1.5 py-0.5 text-[10px] font-bold bg-orange-500 text-white rounded shadow-sm">
               Tập {movie.currentEpisode}/{movie.totalEpisodes}
             </span>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Info overlay at bottom */}

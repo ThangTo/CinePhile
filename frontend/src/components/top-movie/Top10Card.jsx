@@ -26,7 +26,12 @@ const Top10Card = ({ movie, rank }) => {
       className="relative flex-shrink-0 w-[50%] sm:w-[30%] md:w-[20%] lg:w-[16.5%] min-w-[100px] select-none cursor-pointer"
       onClick={handleClick}
     >
-      <ClippedPoster src={movie.poster} alt={movie.title} isOdd={isOdd} />
+      <ClippedPoster 
+        src={movie.poster} 
+        fallbackSrcs={[movie.backgroundImage, movie.thumb_url, movie.poster_url]} 
+        alt={movie.title} 
+        isOdd={isOdd} 
+      />
 
       {/* Movie Info */}
       <div className="flex items-start gap-2 mt-1">
@@ -61,11 +66,15 @@ const Top10Card = ({ movie, rank }) => {
                 {movie.quality}
               </span>
             )}
-            {movie.totalEpisodes > 1 && movie.currentEpisode && (
+            {movie.totalEpisodes === 1 && (movie.currentEpisode === 1 || movie.currentEpisode === "1" || movie.currentEpisode === "Full") ? (
+              <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded text-[10px] font-semibold">
+                Full
+              </span>
+            ) : movie.totalEpisodes > 1 && movie.currentEpisode ? (
               <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded text-[10px] font-semibold">
                 Tập {movie.currentEpisode}
               </span>
-            )}
+            ) : null}
             {movie.ageRating && (
               <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded text-[10px] font-semibold">
                 {movie.ageRating}

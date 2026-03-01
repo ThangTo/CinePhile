@@ -9,6 +9,7 @@ import ToastContainer from "components/common/ToastContainer";
 import RatingModal from "components/watch-page/RatingModal";
 import userService from "services/user.service";
 import favoritesCache from "utils/favoritesCache";
+import OptimizedImage from "components/common/OptimizedImage";
 
 /**
  * Mobile Movie Hero Component - Hero section for mobile movie detail page
@@ -74,10 +75,10 @@ const MobileMovieBanner = ({ movie, audioType }) => {
   } = useMovieRating(movie);
 
   const handleWatch = () => {
-    if (movie.isHidden) {
-      // If movie is hidden, open trailer
-      if (movie.trailer_url) {
-        window.open(movie.trailer_url, "_blank");
+    if (movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0) {
+      // If movie is hidden or has no episodes, open trailer
+      if (movie.trailer_url || movie.trailer) {
+        window.open(movie.trailer_url || movie.trailer, "_blank");
       } else {
         warning("Trailer chưa có sẵn");
       }
@@ -150,9 +151,10 @@ const MobileMovieBanner = ({ movie, audioType }) => {
       {/* Background Image */}
       <BannerBackground
         backgroundImage={movie.bgImage || movie.backgroundImage || movie.poster}
+        fallbackSrcs={[movie.backgroundImage, movie.thumb_url, movie.poster_url, movie.poster]}
         title={movie.title}
         classNameOverlay="from-bgColor via-bgColor/50 to-transparent"
-        overlTop={true}
+        overlayTop={true}
         className="sm:relative"
       />
 
@@ -161,7 +163,14 @@ const MobileMovieBanner = ({ movie, audioType }) => {
         {/* Poster with Rating Badge */}
         <div className="relative w-48 mb-6">
           <div className="aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/10">
-            <img src={movie.poster} alt={movie.title} className="w-full h-full object-cover" />
+            <OptimizedImage 
+              src={movie.poster} 
+              fallbackSrcs={[movie.backgroundImage, movie.thumb_url, movie.poster_url]} 
+              alt={movie.title} 
+              className="w-full h-full object-cover" 
+              priority={true}
+              sizeKey="DETAIL"
+            />
           </div>
 
           {/* Rating Badge - Top Right of Poster */}
@@ -269,13 +278,13 @@ const MobileMovieBanner = ({ movie, audioType }) => {
         <button
           onClick={handleWatch}
           className={`w-[85%] max-w-xs ${
-            movie.isHidden
+            movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0
               ? "bg-yellow-600 hover:bg-yellow-700"
               : "bg-primaryColor hover:bg-hoverPrimaryColor"
           } text-primaryColorButtonText font-bold py-4 rounded-full flex items-center justify-center gap-3 shadow-lg transition-all hover:scale-105 mb-6`}
         >
-          <i className={`fa-solid ${movie.isHidden ? "fa-film" : "fa-play"} text-lg`} />
-          <span className="text-lg">{movie.isHidden ? "Xem Trailer" : "Xem Ngay"}</span>
+          <i className={`fa-solid ${movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0 ? "fa-film" : "fa-play"} text-lg`} />
+          <span className="text-lg">{movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0 ? "Xem Trailer" : "Xem Ngay"}</span>
         </button>
 
         {/* Action Buttons */}

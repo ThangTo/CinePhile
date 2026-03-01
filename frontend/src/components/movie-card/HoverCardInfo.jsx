@@ -33,9 +33,13 @@ const HoverCardInfo = ({ rating, ageRating, year, season, currentEpisode, totalE
       )} */}
 
       {/* Episode Count */}
-      {totalEpisodes && (
+      {totalEpisodes > 0 && (
         <span className="text-gray-300 text-xs">
-          Tập {currentEpisode || 1}/{totalEpisodes}
+          {currentEpisode === 0 || currentEpisode === "0"
+            ? "Tập: Trailer"
+            : totalEpisodes === 1 && (currentEpisode === 1 || currentEpisode === "1" || currentEpisode === "Full")
+            ? "Tập: Full"
+            : `Tập ${currentEpisode}/${totalEpisodes}`}
         </span>
       )}
     </div>

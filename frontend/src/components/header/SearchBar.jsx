@@ -252,6 +252,7 @@ const SearchBar = ({ className = "", placeholder = "Tìm kiếm phim, diễn vi�
                           {movie.poster && (
                             <OptimizedImage
                               src={movie.poster}
+                              fallbackSrcs={[movie.backgroundImage, movie.thumb_url, movie.poster_url]}
                               alt={movie.title}
                               className="w-full h-full object-cover"
                               priority={true}
@@ -271,6 +272,19 @@ const SearchBar = ({ className = "", placeholder = "Tìm kiếm phim, diễn vi�
                             {movie.ageRating && (
                               <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-white/10 text-[10px] font-semibold text-amber-300">
                                 {movie.ageRating}
+                              </span>
+                            )}
+                            {(!movie.currentEpisode || movie.currentEpisode === 0 || movie.isHidden) ? (
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-white/10 text-[10px] font-semibold text-purple-400">
+                                Trailer
+                              </span>
+                            ) : movie.totalEpisodes === 1 && (movie.currentEpisode === 1 || movie.currentEpisode === "1" || movie.currentEpisode === "Full") ? (
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-white/10 text-[10px] font-semibold text-orange-400">
+                                Full
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-white/10 text-[10px] font-semibold text-orange-400">
+                                {movie.currentEpisode}/{movie.totalEpisodes || '?'} tập
                               </span>
                             )}
                             {movie.year && (

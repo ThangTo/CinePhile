@@ -130,6 +130,7 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]" }) => {
         {/* Header with backdrop and title */}
         <HoverCardHeader
           backgroundImage={movie.backgroundImage || movie.posterUrl || movie.poster}
+          fallbackSrcs={[movie.poster, movie.thumb_url, movie.poster_url]}
           title={movie.title}
           subtitle={movie.subtitle || movie.englishTitle}
           trailerUrl={movie.trailer || movie.trailerUrl || movie.trailer_url}
@@ -145,6 +146,7 @@ const MovieHoverCard = ({ movie, hoverClass = "w-[400px]" }) => {
             onInfo={handleInfo}
             isFavorite={isFavorite}
             isHidden={movie.isHidden}
+            currentEpisode={movie.currentEpisode}
           />
 
           {/* Movie Info Badges */}

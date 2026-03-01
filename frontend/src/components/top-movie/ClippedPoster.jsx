@@ -29,10 +29,11 @@ const POLY_ODD = `
  * Poster with clipped corner and gradient border
  * @param {Object} props
  * @param {string} props.src - Image source
+ * @param {Array} props.fallbackSrcs - Array of fallback image sources
  * @param {string} props.alt - Image alt text
  * @param {boolean} props.isOdd - Whether to clip left or right corner
  */
-const ClippedPoster = ({ src, alt, isOdd = false }) => {
+const ClippedPoster = ({ src, fallbackSrcs = [], alt, isOdd = false }) => {
   const gradId = useId();
 
   return (
@@ -40,6 +41,7 @@ const ClippedPoster = ({ src, alt, isOdd = false }) => {
       <div className={`shape ${isOdd ? "is-odd" : "is-even"}`}>
         <OptimizedImage
           src={src}
+          fallbackSrcs={fallbackSrcs}
           alt={alt}
           className="w-full h-full object-cover pointer-events-none select-none"
           preloadOnHover={true}
