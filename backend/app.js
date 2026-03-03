@@ -212,13 +212,33 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  // Redis live test
+  let redisStatus = 'disconnected';
+  let redisLatency = null;
+  if (redisService.isConnected && redisService.client) {
+    try {
+      const start = Date.now();
+      await redisService.client.ping();
+      redisLatency = Date.now() - start;
+      redisStatus = 'connected';
+    } catch {
+      redisStatus = 'error';
+    }
+  }
+
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     pid: process.pid,
+    redis: {
+      status: redisStatus,
+      latencyMs: redisLatency,
+      urlConfigured: !!process.env.REDIS_URL,
+      protocol: process.env.REDIS_URL ? process.env.REDIS_URL.split('://')[0] : null,
+    },
   });
 });
 
