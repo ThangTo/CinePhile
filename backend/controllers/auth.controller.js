@@ -14,7 +14,11 @@ const register = async (req, res) => {
   try {
     const result = await authService.register(req.body);
     attachAuthCookies(res, result);
-    res.status(201).json({ user: result.user });
+    res.status(201).json({
+      user: result.user,
+      accessToken: result.token,
+      refreshToken: result.refreshToken,
+    });
   } catch (error) {
     // Map error messages to Vietnamese
     let message = error.message;
@@ -46,6 +50,7 @@ const login = async (req, res) => {
     res.json({
       user: result.user,
       accessToken: result.token,
+      refreshToken: result.refreshToken,
     });
   } catch (error) {
     // Map error messages to Vietnamese
@@ -114,7 +119,11 @@ const refreshToken = async (req, res) => {
 
     const tokens = await authService.refreshToken(incomingRefreshToken);
     attachAuthCookies(res, tokens);
-    res.json({ message: 'Token refreshed' });
+    res.json({
+      message: 'Token refreshed',
+      accessToken: tokens.token,
+      refreshToken: tokens.refreshToken,
+    });
   } catch (error) {
     res.status(401).json({ message: error.message });
   }

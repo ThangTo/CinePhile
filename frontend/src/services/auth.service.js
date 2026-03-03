@@ -1,5 +1,5 @@
 import apiRequest from "./utils/apiRequest";
-import { setAuthData, clearAuthData, getCurrentUserLocal, isAuthenticated } from "lib/auth-storage";
+import { setAuthData, clearAuthData, getCurrentUserLocal, isAuthenticated, saveMobileTokens } from "lib/auth-storage";
 
 // ============================================================================
 // Authentication Service
@@ -33,6 +33,8 @@ const authService = {
       const user = data?.user || data;
       if (user) {
         setAuthData({ user });
+        // Mobile: save tokens to localStorage (desktop uses cookies only)
+        saveMobileTokens(data?.accessToken, data?.refreshToken);
       }
 
       return data;
@@ -59,6 +61,8 @@ const authService = {
       const user = data?.user || data;
       if (user) {
         setAuthData({ user });
+        // Mobile: save tokens to localStorage (desktop uses cookies only)
+        saveMobileTokens(data?.accessToken, data?.refreshToken);
       }
       return data;
     } catch (error) {
@@ -92,10 +96,13 @@ const authService = {
    * @returns {Promise<Object>} { token }
    */
   refreshToken: async () => {
-    return apiRequest("/auth/refresh-token", {
+    const data = await apiRequest("/auth/refresh-token", {
       method: "POST",
       requiresAuth: true,
     });
+    // Mobile: save new tokens to localStorage
+    saveMobileTokens(data?.accessToken, data?.refreshToken);
+    return data;
   },
 
   /**

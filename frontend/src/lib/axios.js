@@ -82,25 +82,45 @@ http.interceptors.response.use(
       try {
         // Deduplicate refresh calls
         if (!refreshPromise) {
+          // Mobile: include refreshToken from localStorage in request body
+          // (cookies may be blocked as third-party)
+          let refreshBody = {};
+          try {
+            const authStorage = require("./auth-storage");
+            if (authStorage.isMobileDevice()) {
+              const storedRefreshToken = authStorage.getRefreshToken();
+              if (storedRefreshToken) {
+                refreshBody = { refreshToken: storedRefreshToken };
+              }
+            }
+          } catch (e) {}
           refreshPromise = http.post(
             "/auth/refresh-token",
-            {},
+            refreshBody,
             { withCredentials: true, __isRefreshCall: true }
           );
         }
 
-        await refreshPromise;
+        const refreshResponse = await refreshPromise;
         refreshPromise = null;
 
-        // Fix 2: Xóa token cũ trong localStorage (nếu có) để tránh gửi
-        // Bearer header với token hết hạn khi retry
+        // Mobile: save new tokens from refresh response to localStorage
+        // Desktop: clear any stale localStorage tokens, rely solely on cookies
         try {
           const authStorage = require("./auth-storage");
-          authStorage.setToken(null);
-          authStorage.setRefreshToken(null);
+          if (authStorage.isMobileDevice()) {
+            const newAccessToken = refreshResponse?.data?.accessToken;
+            const newRefreshToken = refreshResponse?.data?.refreshToken;
+            if (newAccessToken) authStorage.setToken(newAccessToken);
+            if (newRefreshToken) authStorage.setRefreshToken(newRefreshToken);
+          } else {
+            // Desktop: clear localStorage tokens, use cookies
+            authStorage.setToken(null);
+            authStorage.setRefreshToken(null);
+          }
         } catch (e) {}
 
-        // Retry — xóa Authorization header cũ, dùng cookies mới từ refresh
+        // Retry — remove old Authorization header, use cookies or new localStorage token
         const retryConfig = { ...originalRequest, __isRefreshCall: false, withCredentials: true };
         if (retryConfig.headers) {
           delete retryConfig.headers.Authorization;

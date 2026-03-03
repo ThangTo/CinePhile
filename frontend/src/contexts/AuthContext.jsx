@@ -45,20 +45,20 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (apiError) {
           // Xác định loại lỗi:
-          // - status 401: Token hết hạn và refresh cũng thất bại
-          // - status 0 hoặc undefined: Refresh token thất bại (axios interceptor trả status 0)
-          // - Các status khác (500, 503...): Lỗi server/mạng tạm thời → giữ cached user
+          // - status 401: Token hết hạn và refresh cũng thất bại (server xác nhận)
+          // - status 0 hoặc undefined: Có thể là cookie bị chặn (mobile) hoặc mạng lỗi
+          //   → Giữ cached user để tránh logout oan trên mobile
+          // - Các status khác (500, 503...): Lỗi server tạm thời → giữ cached user
           const status = apiError?.status;
-          const isAuthExpired = status === 401 || status === 0 || status === undefined;
-          const isServerError = status >= 500;
+          const isServerConfirmedExpired = status === 401;
 
-          if (isAuthExpired && !isServerError) {
-            console.warn("⚠️ Auth expired (status:", status, "), clearing auth data");
+          if (isServerConfirmedExpired) {
+            console.warn("⚠️ Auth expired (401 from server), clearing auth data");
             authService.clearAuthData();
             setUser(null);
           } else {
-            // Lỗi mạng/server tạm thời, giữ lại cached user
-            console.warn("⚠️ Server/network error, keeping cached user:", apiError?.message);
+            // Lỗi mạng/cookie bị chặn/server tạm thời → giữ lại cached user
+            console.warn("⚠️ Non-401 error, keeping cached user (status:", status, "):", apiError?.message);
           }
         }
       } catch (error) {
@@ -95,10 +95,8 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         // Auth đã hết hạn khi tab/app ở background
         const status = error?.status;
-        const isAuthExpired = status === 401 || status === 0 || status === undefined;
-        const isServerError = status >= 500;
-
-        if (isAuthExpired && !isServerError) {
+        // Chỉ logout khi server xác nhân 401 rõ ràng
+        if (status === 401) {
           console.warn("⚠️ Auth expired while inactive, logging out");
           authService.clearAuthData();
           setUser(null);

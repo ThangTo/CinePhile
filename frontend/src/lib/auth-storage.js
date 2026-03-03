@@ -151,3 +151,48 @@ export const clearReturnLocation = () => {
     console.error("Error clearing return location:", error);
   }
 };
+
+// ============================================================================
+// Mobile Detection
+// ============================================================================
+
+/**
+ * Detect if the current device is mobile
+ * Used to conditionally store tokens in localStorage (mobile fallback for blocked cookies)
+ * @returns {boolean}
+ */
+export const isMobileDevice = () => {
+  if (typeof navigator === "undefined") return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+};
+
+/**
+ * Save auth tokens to localStorage only on mobile devices
+ * Desktop relies solely on httpOnly cookies for better security
+ * @param {string} token - Access token
+ * @param {string} refreshToken - Refresh token
+ */
+export const saveMobileTokens = (token, refreshToken) => {
+  if (!isMobileDevice()) return;
+  try {
+    if (token) setToken(token);
+    if (refreshToken) setRefreshToken(refreshToken);
+  } catch (error) {
+    console.warn("⚠️ Could not save tokens to localStorage (mobile):", error);
+  }
+};
+
+/**
+ * Clear mobile tokens from localStorage
+ */
+export const clearMobileTokens = () => {
+  if (!isMobileDevice()) return;
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+  } catch (error) {
+    // ignore
+  }
+};
