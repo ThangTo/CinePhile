@@ -76,10 +76,15 @@ app.use(trackingMiddleware);
 
 // Rate limiting
 const createRateLimiter = (windowMs, max, message) => {
+  // RedisStore works if Redis client has sendCommand — both TCP and REST clients support this
   const store =
     redisService.isConnected && redisService.client
       ? new RedisStore({
-          sendCommand: (...args) => redisService.client.sendCommand(args),
+          sendCommand: (...args) => {
+            // TCP mode: client.sendCommand(args) expects array
+            // REST mode: client.sendCommand(args) also expects array
+            return redisService.client.sendCommand(args);
+          },
         })
       : undefined;
 
@@ -259,9 +264,10 @@ app.get('/health', async (req, res) => {
     pid: process.pid,
     redis: {
       status: redisStatus,
+      mode: redisService.mode,
       latencyMs: redisLatency,
-      urlConfigured: !!process.env.REDIS_URL,
-      protocol: process.env.REDIS_URL ? process.env.REDIS_URL.split('://')[0] : null,
+      urlConfigured: !!process.env.REDIS_URL || !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
+      protocol: process.env.UPSTASH_REDIS_REST_URL ? 'https (REST)' : (process.env.REDIS_URL ? process.env.REDIS_URL.split('://')[0] : null),
       error: redisError,
     },
   });
