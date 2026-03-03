@@ -216,14 +216,38 @@ app.get('/health', async (req, res) => {
   // Redis live test
   let redisStatus = 'disconnected';
   let redisLatency = null;
+  let redisError = null;
+
   if (redisService.isConnected && redisService.client) {
     try {
       const start = Date.now();
       await redisService.client.ping();
       redisLatency = Date.now() - start;
       redisStatus = 'connected';
-    } catch {
+    } catch (err) {
       redisStatus = 'error';
+      redisError = err.message;
+    }
+  } else if (process.env.REDIS_URL) {
+    // Try fresh connection to capture exact error
+    try {
+      const redis = require('redis');
+      const testClient = redis.createClient({
+        url: process.env.REDIS_URL,
+        socket: { connectTimeout: 10000, reconnectStrategy: false },
+      });
+      const start = Date.now();
+      await testClient.connect();
+      const pong = await testClient.ping();
+      redisLatency = Date.now() - start;
+      redisStatus = 'fresh_connect_ok';
+      redisError = 'Singleton was disconnected but fresh connection works — possible startup race condition';
+      await testClient.quit();
+    } catch (err) {
+      redisStatus = 'connection_failed';
+      redisError = err.message;
+      if (err.code) redisError += ` [code: ${err.code}]`;
+      if (err.cause) redisError += ` [cause: ${err.cause.message || err.cause}]`;
     }
   }
 
@@ -238,6 +262,7 @@ app.get('/health', async (req, res) => {
       latencyMs: redisLatency,
       urlConfigured: !!process.env.REDIS_URL,
       protocol: process.env.REDIS_URL ? process.env.REDIS_URL.split('://')[0] : null,
+      error: redisError,
     },
   });
 });
