@@ -17,9 +17,34 @@ class AnalyticsService {
   }
 
   /**
-   * Get current real-time active users count
+   * Helper to count guests vs users from an array of identifiers
+   * @param {string[]} identifiers Array of identifiers (e.g. ['ip_127.0.0.1', 'user_12345'])
+   * @returns {Object} { total, guestCount, userCount }
+   */
+  _countUserTypes(identifiers) {
+    let guestCount = 0;
+    let userCount = 0;
+    
+    identifiers.forEach(id => {
+      if (id.startsWith('user_')) {
+        userCount++;
+      } else {
+        // Includes 'ip_' and any unknown format
+        guestCount++;
+      }
+    });
+
+    return {
+      total: identifiers.length,
+      guestCount,
+      userCount
+    };
+  }
+
+  /**
+   * Get current real-time active users count + breakdown
    * Also cleans up expired entries from the sorted set
-   * @returns {Promise<number>} Number of active users
+   * @returns {Promise<Object>} { total, guestCount, userCount }
    */
   async getRealtimeActiveUsers() {
     const now = Date.now();
@@ -32,28 +57,25 @@ class AnalyticsService {
           this.localActiveUsers.delete(id);
         }
       }
-      return this.localActiveUsers.size;
+      return this._countUserTypes(Array.from(this.localActiveUsers.keys()));
     }
 
     try {
-      const now = Date.now();
-      const cutoff = now - this.ACTIVE_WINDOW_MS;
-
       // 1. Remove entries older than 5 minutes
       await redisService.client.sendCommand(['ZREMRANGEBYSCORE', this.ACTIVE_USERS_KEY, '-inf', cutoff.toString()]);
       
-      // 2. Count remaining users
-      const count = await redisService.client.sendCommand(['ZCARD', this.ACTIVE_USERS_KEY]);
-      return parseInt(count, 10) || 0;
+      // 2. Fetch all remaining identifiers to break down by type
+      const activeUsers = await redisService.client.sendCommand(['ZRANGE', this.ACTIVE_USERS_KEY, '0', '-1']);
+      return this._countUserTypes(activeUsers);
     } catch (error) {
       console.error('Error in getRealtimeActiveUsers:', error);
-      return 0;
+      return { total: 0, guestCount: 0, userCount: 0 };
     }
   }
 
   /**
-   * Get total visit stats (Today, This Week, This Month)
-   * @returns {Promise<Object>} { today, week, month }
+   * Get total visit stats (Today, This Week, This Month) with breakdown
+   * @returns {Promise<Object>} { today: {total, guestCount, userCount}, week: {...}, month: {...} }
    */
   async getVisitsStats() {
     const todayDate = moment().tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD');
@@ -80,21 +102,24 @@ class AnalyticsService {
 
     const allKeysToFetch = [...new Set([todayKey, ...weekKeys, ...monthKeys])];
 
+    const emptyStats = { total: 0, guestCount: 0, userCount: 0 };
+
     if (!redisService.isConnected || !redisService.client) {
       // Memory Fallback
-      const getUniqueVisits = (key) => {
-        const set = this.localVisits.get(key);
-        return set ? set.size : 0;
+      const getUniqueVisitsBreakdown = (keys) => {
+        const combinedSet = new Set();
+        keys.forEach(key => {
+          const set = this.localVisits.get(key);
+          if (set) {
+            set.forEach(id => combinedSet.add(id));
+          }
+        });
+        return this._countUserTypes(Array.from(combinedSet));
       };
 
-      const valuesMap = {};
-      allKeysToFetch.forEach(key => {
-        valuesMap[key] = getUniqueVisits(key);
-      });
-
-      const todayVisits = valuesMap[todayKey] || 0;
-      const weekVisits = weekKeys.reduce((sum, key) => sum + (valuesMap[key] || 0), 0);
-      const monthVisits = monthKeys.reduce((sum, key) => sum + (valuesMap[key] || 0), 0);
+      const todayVisits = getUniqueVisitsBreakdown([todayKey]);
+      const weekVisits = getUniqueVisitsBreakdown(weekKeys);
+      const monthVisits = getUniqueVisitsBreakdown(monthKeys);
 
       return {
         today: todayVisits,
@@ -105,38 +130,44 @@ class AnalyticsService {
 
     try {
       if (allKeysToFetch.length === 0) {
-          return { today: 0, week: 0, month: 0 };
+          return { today: emptyStats, week: emptyStats, month: emptyStats };
       }
 
-      // Fetch SCARD (Set Cardinality) for all keys using pipelining or multiple commands
-      // Since MGET only works for STRINGS, we need to execute SCARD manually.
+      // We need to use SUNION to combine sets and get unique elements across multiple days
+      // For pipelining, we'll fetch the members directly
       const multi = redisService.client.multi();
-      allKeysToFetch.forEach(key => {
-        multi.sCard(key);
-      });
       
-      const values = await multi.exec();
+      // 1. Today's members
+      multi.sendCommand(['SMEMBERS', todayKey]);
       
-      // Map values back to their keys
-      const valuesMap = {};
-      allKeysToFetch.forEach((key, index) => {
-        valuesMap[key] = values[index] || 0;
-      });
-
-      // Sum them up
-      const todayVisits = valuesMap[todayKey] || 0;
+      // 2. This week's unique members across all days
+      if (weekKeys.length > 0) {
+        multi.sendCommand(['SUNION', ...weekKeys]);
+      } else {
+        multi.sendCommand(['SMEMBERS', 'nonexistent_key']); // Dummy command to keep array indexes aligned
+      }
       
-      const weekVisits = weekKeys.reduce((sum, key) => sum + (valuesMap[key] || 0), 0);
-      const monthVisits = monthKeys.reduce((sum, key) => sum + (valuesMap[key] || 0), 0);
+      // 3. This month's unique members across all days
+      if (monthKeys.length > 0) {
+        multi.sendCommand(['SUNION', ...monthKeys]);
+      } else {
+        multi.sendCommand(['SMEMBERS', 'nonexistent_key']);
+      }
+      
+      const results = await multi.exec();
+      
+      const todayMembers = results[0] || [];
+      const weekMembers = results[1] || [];
+      const monthMembers = results[2] || [];
 
       return {
-        today: todayVisits,
-        week: weekVisits,
-        month: monthVisits
+        today: this._countUserTypes(todayMembers),
+        week: this._countUserTypes(weekMembers),
+        month: this._countUserTypes(monthMembers)
       };
     } catch (error) {
       console.error('Error in getVisitsStats:', error);
-      return { today: 0, week: 0, month: 0 };
+      return { today: emptyStats, week: emptyStats, month: emptyStats };
     }
   }
 }

@@ -64,10 +64,12 @@ const AdminOverviewTab = () => {
   const [genresChart, setGenresChart] = useState({ labels: [], data: [] });
   const [isLoadingGenresChart, setIsLoadingGenresChart] = useState(true);
 
-  // Realtime Analytics States
-  const [activeUsersHistory, setActiveUsersHistory] = useState([]);
-  const [currentActiveUsers, setCurrentActiveUsers] = useState(0);
-  const [visitsStats, setVisitsStats] = useState({ today: 0, week: 0, month: 0 });
+  const [currentActiveUsers, setCurrentActiveUsers] = useState({ total: 0, guests: 0, users: 0 });
+  const [visitsStats, setVisitsStats] = useState({ 
+    today: { total: 0, guestCount: 0, userCount: 0 }, 
+    week: { total: 0, guestCount: 0, userCount: 0 }, 
+    month: { total: 0, guestCount: 0, userCount: 0 } 
+  });
   const activeUsersHistoryRef = useRef([]); // To keep track inside setInterval
 
   useEffect(() => {
@@ -147,16 +149,19 @@ const AdminOverviewTab = () => {
     const pollActiveUsers = async () => {
       try {
         const countData = await statsAPI.getRealtimeActiveUsers();
-        const activeCount = countData?.count ?? countData ?? 0;
+        // Handle both older format (number) and new format (object) safely
+        const total = countData?.count?.total ?? countData?.count ?? countData ?? 0;
+        const guests = countData?.count?.guestCount ?? 0;
+        const users = countData?.count?.userCount ?? 0;
         
-        setCurrentActiveUsers(activeCount);
+        setCurrentActiveUsers({ total, guests, users });
         
         const now = new Date();
         const timeLabel = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
         
         activeUsersHistoryRef.current = [
           ...activeUsersHistoryRef.current,
-          { time: timeLabel, users: activeCount }
+          { time: timeLabel, total, guests, users }
         ];
 
         // Keep last 12 points (60 seconds worth of data)
@@ -364,8 +369,8 @@ const AdminOverviewTab = () => {
     labels: activeUsersHistory.map(d => d.time),
     datasets: [
       {
-        label: "Người dùng online",
-        data: activeUsersHistory.map(d => d.users),
+        label: "Tổng online",
+        data: activeUsersHistory.map(d => d.total),
         borderColor: "#10b981", // emerald-500
         backgroundColor: "rgba(16, 185, 129, 0.1)",
         borderWidth: 2,
@@ -377,6 +382,30 @@ const AdminOverviewTab = () => {
         pointHoverBorderColor: "#10b981",
         pointRadius: 4,
         pointHoverRadius: 6,
+      },
+      {
+        label: "Thành viên",
+        data: activeUsersHistory.map(d => d.users),
+        borderColor: "#3b82f6", // blue-500
+        backgroundColor: "rgba(59, 130, 246, 0.0)",
+        borderWidth: 2,
+        borderDash: [5, 5],
+        tension: 0.4,
+        fill: false,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+      },
+      {
+        label: "Khách",
+        data: activeUsersHistory.map(d => d.guests),
+        borderColor: "#6b7280", // gray-500
+        backgroundColor: "rgba(107, 114, 128, 0.0)",
+        borderWidth: 2,
+        borderDash: [5, 5],
+        tension: 0.4,
+        fill: false,
+        pointRadius: 0,
+        pointHoverRadius: 4,
       }
     ]
   };
@@ -483,10 +512,17 @@ const AdminOverviewTab = () => {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Lưu lượng truy cập (Realtime)</h3>
-                <p className="text-xs text-emerald-400 font-medium tracking-wide">
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
-                  {currentActiveUsers} ĐANG TRỰC TUYẾN
-                </p>
+                <div className="flex items-center gap-4 mt-1">
+                  <p className="text-xs text-emerald-400 font-medium tracking-wide">
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+                    {currentActiveUsers.total || 0} ĐANG TRỰC TUYẾN
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium tracking-wide">
+                    <span className="text-blue-400">{currentActiveUsers.users || 0} Thành viên</span>
+                    <span className="mx-2">•</span>
+                    <span className="text-gray-400">{currentActiveUsers.guests || 0} Khách</span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -497,31 +533,43 @@ const AdminOverviewTab = () => {
 
         {/* Visits Summary */}
         <div className="lg:col-span-1 flex flex-col gap-4">
-          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-5 border border-white/5 shadow-xl flex items-center gap-4">
-            <div className="p-4 bg-blue-500/10 rounded-xl text-blue-400">
+          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-4 lg:p-5 border border-white/5 shadow-xl flex items-center gap-4 relative overflow-hidden">
+            <div className="p-4 bg-blue-500/10 rounded-xl text-blue-400 z-10">
               <FiMonitor size={28} />
             </div>
-            <div>
+            <div className="z-10 w-full pr-2">
               <p className="text-sm text-gray-400">Truy cập hôm nay</p>
-              <h4 className="text-2xl font-bold text-white">{visitsStats.today.toLocaleString()}</h4>
+              <h4 className="text-2xl font-bold text-white">{visitsStats.today.total?.toLocaleString() || 0}</h4>
+              <div className="flex justify-between items-center w-full mt-1 text-[11px] font-medium">
+                <span className="text-blue-400">{visitsStats.today.userCount?.toLocaleString() || 0} TV</span>
+                <span className="text-gray-500">{visitsStats.today.guestCount?.toLocaleString() || 0} Khách</span>
+              </div>
             </div>
           </div>
-          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-5 border border-white/5 shadow-xl flex items-center gap-4">
-            <div className="p-4 bg-purple-500/10 rounded-xl text-purple-400">
+          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-4 lg:p-5 border border-white/5 shadow-xl flex items-center gap-4 relative overflow-hidden">
+            <div className="p-4 bg-purple-500/10 rounded-xl text-purple-400 z-10">
               <FiGlobe size={28} />
             </div>
-            <div>
+            <div className="z-10 w-full pr-2">
               <p className="text-sm text-gray-400">Trong tuần này</p>
-              <h4 className="text-2xl font-bold text-white">{visitsStats.week.toLocaleString()}</h4>
+              <h4 className="text-2xl font-bold text-white">{visitsStats.week.total?.toLocaleString() || 0}</h4>
+              <div className="flex justify-between items-center w-full mt-1 text-[11px] font-medium">
+                <span className="text-purple-400">{visitsStats.week.userCount?.toLocaleString() || 0} TV</span>
+                <span className="text-gray-500">{visitsStats.week.guestCount?.toLocaleString() || 0} Khách</span>
+              </div>
             </div>
           </div>
-          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-5 border border-white/5 shadow-xl flex items-center gap-4">
-            <div className="p-4 bg-pink-500/10 rounded-xl text-pink-400">
+          <div className="bg-[#ffffff05] flex-1 rounded-2xl p-4 lg:p-5 border border-white/5 shadow-xl flex items-center gap-4 relative overflow-hidden">
+            <div className="p-4 bg-pink-500/10 rounded-xl text-pink-400 z-10">
               <FiBarChart2 size={28} />
             </div>
-            <div>
+            <div className="z-10 w-full pr-2">
               <p className="text-sm text-gray-400">Trong tháng này</p>
-              <h4 className="text-2xl font-bold text-white">{visitsStats.month.toLocaleString()}</h4>
+              <h4 className="text-2xl font-bold text-white">{visitsStats.month.total?.toLocaleString() || 0}</h4>
+              <div className="flex justify-between items-center w-full mt-1 text-[11px] font-medium">
+                <span className="text-pink-400">{visitsStats.month.userCount?.toLocaleString() || 0} TV</span>
+                <span className="text-gray-500">{visitsStats.month.guestCount?.toLocaleString() || 0} Khách</span>
+              </div>
             </div>
           </div>
         </div>
