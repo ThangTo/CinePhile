@@ -64,6 +64,8 @@ const AdminOverviewTab = () => {
   const [genresChart, setGenresChart] = useState({ labels: [], data: [] });
   const [isLoadingGenresChart, setIsLoadingGenresChart] = useState(true);
 
+  // Realtime Analytics States
+  const [activeUsersHistory, setActiveUsersHistory] = useState([]);
   const [currentActiveUsers, setCurrentActiveUsers] = useState({ total: 0, guests: 0, users: 0 });
   const [visitsStats, setVisitsStats] = useState({ 
     today: { total: 0, guestCount: 0, userCount: 0 }, 
