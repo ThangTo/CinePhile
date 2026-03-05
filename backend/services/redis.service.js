@@ -404,6 +404,11 @@ class UpstashPipeline {
     this._commands = [];
   }
 
+  sendCommand(args) {
+    this._commands.push(args);
+    return this;
+  }
+
   sCard(key) {
     this._commands.push(['SCARD', key]);
     return this;
