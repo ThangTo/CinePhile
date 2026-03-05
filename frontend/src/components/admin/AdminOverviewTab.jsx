@@ -135,9 +135,9 @@ const AdminOverviewTab = () => {
       try {
         const vStats = await statsAPI.getRealtimeVisits();
         setVisitsStats({
-          today: vStats?.today || 0,
-          week: vStats?.week || 0,
-          month: vStats?.month || 0,
+          today: vStats?.today || { total: 0, guestCount: 0, userCount: 0 },
+          week: vStats?.week || { total: 0, guestCount: 0, userCount: 0 },
+          month: vStats?.month || { total: 0, guestCount: 0, userCount: 0 },
         });
       } catch (err) {
         console.error("Failed to load visit stats", err);
