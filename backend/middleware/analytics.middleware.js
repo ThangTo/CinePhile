@@ -53,6 +53,49 @@ const trackingMiddleware = async (req, res, next) => {
     console.error('Error in tracking middleware:', error);
   }
 
+  // Run location tracking asynchronously so it doesn't block the request
+  (async () => {
+    try {
+      if (!redisService.isConnected || !redisService.client) return;
+
+      let identifier = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress || 'unknown';
+      if (identifier.includes(',')) {
+        identifier = identifier.split(',')[0].trim();
+      }
+      
+      let trackIdentifier = null;
+      if (req.user && req.user._id) {
+        trackIdentifier = `user_${req.user._id}`;
+      } else {
+        trackIdentifier = `ip_${identifier}`;
+      }
+
+      // GeoIP Lookup
+      const geoip = require('geoip-lite');
+      // For local testing, assign a mock IP if it's localhost
+      let lookupIp = identifier;
+      if (lookupIp === '127.0.0.1' || lookupIp === '::1' || lookupIp === '::ffff:127.0.0.1') {
+        const mockIps = ['8.8.8.8', '1.1.1.1', '208.67.222.222', '9.9.9.9']; // Mix of US/Global IPs
+        lookupIp = mockIps[Math.floor(Math.random() * mockIps.length)];
+      }
+
+      const geo = geoip.lookup(lookupIp);
+      if (geo) {
+        const locationData = {
+          lat: geo.ll[0],
+          lon: geo.ll[1],
+          city: geo.city || 'Unknown City',
+          country: geo.country || 'Unknown Country'
+        };
+        const locationKey = `analytics:location:${trackIdentifier}`;
+        await redisService.client.sendCommand(['SET', locationKey, JSON.stringify(locationData)]);
+        await redisService.client.sendCommand(['EXPIRE', locationKey, (60 * 60 * 24 * 60).toString()]); // 60 days
+      }
+    } catch (error) {
+      console.error('Error in tracking middleware geolocation:', error);
+    }
+  })();
+
   next();
 };
 

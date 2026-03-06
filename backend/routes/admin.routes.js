@@ -105,6 +105,9 @@ router.get('/analytics/realtime', adminController.getRealtimeActiveUsers);
 // GET /api/v1/admin/analytics/visits - Get today/week/month visits
 router.get('/analytics/visits', adminController.getRealtimeVisits);
 
+// GET /api/v1/admin/analytics/locations - Get map locations
+router.get('/analytics/locations', adminController.getAnalyticsLocations);
+
 // ===== ADMIN SETTINGS =====
 // GET /api/v1/admin/settings/theme - Get current theme
 router.get('/settings/theme', adminController.getTheme);

@@ -860,6 +860,19 @@ export const statsAPI = {
     });
     return response.data || response;
   },
+
+  /**
+   * Get locations of visitors
+   * @param {string} period 'realtime', 'today', 'week', 'month'
+   * @returns {Promise<Object>} Locations object {success, count, locations}
+   */
+  getAnalyticsLocations: async (period = "realtime") => {
+    const response = await apiRequest("/admin/analytics/locations", {
+      params: { period },
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };
 
 /**

@@ -3,6 +3,9 @@ import { BarSpinner } from "components/common/LoadingState";
 import { statsAPI } from "services/admin.service";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 import { Chart, registerables } from "chart.js";
+import AnalyticsMap from "./AnalyticsMap";
+
+Chart.register(...registerables);
 import { getOptimizedImageUrl } from "constants/imageSizes";
 import {
   FiActivity,
@@ -575,6 +578,11 @@ const AdminOverviewTab = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* 2.5 Map Section */}
+      <div className="w-full">
+        <AnalyticsMap />
       </div>
 
       {/* 3. Charts Section */}

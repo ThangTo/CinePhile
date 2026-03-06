@@ -170,6 +170,91 @@ class AnalyticsService {
       return { today: emptyStats, week: emptyStats, month: emptyStats };
     }
   }
+
+  /**
+   * Get locations of users for a specific period
+   * @param {string} period 'realtime', 'today', 'week', 'month'
+   * @returns {Promise<Array>} Array of location objects with counts
+   */
+  async getLocationsByPeriod(period) {
+    if (!redisService.isConnected || !redisService.client) {
+      return [];
+    }
+
+    try {
+      let identifiers = [];
+
+      if (period === 'realtime') {
+        const now = Date.now();
+        const cutoff = now - this.ACTIVE_WINDOW_MS;
+        identifiers = await redisService.client.sendCommand(['ZRANGE', this.ACTIVE_USERS_KEY, '0', '-1']);
+      } else {
+        const todayDate = moment().tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD');
+        const startOfWeek = moment().tz('Asia/Ho_Chi_Minh').startOf('isoWeek');
+        const startOfMonth = moment().tz('Asia/Ho_Chi_Minh').startOf('month');
+        const nowNode = moment().tz('Asia/Ho_Chi_Minh');
+
+        let keys = [];
+        if (period === 'today') {
+          keys.push(`analytics:visits:${todayDate}`);
+        } else if (period === 'week') {
+          let curr = startOfWeek.clone();
+          while (curr.isSameOrBefore(nowNode, 'day')) {
+            keys.push(`analytics:visits:${curr.format('YYYY-MM-DD')}`);
+            curr.add(1, 'days');
+          }
+        } else if (period === 'month') {
+          let curr = startOfMonth.clone();
+          while (curr.isSameOrBefore(nowNode, 'day')) {
+            keys.push(`analytics:visits:${curr.format('YYYY-MM-DD')}`);
+            curr.add(1, 'days');
+          }
+        }
+
+        if (keys.length === 1) {
+          identifiers = await redisService.client.sendCommand(['SMEMBERS', keys[0]]);
+        } else if (keys.length > 1) {
+          identifiers = await redisService.client.sendCommand(['SUNION', ...keys]);
+        }
+      }
+
+      if (!identifiers || identifiers.length === 0) {
+        return [];
+      }
+
+      // Fetch location data for these identifiers
+      const locationKeys = identifiers.map(id => `analytics:location:${id}`);
+      
+      const locationsData = await redisService.client.mGet(locationKeys);
+      
+      // Aggregate by coordinates
+      const locationMap = new Map();
+
+      locationsData.forEach(data => {
+        if (data) {
+          try {
+            const loc = JSON.parse(data);
+            if (loc && loc.lat !== undefined && loc.lon !== undefined) {
+              const coordKey = `${loc.lat},${loc.lon}`;
+              if (locationMap.has(coordKey)) {
+                const existing = locationMap.get(coordKey);
+                existing.count += 1;
+              } else {
+                locationMap.set(coordKey, { ...loc, count: 1 });
+              }
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      });
+
+      return Array.from(locationMap.values());
+    } catch (error) {
+      console.error(`Error in getLocationsByPeriod(${period}):`, error);
+      return [];
+    }
+  }
 }
 
 module.exports = new AnalyticsService();

@@ -381,6 +381,18 @@ const getRealtimeVisits = async (req, res) => {
   }
 };
 
+// GET /admin/analytics/locations
+const getAnalyticsLocations = async (req, res) => {
+  try {
+    const { period = 'realtime' } = req.query; // 'realtime', 'today', 'week', 'month'
+    const locations = await analyticsService.getLocationsByPeriod(period);
+    res.status(200).json({ success: true, count: locations.length, locations });
+  } catch (error) {
+    console.error('Error fetching analytics locations:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 /**
  * POST /admin/movies/crawl/by-page
  * Crawl movies by page range with Server-Sent Events for real-time logs
@@ -706,6 +718,7 @@ module.exports = {
   getChartData,
   getRealtimeActiveUsers,
   getRealtimeVisits,
+  getAnalyticsLocations,
 
   // Crawl
   crawlMoviesByPage,
