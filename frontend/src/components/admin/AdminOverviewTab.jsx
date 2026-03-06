@@ -4,8 +4,6 @@ import { statsAPI } from "services/admin.service";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 import { Chart, registerables } from "chart.js";
 import AnalyticsMap from "./AnalyticsMap";
-
-Chart.register(...registerables);
 import { getOptimizedImageUrl } from "constants/imageSizes";
 import {
   FiActivity,
