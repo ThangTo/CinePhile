@@ -229,22 +229,57 @@ class AnalyticsService {
       
       // Aggregate by coordinates
       const locationMap = new Map();
+      const geoip = require('geoip-lite');
 
-      locationsData.forEach(data => {
+      locationsData.forEach((data, index) => {
+        let loc = null;
         if (data) {
           try {
-            const loc = JSON.parse(data);
-            if (loc && loc.lat !== undefined && loc.lon !== undefined) {
-              const coordKey = `${loc.lat},${loc.lon}`;
-              if (locationMap.has(coordKey)) {
-                const existing = locationMap.get(coordKey);
-                existing.count += 1;
-              } else {
-                locationMap.set(coordKey, { ...loc, count: 1 });
-              }
-            }
+            loc = JSON.parse(data);
           } catch (e) {
             // Ignore parse errors
+          }
+        }
+
+        // Fallback: If no location data exists in cache, try to extract IP from the identifier and look it up on the fly
+        if (!loc) {
+           const id = identifiers[index];
+           if (id && id.startsWith('ip_')) {
+              let ipToLookup = id.replace('ip_', '');
+              // Mock for local testing
+              if (ipToLookup === '127.0.0.1' || ipToLookup === '::1' || ipToLookup === '::ffff:127.0.0.1' || ipToLookup === 'unknown') {
+                 // We don't want to randomly assign historical IPs locally to avoid skewing logic unnecessarily,
+                 // but if needed we can fallback to a known location, e.g., Ho Chi Minh City
+                 loc = { lat: 10.762622, lon: 106.660172, city: 'Ho Chi Minh City', country: 'VN' };
+              } else {
+                 const geo = geoip.lookup(ipToLookup);
+                 if (geo) {
+                   loc = {
+                     lat: geo.ll[0],
+                     lon: geo.ll[1],
+                     city: geo.city || 'Unknown City',
+                     country: geo.country || 'Unknown Country'
+                   };
+                 }
+              }
+              
+              // Cache the fallback lookup result into Redis so we don't calculate it again next time
+              if (loc) {
+                const locationKey = `analytics:location:${id}`;
+                // Fire and forget to not block the main logic loop
+                redisService.client.sendCommand(['SET', locationKey, JSON.stringify(loc)]).catch(() => {});
+                redisService.client.sendCommand(['EXPIRE', locationKey, (60 * 60 * 24 * 60).toString()]).catch(() => {});
+              }
+           }
+        }
+
+        if (loc && loc.lat !== undefined && loc.lon !== undefined) {
+          const coordKey = `${loc.lat},${loc.lon}`;
+          if (locationMap.has(coordKey)) {
+            const existing = locationMap.get(coordKey);
+            existing.count += 1;
+          } else {
+            locationMap.set(coordKey, { ...loc, count: 1 });
           }
         }
       });
