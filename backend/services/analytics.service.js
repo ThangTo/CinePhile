@@ -225,7 +225,7 @@ class AnalyticsService {
       // Fetch location data for these identifiers
       const locationKeys = identifiers.map(id => `analytics:location:${id}`);
       
-      const locationsData = await redisService.client.mGet(locationKeys);
+      const locationsData = await redisService.client.sendCommand(['MGET', ...locationKeys]);
       
       // Aggregate by coordinates
       const locationMap = new Map();
