@@ -45,7 +45,7 @@ const movieSchema = new mongoose.Schema(
     year: { type: Number, index: true },
     lang: { type: String },
     quality: { type: String, default: 'HD' },
-    type: { type: String, enum: ['movie', 'tvshows', 'series', 'hoathinh'], index: true },
+    type: { type: String, enum: ['single', 'movie', 'tvshows', 'series', 'hoathinh'], index: true },
     status: { type: String, enum: ['upcoming', 'ongoing', 'completed'], default: 'ongoing' },
 
     age_rating: {

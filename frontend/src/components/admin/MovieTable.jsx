@@ -385,6 +385,7 @@ const MovieTable = () => {
                 <th className="px-6 py-4">Poster</th>
                 <th className="px-6 py-4">Thông tin phim</th>
                 <th className="px-6 py-4 text-center">Năm</th>
+                <th className="px-6 py-4 text-center">Loại phim</th>
                 <th className="px-6 py-4 text-center">Rating</th>
                 <th className="px-6 py-4 text-right">Lượt xem</th>
                 <th className="px-6 py-4 text-center">Hành động</th>
@@ -444,6 +445,23 @@ const MovieTable = () => {
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 text-gray-300 text-xs font-medium">
                           <FiCalendar size={12} />
                           {movie.year}
+                        </div>
+                      </td>
+
+                      {/* Type */}
+                      <td className="px-6 py-4 text-center">
+                        <div className={`inline-flex items-center justify-center px-2 py-1 rounded-md text-xs font-bold ${
+                          movie.type === 'single' || movie.type === 'movie' 
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                            : movie.type === 'hoathinh' 
+                              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                              : 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        }`}>
+                          {movie.type === 'single' || movie.type === 'movie' 
+                            ? 'Phim Lẻ' 
+                            : movie.type === 'hoathinh' 
+                              ? 'Hoạt Hình' 
+                              : 'Phim Bộ'}
                         </div>
                       </td>
 
@@ -511,7 +529,7 @@ const MovieTable = () => {
                   ))
                 : !isLoading && (
                     <tr>
-                      <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-2">
                             <FiFilm className="text-gray-600 text-3xl" />
