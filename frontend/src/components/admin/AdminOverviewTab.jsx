@@ -21,7 +21,7 @@ import {
 
 Chart.register(...registerables);
 
-const DashboardCard = ({ title, value, icon: Icon, color, trend, suffix }) => (
+const DashboardCard = ({ title, value, icon: Icon, color, weekly, suffix }) => (
   <div className="relative overflow-hidden rounded-2xl bg-[#ffffff05] border border-white/5 p-6 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#ffffff08] group">
     {/* Background Glow */}
     <div
@@ -42,17 +42,17 @@ const DashboardCard = ({ title, value, icon: Icon, color, trend, suffix }) => (
       </div>
     </div>
 
-    {/* Trend Section */}
-    <div className="mt-4 flex items-center gap-2 text-sm">
-      <span
-        className={`flex items-center gap-1 font-semibold ${
-          trend >= 0 ? "text-green-400" : "text-red-400"
-        }`}
-      >
-        {trend >= 0 ? <FiArrowUp /> : <FiArrowDown />}
-        {Math.abs(trend)}%
-      </span>
-      <span className="text-gray-500 text-xs">{suffix || "so với tuần trước"}</span>
+    {/* Trend Section (Now absolute numbers) */}
+    <div className="mt-4 flex flex-col gap-1 text-[11px]">
+      <div className="flex items-center justify-between">
+         <span className="text-gray-500">Tuần này:</span>
+         <span className="text-green-400 font-bold">+{weekly?.current?.toLocaleString() || 0}</span>
+      </div>
+      <div className="flex items-center justify-between">
+         <span className="text-gray-500">Tuần trước:</span>
+         <span className="text-blue-400 font-bold">+{weekly?.last?.toLocaleString() || 0}</span>
+      </div>
+      {suffix && <span className="text-gray-600 italic mt-1">{suffix}</span>}
     </div>
   </div>
 );
@@ -478,29 +478,29 @@ const AdminOverviewTab = () => {
           value={stats.totalMovies}
           icon={FiFilm}
           color="bg-blue-500"
-          trend={stats.trends.movies}
+          weekly={stats.weekly?.movies}
         />
         <DashboardCard
           title="Người Dùng"
           value={stats.totalUsers}
           icon={FiUsers}
           color="bg-indigo-500"
-          trend={stats.trends.users}
+          weekly={stats.weekly?.users}
         />
         <DashboardCard
           title="Lượt Xem"
           value={stats.totalViews}
           icon={FiEye}
           color="bg-purple-500"
-          trend={stats.trends.views}
+          weekly={stats.weekly?.views}
         />
         <DashboardCard
-          title="Đăng Ký Mới"
-          value={stats.newUsers}
-          icon={FiTrendingUp}
+          title="Đang Trực Tuyến"
+          value={stats.onlineNow}
+          icon={FiActivity}
           color="bg-emerald-500"
-          trend={stats.trends.newUsers}
-          suffix="(7 ngày qua)"
+          weekly={stats.weekly?.online}
+          suffix="Lượt truy cập tuần"
         />
       </div>
 

@@ -16,6 +16,8 @@ import {
   FiCheck,
   FiLink,
   FiEye,
+  FiTrash2,
+  FiEdit2,
 } from "react-icons/fi";
 
 // --- UI COMPONENTS ---
@@ -98,6 +100,156 @@ const ImagePreview = ({ url, label, aspectRatio = "aspect-[2/3]" }) => (
   </div>
 );
 
+// Component Quản lý Gallery (Modal con)
+const GalleryManageModal = ({ isOpen, onClose, onSave, title, initialString, aspectRatio }) => {
+  const [urls, setUrls] = useState([]);
+  const [newUrl, setNewUrl] = useState("");
+  const [editingIndex, setEditingIndex] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const parsed = initialString ? initialString.split(/[\n,]+/).map((u) => u.trim()).filter(Boolean) : [];
+      setUrls(parsed);
+      setNewUrl("");
+      setEditingIndex(null);
+    }
+  }, [isOpen, initialString]);
+
+  if (!isOpen) return null;
+
+  const handleAddOrUpdate = () => {
+    if (newUrl.trim()) {
+      if (editingIndex !== null) {
+        const updatedUrls = [...urls];
+        updatedUrls[editingIndex] = newUrl.trim();
+        setUrls(updatedUrls);
+        setEditingIndex(null);
+      } else {
+        setUrls([...urls, newUrl.trim()]);
+      }
+      setNewUrl("");
+    }
+  };
+
+  const handleEdit = (index) => {
+    setEditingIndex(index);
+    setNewUrl(urls[index]);
+  };
+
+  const handleRemove = (index) => {
+    setUrls(urls.filter((_, i) => i !== index));
+    if (editingIndex === index) {
+      setEditingIndex(null);
+      setNewUrl("");
+    } else if (editingIndex !== null && editingIndex > index) {
+      setEditingIndex(editingIndex - 1);
+    }
+  };
+
+  const handleSave = () => {
+    onSave(urls.join(",\n"));
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+      <div className="bg-[#1a1c23] w-full max-w-4xl rounded-2xl shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
+        <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <FiImage className="text-primaryColor" /> Quản Lý Gallery: {title}
+          </h2>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors">
+            <FiX size={24} />
+          </button>
+        </div>
+
+        <div className="p-6 flex-1 overflow-y-auto space-y-6">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              placeholder="Nhập link ảnh mới..."
+              className="flex-1 bg-black/20 border border-white/5 focus:border-primaryColor rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primaryColor/50 transition-all shadow-inner"
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddOrUpdate())}
+            />
+            {editingIndex !== null && (
+              <button
+                type="button"
+                onClick={() => { setEditingIndex(null); setNewUrl(""); }}
+                className="px-6 py-3 rounded-xl bg-gray-500/20 text-gray-300 font-bold border border-white/10 hover:bg-gray-500/40 hover:text-white transition-all shrink-0"
+              >
+                Hủy Sửa
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleAddOrUpdate}
+              disabled={!newUrl.trim()}
+              className={`px-6 py-3 rounded-xl font-bold border transition-all disabled:opacity-50 shrink-0 ${
+                editingIndex !== null
+                  ? "bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500 hover:text-white"
+                  : "bg-white/10 text-white border-white/10 hover:bg-white/20"
+              }`}
+            >
+              {editingIndex !== null ? "Cập Nhật" : "Thêm Ảnh"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {urls.map((url, i) => (
+              <div key={i} className={`relative group rounded-xl overflow-hidden border ${editingIndex === i ? "border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]" : "border-white/10"} ${aspectRatio} bg-black/40`}>
+                <img src={url} alt="" className={`w-full h-full object-cover ${editingIndex === i ? "opacity-30" : ""}`} onError={(e) => (e.target.style.display = "none")} />
+                {editingIndex === i && (
+                  <div className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg shadow-blue-500/50">
+                    ĐANG SỬA
+                  </div>
+                )}
+                <div className={`absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 gap-2 backdrop-blur-sm ${editingIndex === i ? "opacity-100" : ""}`}>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(i)}
+                      className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500 hover:text-white transition-colors"
+                      title="Sửa link ảnh"
+                    >
+                      <FiEdit2 size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(i)}
+                      className="p-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                      title="Xóa ảnh"
+                    >
+                      <FiTrash2 size={20} />
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-gray-300 truncate w-full px-2 text-center" title={url}>{url}</span>
+                </div>
+              </div>
+            ))}
+            {urls.length === 0 && (
+              <div className="col-span-full py-12 text-center text-gray-500 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-xl">
+                <FiImage size={40} className="mb-2 opacity-50" />
+                <p>Chưa có ảnh nào trong gallery này.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-white/10 flex justify-end gap-3 bg-black/20 shrink-0">
+          <button type="button" onClick={onClose} className="px-6 py-2 rounded-xl text-gray-400 font-medium hover:bg-white/5 transition-all">
+            Hủy
+          </button>
+          <button type="button" onClick={handleSave} className="px-6 py-2 rounded-xl bg-primaryColor text-black font-bold shadow-lg shadow-primaryColor/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
+            Lưu Gallery
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
   const [formData, setFormData] = useState({
     title: "",
@@ -114,6 +266,18 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     backgroundImage: "",
     trailer: "",
     views: 0,
+    status: "ongoing",
+    currentEpisode: "",
+    totalEpisodes: 0,
+    logo: "",
+    backdrops: "",
+    posters: "",
+  });
+  const [galleryModal, setGalleryModal] = useState({
+    isOpen: false,
+    type: null, // "posters" or "backdrops"
+    title: "",
+    aspectRatio: "aspect-[2/3]",
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,6 +301,12 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         backgroundImage: movie.backgroundImage || movie.thumb_url || "",
         trailer: movie.trailer || movie.trailerUrl || movie.trailer_url || "",
         views: movie.views ?? movie.viewCount ?? 0,
+        status: movie.status || "ongoing",
+        currentEpisode: movie.currentEpisode !== undefined ? String(movie.currentEpisode) : "",
+        totalEpisodes: movie.totalEpisodes || 0,
+        logo: movie.logo || movie.images?.logo || "",
+        backdrops: movie.backdrops?.join(",\n") || movie.images?.backdrops?.join(",\n") || "",
+        posters: movie.posters?.join(",\n") || movie.images?.posters?.join(",\n") || "",
       });
     } else {
       setFormData({
@@ -154,6 +324,12 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         backgroundImage: "",
         trailer: "",
         views: 0,
+        status: "ongoing",
+        currentEpisode: "",
+        totalEpisodes: 0,
+        logo: "",
+        backdrops: "",
+        posters: "",
       });
     }
     setErrors({});
@@ -200,16 +376,19 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
       const movieData = {
         ...formData,
         genres: formData.genres
-          .split(",")
-          .map((g) => g.trim())
-          .filter(Boolean),
-        rating: parseFloat(formData.rating),
-        year: parseInt(formData.year),
-        // Ensure poster, backgroundImage, and trailer are included even if empty
+          ? formData.genres.split(",").map((g) => g.trim()).filter(Boolean)
+          : [],
+        rating: parseFloat(formData.rating) || 0,
+        year: parseInt(formData.year) || new Date().getFullYear(),
+        // Ensure poster, backgroundImage, trailer, and logo are included even if empty
         poster: formData.poster || "",
         backgroundImage: formData.backgroundImage || "",
         trailer: formData.trailer || "",
+        logo: formData.logo || "",
+        backdrops: formData.backdrops ? formData.backdrops.split(/[\n,]+/).map((u) => u.trim()).filter(Boolean) : [],
+        posters: formData.posters ? formData.posters.split(/[\n,]+/).map((u) => u.trim()).filter(Boolean) : [],
         views: parseInt(formData.views) || 0,
+        totalEpisodes: parseInt(formData.totalEpisodes) || 0,
       };
       await onSave(movieData);
       onClose();
@@ -270,9 +449,22 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
               <div className="lg:col-span-2 flex flex-col gap-5">
                 {/* 1. Core Info */}
                 <div className="bg-black/10 rounded-xl p-5 border border-white/5 space-y-4">
-                  <h3 className="text-white font-bold flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
-                    <FiType className="text-primaryColor" /> Thông Tin Cơ Bản
-                  </h3>
+                  <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                    <h3 className="text-white font-bold flex items-center gap-2">
+                      <FiType className="text-primaryColor" /> Thông Tin Cơ Bản
+                    </h3>
+                    {movie?.tmdb?.id && (
+                      <a
+                        href={`https://www.themoviedb.org/${movie.tmdb.type || 'movie'}/${movie.tmdb.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-white rounded-lg transition-colors border border-blue-500/20"
+                        title="Xem trên TMDB"
+                      >
+                        <FiLink size={12} /> Link TMDB
+                      </a>
+                    )}
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       label="Tên Phim (TV) *"
@@ -400,6 +592,43 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                     />
                   </div>
 
+                  <div className="border-t border-white/5 my-1"></div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <ChipSelector
+                      label="Trạng Thái (Status)"
+                      icon={FiMonitor}
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      options={[
+                        { value: "upcoming", label: "Sắp chiếu" },
+                        { value: "ongoing", label: "Đang chiếu" },
+                        { value: "completed", label: "Hoàn Thành" },
+                      ]}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                       <FormField
+                         label="Tập hiện tại"
+                         name="currentEpisode"
+                         icon={FiMonitor}
+                         value={formData.currentEpisode}
+                         onChange={handleChange}
+                         placeholder="VD: 7 hoặc Full"
+                       />
+                       <FormField
+                         label="Tổng số tập"
+                         name="totalEpisodes"
+                         type="number"
+                         icon={FiMonitor}
+                         value={formData.totalEpisodes}
+                         onChange={handleChange}
+                         placeholder="VD: 12"
+                       />
+                    </div>
+                  </div>
+
                   <div className="space-y-3">
                     <FormField
                       label="Trailer URL (YouTube)"
@@ -462,8 +691,71 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                       />
                       <ImagePreview
                         url={formData.backgroundImage}
-                        label="Backdrop Preview"
+                        label="Primary Backdrop Preview"
                         aspectRatio="aspect-video"
+                      />
+                    </div>
+                    
+                    {/* Gallery Manager for Posters */}
+                    <div className="space-y-3 border-t border-white/5 pt-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-gray-300">TMDB Posters Gallery</label>
+                        <button
+                          type="button"
+                          onClick={() => setGalleryModal({ isOpen: true, type: "posters", title: "TMDB Posters", aspectRatio: "aspect-[2/3]" })}
+                          className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-primaryColor font-medium transition-colors border border-primaryColor/30"
+                        >
+                          Quản Lý Gallery ({formData.posters ? formData.posters.split(/[\n,]+/).filter(Boolean).length : 0})
+                        </button>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                        {formData.posters ? formData.posters.split(/[\n,]+/).map(u => u.trim()).filter(Boolean).slice(0, 5).map((url, i) => (
+                          <img key={`p-${i}`} src={url} alt="" className="h-20 aspect-[2/3] object-cover rounded shrink-0 border border-white/10" />
+                        )) : <span className="text-xs text-gray-500 italic">Trống</span>}
+                        {formData.posters && formData.posters.split(/[\n,]+/).filter(Boolean).length > 5 && (
+                          <div className="h-20 aspect-[2/3] rounded shrink-0 border border-white/10 flex items-center justify-center bg-white/5 text-gray-400 text-xs font-bold">
+                            +{formData.posters.split(/[\n,]+/).filter(Boolean).length - 5}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Gallery Manager for Backdrops */}
+                    <div className="space-y-3 border-t border-white/5 pt-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-gray-300">TMDB Backdrops Gallery</label>
+                        <button
+                          type="button"
+                          onClick={() => setGalleryModal({ isOpen: true, type: "backdrops", title: "TMDB Backdrops", aspectRatio: "aspect-video" })}
+                          className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-primaryColor font-medium transition-colors border border-primaryColor/30"
+                        >
+                          Quản Lý Gallery ({formData.backdrops ? formData.backdrops.split(/[\n,]+/).filter(Boolean).length : 0})
+                        </button>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                        {formData.backdrops ? formData.backdrops.split(/[\n,]+/).map(u => u.trim()).filter(Boolean).slice(0, 5).map((url, i) => (
+                          <img key={`b-${i}`} src={url} alt="" className="h-20 aspect-video object-cover rounded shrink-0 border border-white/10" />
+                        )) : <span className="text-xs text-gray-500 italic">Trống</span>}
+                        {formData.backdrops && formData.backdrops.split(/[\n,]+/).filter(Boolean).length > 5 && (
+                          <div className="h-20 aspect-video rounded shrink-0 border border-white/10 flex items-center justify-center bg-white/5 text-gray-400 text-xs font-bold">
+                            +{formData.backdrops.split(/[\n,]+/).filter(Boolean).length - 5}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 border-t border-white/5 pt-4">
+                      <FormField
+                        label="Logo URL"
+                        name="logo"
+                        value={formData.logo}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                      />
+                      <ImagePreview
+                        url={formData.logo}
+                        label="Logo Preview"
+                        aspectRatio="aspect-[3/1]"
                       />
                     </div>
                   </div>
@@ -498,6 +790,18 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
           </button>
         </div>
       </div>
+      
+      {/* Kéo Modal con gọi ở đây để đè lên form */}
+      <GalleryManageModal
+        isOpen={galleryModal.isOpen}
+        title={galleryModal.title}
+        aspectRatio={galleryModal.aspectRatio}
+        initialString={galleryModal.type ? formData[galleryModal.type] : ""}
+        onClose={() => setGalleryModal({ ...galleryModal, isOpen: false })}
+        onSave={(newString) => {
+          setFormData({ ...formData, [galleryModal.type]: newString });
+        }}
+      />
     </div>
   );
 };

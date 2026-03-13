@@ -125,17 +125,26 @@ const transformMovieData = (movieData, isUpdate = false) => {
     ageRating: 'age_rating',
     isNew: 'isNewRelease',
     isFeatured: 'isFeatured',
+    logo: 'logo', // special handling below
+    backdrops: 'backdrops', // special handling below
+    posters: 'posters' // special handling below
   };
 
   // Apply field mappings
   Object.keys(fieldMappings).forEach((frontendField) => {
-    // For URL fields (poster, backgroundImage, trailer), include empty strings
+    // For URL fields (poster, backgroundImage, trailer, logo, backdrops, posters), include empty strings/arrays
     // For other fields, skip undefined and null
-    const isUrlField = frontendField === 'poster' || frontendField === 'backgroundImage' || frontendField === 'trailer';
+    const isUrlField = frontendField === 'poster' || frontendField === 'backgroundImage' || frontendField === 'trailer' || frontendField === 'logo' || frontendField === 'backdrops' || frontendField === 'posters';
     
     if (isUrlField) {
+      if (frontendField === 'logo' || frontendField === 'backdrops' || frontendField === 'posters') {
+        if (movieData[frontendField] !== undefined) {
+           transformed.images = transformed.images || {};
+           transformed.images[frontendField] = movieData[frontendField];
+        }
+      }
       // URL fields: include if not undefined (empty string is valid)
-      if (movieData[frontendField] !== undefined) {
+      else if (movieData[frontendField] !== undefined) {
         const dbField = fieldMappings[frontendField];
         transformed[dbField] = movieData[frontendField] || '';
       }

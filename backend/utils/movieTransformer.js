@@ -63,6 +63,19 @@ const transformMovie = (movieDoc) => {
     }
   });
 
+  // Extract images for frontend convenience
+  if (transformed.images) {
+    if (transformed.images.logo !== undefined) {
+      transformed.logo = transformed.images.logo;
+    }
+    if (transformed.images.backdrops !== undefined) {
+      transformed.backdrops = transformed.images.backdrops;
+    }
+    if (transformed.images.posters !== undefined) {
+      transformed.posters = transformed.images.posters;
+    }
+  }
+
   // Transform categories to genres (array of labels/names only)
   if (transformed.categories && Array.isArray(transformed.categories)) {
     // Extract only the name/label from each category object

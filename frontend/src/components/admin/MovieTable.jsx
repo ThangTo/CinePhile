@@ -386,7 +386,8 @@ const MovieTable = () => {
                 <th className="px-6 py-4">Thông tin phim</th>
                 <th className="px-6 py-4 text-center">Năm</th>
                 <th className="px-6 py-4 text-center">Loại phim</th>
-                <th className="px-6 py-4 text-center">Rating</th>
+                <th className="px-6 py-4 text-center">Tập / Status</th>
+                {/* <th className="px-6 py-4 text-center">Rating</th> */}
                 <th className="px-6 py-4 text-right">Lượt xem</th>
                 <th className="px-6 py-4 text-center">Hành động</th>
               </tr>
@@ -465,13 +466,31 @@ const MovieTable = () => {
                         </div>
                       </td>
 
-                      {/* Rating */}
+                      {/* Episodes and Status */}
                       <td className="px-6 py-4 text-center">
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className="text-sm text-gray-300 font-medium">
+                            {movie.currentEpisode || "0"}/{movie.totalEpisodes || "?"}
+                          </span>
+                          <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                            movie.status === 'completed'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : movie.status === 'upcoming'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {movie.status === 'completed' ? 'Hoàn Thành' : movie.status === 'upcoming' ? 'Sắp Chiếu' : 'Đang Chiếu'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Rating */}
+                      {/* <td className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center gap-1 text-yellow-500 font-bold">
                           <FiStar className="fill-yellow-500" size={14} />
                           <span>{movie.rating ? movie.rating.toFixed(1) : "N/A"}</span>
                         </div>
-                      </td>
+                      </td> */}
 
                       {/* Views */}
                       <td className="px-6 py-4 text-right">

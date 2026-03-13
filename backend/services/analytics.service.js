@@ -170,6 +170,70 @@ class AnalyticsService {
       return { today: emptyStats, week: emptyStats, month: emptyStats };
     }
   }
+  
+  /**
+   * Get weekly visits comparison (This Week vs Last Week)
+   * @returns {Promise<Object>} { thisWeek: {total, guestCount, userCount}, lastWeek: {total, guestCount, userCount} }
+   */
+  async getWeeklyVisitsComparison() {
+    const startOfThisWeek = moment().tz('Asia/Ho_Chi_Minh').startOf('isoWeek');
+    const startOfLastWeek = moment().tz('Asia/Ho_Chi_Minh').subtract(1, 'week').startOf('isoWeek');
+    const endOfLastWeek = moment(startOfLastWeek).endOf('isoWeek');
+    const nowNode = moment().tz('Asia/Ho_Chi_Minh');
+
+    const getKeysInRange = (start, end) => {
+      let keys = [];
+      let current = start.clone();
+      while (current.isSameOrBefore(end, 'day')) {
+        keys.push(`analytics:visits:${current.format('YYYY-MM-DD')}`);
+        current.add(1, 'days');
+      }
+      return keys;
+    };
+
+    const thisWeekKeys = getKeysInRange(startOfThisWeek, nowNode);
+    const lastWeekKeys = getKeysInRange(startOfLastWeek, endOfLastWeek);
+
+    const emptyStats = { total: 0, guestCount: 0, userCount: 0 };
+
+    if (!redisService.isConnected || !redisService.client) {
+      const getUniqueVisitsBreakdown = (keys) => {
+        const combinedSet = new Set();
+        keys.forEach(key => {
+          const set = this.localVisits.get(key);
+          if (set) {
+            set.forEach(id => combinedSet.add(id));
+          }
+        });
+        return this._countUserTypes(Array.from(combinedSet));
+      };
+
+      return {
+        thisWeek: getUniqueVisitsBreakdown(thisWeekKeys),
+        lastWeek: getUniqueVisitsBreakdown(lastWeekKeys)
+      };
+    }
+
+    try {
+      const multi = redisService.client.multi();
+      
+      if (thisWeekKeys.length > 0) multi.sendCommand(['SUNION', ...thisWeekKeys]);
+      else multi.sendCommand(['SMEMBERS', 'nonexistent']);
+
+      if (lastWeekKeys.length > 0) multi.sendCommand(['SUNION', ...lastWeekKeys]);
+      else multi.sendCommand(['SMEMBERS', 'nonexistent']);
+
+      const results = await multi.exec();
+      
+      return {
+        thisWeek: this._countUserTypes(results[0] || []),
+        lastWeek: this._countUserTypes(results[1] || [])
+      };
+    } catch (error) {
+      console.error('Error in getWeeklyVisitsComparison:', error);
+      return { thisWeek: emptyStats, lastWeek: emptyStats };
+    }
+  }
 
   /**
    * Get locations of users for a specific period

@@ -11,6 +11,7 @@ const NotificationModel = require('../models/notification.model');
 const { transformMovies } = require('../utils/movieTransformer');
 const movieService = require('./movie.service');
 const notificationService = require('./notification.service');
+const analyticsService = require('./analytics.service');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
 const { parseEpisodeNumber } = require('../utils/movieTransformer');
 const { crawlMovieBySlug } = require('./crawler.service');
@@ -620,9 +621,9 @@ const calculateTrend = (current, previous) => {
 };
 
 /**
- * Get dashboard statistics with week-over-week trends.
- * Counts for "trending" compare the last 7 days vs. the 7 days before that.
- * newUsers replaces activeUsers and reflects users created in the last week.
+ * Get dashboard statistics with week-over-week absolute values.
+ * Counts for "currentWeek" are for the last 7 days.
+ * Counts for "lastWeek" are for the 7 days before that.
  */
 const getStats = async () => {
   const now = new Date();
@@ -642,6 +643,8 @@ const getStats = async () => {
     usersPrevWeek,
     viewsThisWeek,
     viewsPrevWeek,
+    realtimeOnline,
+    visitsComparison
   ] = await Promise.all([
     MovieModel.countDocuments(),
     UserModel.countDocuments(),
@@ -654,6 +657,8 @@ const getStats = async () => {
     UserHistoryModel.countDocuments({
       createdAt: { $gte: previousWeekStart, $lt: currentWeekStart },
     }),
+    analyticsService.getRealtimeActiveUsers(),
+    analyticsService.getWeeklyVisitsComparison()
   ]);
 
   const totalViews = totalViewsData.length > 0 ? totalViewsData[0].total : 0;
@@ -662,13 +667,21 @@ const getStats = async () => {
     totalMovies,
     totalUsers,
     totalViews,
-    newUsers: usersThisWeek,
-    trends: {
-      movies: calculateTrend(moviesThisWeek, moviesPrevWeek),
-      users: calculateTrend(usersThisWeek, usersPrevWeek),
-      views: calculateTrend(viewsThisWeek, viewsPrevWeek),
-      newUsers: calculateTrend(usersThisWeek, usersPrevWeek),
+    onlineNow: realtimeOnline.total || 0,
+    newUsers: usersThisWeek, // Keep for backward compatibility if needed, but we'll focus on weekly
+    weekly: {
+      movies: { current: moviesThisWeek, last: moviesPrevWeek },
+      users: { current: usersThisWeek, last: usersPrevWeek },
+      views: { current: viewsThisWeek, last: viewsPrevWeek },
+      online: { current: visitsComparison.thisWeek.total, last: visitsComparison.lastWeek.total }
     },
+    // Keep trends but rename or use them to store absolute values for frontend easier migration
+    trends: {
+      movies: moviesThisWeek,
+      users: usersThisWeek,
+      views: viewsThisWeek,
+      newUsers: usersPrevWeek // This is a bit ambiguous now, better use weekly object
+    }
   };
 };
 
