@@ -30,8 +30,11 @@ const DropdownMenu = ({ label, items, isMobile = false, className = "" }) => {
 
         {/* Desktop Dropdown */}
         <div className="absolute left-0 top-full pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-          <div className="bg-bgColor4 backdrop-blur-sm rounded-xl shadow-2xl border border-white/10 p-4 w-[min(90vw,48rem)] max-h-[60vh] overflow-y-auto overflow-x-hidden overscroll-contain pretty-scroll">
+          <div className="bg-bgColor4 xl:block hidden backdrop-blur-sm rounded-xl shadow-2xl border border-white/10 p-4 w-[min(90vw,48rem)] max-h-[60vh] overflow-y-auto overflow-x-hidden overscroll-contain pretty-scroll">
             <DropdownGrid items={items} columns={4} />
+          </div>
+          <div className="bg-bgColor4 lg:block xl:hidden backdrop-blur-sm rounded-xl shadow-2xl border border-white/10 p-4 w-[min(90vw,32rem)] max-h-[80vh] overflow-y-auto overflow-x-hidden overscroll-contain pretty-scroll">
+            <DropdownGrid items={items} columns={3} />
           </div>
         </div>
       </div>

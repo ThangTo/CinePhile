@@ -6,6 +6,7 @@ import { preloadImages } from "utils/imagePreloader";
 import OptimizedImage from "components/common/OptimizedImage";
 import useToast from "hooks/useToast";
 import ToastContainer from "components/common/ToastContainer";
+import { useNavigate } from "react-router-dom";
 
 /**
  * Banner Home Component - Main hero banner for homepage
@@ -19,6 +20,7 @@ const BannerHome = ({ movie }) => {
   const [randomBackgrounds, setRandomBackgrounds] = useState({});
   const timerRef = useRef(null);
   const { toasts, removeToast, success, warning } = useToast();
+  const navigate = useNavigate();
 
   /**
    * Get random background image from movie's backdrops or backgroundImage
@@ -174,6 +176,14 @@ const BannerHome = ({ movie }) => {
   const currentMovie = movies[currentIndex] || null;
   const { infoBadges, actionButtons } = useBannerConfig(currentMovie || {}, success, warning);
 
+  const handleBannerClick = (e) => {
+    // Bỏ qua click nếu người dùng đang bấm vào các nút chức năng (button, link) bên trong
+    if (e.target.closest("button") || e.target.closest("a")) {
+      return;
+    }
+    navigate(`/movie/${currentMovie.id}`);
+  };
+
   // Show loading state if no movie data
   if (loading || !currentMovie) {
     return (
@@ -184,7 +194,10 @@ const BannerHome = ({ movie }) => {
   }
 
   return (
-    <section className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[250px] md:h-[600px] lg:h-[700px]">
+    <section 
+      className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[350px] sm:h-[450px] md:h-[600px] lg:h-[700px] cursor-pointer"
+      onClick={handleBannerClick}
+    >
       {/* Background with gradients */}
       <BannerBackground
         backgroundImage={
@@ -215,7 +228,10 @@ const BannerHome = ({ movie }) => {
             return (
               <button
                 key={m.id || index}
-                onClick={() => handleSelectMovie(index)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectMovie(index);
+                }}
                 className={`relative rounded-md overflow-hidden transition-transform duration-200 ${
                   isActive ? "scale-105 ring-2 ring-primaryColor" : "hover:scale-105"
                 }`}
@@ -237,6 +253,41 @@ const BannerHome = ({ movie }) => {
           })}
         </div>
       )}
+
+      {/* Bottom circular poster selector (mobile only) */}
+      {movies.length > 1 && (
+        <div className="flex md:hidden gap-3 absolute bottom-6 left-1/2 sm:left-3/4 -translate-x-1/2 z-[100]">
+          {movies.map((m, index) => {
+            const isActive = index === currentIndex;
+            return (
+              <button
+                key={`mob-${m.id || index}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectMovie(index);
+                }}
+                className={`relative w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full overflow-hidden transition-all duration-200 bg-black/50 ${
+                  isActive ? "scale-110 ring-2 ring-primaryColor shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]" : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                <OptimizedImage
+                  src={m.poster}
+                  fallbackSrcs={[m.poster_url, m.thumb_url, m.backgroundImage]}
+                  alt={m.title}
+                  className="w-full h-full object-cover rounded-full"
+                  priority={index === 0}
+                  lazy={false}
+                  preloadOnHover={false}
+                  size="40"
+                  quality="80"
+                />
+                {isActive && <div className="absolute inset-0 bg-black/10 pointer-events-none rounded-full" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </section>
   );

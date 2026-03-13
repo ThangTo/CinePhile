@@ -91,7 +91,7 @@ const CategoryChips = () => {
   }
 
   return (
-    <section className="w-full py-6">
+    <section className="w-full sm:py-6 py-2">
       <h2 className="text-xl sm:text-2xl font-bold mb-4 px-4">Bạn đang quan tâm gì?</h2>
 
       {/* Mobile: Horizontal Scroll */}
@@ -101,7 +101,7 @@ const CategoryChips = () => {
             <Link
               key={genre.slug}
               to={`/genre/${genre.slug}`}
-              className={`relative flex flex-col items-center justify-center flex-shrink-0 w-[120px] rounded-xl p-3 text-white bg-gradient-to-br ${
+              className={`relative flex flex-col items-center justify-center flex-shrink-0 w-[120px] rounded-xl p-4 text-white bg-gradient-to-br ${
                 colors[idx % colors.length]
               } overflow-hidden`}
             >
