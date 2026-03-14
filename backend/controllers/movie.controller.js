@@ -528,8 +528,16 @@ const proxyM3u8 = async (req, res) => {
     const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
 
     // Build proxy base URL from request (e.g. "https://your-server/api/v1/movies/proxy-m3u8")
-    const protocol = req.protocol;
+    // Fix Mixed Content: Ensure HTTPS is used behind reverse proxies (like DuckDNS/Cloudflare)
+    const forwardedProto = req.headers['x-forwarded-proto'];
     const host = req.get('host');
+    let protocol = forwardedProto || req.protocol;
+    
+    // Force HTTPS in production/non-localhost if protocol is somehow still HTTP
+    if (protocol === 'http' && host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+      protocol = 'https';
+    }
+    
     const proxyBase = `${protocol}://${host}${req.baseUrl || ''}/proxy-m3u8`;
 
     // Detect if this is a Master Playlist or a Media Playlist
