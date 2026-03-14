@@ -26,6 +26,7 @@ const MobileMoreMenu = ({
   showMoreMenu,
   onToggleMoreMenu,
   setShowMoreMenu,
+  onDownload,
 }) => {
   return (
     <div className="relative more-menu-container">
@@ -92,6 +93,20 @@ const MobileMoreMenu = ({
             <span className="text-right">Thu nhỏ</span>
             <i className="fa-solid fa-images text-base" />
           </button>
+
+          {/* Download */}
+          {onDownload && (
+            <button
+              onClick={() => {
+                onDownload();
+                setShowMoreMenu(false);
+              }}
+              className="w-full px-3 py-2 text-white hover:bg-white/10 transition-colors flex items-center justify-end gap-2 text-right"
+            >
+              <span className="text-right">Tải phim gốc</span>
+              <i className="fa-solid fa-download text-base" />
+            </button>
+          )}
 
           {/* Speed */}
           <div className="speed-menu-container relative text-right">

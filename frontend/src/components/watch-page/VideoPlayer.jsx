@@ -341,11 +341,11 @@ const VideoPlayer = ({
 
           // === BƯỚC 2: Khởi tạo HLS NGAY LẬP TỨC ===
           const hls = new Hls({
-            maxBufferLength: 10,       // TỐI ƯU: Chỉ cần 10s buffer là đã tự tin bốc frame chiếu ngay, không cần cày cuốc chờ đủ 30s
-            maxMaxBufferLength: 30,    // TỐI ƯU: Không buffer quá 30s để tiết kiệm RAM và Bandwidth, ưu tiên play nhanh
-            maxBufferSize: 2 * 1000 * 1000, // TỐI ƯU: Ép HLS.js hiểu "chỉ cần tải 2MB data đầu tiên là phải nhả hình ra cho tao xem" thay vì tải cục 60MB
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            maxBufferSize: 2 * 1000 * 1000,
             startFragPrefetch: true,
-            autoStartLoad: false, // TỐI ƯU: Không tự động tải segment file (.ts) khi chưa có progress
+            autoStartLoad: false,
             manifestLoadingTimeOut: 20000,
             fragLoadingTimeOut: 25000,
             manifestLoadingMaxRetry: 5,
@@ -865,6 +865,38 @@ const VideoPlayer = ({
     }
   }, [quality, availableLevels.length, applyQualityLevel]);
 
+  const handleDownloadMovie = useCallback(() => {
+    let rawM3u8 = null;
+    if (episode?.link_m3u8) {
+      rawM3u8 = episode.link_m3u8;
+    } else if (episode?.videoUrl && episode.videoUrl.includes(".m3u8")) {
+      rawM3u8 = episode.videoUrl;
+    } else if (videoUrl && videoUrl.includes(".m3u8")) {
+      rawM3u8 = videoUrl;
+    }
+
+    if (!rawM3u8) {
+      showToast("Không tìm thấy link tải phim!", "error");
+      return;
+    }
+
+    showToast("Đang tải dữ liệu phim, vui lòng đợi hộp thoại lưu file xuất hiện...", "info");
+
+    const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+    const movieNameStr = movie?.name || "Phim";
+    const episodeStr = episode?.name ? ` - Tập ${episode.name}` : "";
+    const filename = `${movieNameStr}${episodeStr}`;
+
+    const downloadUrl = `${apiUrl}/movies/download?url=${encodeURIComponent(rawM3u8)}&filename=${encodeURIComponent(filename)}`;
+
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [episode, videoUrl, movie, showToast]);
+
   const blurAmount = useMemo(() => {
     if (quality === "Auto" || !currentActualQuality) return 0;
     const selectedHeight = parseInt(quality.replace("p", ""), 10);
@@ -1037,6 +1069,7 @@ const VideoPlayer = ({
         showMoreMenu={showMoreMenu}
         onToggleMoreMenu={() => setShowMoreMenu(!showMoreMenu)}
         setShowMoreMenu={setShowMoreMenu}
+        onDownload={handleDownloadMovie}
       />
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <PremiumRequiredModal isOpen={showPremiumModal} onClose={() => setShowPremiumModal(false)} />

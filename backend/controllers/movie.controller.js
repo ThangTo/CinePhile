@@ -1,6 +1,8 @@
 const movieService = require('../services/movie.service');
-
-/**
+const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');/**
  * Helper: Parse array query parameters (genres, countries)
  * @param {string|string[]} param - Query parameter value
  * @returns {string[]|undefined} Parsed array or undefined
@@ -620,6 +622,149 @@ const proxyM3u8 = async (req, res) => {
   }
 };
 
+/**
+ * GET /movies/download
+ * Download movie directly to an MP4 file using FFmpeg, bypassing ads.
+ * @param {string} req.query.url - Target M3U8 URL
+ * @param {string} req.query.filename - Desired output filename
+ */
+const downloadMovie = async (req, res) => {
+  let tempM3u8Path = null;
+  try {
+    const { url, filename } = req.query;
+    if (!url) {
+      return res.status(400).send('Missing url parameter');
+    }
+
+    let currentUrl = url;
+    let response = await fetch(currentUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
+    }
+    let content = await response.text();
+
+    // 1. If Master Playlist, get highest quality Media Playlist
+    if (content.includes('#EXT-X-STREAM-INF')) {
+      const lines = content.split('\n');
+      let maxBandwidth = 0;
+      let bestUri = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('BANDWIDTH=')) {
+          const match = lines[i].match(/BANDWIDTH=(\d+)/);
+          const bandwidth = match ? parseInt(match[1]) : 0;
+          if (lines[i + 1] && bandwidth > maxBandwidth) {
+            maxBandwidth = bandwidth;
+            bestUri = lines[i + 1].trim();
+          }
+        }
+      }
+
+      if (bestUri) {
+        currentUrl = new URL(bestUri, currentUrl).toString();
+        response = await fetch(currentUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        content = await response.text();
+      }
+    }
+
+    // 2. Process Media Playlist (Filter ads & make URLs absolute)
+    const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+    const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+    const lines = content.split('\n');
+    const cleanLines = [];
+    let skipNext = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim();
+      if (!line) continue;
+
+      if (line.startsWith('#EXTINF')) {
+        const nextLine = (lines[i + 1] || '').trim();
+        if (nextLine && !nextLine.startsWith('#')) {
+          const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
+          if (isAd) {
+            skipNext = true;
+            continue;
+          }
+        }
+      }
+
+      if (skipNext) {
+        skipNext = false;
+        continue;
+      }
+
+      if (line.includes('#EXT-X-DISCONTINUITY')) continue;
+
+      if (!line.startsWith('#')) {
+        if (!line.startsWith('http')) {
+          line = new URL(line, baseUrl).toString();
+        }
+        if (line.includes('convertv7/')) {
+          line = line.replace('convertv7/', '');
+        }
+      }
+      cleanLines.push(line);
+    }
+
+    const cleanContent = cleanLines.join('\n');
+
+    // 3. Write clean M3U8 to temp directory
+    tempM3u8Path = path.join(os.tmpdir(), `clean_download_${Date.now()}_${Math.floor(Math.random() * 1000)}.m3u8`);
+    fs.writeFileSync(tempM3u8Path, cleanContent);
+
+    // 4. Stream response using FFmpeg
+    const outputFilename = filename ? `${filename}.mp4` : `movie_${Date.now()}.mp4`;
+    
+    // Đảm bảo tên file an toàn cho HTTP headers
+    const safeFilename = encodeURIComponent(outputFilename).replace(/['()]/g, escape).replace(/\*/g, '%2A');
+
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${safeFilename}`);
+    res.setHeader('Content-Type', 'video/mp4');
+
+    const command = ffmpeg(tempM3u8Path)
+      .inputOptions(['-protocol_whitelist file,http,https,tcp,tls,crypto'])
+      .outputOptions([
+        '-c copy',
+        '-bsf:a aac_adtstoasc',
+        '-f mp4',
+        '-movflags frag_keyframe+empty_moov' // Required for streaming MP4
+      ])
+      .on('error', (err) => {
+        console.error('[downloadMovie] FFmpeg Error:', err.message);
+        if (!res.headersSent) {
+          res.status(500).send('Error generating video');
+        }
+        if (tempM3u8Path && fs.existsSync(tempM3u8Path)) {
+          fs.unlinkSync(tempM3u8Path);
+        }
+      })
+      .on('end', () => {
+        console.log(`[downloadMovie] Finished streaming ${outputFilename}`);
+        if (tempM3u8Path && fs.existsSync(tempM3u8Path)) {
+          fs.unlinkSync(tempM3u8Path);
+        }
+      });
+
+    command.pipe(res, { end: true });
+
+  } catch (error) {
+    console.error('[downloadMovie] Error:', error.message);
+    if (!res.headersSent) {
+      res.status(500).send('Error processing download request');
+    }
+    if (tempM3u8Path && fs.existsSync(tempM3u8Path)) {
+      try { fs.unlinkSync(tempM3u8Path); } catch (e) {}
+    }
+  }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -646,4 +791,5 @@ module.exports = {
   getRecommendations,
   getForYou,
   proxyM3u8,
+  downloadMovie,
 };

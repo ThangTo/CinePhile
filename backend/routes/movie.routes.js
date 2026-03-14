@@ -36,6 +36,9 @@ router.get('/meta/theme', movieController.getTheme);
 // GET /api/v1/movies/proxy-m3u8 - Proxy M3U8 stream (must be before /:id)
 router.get('/proxy-m3u8', movieController.proxyM3u8);
 
+// GET /api/v1/movies/download - Download movie (must be before /:id)
+router.get('/download', movieController.downloadMovie);
+
 // GET /api/v1/movies/genre/:genre - Get movies by genre (must be before /:id)
 router.get('/genre/:genre', movieController.getByGenre);
 

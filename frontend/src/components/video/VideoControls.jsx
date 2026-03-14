@@ -60,6 +60,8 @@ const VideoControls = ({
   showMoreMenu,
   onToggleMoreMenu,
   setShowMoreMenu,
+  // Download
+  onDownload,
 }) => {
   if (!showControls || !hasNativePlayer) {
     return null;
@@ -243,6 +245,20 @@ const VideoControls = ({
             />
           </div>
 
+          {/* Download Button */}
+          {onDownload && (
+            <div className="hidden md:block">
+              <Tooltip text="Tải phim gốc">
+                <button
+                  onClick={onDownload}
+                  className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all hover:scale-105"
+                >
+                  <i className="fa-solid fa-download text-white text-sm lg:text-base" />
+                </button>
+              </Tooltip>
+            </div>
+          )}
+
           {/* Fullscreen - Always visible */}
           <Tooltip text={isFullscreen ? "Thoát toàn màn hình (f)" : "Toàn màn hình (f)"}>
             <button
@@ -281,6 +297,7 @@ const VideoControls = ({
               showMoreMenu={showMoreMenu}
               onToggleMoreMenu={onToggleMoreMenu}
               setShowMoreMenu={setShowMoreMenu}
+              onDownload={onDownload}
             />
           </div>
         </div>
