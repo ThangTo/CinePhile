@@ -502,6 +502,114 @@ const getForYou = async (req, res) => {
   }
 };
 
+/**
+ * GET /movies/proxy-m3u8
+ * Proxy M3U8 stream to filter out advertisements
+ * @param {string} req.query.url - Taget M3U8 URL
+ */
+const proxyM3u8 = async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) {
+      return res.status(400).send('Missing url parameter');
+    }
+
+    // Use native fetch to get the M3U8 content
+    let currentUrl = url;
+    let response = await fetch(currentUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
+    }
+    let content = await response.text();
+
+    // PHASE 1: Handle Master Playlist redirection
+    if (content.includes('#EXT-X-STREAM-INF')) {
+      const lines = content.split('\n');
+      let maxBandwidth = 0;
+      let bestUri = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('BANDWIDTH=')) {
+          const match = lines[i].match(/BANDWIDTH=(\d+)/);
+          const bandwidth = match ? parseInt(match[1], 10) : 0;
+          
+          const nextLine = (lines[i + 1] || '').trim();
+          if (nextLine && !nextLine.startsWith('#') && bandwidth > maxBandwidth) {
+            maxBandwidth = bandwidth;
+            bestUri = nextLine;
+          }
+        }
+      }
+
+      if (bestUri) {
+        currentUrl = new URL(bestUri, currentUrl).toString();
+        response = await fetch(currentUrl);
+        if (!response.ok) {
+           throw new Error(`Failed to fetch nested M3U8: ${response.statusText}`);
+        }
+        content = await response.text();
+      }
+    }
+
+    // PHASE 2: Filter Ads and Rewrite Links
+    const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+    const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+    const lines = content.split('\n');
+    const cleanLines = [];
+    let skipNext = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim();
+      if (!line) continue;
+
+      // Check for ad segments
+      if (line.startsWith('#EXTINF')) {
+        let nextLine = (lines[i + 1] || '').trim();
+        if (nextLine && !nextLine.startsWith('#')) {
+          const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
+          if (isAd) {
+            skipNext = true;
+            continue;
+          }
+        }
+      }
+
+      if (skipNext) {
+        skipNext = false;
+        continue;
+      }
+
+      if (line.includes('#EXT-X-DISCONTINUITY')) continue;
+
+      // Rewrite URL and convertv7 logic
+      if (!line.startsWith('#')) {
+        if (!line.startsWith('http')) {
+          line = new URL(line, baseUrl).toString();
+        }
+        if (line.includes('convertv7/')) {
+          line = line.replace('convertv7/', '');
+        }
+      }
+      cleanLines.push(line);
+    }
+
+    const cleanContent = cleanLines.join('\n');
+
+    // Send the filtered M3U8 playlist back to the client
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    // Prevent client/CDN caching of this stream to avoid stale playlists
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    
+    res.send(cleanContent);
+  } catch (error) {
+    console.error('[proxyM3u8] Error:', error.message);
+    res.status(500).send('Error processing M3U8 stream');
+  }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -527,4 +635,5 @@ module.exports = {
   deleteComment,
   getRecommendations,
   getForYou,
+  proxyM3u8,
 };

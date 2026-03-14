@@ -8,7 +8,7 @@ import useToast from "hooks/useToast";
 import ToastContainer from "../common/ToastContainer";
 import PremiumRequiredModal from "../common/PremiumRequiredModal";
 import { isPremiumActive } from "utils/premiumUtils";
-// import { getVideoSource } from "config/video.config"; // Có thể bỏ dòng này nếu không dùng nữa
+import { getVideoSource, USE_SERVER_ADBLOCK } from "config/video.config";
 
 const VideoPlayer = ({
   movie,
@@ -60,11 +60,20 @@ const VideoPlayer = ({
 
   // 1. SỬA ĐỔI: Lấy link m3u8 trực tiếp, KHÔNG qua Proxy Backend
   const hlsSource = useMemo(() => {
+    let rawM3u8 = null;
     if (episode?.link_m3u8) {
-      return episode.link_m3u8; // Trả về link gốc
+      rawM3u8 = episode.link_m3u8;
+    } else if (episode?.videoUrl && episode.videoUrl.includes(".m3u8")) {
+      rawM3u8 = episode.videoUrl;
+    } else if (videoUrl && videoUrl.includes(".m3u8")) {
+      rawM3u8 = videoUrl;
     }
-    if (episode?.videoUrl && episode.videoUrl.includes(".m3u8")) return episode.videoUrl;
-    if (videoUrl && videoUrl.includes(".m3u8")) return videoUrl;
+
+    if (rawM3u8) {
+      const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+      return getVideoSource(rawM3u8, `${apiUrl}/movies/proxy-m3u8`);
+    }
+    
     return null;
   }, [episode, videoUrl]);
 
@@ -380,104 +389,101 @@ const VideoPlayer = ({
           try {
               console.log("🚀 Bắt đầu tải M3U8:", hlsSource);
               
-              // 1. Fetch file gốc
-              let currentUrl = hlsSource;
-              let response = await fetch(currentUrl);
-              let content = await response.text();
+              if (USE_SERVER_ADBLOCK) {
+                // Backend proxy đã xử lý việc tìm stream chất lượng cao nhất và lọc quảng cáo
+                // Chúng ta chỉ việc nạp thẳng URL này vào HLS.js
+                console.log("✅ Server-side Adblock Active");
+                hls.loadSource(hlsSource);
+              } else {
+                // --- CHẠY LOGIC LỌC QUẢNG CÁO Ở CLIENT ---
+                
+                // 1. Fetch file gốc
+                let currentUrl = hlsSource;
+                let response = await fetch(currentUrl);
+                let content = await response.text();
 
-              // --- GIAI ĐOẠN 1: XỬ LÝ MASTER PLAYLIST (QUAN TRỌNG: Mới thêm vào) ---
-              // Nếu file này chỉ là danh sách chọn độ phân giải, ta phải lấy link file thật
-              if (content.includes('#EXT-X-STREAM-INF')) {
-                  console.log("⚠️ Phát hiện Master Playlist -> Đang tìm luồng chất lượng cao nhất...");
-                  
-                  const lines = content.split('\n');
-                  let maxBandwidth = 0;
-                  let bestUri = '';
+                // --- GIAI ĐOẠN 1: XỬ LÝ MASTER PLAYLIST ---
+                if (content.includes('#EXT-X-STREAM-INF')) {
+                    console.log("⚠️ Phát hiện Master Playlist -> Đang tìm luồng chất lượng cao nhất...");
+                    
+                    const lines = content.split('\n');
+                    let maxBandwidth = 0;
+                    let bestUri = '';
 
-                  for (let i = 0; i < lines.length; i++) {
-                      if (lines[i].includes('BANDWIDTH=')) {
-                          const match = lines[i].match(/BANDWIDTH=(\d+)/);
-                          const bandwidth = match ? parseInt(match[1]) : 0;
-                          
-                          // Dòng tiếp theo là link m3u8 con
-                          const nextLine = (lines[i + 1] || '').trim();
-                          if (nextLine && !nextLine.startsWith('#') && bandwidth > maxBandwidth) {
-                              maxBandwidth = bandwidth;
-                              bestUri = nextLine;
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].includes('BANDWIDTH=')) {
+                            const match = lines[i].match(/BANDWIDTH=(\d+)/);
+                            const bandwidth = match ? parseInt(match[1]) : 0;
+                            
+                            const nextLine = (lines[i + 1] || '').trim();
+                            if (nextLine && !nextLine.startsWith('#') && bandwidth > maxBandwidth) {
+                                maxBandwidth = bandwidth;
+                                bestUri = nextLine;
+                            }
+                        }
+                    }
+
+                    if (bestUri) {
+                        currentUrl = new URL(bestUri, currentUrl).toString();
+                        console.log("👉 Chuyển hướng sang Media Playlist:", currentUrl);
+                        
+                        response = await fetch(currentUrl);
+                        content = await response.text();
+                    }
+                }
+
+                // --- GIAI ĐOẠN 2: LỌC QUẢNG CÁO & REWRITE LINK ---
+                const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+                const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+                const lines = content.split('\n');
+                const cleanLines = [];
+                let skipNext = false;
+
+                for (let i = 0; i < lines.length; i++) {
+                  let line = lines[i].trim();
+                  if (!line) continue;
+
+                  if (line.startsWith('#EXTINF')) {
+                      let nextLine = (lines[i + 1] || '').trim();
+                      if (nextLine && !nextLine.startsWith('#')) {
+                          const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
+                          if (isAd) {
+                              console.log("🚫 Đã chặn 1 quảng cáo:", nextLine);
+                              skipNext = true;
+                              continue;
                           }
                       }
                   }
 
-                  if (bestUri) {
-                      // Cập nhật URL mới để tải file con
-                      // new URL() sẽ tự xử lý việc nối link tương đối/tuyệt đối
-                      currentUrl = new URL(bestUri, currentUrl).toString();
-                      console.log("👉 Chuyển hướng sang Media Playlist:", currentUrl);
-                      
-                      // Tải nội dung của link con (Đây mới là file chứa quảng cáo)
-                      response = await fetch(currentUrl);
-                      content = await response.text();
+                  if (skipNext) {
+                      skipNext = false;
+                      continue;
                   }
+
+                  if (line.includes('#EXT-X-DISCONTINUITY')) continue;
+
+                  if (!line.startsWith('#')) {
+                      if (!line.startsWith('http')) {
+                          line = new URL(line, baseUrl).toString();
+                      }
+                      if (line.includes('convertv7/')) {
+                          line = line.replace('convertv7/', '');
+                      }
+                  }
+                  cleanLines.push(line);
+                }
+
+                const cleanM3u8Content = cleanLines.join('\n');
+
+                // 3. Tạo Blob URL
+                const blob = new Blob([cleanM3u8Content], { type: 'application/vnd.apple.mpegurl' });
+                
+                if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+                blobUrlRef.current = URL.createObjectURL(blob);
+                
+                console.log("✅ Client-side Adblock Active (Blob Created)");
+                hls.loadSource(blobUrlRef.current);
               }
-
-              // --- GIAI ĐOẠN 2: LỌC QUẢNG CÁO & REWRITE LINK ---
-              // BaseURL phải lấy từ cái link cuối cùng mình vừa tải (currentUrl)
-              const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-              
-              const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
-              const lines = content.split('\n');
-              const cleanLines = [];
-              let skipNext = false;
-
-              for (let i = 0; i < lines.length; i++) {
-                let line = lines[i].trim();
-                if (!line) continue;
-
-                // A. Check Quảng Cáo
-                if (line.startsWith('#EXTINF')) {
-                    let nextLine = (lines[i + 1] || '').trim();
-                    if (nextLine && !nextLine.startsWith('#')) {
-                        const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
-                        if (isAd) {
-                            console.log("🚫 Đã chặn 1 quảng cáo:", nextLine); // Log để kiểm chứng
-                            skipNext = true;
-                            continue;
-                        }
-                    }
-                }
-
-                if (skipNext) {
-                    skipNext = false;
-                    continue;
-                }
-
-                if (line.includes('#EXT-X-DISCONTINUITY')) continue;
-
-                // B. Rewrite Link & ConvertV7 (Áp dụng cho mọi dòng link video)
-                if (!line.startsWith('#')) {
-                    // 1. Chuyển link tương đối -> Tuyệt đối
-                    if (!line.startsWith('http')) {
-                        line = new URL(line, baseUrl).toString();
-                    }
-                    
-                    // 2. Fix lỗi convertv7 (như backend cũ)
-                    if (line.includes('convertv7/')) {
-                        line = line.replace('convertv7/', '');
-                    }
-                }
-                cleanLines.push(line);
-              }
-
-              const cleanM3u8Content = cleanLines.join('\n');
-
-              // 3. Tạo Blob URL
-              const blob = new Blob([cleanM3u8Content], { type: 'application/vnd.apple.mpegurl' });
-              
-              if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-              blobUrlRef.current = URL.createObjectURL(blob);
-              
-              console.log("✅ Client-side Adblock Active (Blob Created)");
-              hls.loadSource(blobUrlRef.current);
 
           } catch (err) {
               console.error("❌ Lỗi xử lý M3U8:", err);
