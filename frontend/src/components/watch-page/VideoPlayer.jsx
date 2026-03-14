@@ -196,79 +196,13 @@ const VideoPlayer = ({
     }
   }, [episode?._id, episode?.id]);
 
-  // Load progress and auto-seek logic (Giữ nguyên)
+  // === TỐI ƯU: Auto-play khi video sẵn sàng (không seek ở đây, startPosition lo) ===
   useEffect(() => {
     const video = videoRef.current;
-    const movieId = movie?._id || movie?.id;
-    if (!video || !hasNativePlayer || hasAutoPlayed || !user || !movieId) return;
+    if (!video || !hasNativePlayer || hasAutoPlayed) return;
 
-    let shouldSeek = false;
-    let seekTime = 0;
-
-    const currentKey = window.history.state?.key || window.location.pathname;
-    const lastKey = sessionStorage.getItem("watchPageKey");
-    const isReload = lastKey === currentKey;
-
-    if (!isReload) {
-      localStorage.removeItem("resumeTime");
-      sessionStorage.setItem("watchPageKey", currentKey);
-    }
-
-    const resumeTimeRef = localStorage.getItem("resumeTime");
-    const loadProgressAndSeek = async () => {
-      try {
-        if (resumeTime === 0 && resumeTimeRef === null) {
-          shouldSeek = false;
-          seekTime = 0;
-          localStorage.setItem("resumeTime", "1");
-          return;
-        }
-
-        const response = await userService.getProgress(movieId);
-
-        if (response?.success && response?.data) {
-          const progress = response.data;
-          if (progress.progress < 95 && progress.watchTime > 5) {
-            if (episode?._id || episode?.id) {
-              const savedEpisodeId =
-                progress.episodeId?._id || progress.episodeId?.id || progress.episodeId;
-              const currentEpisodeId = episode._id || episode.id;
-              if (savedEpisodeId && savedEpisodeId.toString() === currentEpisodeId.toString()) {
-                shouldSeek = true;
-                seekTime = Math.max(0, progress.watchTime - 3);
-              }
-            } else {
-              shouldSeek = true;
-              seekTime = Math.max(0, progress.watchTime - 3);
-            }
-          }
-        } else {
-          if (resumeTime !== null && resumeTime > 0) {
-            shouldSeek = true;
-            seekTime = Math.max(0, resumeTime - 3);
-          }
-        }
-      } catch (error) {
-        if (resumeTime !== null && resumeTime > 0) {
-          shouldSeek = true;
-          seekTime = Math.max(0, resumeTime - 3);
-        }
-      }
-    };
-
-    const handleCanPlayThrough = async () => {
-      await loadProgressAndSeek();
-
-      if (shouldSeek && !hasAutoSeekedRef.current) {
-        video.currentTime = seekTime;
-        setCurrentTime(seekTime);
-        hasAutoSeekedRef.current = true;
-      } else if (resumeTime === 0 && !hasAutoSeekedRef.current) {
-        video.currentTime = 0;
-        setCurrentTime(0);
-        hasAutoSeekedRef.current = true;
-      }
-
+    const handleCanPlay = async () => {
+      if (hasAutoPlayed) return;
       try {
         await video.play();
         setIsPlaying(true);
@@ -279,24 +213,15 @@ const VideoPlayer = ({
     };
 
     if (video.readyState >= 3) {
-      handleCanPlayThrough();
+      handleCanPlay();
     } else {
-      video.addEventListener("canplaythrough", handleCanPlayThrough);
+      video.addEventListener("canplay", handleCanPlay);
     }
 
     return () => {
-      video.removeEventListener("canplaythrough", handleCanPlayThrough);
+      video.removeEventListener("canplay", handleCanPlay);
     };
-  }, [
-    hasNativePlayer,
-    resumeTime,
-    hasAutoPlayed,
-    user,
-    movie?._id,
-    movie?.id,
-    episode?._id,
-    episode?.id,
-  ]);
+  }, [hasNativePlayer, hasAutoPlayed]);
 
   // Save progress logic (Giữ nguyên)
   useEffect(() => {
@@ -357,7 +282,8 @@ const VideoPlayer = ({
     };
   }, [user, movie?._id, movie?.id, episode?._id, episode?.id, duration, hasNativePlayer]);
 
-  // 2. SỬA ĐỔI: Client-side HLS Fetching & Processing (Đã fix lỗi Master Playlist)
+  // 2. SỬA ĐỔI: Client-side HLS Fetching & Processing
+  // TỐI ƯU: Fetch progress TRƯỚC → dùng startPosition để HLS load ĐÚNG CHỖ resume
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -375,10 +301,51 @@ const VideoPlayer = ({
 
     const initHlsPlayer = async () => {
         if (Hls.isSupported()) {
+          // === BƯỚC 1: Chỉ KHỞI TẠO progress fetching (Không await để tranh thủ làm việc khác) ===
+          const movieId = movie?._id || movie?.id;
+
+          const currentKey = window.history.state?.key || window.location.pathname;
+          const lastKey = sessionStorage.getItem("watchPageKey");
+          const isReload = lastKey === currentKey;
+          if (!isReload) {
+            localStorage.removeItem("resumeTime");
+            sessionStorage.setItem("watchPageKey", currentKey);
+          }
+          const resumeTimeRef = localStorage.getItem("resumeTime");
+
+          let progressPromise;
+          if (resumeTime === 0 && resumeTimeRef === null) {
+            localStorage.setItem("resumeTime", "1");
+            progressPromise = Promise.resolve(0);
+          } else if (user && movieId) {
+            progressPromise = userService.getProgress(movieId)
+              .then(response => {
+                if (response?.success && response?.data) {
+                  const progress = response.data;
+                  if (progress.progress < 95 && progress.watchTime > 5) {
+                    let matched = true;
+                    if (episode?._id || episode?.id) {
+                      const savedEpisodeId = progress.episodeId?._id || progress.episodeId?.id || progress.episodeId;
+                      const currentEpisodeId = episode._id || episode.id;
+                      matched = savedEpisodeId && savedEpisodeId.toString() === currentEpisodeId.toString();
+                    }
+                    if (matched) return Math.max(0, progress.watchTime - 3);
+                  }
+                }
+                return (resumeTime !== null && resumeTime > 0) ? Math.max(0, resumeTime - 3) : -1;
+              })
+              .catch(() => (resumeTime !== null && resumeTime > 0) ? Math.max(0, resumeTime - 3) : -1);
+          } else {
+            progressPromise = Promise.resolve((resumeTime !== null && resumeTime > 0) ? Math.max(0, resumeTime - 3) : -1);
+          }
+
+          // === BƯỚC 2: Khởi tạo HLS NGAY LẬP TỨC ===
           const hls = new Hls({
-            maxBufferLength: 30,
-            maxMaxBufferLength: 60,
+            maxBufferLength: 10,       // TỐI ƯU: Chỉ cần 10s buffer là đã tự tin bốc frame chiếu ngay, không cần cày cuốc chờ đủ 30s
+            maxMaxBufferLength: 30,    // TỐI ƯU: Không buffer quá 30s để tiết kiệm RAM và Bandwidth, ưu tiên play nhanh
+            maxBufferSize: 2 * 1000 * 1000, // TỐI ƯU: Ép HLS.js hiểu "chỉ cần tải 2MB data đầu tiên là phải nhả hình ra cho tao xem" thay vì tải cục 60MB
             startFragPrefetch: true,
+            autoStartLoad: false, // TỐI ƯU: Không tự động tải segment file (.ts) khi chưa có progress
             manifestLoadingTimeOut: 20000,
             fragLoadingTimeOut: 25000,
             manifestLoadingMaxRetry: 5,
@@ -495,8 +462,19 @@ const VideoPlayer = ({
           hlsRef.current = hls;
 
           // ... (Giữ nguyên phần Event Listeners bên dưới) ...
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-             // ... Logic quality cũ ...
+          hls.on(Hls.Events.MANIFEST_PARSED, async () => {
+             // === BƯỚC 3: M3U8 tải xong, chờ xem API progress trả về vị trí chưa ===
+             const startPos = await progressPromise;
+             console.log(`🎬 Start Load at Position: ${startPos >= 0 ? startPos + 's' : 'default'}`);
+             
+             if (startPos >= 0) {
+               video.currentTime = startPos;
+               hls.startLoad(startPos);
+             } else {
+               hls.startLoad();
+             }
+
+             // Logic quality giữ nguyên...
              const levels = hls.levels || [];
              setAvailableLevels(levels);
              if (levels.length > 0) {
