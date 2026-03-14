@@ -52,7 +52,14 @@ export function getVideoSource(m3u8Url, proxyEndpoint) {
 
   // Nếu sử dụng proxy lọc quảng cáo trên server hoặc CẦN proxy CORS, ta luôn gọi proxyEndpoint
   if (USE_SERVER_ADBLOCK || shouldUseProxy(m3u8Url)) {
-    return `${proxyEndpoint}?url=${encodeURIComponent(m3u8Url)}`;
+    let finalUrl = `${proxyEndpoint}?url=${encodeURIComponent(m3u8Url)}`;
+    
+    // Fix Mixed Content: Nếu trang đang chạy HTTPS, ép proxy URL cũng phải HTTPS
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+      finalUrl = finalUrl.replace(/^http:\/\//i, 'https://');
+    }
+    
+    return finalUrl;
   }
 
   return m3u8Url; // Direct URL cho client xử lý tiếp theo nếu USE_SERVER_ADBLOCK=false
