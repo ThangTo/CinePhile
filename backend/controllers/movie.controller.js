@@ -505,7 +505,9 @@ const getForYou = async (req, res) => {
 /**
  * GET /movies/proxy-m3u8
  * Proxy M3U8 stream to filter out advertisements
- * @param {string} req.query.url - Taget M3U8 URL
+ * Master Playlist: rewrites sub-playlist URLs to go through this proxy (adaptive bitrate + ad filtering)
+ * Media Playlist: filters ad segments and rewrites relative URLs to absolute
+ * @param {string} req.query.url - Target M3U8 URL
  */
 const proxyM3u8 = async (req, res) => {
   try {
@@ -514,95 +516,95 @@ const proxyM3u8 = async (req, res) => {
       return res.status(400).send('Missing url parameter');
     }
 
-    // Use native fetch to get the M3U8 content
-    let currentUrl = url;
-    let response = await fetch(currentUrl);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
     }
-    let content = await response.text();
+    const content = await response.text();
+    const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
 
-    // PHASE 1: Handle Master Playlist redirection
-    if (content.includes('#EXT-X-STREAM-INF')) {
+    // Build proxy base URL from request (e.g. "https://your-server/api/v1/movies/proxy-m3u8")
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const proxyBase = `${protocol}://${host}${req.baseUrl || ''}/proxy-m3u8`;
+
+    // Detect if this is a Master Playlist or a Media Playlist
+    const isMasterPlaylist = content.includes('#EXT-X-STREAM-INF');
+
+    let cleanContent;
+
+    if (isMasterPlaylist) {
+      // MASTER PLAYLIST: Keep all quality levels, rewrite sub-playlist URLs THROUGH PROXY
+      // This preserves adaptive bitrate AND ensures ad filtering at every level
       const lines = content.split('\n');
-      let maxBandwidth = 0;
-      let bestUri = '';
+      const rewrittenLines = lines.map((line) => {
+        const trimmed = line.trim();
+        // If it's a URL line (not a tag, not empty)
+        if (trimmed && !trimmed.startsWith('#')) {
+          // Resolve to absolute URL first
+          const absoluteUrl = trimmed.startsWith('http')
+            ? trimmed
+            : new URL(trimmed, baseUrl).toString();
+          // Rewrite through proxy so HLS.js will call us again for this sub-playlist
+          return `${proxyBase}?url=${encodeURIComponent(absoluteUrl)}`;
+        }
+        return line;
+      });
+      cleanContent = rewrittenLines.join('\n');
+    } else {
+      // MEDIA PLAYLIST: Filter ads and rewrite URLs
+      const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+      const lines = content.split('\n');
+      const cleanLines = [];
+      let skipNext = false;
 
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes('BANDWIDTH=')) {
-          const match = lines[i].match(/BANDWIDTH=(\d+)/);
-          const bandwidth = match ? parseInt(match[1], 10) : 0;
-          
+        let line = lines[i].trim();
+        if (!line) continue;
+
+        // Check for ad segments
+        if (line.startsWith('#EXTINF')) {
           const nextLine = (lines[i + 1] || '').trim();
-          if (nextLine && !nextLine.startsWith('#') && bandwidth > maxBandwidth) {
-            maxBandwidth = bandwidth;
-            bestUri = nextLine;
+          if (nextLine && !nextLine.startsWith('#')) {
+            const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
+            if (isAd) {
+              skipNext = true;
+              continue;
+            }
           }
         }
-      }
 
-      if (bestUri) {
-        currentUrl = new URL(bestUri, currentUrl).toString();
-        response = await fetch(currentUrl);
-        if (!response.ok) {
-           throw new Error(`Failed to fetch nested M3U8: ${response.statusText}`);
+        if (skipNext) {
+          skipNext = false;
+          continue;
         }
-        content = await response.text();
-      }
-    }
 
-    // PHASE 2: Filter Ads and Rewrite Links
-    const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-    const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
-    const lines = content.split('\n');
-    const cleanLines = [];
-    let skipNext = false;
+        if (line.includes('#EXT-X-DISCONTINUITY')) continue;
 
-    for (let i = 0; i < lines.length; i++) {
-      let line = lines[i].trim();
-      if (!line) continue;
-
-      // Check for ad segments
-      if (line.startsWith('#EXTINF')) {
-        let nextLine = (lines[i + 1] || '').trim();
-        if (nextLine && !nextLine.startsWith('#')) {
-          const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
-          if (isAd) {
-            skipNext = true;
-            continue;
+        // Rewrite relative URLs to absolute
+        if (!line.startsWith('#')) {
+          if (!line.startsWith('http')) {
+            line = new URL(line, baseUrl).toString();
+          }
+          if (line.includes('convertv7/')) {
+            line = line.replace('convertv7/', '');
           }
         }
+        cleanLines.push(line);
       }
 
-      if (skipNext) {
-        skipNext = false;
-        continue;
-      }
-
-      if (line.includes('#EXT-X-DISCONTINUITY')) continue;
-
-      // Rewrite URL and convertv7 logic
-      if (!line.startsWith('#')) {
-        if (!line.startsWith('http')) {
-          line = new URL(line, baseUrl).toString();
-        }
-        if (line.includes('convertv7/')) {
-          line = line.replace('convertv7/', '');
-        }
-      }
-      cleanLines.push(line);
+      cleanContent = cleanLines.join('\n');
     }
 
-    const cleanContent = cleanLines.join('\n');
-
-    // Send the filtered M3U8 playlist back to the client
+    // Send the processed M3U8 playlist back to the client
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-    // Prevent client/CDN caching of this stream to avoid stale playlists
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Cache 5 minutes to reduce repeated fetches
+    res.setHeader('Cache-Control', 'public, max-age=300');
     res.send(cleanContent);
   } catch (error) {
     console.error('[proxyM3u8] Error:', error.message);

@@ -376,8 +376,8 @@ const VideoPlayer = ({
     const initHlsPlayer = async () => {
         if (Hls.isSupported()) {
           const hls = new Hls({
-            maxBufferLength: 60,
-            maxMaxBufferLength: 120,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
             startFragPrefetch: true,
             manifestLoadingTimeOut: 20000,
             fragLoadingTimeOut: 25000,
@@ -390,8 +390,8 @@ const VideoPlayer = ({
               console.log("🚀 Bắt đầu tải M3U8:", hlsSource);
               
               if (USE_SERVER_ADBLOCK) {
-                // Backend proxy đã xử lý việc tìm stream chất lượng cao nhất và lọc quảng cáo
-                // Chúng ta chỉ việc nạp thẳng URL này vào HLS.js
+                // Server proxy xử lý toàn bộ: lọc quảng cáo + adaptive bitrate
+                // Chỉ cần truyền URL proxy trực tiếp cho HLS.js
                 console.log("✅ Server-side Adblock Active");
                 hls.loadSource(hlsSource);
               } else {
