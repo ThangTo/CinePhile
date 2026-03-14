@@ -1,5 +1,5 @@
-.env
-# .env.*
+.env.production
+.env.*
 /node_modules
 
 # PM2 logs
