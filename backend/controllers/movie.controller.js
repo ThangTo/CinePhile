@@ -729,8 +729,6 @@ const downloadMovie = async (req, res) => {
  * @param {string} req.query.filename - Desired output filename
  */
 const downloadMovieMobile = async (req, res) => {
-  let outputPath = null;
-
   try {
     const { url, filename } = req.query;
     if (!url) {
@@ -756,11 +754,13 @@ const downloadMovieMobile = async (req, res) => {
     const protocol = req.protocol === 'https' ? 'https' : 'http';
     const proxyUrl = `${protocol}://127.0.0.1:${localPort}/api/v1/movies/proxy-m3u8?url=${encodeURIComponent(url)}`;
 
-    // Đường dẫn File Tạm (MP4) chứa video Mobile do Server kéo hộ
-    outputPath = path.join(os.tmpdir(), `mobile_export_${Date.now()}_${Math.floor(Math.random() * 1000)}.mp4`);
     const finalFilename = filename ? `${filename}.mp4` : `CinePhine_Movie_${Date.now()}.mp4`;
 
-    console.log(`[Mobile Download] Chấp nhận kết nối (${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS}). Đang tải phim proxy gốc...`);
+    // Cài đặt Response Headers để rủ trình duyệt Tải về dạng Dòng Chảy (Stream)
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(finalFilename)}"`);
+    res.setHeader('Content-Type', 'video/mp4');
+
+    console.log(`[Mobile Download] Chấp nhận kết nối (${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS}). Đang Stream trực tiếp ra HTTP...`);
 
     let isAborted = false;
 
@@ -772,9 +772,10 @@ const downloadMovieMobile = async (req, res) => {
       ])
       .outputOptions([
         '-c copy',             // Copy video/audio, no re-encoding
-        '-bsf:a aac_adtstoasc' // Sửa lỗi AAC Audio bị gãy
+        '-bsf:a aac_adtstoasc',// Sửa lỗi AAC Audio bị gãy
+        '-f mp4',              // Định dạng MP4 container
+        '-movflags frag_keyframe+empty_moov' // STREAMING CHUNKED MP4: Cho phép ghi MP4 không cần đợi kết thúc
       ])
-      .save(outputPath)
       .on('error', (err) => {
         if (isAborted) {
           console.log('[Mobile Download] Đã huỷ tiến trình FFmpeg an toàn do User ngắt kết nối sớm.');
@@ -782,32 +783,20 @@ const downloadMovieMobile = async (req, res) => {
           console.error('[Mobile Download] FFmpeg Error:', err.message);
           if (!res.headersSent) {
              res.status(500).send('Lỗi trong quá trình tạo video (FFmpeg Server Error)');
+          } else {
+             res.end(); // Kết thúc stream lỗi để tránh treo tab Client
           }
         }
         activeDownloads = Math.max(0, activeDownloads - 1);
-        if (outputPath && fs.existsSync(outputPath)) {
-          try { fs.unlinkSync(outputPath); } catch(e){}
-        }
       })
       .on('end', () => {
         if (isAborted) return;
-        console.log(`[Mobile Download] Nén xong MP4! Đang truyền về Client. Active: ${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS}`);
-        
-        // Truyền file khổng lồ về ổ cứng người dùng Mobile
-        res.download(outputPath, finalFilename, (err) => {
-          if (err) {
-            console.error('[Mobile Download] Lỗi rớt mạng khi điện thoại tải file:', err.message);
-          }
-          
-          activeDownloads = Math.max(0, activeDownloads - 1);
-          console.log(`[Mobile Download] Đóng kết nối. Giải phóng hàng đợi: ${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS}`);
-
-          // Cực kỳ quan trọng: Nhớ dọn rác Ổ Đĩa Vercel
-          if (outputPath && fs.existsSync(outputPath)) {
-            try { fs.unlinkSync(outputPath); } catch (e) {}
-          }
-        });
+        console.log(`[Mobile Download] Nén và Stream xong MP4! Active: ${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS}`);
+        activeDownloads = Math.max(0, activeDownloads - 1);
       });
+
+    // Bơm thẳng dữ liệu từ FFmpeg qua HTTP Response về điện thoại người dùng (ZERO-DISK)
+    command.pipe(res, { end: true });
 
     // Phòng hộ: Nếu người dùng ngắt kết nối (tắt tab) TRƯỚC khi FFmpeg nén xong
     req.on('close', () => {
@@ -824,9 +813,8 @@ const downloadMovieMobile = async (req, res) => {
     activeDownloads = Math.max(0, activeDownloads - 1);
     if (!res.headersSent) {
       res.status(500).send('Error processing download request');
-    }
-    if (outputPath && fs.existsSync(outputPath)) {
-      try { fs.unlinkSync(outputPath); } catch (e) {}
+    } else {
+      res.end();
     }
   }
 };

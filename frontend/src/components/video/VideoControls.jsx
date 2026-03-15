@@ -62,6 +62,11 @@ const VideoControls = ({
   setShowMoreMenu,
   // Download
   onDownload,
+  // Download Progress (Minimal UI)
+  isDownloading,
+  downloadProgress,
+  isDownloadMinimized,
+  onToggleDownloadMinimize,
 }) => {
   if (!showControls || !hasNativePlayer) {
     return null;
@@ -165,6 +170,30 @@ const VideoControls = ({
             </span>
           </div>
         </div>
+
+        {/* Center Controls (Minimized Download Progress) */}
+        {isDownloading && isDownloadMinimized && (
+          <Tooltip text="Mở rộng thông tin tải">
+            <div 
+              onClick={onToggleDownloadMinimize}
+              className="hidden lg:flex items-center gap-3 bg-white/10 px-4 py-1.5 rounded-full cursor-pointer hover:bg-white/20 transition-all border border-white/5 mx-2 min-w-[200px]"
+            >
+              <i className="fa-solid fa-cloud-arrow-down text-primaryColor animate-bounce text-sm" style={{ animationDuration: '1.5s' }}></i>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-white/70 font-medium">Đang tải...</span>
+                  <span className="text-[10px] text-white font-bold">{downloadProgress}%</span>
+                </div>
+                <div className="w-full bg-white/20 rounded-full h-1 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-primaryColor to-primaryColor/70 h-1 rounded-full transition-all duration-300"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </Tooltip>
+        )}
 
         <div className="flex items-center gap-1 md:gap-2">
           {/* Next Episode - Desktop/Tablet */}
