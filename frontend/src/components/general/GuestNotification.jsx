@@ -78,6 +78,7 @@ const GuestNotification = () => {
   const features = [
     { icon: "🎬", text: "Lưu phim yêu thích & danh sách xem sau" },
     { icon: "📊", text: "Theo dõi tiến trình xem phim" },
+    { icon: "📥", text: "Tải phim không quảng cáo về máy" },
     { icon: "🔔", text: "Nhận thông báo phim mới" },
     { icon: "✨", text: "Đề xuất phim cá nhân hóa" },
     { icon: "⭐", text: "Đánh giá và bình luận phim" },

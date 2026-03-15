@@ -1,8 +1,11 @@
 const movieService = require('../services/movie.service');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
-const os = require('os');/**
+
+let activeDownloads = 0;
+const MAX_CONCURRENT_DOWNLOADS = 3;/**
  * Helper: Parse array query parameters (genres, countries)
  * @param {string|string[]} param - Query parameter value
  * @returns {string[]|undefined} Parsed array or undefined
@@ -629,11 +632,10 @@ const proxyM3u8 = async (req, res) => {
  * @param {string} req.query.filename - Desired output filename
  */
 const downloadMovie = async (req, res) => {
-  let tempM3u8Path = null;
   try {
-    const { url, filename } = req.query;
+    const { url } = req.query;
     if (!url) {
-      return res.status(400).send('Missing url parameter');
+      return res.status(400).json({ error: 'Missing url parameter' });
     }
 
     let currentUrl = url;
@@ -677,7 +679,7 @@ const downloadMovie = async (req, res) => {
     const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
     const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
     const lines = content.split('\n');
-    const cleanLines = [];
+    const segments = [];
     let skipNext = false;
 
     for (let i = 0; i < lines.length; i++) {
@@ -709,58 +711,122 @@ const downloadMovie = async (req, res) => {
         if (line.includes('convertv7/')) {
           line = line.replace('convertv7/', '');
         }
+        segments.push(line);
       }
-      cleanLines.push(line);
     }
 
-    const cleanContent = cleanLines.join('\n');
-
-    // 3. Write clean M3U8 to temp directory
-    tempM3u8Path = path.join(os.tmpdir(), `clean_download_${Date.now()}_${Math.floor(Math.random() * 1000)}.m3u8`);
-    fs.writeFileSync(tempM3u8Path, cleanContent);
-
-    // 4. Stream response using FFmpeg
-    const outputFilename = filename ? `${filename}.mp4` : `movie_${Date.now()}.mp4`;
-    
-    // Đảm bảo tên file an toàn cho HTTP headers
-    const safeFilename = encodeURIComponent(outputFilename).replace(/['()]/g, escape).replace(/\*/g, '%2A');
-
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${safeFilename}`);
-    res.setHeader('Content-Type', 'video/mp4');
-
-    const command = ffmpeg(tempM3u8Path)
-      .inputOptions(['-protocol_whitelist file,http,https,tcp,tls,crypto'])
-      .outputOptions([
-        '-c copy',
-        '-bsf:a aac_adtstoasc',
-        '-f mp4',
-        '-movflags frag_keyframe+empty_moov' // Required for streaming MP4
-      ])
-      .on('error', (err) => {
-        console.error('[downloadMovie] FFmpeg Error:', err.message);
-        if (!res.headersSent) {
-          res.status(500).send('Error generating video');
-        }
-        if (tempM3u8Path && fs.existsSync(tempM3u8Path)) {
-          fs.unlinkSync(tempM3u8Path);
-        }
-      })
-      .on('end', () => {
-        console.log(`[downloadMovie] Finished streaming ${outputFilename}`);
-        if (tempM3u8Path && fs.existsSync(tempM3u8Path)) {
-          fs.unlinkSync(tempM3u8Path);
-        }
-      });
-
-    command.pipe(res, { end: true });
+    res.json({ segments });
 
   } catch (error) {
     console.error('[downloadMovie] Error:', error.message);
+    res.status(500).json({ error: 'Error processing download request' });
+  }
+};
+
+/**
+ * Handle Desktop / Mobile Video Segment TS generation (For Mobile Fallback)
+ * @param {string} req.query.url - Link M3U8
+ * @param {string} req.query.filename - Desired output filename
+ */
+const downloadMovieMobile = async (req, res) => {
+  let outputPath = null;
+
+  try {
+    const { url, filename } = req.query;
+    if (!url) {
+      return res.status(400).send('Missing url parameter');
+    }
+
+    // 1. Kiểm tra giới hạn người tải cùng lúc
+    if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
+      console.warn(`[Mobile Download] TỪ CHỐI TẢI do vượt quá giới hạn concurrent (${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS})`);
+      return res.status(429).send('Server đang có quá nhiều yêu cầu tải phim cùng lúc. Vui lòng thử lại sau vài phút!');
+    }
+
+    // Nếu chỉ là request Ping kiểm tra slot trống từ trình duyệt (Pre-flight check)
+    if (req.method === 'HEAD') {
+      return res.status(200).end();
+    }
+
+    // Tăng count khi có người vào luồng
+    activeDownloads++;
+    req.setTimeout(0); // Vô hiệu hoá Time-out
+
+    const localPort = req.socket.localPort || process.env.PORT || 5000;
+    const protocol = req.protocol === 'https' ? 'https' : 'http';
+    const proxyUrl = `${protocol}://127.0.0.1:${localPort}/api/v1/movies/proxy-m3u8?url=${encodeURIComponent(url)}`;
+
+    // Đường dẫn File Tạm (MP4) chứa video Mobile do Server kéo hộ
+    outputPath = path.join(os.tmpdir(), `mobile_export_${Date.now()}_${Math.floor(Math.random() * 1000)}.mp4`);
+    const finalFilename = filename ? `${filename}.mp4` : `CinePhine_Movie_${Date.now()}.mp4`;
+
+    console.log(`[Mobile Download] Chấp nhận kết nối (${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS}). Đang tải phim proxy gốc...`);
+
+    let isAborted = false;
+
+    // Chạy Engine FFmpeg để Multiplex video
+    const command = ffmpeg(proxyUrl)
+      .inputOptions([
+        '-protocol_whitelist file,http,https,tcp,tls,crypto',
+        '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n'
+      ])
+      .outputOptions([
+        '-c copy',             // Copy video/audio, no re-encoding
+        '-bsf:a aac_adtstoasc' // Sửa lỗi AAC Audio bị gãy
+      ])
+      .save(outputPath)
+      .on('error', (err) => {
+        if (isAborted) {
+          console.log('[Mobile Download] Đã huỷ tiến trình FFmpeg an toàn do User ngắt kết nối sớm.');
+        } else {
+          console.error('[Mobile Download] FFmpeg Error:', err.message);
+          if (!res.headersSent) {
+             res.status(500).send('Lỗi trong quá trình tạo video (FFmpeg Server Error)');
+          }
+        }
+        activeDownloads = Math.max(0, activeDownloads - 1);
+        if (outputPath && fs.existsSync(outputPath)) {
+          try { fs.unlinkSync(outputPath); } catch(e){}
+        }
+      })
+      .on('end', () => {
+        if (isAborted) return;
+        console.log(`[Mobile Download] Nén xong MP4! Đang truyền về Client. Active: ${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS}`);
+        
+        // Truyền file khổng lồ về ổ cứng người dùng Mobile
+        res.download(outputPath, finalFilename, (err) => {
+          if (err) {
+            console.error('[Mobile Download] Lỗi rớt mạng khi điện thoại tải file:', err.message);
+          }
+          
+          activeDownloads = Math.max(0, activeDownloads - 1);
+          console.log(`[Mobile Download] Đóng kết nối. Giải phóng hàng đợi: ${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS}`);
+
+          // Cực kỳ quan trọng: Nhớ dọn rác Ổ Đĩa Vercel
+          if (outputPath && fs.existsSync(outputPath)) {
+            try { fs.unlinkSync(outputPath); } catch (e) {}
+          }
+        });
+      });
+
+    // Phòng hộ: Nếu người dùng ngắt kết nối (tắt tab) TRƯỚC khi FFmpeg nén xong
+    req.on('close', () => {
+      // Nếu file MP4 chưa kịp gửi ra ngoài (nghĩa là connection bị drop lúc ffmpeg đang chạy)
+      if (!res.writableEnded) {
+        console.warn(`[Mobile Download] Khách hàng ngắt kết nối sớm. Đang Dừng khẩn cấp FFmpeg...`);
+        isAborted = true;
+        command.kill('SIGKILL'); // Bóp cổ Fire sự kiện .on('error') ở trên
+      }
+    });
+
+  } catch (error) {
+    console.error('[Mobile Download] Ngoại lệ rớt Error Catch:', error.message);
+    activeDownloads = Math.max(0, activeDownloads - 1);
     if (!res.headersSent) {
       res.status(500).send('Error processing download request');
     }
-    if (tempM3u8Path && fs.existsSync(tempM3u8Path)) {
-      try { fs.unlinkSync(tempM3u8Path); } catch (e) {}
+    if (outputPath && fs.existsSync(outputPath)) {
+      try { fs.unlinkSync(outputPath); } catch (e) {}
     }
   }
 };
@@ -789,7 +855,10 @@ module.exports = {
   dislikeComment,
   deleteComment,
   getRecommendations,
-  getForYou,
+  getEpisodes,
   proxyM3u8,
   downloadMovie,
+  downloadMovieMobile,
+  getCast,
+  getForYou,
 };

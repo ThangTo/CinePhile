@@ -40,8 +40,12 @@ const VideoPlayer = ({
   const [bufferedPercentage, setBufferedPercentage] = useState(0);
   const [hasAutoPlayed, setHasAutoPlayed] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadTotalSegments, setDownloadTotalSegments] = useState(0);
+  const [downloadCompletedSegments, setDownloadCompletedSegments] = useState(0);
 
-  const { user } = useAuth();
+  const { user, openAuthModal } = useAuth();
   const isPremium = isPremiumActive(user);
   const isAdmin = user?.role === "admin";
   const isRegularUser = !isPremium && !isAdmin;
@@ -57,6 +61,7 @@ const VideoPlayer = ({
 
   const hlsRef = useRef(null);
   const blobUrlRef = useRef(null); // Ref để lưu Blob URL và dọn dẹp sau này
+  const downloadAbortControllerRef = useRef(null);
 
   // 1. SỬA ĐỔI: Lấy link m3u8 trực tiếp, KHÔNG qua Proxy Backend
   const hlsSource = useMemo(() => {
@@ -341,8 +346,8 @@ const VideoPlayer = ({
 
           // === BƯỚC 2: Khởi tạo HLS NGAY LẬP TỨC ===
           const hls = new Hls({
-            maxBufferLength: 30,
-            maxMaxBufferLength: 60,
+            maxBufferLength: 40,
+            maxMaxBufferLength: 80,
             maxBufferSize: 2 * 1000 * 1000,
             startFragPrefetch: true,
             autoStartLoad: false,
@@ -865,7 +870,17 @@ const VideoPlayer = ({
     }
   }, [quality, availableLevels.length, applyQualityLevel]);
 
-  const handleDownloadMovie = useCallback(() => {
+  const handleDownloadMovie = useCallback(async () => {
+    if (!user) {
+      openAuthModal("login");
+      return;
+    }
+
+    if (isDownloading) {
+      showToast("Đang có một tiến trình tải phim, vui lòng đợi!", "warning");
+      return;
+    }
+
     let rawM3u8 = null;
     if (episode?.link_m3u8) {
       rawM3u8 = episode.link_m3u8;
@@ -880,22 +895,135 @@ const VideoPlayer = ({
       return;
     }
 
-    showToast("Đang tải dữ liệu phim, vui lòng đợi hộp thoại lưu file xuất hiện...", "info");
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    downloadAbortControllerRef.current = new AbortController();
+    const signal = downloadAbortControllerRef.current.signal;
 
-    const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
-    const movieNameStr = movie?.name || "Phim";
-    const episodeStr = episode?.name ? ` - Tập ${episode.name}` : "";
-    const filename = `${movieNameStr}${episodeStr}`;
+    showToast("Đang lấy thông tin các phân đoạn phim từ Server...", "info");
 
-    const downloadUrl = `${apiUrl}/movies/download?url=${encodeURIComponent(rawM3u8)}&filename=${encodeURIComponent(filename)}`;
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+      const movieNameStr = movie?.name || "Phim";
+      const episodeStr = episode?.name ? ` - Tập ${episode.name}` : "";
+      const baseFilename = `CinePhine - ${movieNameStr}${episodeStr}`;
 
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [episode, videoUrl, movie, showToast]);
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // --- NHÁNH 1: MOBILE (Dùng Server Proxy FFmpeg) ---
+        setIsDownloading(false);
+        showToast("Đang kết nối luồng tải MP4 dành riêng cho thiết bị di động...", "info");
+        
+        const mobileDownloadUrl = `${apiUrl}/movies/download-mobile?url=${encodeURIComponent(rawM3u8)}&filename=${encodeURIComponent(baseFilename)}`;
+        
+        // Gõ cửa kiểm tra xem Server có full chỗ không (Pre-flight HEAD request)
+        const checkRes = await fetch(mobileDownloadUrl, { method: 'HEAD' });
+        
+        if (checkRes.status === 429) {
+           showToast("Server đang có quá nhiều (+3) giao dịch tải phim cùng lúc! Vui lòng thử lại sau vài phút.", "error");
+           return; // Hủy không tải
+        } else if (!checkRes.ok) {
+           throw new Error("Lỗi kết nối đến luồng tải di động. " + checkRes.status);
+        }
+
+        // Nếu còn slot, ra lệnh cho trình duyệt tải về dưới nền. Bỏ target="_blank" để tránh mở tab trắng.
+        showToast("Máy chủ đang xử lý nén phim nguyên khối. Quá trình tải sẽ tự động bắt đầu sau ít phút, vui lòng chờ nguyên trang!", "success");
+        const a = document.createElement('a');
+        a.href = mobileDownloadUrl;
+        a.setAttribute("download", `${baseFilename}.mp4`);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+      } else {
+        // --- NHÁNH 2: DESKTOP (Tự tải TS cục bộ) ---
+        const response = await fetch(`${apiUrl}/movies/download?url=${encodeURIComponent(rawM3u8)}`);
+        if (!response.ok) throw new Error("Lỗi khi lấy thông tin tải phim từ Server");
+
+        const { segments } = await response.json();
+        if (!segments || segments.length === 0) throw new Error("Không tìm thấy dữ liệu video stream hợp lệ");
+
+        setDownloadTotalSegments(segments.length);
+        setDownloadCompletedSegments(0);
+
+        // NATIVE FILE SYSTEM (Chrome/Edge - Tối ưu 0% RAM)
+        if (window.showSaveFilePicker) {
+          showToast(`Bắt đầu tải ${segments.length} phân đoạn video xuống đĩa cứng...`, "info");
+          try {
+            const fileHandle = await window.showSaveFilePicker({
+              suggestedName: `${baseFilename}.ts`,
+              types: [{ description: 'TS Video File', accept: { 'video/mp2t': ['.ts'] } }]
+            });
+
+            const writable = await fileHandle.createWritable();
+            let completed = 0;
+
+            for (let i = 0; i < segments.length; i += 4) {
+              const batch = segments.slice(i, i + 4);
+              const buffers = await Promise.all(batch.map(async (segUrl) => {
+                const res = await fetch(segUrl, { signal }); return await res.arrayBuffer();
+              }));
+              for (const buffer of buffers) {
+                await writable.write(buffer);
+                completed++;
+                setDownloadCompletedSegments(completed);
+                setDownloadProgress(Math.floor((completed / segments.length) * 100));
+              }
+            }
+            await writable.close();
+            showToast(`Đã lưu thành công phim vào máy của bạn!`, "success");
+          } catch (err) {
+            if (err.name !== 'AbortError') throw err; // Chống lỗi khi user huỷ
+          }
+        } 
+        // FALLBACK BỘ ĐỆM RAM (Firefox, Safari Mac, hoặc Web không có HTTPS)
+        else {
+          showToast(`Trình duyệt không hỗ trợ luồng ghi. Bắt đầu tải ${segments.length} phân đoạn vào bộ đệm RAM...`, "warning");
+          const allBuffers = [];
+          let completed = 0;
+
+          for (let i = 0; i < segments.length; i += 4) {
+             const batch = segments.slice(i, i + 4);
+             const buffers = await Promise.all(batch.map(async (segUrl) => {
+               const res = await fetch(segUrl, { signal }); return await res.arrayBuffer();
+             }));
+             for (const buffer of buffers) {
+               allBuffers.push(buffer);
+               completed++;
+               setDownloadCompletedSegments(completed);
+               setDownloadProgress(Math.floor((completed / segments.length) * 100));
+             }
+          }
+
+          const blob = new Blob(allBuffers, { type: 'video/mp2t' });
+          const objUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = objUrl;
+          a.download = `${baseFilename}.ts`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(objUrl);
+          showToast(`Đã lưu thành công phim! Vui lòng kiểm tra thư mục Download.`, "success");
+        }
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') return; // Bỏ qua lốc lỗi nếu người dùng chủ động huỷ
+      console.error("Lỗi tải phim", error);
+      showToast(error.message || "Có lỗi xảy ra trong quá trình tải. Giao thức bị từ chối.", "error");
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [user, episode, videoUrl, movie, showToast, openAuthModal, isDownloading]);
+
+  const handleCancelDownload = useCallback(() => {
+    if (downloadAbortControllerRef.current) {
+      downloadAbortControllerRef.current.abort();
+    }
+    setIsDownloading(false);
+    showToast("Tiến trình tải phim đã bị hủy.", "info");
+  }, [showToast]);
 
   const blurAmount = useMemo(() => {
     if (quality === "Auto" || !currentActualQuality) return 0;
@@ -1071,6 +1199,37 @@ const VideoPlayer = ({
         setShowMoreMenu={setShowMoreMenu}
         onDownload={handleDownloadMovie}
       />
+
+      {/* Download Progress Overlay */}
+      {isDownloading && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-black/85 p-6 rounded-xl flex flex-col items-center justify-center border border-white/10 min-w-[320px] backdrop-blur-xl shadow-2xl">
+          <div className="text-white text-lg font-bold mb-4 flex items-center gap-3">
+            <i className="fa-solid fa-cloud-arrow-down text-primaryColor md:text-xl relative"><span className="absolute inline-flex h-full w-full rounded-full bg-primaryColor opacity-20 animate-ping inset-0"></span></i>
+            Đang ghép nối phim...
+          </div>
+          <div className="w-full bg-white/10 rounded-full h-3 mb-3 relative overflow-hidden">
+            <div 
+              className="bg-primaryColor h-3 rounded-full transition-all duration-300 relative" 
+              style={{ width: `${downloadProgress}%` }}
+            >
+              <div className="absolute top-0 right-0 bottom-0 left-0 bg-white/20 animate-pulse"></div>
+            </div>
+          </div>
+          <div className="text-white text-sm font-medium mb-1">
+            {downloadProgress}% ({downloadCompletedSegments}/{downloadTotalSegments} đoạn vỡ)
+          </div>
+          <div className="text-white/50 text-xs mt-2 text-center leading-relaxed">
+            Vui lòng <span className="text-yellow-400">không đóng tab</span> trình duyệt <br/> cho đến khi tiến trình đạt 100%.
+          </div>
+          <button 
+             onClick={handleCancelDownload}
+             className="mt-4 px-5 py-2 bg-red-600/80 hover:bg-red-500 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+             Hủy Tải
+          </button>
+        </div>
+      )}
+
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <PremiumRequiredModal isOpen={showPremiumModal} onClose={() => setShowPremiumModal(false)} />
     </div>
