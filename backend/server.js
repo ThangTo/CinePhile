@@ -1,9 +1,11 @@
 const dotenv = require('dotenv');
 dotenv.config();
 const mongoose = require('mongoose');
+const http = require('http');
 const { connectDB } = require('./config/db/db');
 const redisService = require('./services/redis.service');
 const { initCronJobs } = require('./services/cron.service');
+const { initVoiceSocket } = require('./services/voiceSocket.service');
 const app = require('./app');
 const PORT = process.env.PORT || 5000;
 // Connect to database
@@ -18,8 +20,14 @@ redisService.connect().catch((err) => {
 // Initialize cron jobs for automated tasks
 initCronJobs();
 
+// Create HTTP server from Express app (required for Socket.IO)
+const httpServer = http.createServer(app);
+
+// Attach Voice WebSocket (Deepgram + Timi)
+initVoiceSocket(httpServer);
+
 // Start server
-const server = app.listen(PORT, () => {
+const server = httpServer.listen(PORT, () => {
   console.log(`🚀 Server (PID: ${process.pid}) listening at http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
 
@@ -34,6 +42,16 @@ const gracefulShutdown = async (signal) => {
   console.log(`\n${signal} received. Shutting down gracefully...`);
   server.close(async () => {
     console.log('✅ HTTP server closed');
+
+    // Close Bull queue
+    try {
+      const { closeQueue } = require('./services/videoQueue.service');
+      await closeQueue();
+      const { closeAnalysisQueue } = require('./services/analysisQueue.service');
+      await closeAnalysisQueue();
+    } catch (err) {
+      console.warn('⚠️ Queue close error:', err.message);
+    }
 
     // Close Redis connection
     if (redisService.isConnected) {

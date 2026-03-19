@@ -3,6 +3,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { processM3u8Stream } = require('../utils/m3u8Utils');
 
 let activeDownloads = 0;
 const MAX_CONCURRENT_DOWNLOADS = 3;/**
@@ -545,73 +546,10 @@ const proxyM3u8 = async (req, res) => {
     
     const proxyBase = `${protocol}://${host}${req.baseUrl || ''}/proxy-m3u8`;
 
-    // Detect if this is a Master Playlist or a Media Playlist
     const isMasterPlaylist = content.includes('#EXT-X-STREAM-INF');
 
-    let cleanContent;
-
-    if (isMasterPlaylist) {
-      // MASTER PLAYLIST: Keep all quality levels, rewrite sub-playlist URLs THROUGH PROXY
-      // This preserves adaptive bitrate AND ensures ad filtering at every level
-      const lines = content.split('\n');
-      const rewrittenLines = lines.map((line) => {
-        const trimmed = line.trim();
-        // If it's a URL line (not a tag, not empty)
-        if (trimmed && !trimmed.startsWith('#')) {
-          // Resolve to absolute URL first
-          const absoluteUrl = trimmed.startsWith('http')
-            ? trimmed
-            : new URL(trimmed, baseUrl).toString();
-          // Rewrite through proxy so HLS.js will call us again for this sub-playlist
-          return `${proxyBase}?url=${encodeURIComponent(absoluteUrl)}`;
-        }
-        return line;
-      });
-      cleanContent = rewrittenLines.join('\n');
-    } else {
-      // MEDIA PLAYLIST: Filter ads and rewrite URLs
-      const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
-      const lines = content.split('\n');
-      const cleanLines = [];
-      let skipNext = false;
-
-      for (let i = 0; i < lines.length; i++) {
-        let line = lines[i].trim();
-        if (!line) continue;
-
-        // Check for ad segments
-        if (line.startsWith('#EXTINF')) {
-          const nextLine = (lines[i + 1] || '').trim();
-          if (nextLine && !nextLine.startsWith('#')) {
-            const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
-            if (isAd) {
-              skipNext = true;
-              continue;
-            }
-          }
-        }
-
-        if (skipNext) {
-          skipNext = false;
-          continue;
-        }
-
-        if (line.includes('#EXT-X-DISCONTINUITY')) continue;
-
-        // Rewrite relative URLs to absolute
-        if (!line.startsWith('#')) {
-          if (!line.startsWith('http')) {
-            line = new URL(line, baseUrl).toString();
-          }
-          if (line.includes('convertv7/')) {
-            line = line.replace('convertv7/', '');
-          }
-        }
-        cleanLines.push(line);
-      }
-
-      cleanContent = cleanLines.join('\n');
-    }
+    // Use the extracted utility function to ensure 100% exact logic
+    const cleanContent = await processM3u8Stream(url, proxyBase);
 
     // Send the processed M3U8 playlist back to the client
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');

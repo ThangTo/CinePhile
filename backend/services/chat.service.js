@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 // ENVIRONMENT VARIABLES - API Keys
 // ============================================
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const { callOpenRouterWithFallback, isRateLimitError } = require('../utils/llmUtils');
 
 const SYSTEM_PROMPT =
   process.env.CHATBOT_SYSTEM_PROMPT ||
@@ -78,19 +79,6 @@ function detectIntentByKeyword(message = '') {
   return 'general';
 }
 
-function isRateLimitError(error) {
-  const errorMsg = error?.message?.toLowerCase() || '';
-  const errorStr = JSON.stringify(error).toLowerCase();
-  return (
-    errorMsg.includes('rate limit') ||
-    errorMsg.includes('quota') ||
-    errorMsg.includes('429') ||
-    errorStr.includes('rate_limit_exceeded') ||
-    errorStr.includes('quota_exceeded') ||
-    error?.status === 429 ||
-    error?.statusCode === 429
-  );
-}
 
 // ============================================
 // INTENT CLASSIFIER - OpenRouter
@@ -138,32 +126,17 @@ async function classifyIntentWithOpenRouter(message) {
     ${message}`;
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': process.env.CLIENT_URL || 'https://cinephile.app',
-        'X-Title': 'CinePhile Chatbot',
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
-        messages: [
-    {
-      role: 'user',
-            content: classifierPrompt,
-    },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      }),
-  });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-      throw new Error(data.error?.message || 'OpenRouter API error');
-  }
+    const data = await callOpenRouterWithFallback({
+      model: 'openai/gpt-4o-mini', // Intent model
+      messages: [
+        {
+          role: 'user',
+          content: classifierPrompt,
+        },
+      ],
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+    });
 
     const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
     const parsed = JSON.parse(rawText);
@@ -188,51 +161,9 @@ async function classifyIntentWithOpenRouter(message) {
 }
 
 // ============================================
-// LLM ADAPTER - OpenRouter (Multiple Models)
+// MAIN LLM CALLER - OpenRouter with fallback
 // ============================================
-
-// OpenRouter Adapter - Try different models with fallback
-async function callOpenRouter({ userQuery, dbContext, history = [], model = null }) {
-  if (!OPENROUTER_API_KEY) {
-    throw new Error('OPENROUTER_API_KEY chưa được cấu hình');
-  }
-
-  // Default model list to try (in order of preference)
-  const models = model
-    ? [model]
-    : [
-      'qwen/qwen3-4b:free',
-      'qwen/qwen3-next-80b-a3b-instruct:free',
-      'qwen/qwen3-coder:free',
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'meta-llama/llama-3.2-3b-instruct:free',
-      'openai/gpt-oss-120b:free',
-      'openai/gpt-oss-20b:free',
-      'google/gemma-3-4b-it:free',
-      'google/gemma-3-12b-it:free',
-      'google/gemma-3-27b-it:free',
-      'google/gemma-3n-e2b-it:free',
-      'google/gemma-3n-e4b-it:free',
-      'stepfun/step-3.5-flash:free',
-      'arcee-ai/trinity-large-preview:free',
-      'liquid/lfm-2.5-1.2b-thinking:free',
-      'liquid/lfm-2.5-1.2b-instruct:free',
-      'arcee-ai/trinity-mini:free',
-      'nvidia/nemotron-3-nano-30b-a3b:free',
-      'nvidia/nemotron-nano-12b-v2-vl:free',
-      'nvidia/nemotron-nano-9b-v2:free',
-      'z-ai/glm-4.5-air:free',
-      'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
-      'mistralai/mistral-small-3.1-24b-instruct:free',
-      'nousresearch/hermes-3-llama-3.1-405b:free',
-      // 'openai/gpt-4o-mini', // Fast and cheap
-      // 'anthropic/claude-3.5-sonnet', // High quality
-      'google/gemini-2.0-flash-exp', // Fast
-      'meta-llama/llama-3.1-70b-instruct', // Open source
-      'mistralai/mistral-large', // Good balance
-      // 'openai/gpt-3.5-turbo', // Fallback
-      ];
-
+async function callLLMWithFallback({ userQuery, dbContext, history = [], model = null }) {
   const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
 
   // Add history
@@ -251,65 +182,14 @@ async function callOpenRouter({ userQuery, dbContext, history = [], model = null
     content: `[USER_QUERY]\n${userQuery}\n\n[DB_CONTEXT]\n${JSON.stringify(dbContext, null, 2)}`,
   });
 
-  // Try each model until one succeeds
-  let lastError = null;
-  for (const modelName of models) {
-    try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': process.env.CLIENT_URL || 'https://cinephile.app',
-          'X-Title': 'CinePhine Chatbot',
-        },
-        body: JSON.stringify({
-          model: modelName,
-          messages,
-          temperature: 0.7,
-        }),
-      });
+  const data = await callOpenRouterWithFallback({
+    ...(model ? { model } : {}), // fallback models inside util if not specified
+    messages,
+    temperature: 0.7,
+  });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        // If rate limit, try next model
-        if (isRateLimitError({ message: data.error?.message, status: res.status })) {
-          console.log(`⚠️  ${modelName} rate limited, trying next model...`);
-          lastError = new Error(`Rate limit: ${data.error?.message}`);
-          continue;
-        }
-        throw new Error(data.error?.message || 'OpenRouter API error');
-      }
-
-      const rawText = data.choices?.[0]?.message?.content?.trim() || '';
-      console.log(`✅ OpenRouter succeeded with model: ${modelName}`);
-      return rawText.replace(/\*\*/g, '');
-    } catch (error) {
-      lastError = error;
-      // If rate limit, try next model
-      if (isRateLimitError(error) && models.indexOf(modelName) < models.length - 1) {
-        console.log(`⚠️  ${modelName} failed, trying next model...`);
-        continue;
-      }
-      // If not rate limit and not last model, try next
-      if (models.indexOf(modelName) < models.length - 1) {
-        continue;
-      }
-      // Last model failed, throw error
-      throw error;
-    }
-  }
-
-  throw lastError || new Error('All OpenRouter models failed');
-}
-
-// ============================================
-// MAIN LLM CALLER - OpenRouter with fallback
-// ============================================
-async function callLLMWithFallback({ userQuery, dbContext, history = [] }) {
-  // OpenRouter handles fallback internally between models
-  return callOpenRouter({ userQuery, dbContext, history });
+  const rawText = data.choices?.[0]?.message?.content?.trim() || '';
+  return rawText.replace(/\*\*/g, '');
 }
 
 // ============================================

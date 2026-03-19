@@ -94,3 +94,16 @@
     touch-action: manipulation;
   }
 }
+
+/* ====================================================================
+   HEY TIMI - VOICE INDICATOR ANIMATIONS
+   ==================================================================== */
+@keyframes soundWave {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

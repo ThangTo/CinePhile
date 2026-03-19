@@ -871,6 +871,129 @@ const VideoPlayer = ({
     }
   }, [quality, availableLevels.length, applyQualityLevel]);
 
+  // ====================================================================
+  // HEY TIMI - VOICE COMMAND EVENT LISTENERS
+  // Lắng nghe các sự kiện giọng nói từ VoiceContext và điều khiển VideoPlayer
+  // ====================================================================
+  useEffect(() => {
+    const onPlay = () => {
+      const video = videoRef.current;
+      if (video && video.paused) video.play().catch(() => {});
+    };
+    const onPause = () => {
+      const video = videoRef.current;
+      if (video && !video.paused) video.pause();
+    };
+    const onNextEp = () => handleNextEpisode();
+    const onSeek = (e) => {
+      const video = videoRef.current;
+      if (!video) return;
+      const seconds = e.detail?.seconds || 10;
+      video.currentTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
+    };
+    const onFullscreen = () => toggleFullscreen();
+    const onVolumeUp = () => {
+      const video = videoRef.current;
+      if (!video) return;
+      const newVol = Math.min(1, video.volume + 0.1);
+      video.volume = newVol;
+      setVolume(newVol);
+      setIsMuted(false);
+    };
+    const onVolumeDown = () => {
+      const video = videoRef.current;
+      if (!video) return;
+      const newVol = Math.max(0, video.volume - 0.1);
+      video.volume = newVol;
+      setVolume(newVol);
+      if (newVol === 0) setIsMuted(true);
+    };
+    const onMute = () => {
+      const video = videoRef.current;
+      if (video) { video.volume = 0; setIsMuted(true); }
+    };
+    const onUnmute = () => {
+      const video = videoRef.current;
+      if (video) { video.volume = volume; setIsMuted(false); }
+    };
+    const onDuckAudio = () => {
+      const video = videoRef.current;
+      if (video && !isMuted && video.volume > 0.05) {
+        video.volume = 0.05;
+      }
+    };
+    const onRestoreAudio = () => {
+      const video = videoRef.current;
+      if (video && !isMuted) {
+        video.volume = volume;
+      }
+    };
+
+    // === PHASE 4: Advanced Voice Commands ===
+    const onChangeEpisode = (e) => {
+      const epNum = e.detail?.episode_number;
+      if (epNum && onEpisodeChange) {
+        console.log(`[Timi] 🎬 Chuyển tới tập ${epNum}`);
+        onEpisodeChange(epNum);
+      }
+    };
+    const onChangeAudio = (e) => {
+      const audioTypeVal = e.detail?.audio_type;
+      if (audioTypeVal && onAudioTypeChange) {
+        console.log(`[Timi] 🔊 Đổi âm thanh sang: ${audioTypeVal}`);
+        onAudioTypeChange(audioTypeVal);
+      }
+    };
+    const onMaxVolume = () => {
+      const video = videoRef.current;
+      if (video) {
+        video.volume = 1;
+        setVolume(1);
+        setIsMuted(false);
+      }
+    };
+    const onPrevEp = () => {
+      const currentEpNumber = episode?.episode || episode?.episodeId || 1;
+      if (currentEpNumber > 1 && onEpisodeChange) {
+        onEpisodeChange(currentEpNumber - 1);
+      }
+    };
+
+    window.addEventListener("VOICE_CMD_PLAY", onPlay);
+    window.addEventListener("VOICE_CMD_PAUSE", onPause);
+    window.addEventListener("VOICE_CMD_NEXT_EP", onNextEp);
+    window.addEventListener("VOICE_CMD_PREV_EP", onPrevEp);
+    window.addEventListener("VOICE_CMD_SEEK", onSeek);
+    window.addEventListener("VOICE_CMD_FULLSCREEN", onFullscreen);
+    window.addEventListener("VOICE_CMD_VOLUME_UP", onVolumeUp);
+    window.addEventListener("VOICE_CMD_VOLUME_DOWN", onVolumeDown);
+    window.addEventListener("VOICE_CMD_MUTE", onMute);
+    window.addEventListener("VOICE_CMD_UNMUTE", onUnmute);
+    window.addEventListener("VOICE_CMD_DUCK_AUDIO", onDuckAudio);
+    window.addEventListener("VOICE_CMD_RESTORE_AUDIO", onRestoreAudio);
+    window.addEventListener("VOICE_CMD_CHANGE_EPISODE", onChangeEpisode);
+    window.addEventListener("VOICE_CMD_CHANGE_AUDIO", onChangeAudio);
+    window.addEventListener("VOICE_CMD_MAX_VOLUME", onMaxVolume);
+
+    return () => {
+      window.removeEventListener("VOICE_CMD_PLAY", onPlay);
+      window.removeEventListener("VOICE_CMD_PAUSE", onPause);
+      window.removeEventListener("VOICE_CMD_NEXT_EP", onNextEp);
+      window.removeEventListener("VOICE_CMD_PREV_EP", onPrevEp);
+      window.removeEventListener("VOICE_CMD_SEEK", onSeek);
+      window.removeEventListener("VOICE_CMD_FULLSCREEN", onFullscreen);
+      window.removeEventListener("VOICE_CMD_VOLUME_UP", onVolumeUp);
+      window.removeEventListener("VOICE_CMD_VOLUME_DOWN", onVolumeDown);
+      window.removeEventListener("VOICE_CMD_MUTE", onMute);
+      window.removeEventListener("VOICE_CMD_UNMUTE", onUnmute);
+      window.removeEventListener("VOICE_CMD_DUCK_AUDIO", onDuckAudio);
+      window.removeEventListener("VOICE_CMD_RESTORE_AUDIO", onRestoreAudio);
+      window.removeEventListener("VOICE_CMD_CHANGE_EPISODE", onChangeEpisode);
+      window.removeEventListener("VOICE_CMD_CHANGE_AUDIO", onChangeAudio);
+      window.removeEventListener("VOICE_CMD_MAX_VOLUME", onMaxVolume);
+    };
+  }, [duration, volume, toggleFullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDownloadMovie = useCallback(async () => {
     if (!user) {
       openAuthModal("login");

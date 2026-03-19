@@ -8,6 +8,7 @@ import { BarSpinner } from "components/common/LoadingState";
 import { preloadCriticalImages } from "utils/imagePreloader";
 import { groupSeriesMovies } from "utils/seriesGrouping";
 import { slugify } from "utils/slugify";
+import EmptyState from "components/common/EmptyState";
 
 /**
  * Movie section with horizontal scrolling for ALL screen sizes
@@ -33,7 +34,11 @@ const SectionRow = ({
   const { user } = useAuth();
   const [allMovies, setAllMovies] = useState(movies || []);
   const [loading, setLoading] = useState(!movies);
+  const [error, setError] = useState(false);
   const normalizedGenre = genre ? slugify(genre) : null;
+  
+  // Đưa useRef ra ngoài block useEffect
+  const isMountedRef = React.useRef(true);
 
   // Helper function to filter movies (memoized with useCallback)
   const filterMovies = useCallback(
@@ -72,84 +77,87 @@ const SectionRow = ({
     [typeMovies, normalizedGenre]
   );
 
+  // Đưa fetchMovies ra ngoài useEffect
+  const fetchMovies = useCallback(async () => {
+    try {
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(false);
+      }
+      let response;
+      // Fetch more movies to ensure we have enough after filtering
+      // Increase limit if we have multiple filters
+      const hasFilters = typeMovies || normalizedGenre;
+      const fetchLimit = hasFilters ? 100 : 30;
+
+      // If genre is specified, use getByGenre API for better performance
+      if (normalizedGenre) {
+        response = await movieService.getByGenre(normalizedGenre, { limit: fetchLimit });
+      } else {
+        switch (sectionType) {
+          case "trending":
+            response = await movieService.getTrending(fetchLimit);
+            break;
+          case "newReleases":
+            response = await movieService.getNewReleases(fetchLimit);
+            break;
+          case "forYou":
+            response = await movieService.getForYou(fetchLimit);
+            break;
+          default:
+            response = await movieService.getAll({ limit: fetchLimit });
+        }
+      }
+
+      let moviesData = response.data || [];
+
+      // Apply filters
+      moviesData = filterMovies(moviesData);
+
+      if (isMountedRef.current) {
+        setAllMovies(moviesData);
+
+        // Preload critical images (first 15 movies) in background
+        if (moviesData.length > 0) {
+          preloadCriticalImages(moviesData).catch((err) => {
+            console.warn("Failed to preload some images:", err);
+          });
+        }
+      }
+    } catch (err) {
+      console.error(`Error fetching ${sectionType} movies:`, err);
+      if (isMountedRef.current) {
+        setAllMovies([]);
+        setError(true);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [sectionType, typeMovies, normalizedGenre, filterMovies]);
+
   useEffect(() => {
-    let isMounted = true; // Track if component is mounted
+    isMountedRef.current = true; // Track if component is mounted
 
     // If movies prop is provided, use it directly (but still filter if needed)
     if (movies) {
       const filteredMovies = filterMovies(movies);
-      if (isMounted) {
+      if (isMountedRef.current) {
         setAllMovies(filteredMovies);
         setLoading(false);
+        setError(false);
       }
       return;
     }
-
-    // Otherwise, fetch from API based on sectionType
-    const fetchMovies = async () => {
-      try {
-        if (isMounted) {
-          setLoading(true);
-        } 
-        let response;
-        // Fetch more movies to ensure we have enough after filtering
-        // Increase limit if we have multiple filters
-        const hasFilters = typeMovies || normalizedGenre;
-        const fetchLimit = hasFilters ? 100 : 30;
-
-        // If genre is specified, use getByGenre API for better performance
-        if (normalizedGenre) {
-          response = await movieService.getByGenre(normalizedGenre, { limit: fetchLimit });
-        } else {
-          switch (sectionType) {
-            case "trending":
-              response = await movieService.getTrending(fetchLimit);
-              break;
-            case "newReleases":
-              response = await movieService.getNewReleases(fetchLimit);
-              break;
-            case "forYou":
-              response = await movieService.getForYou(fetchLimit);
-              break;
-            default:
-              response = await movieService.getAll({ limit: fetchLimit });
-          }
-        }
-
-        let moviesData = response.data || [];
-
-        // Apply filters
-        moviesData = filterMovies(moviesData);
-
-        if (isMounted) {
-          setAllMovies(moviesData);
-
-          // Preload critical images (first 15 movies) in background
-          if (moviesData.length > 0) {
-            preloadCriticalImages(moviesData).catch((err) => {
-              console.warn("Failed to preload some images:", err);
-            });
-          }
-        }
-      } catch (error) {
-        console.error(`Error fetching ${sectionType} movies:`, error);
-        if (isMounted) {
-          setAllMovies([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
 
     fetchMovies();
 
     // Cleanup function
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
     };
-  }, [sectionType, movies, typeMovies, normalizedGenre, filterMovies]);
+  }, [movies, filterMovies, fetchMovies]);
 
   const displayMovies = allMovies;
 
@@ -165,6 +173,25 @@ const SectionRow = ({
           <SectionHeader title={title} subtitle={subtitle} linkHref={linkHref} />
         </div>
         <BarSpinner className="py-4" />
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="w-full py-2 sm:py-6 overflow-visible">
+        <div className="px-6">
+          <SectionHeader title={title} subtitle={subtitle} linkHref={linkHref} isActive={isActive} />
+        </div>
+        <div className="mt-4">
+          <EmptyState
+            title="Lỗi kết nối"
+            message="Không thể tải dữ liệu ở mục này do lỗi mạng. Vui lòng thử lại."
+            iconClassName="fa-wifi"
+            actionLabel="Thử lại"
+            onAction={fetchMovies}
+          />
+        </div>
       </section>
     );
   }

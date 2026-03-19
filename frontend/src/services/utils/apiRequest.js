@@ -15,7 +15,7 @@ import http from "lib/axios";
  */
 export default async function apiRequest(
   endpoint,
-  { method = "GET", params, data, headers = {}, requiresAuth = false } = {}
+  { method = "GET", params, data, headers = {}, requiresAuth = false, timeout } = {}
 ) {
   const res = await http.request({
     url: endpoint,
@@ -23,6 +23,7 @@ export default async function apiRequest(
     params,
     data,
     headers,
+    timeout,
     meta: { requiresAuth },
   });
   return res.data;

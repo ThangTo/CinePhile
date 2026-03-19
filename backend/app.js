@@ -182,6 +182,8 @@ const chatRoutes = require('./routes/chat.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const castRoutes = require('./routes/cast.routes');
 const paymentRoutes = require('./routes/payment.routes');
+const viralClipRoutes = require('./routes/viralClip.routes');
+const aiRoutes = require('./routes/ai.routes');
 
 // API endpoints with caching
 app.use('/api/v1/movies/trending', cacheMiddleware(600));
@@ -198,6 +200,7 @@ app.use('/api/v1/crawl', crawlerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/cast', castRoutes);
 app.use('/api/v1', paymentRoutes);
+app.use('/api/v1', viralClipRoutes);
 
 // Debug: Log all requests to comments
 app.use('/api/v1/comments', (req, res, next) => {
@@ -206,6 +209,7 @@ app.use('/api/v1/comments', (req, res, next) => {
 });
 app.use('/api/v1/comments', commentRoutes);
 app.use('/api/v1/chat', chatRoutes);
+app.use('/api/v1/ai', aiRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {
