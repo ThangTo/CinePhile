@@ -10,6 +10,7 @@ import { useNotifications } from "contexts/NotificationContext";
 import NotificationPanel from "components/notifications/NotificationPanel";
 import useAuth from "hooks/useAuth";
 import ThemeSelector from "components/common/ThemeSelector";
+import TimiToggle from "components/common/TimiToggle";
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -90,6 +91,10 @@ const Header = () => {
 
           {/* Right: Search + actions */}
           <div className="ml-auto flex items-center gap-3">
+            {/* Timi Toggle - Desktop */}
+            <div className="hidden lg:block">
+              <TimiToggle />
+            </div>
             {/* Theme Selector - Desktop */}
             <div className="hidden lg:block">
               <ThemeSelector />
@@ -195,6 +200,12 @@ const Header = () => {
               <div className="lg:hidden mt-4 mb-4 flex items-center justify-between px-2">
                 <span className="text-sm text-gray-300">Theme</span>
                 <ThemeSelector />
+              </div>
+
+              {/* Timi Toggle - Mobile */}
+              <div className="lg:hidden mb-4 flex items-center justify-between px-2">
+                <span className="text-sm text-gray-300">Trợ lý Timi</span>
+                <TimiToggle />
               </div>
 
               <NavigationLinks isMobile={true} />

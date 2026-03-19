@@ -8,6 +8,7 @@ import { BarSpinner } from "components/common/LoadingState";
 import { preloadCriticalImages } from "utils/imagePreloader";
 import { groupSeriesMovies } from "utils/seriesGrouping";
 import { slugify } from "utils/slugify";
+import EmptyState from "components/common/EmptyState";
 
 /**
  * Landscape Section — Thẻ phim nằm ngang (backdrop 16:9)
@@ -25,6 +26,7 @@ const LandscapeSection = ({
   const navigate = useNavigate();
   const [allMovies, setAllMovies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const normalizedGenre = genre ? slugify(genre) : null;
 
   const filterMovies = useCallback(
@@ -49,13 +51,16 @@ const LandscapeSection = ({
     [typeMovies, normalizedGenre]
   );
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchMovies = async () => {
-      try {
+  const isMountedRef = React.useRef(true);
+
+  const fetchMovies = useCallback(async () => {
+    try {
+      if (isMountedRef.current) {
         setLoading(true);
-        const hasFilters = typeMovies || normalizedGenre;
-        const fetchLimit = hasFilters ? 100 : 30;
+        setError(false);
+      }
+      const hasFilters = typeMovies || normalizedGenre;
+      const fetchLimit = hasFilters ? 100 : 30;
         let response;
 
         if (normalizedGenre) {
@@ -76,22 +81,28 @@ const LandscapeSection = ({
         let data = response.data || [];
         data = filterMovies(data);
 
-        if (isMounted) {
+        if (isMountedRef.current) {
           setAllMovies(data);
           if (data.length > 0) {
             preloadCriticalImages(data).catch(() => {});
           }
         }
-      } catch (error) {
-        console.error(`Error fetching ${sectionType} movies:`, error);
-        if (isMounted) setAllMovies([]);
+      } catch (err) {
+        console.error(`Error fetching ${sectionType} movies:`, err);
+        if (isMountedRef.current) {
+          setAllMovies([]);
+          setError(true);
+        }
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMountedRef.current) setLoading(false);
       }
-    };
-    fetchMovies();
-    return () => { isMounted = false; };
   }, [sectionType, typeMovies, normalizedGenre, filterMovies]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    fetchMovies();
+    return () => { isMountedRef.current = false; };
+  }, [fetchMovies]);
 
   if (loading) {
     return (
@@ -100,6 +111,25 @@ const LandscapeSection = ({
           <SectionHeader title={title} subtitle={subtitle} linkHref={linkHref} />
         </div>
         <BarSpinner className="py-4" />
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="w-full py-2 sm:py-6 overflow-visible">
+        <div className="px-6">
+          <SectionHeader title={title} subtitle={subtitle} linkHref={linkHref} />
+        </div>
+        <div className="mt-4">
+          <EmptyState
+            title="Lỗi kết nối"
+            message="Không thể tải dữ liệu ở mục này do lỗi mạng. Vui lòng thử lại."
+            iconClassName="fa-wifi"
+            actionLabel="Thử lại"
+            onAction={fetchMovies}
+          />
+        </div>
       </section>
     );
   }

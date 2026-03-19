@@ -86,59 +86,42 @@ const GuestNotification = () => {
   ];
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-3">
-      {/* Popup Panel */}
+    <div className="fixed bottom-6 left-6 z-[100000] flex flex-col items-start gap-4">
+      {/* ====== POPUP PANEL ====== */}
       {isOpen && (
         <div
-          className={`w-[340px] sm:w-[380px] rounded-2xl overflow-hidden transition-all duration-500 ease-out ${
-            isVisible
-              ? "opacity-100 translate-y-0 scale-100"
-              : "opacity-0 translate-y-4 scale-95"
+          className={`relative w-[340px] sm:w-[380px] bg-bgColor2/90 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl shadow-black/80 overflow-hidden transition-all duration-500 ease-out origin-bottom-left ${
+            isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-90"
           }`}
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(15, 15, 30, 0.97) 0%, rgba(25, 20, 50, 0.97) 50%, rgba(15, 15, 30, 0.97) 100%)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            boxShadow:
-              "0 25px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(234, 179, 8, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-          }}
         >
+          {/* Ambient Glows (Hiệu ứng ánh sáng) */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-primaryColor/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-primaryColor/10 rounded-full blur-2xl pointer-events-none" />
+
           {/* Header with close button */}
-          <div className="relative px-5 pt-5 pb-3">
+          <div className="relative px-6 pt-6 pb-2 z-10">
             <button
               onClick={handleDismiss}
-              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full text-gray-500 hover:text-white hover:bg-white/10 transition-all duration-200"
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 border border-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-200"
               aria-label="Đóng"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path
-                  d="M1 1L13 13M1 13L13 1"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </button>
 
             {/* Animated greeting icon */}
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-xl"
-                style={{
-                  background:
-                    "linear-gradient(135deg, #eab308 0%, #f59e0b 100%)",
-                  boxShadow: "0 4px 15px rgba(234, 179, 8, 0.3)",
-                  animation: "guestNotifWave 2s ease-in-out infinite",
-                }}
-              >
-                👋
+            <div className="flex items-center gap-4 mb-2">
+              <div className="w-12 h-12 rounded-2xl bg-primaryColor/15 border border-primaryColor/30 flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(var(--primary-color-rgb),0.15)]">
+                <span style={{ animation: "guestNotifWave 2.5s ease-in-out infinite origin-bottom-right" }}>
+                  👋
+                </span>
               </div>
               <div>
-                <h3 className="text-white font-bold text-base leading-tight">
-                  Chào bạn!
+                <h3 className="text-gray-100 font-bold text-lg leading-tight flex items-center gap-2">
+                  Chào bạn! <i className="fa-solid fa-sparkles text-primaryColor text-[10px]" />
                 </h3>
-                <p className="text-gray-400 text-xs mt-0.5">
+                <p className="text-primaryColor/80 text-xs mt-0.5 font-medium tracking-wide uppercase">
                   Chào mừng đến với CinePhine
                 </p>
               </div>
@@ -146,54 +129,40 @@ const GuestNotification = () => {
           </div>
 
           {/* Content */}
-          <div className="px-5 pb-4">
-            <p className="text-gray-300 text-sm leading-relaxed mb-4">
+          <div className="relative px-6 pb-6 z-10">
+            <p className="text-gray-300 text-sm leading-relaxed mb-5">
               Đăng nhập hoặc đăng ký tài khoản để có{" "}
-              <span className="text-yellow-400 font-semibold">
-                trải nghiệm tốt nhất
-              </span>{" "}
-              cùng nhiều tính năng dịch vụ của toàn hệ thống. 
+              <span className="text-primaryColor font-bold drop-shadow-sm">trải nghiệm tốt nhất</span>{" "}
+              cùng nhiều tính năng dịch vụ của toàn hệ thống.
             </p>
 
             {/* Feature list */}
-            <div className="space-y-2 mb-5">
+            <div className="space-y-3 mb-6">
               {features.map((feature, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-2.5 text-sm"
-                  style={{
-                    animation: `guestNotifSlideIn 0.4s ease-out ${
-                      0.1 + index * 0.08
-                    }s both`,
-                  }}
+                  className="flex items-center gap-3 text-sm"
+                  style={{ animation: `guestNotifSlideIn 0.5s ease-out ${0.1 + index * 0.08}s both` }}
                 >
-                  <span className="text-base flex-shrink-0">{feature.icon}</span>
-                  <span className="text-gray-400">{feature.text}</span>
+                  <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 text-[11px] shadow-inner">
+                    {feature.icon}
+                  </div>
+                  <span className="text-gray-300 text-[13px]">{feature.text}</span>
                 </div>
               ))}
             </div>
 
             {/* Action buttons */}
-            <div className="flex gap-2.5">
+            <div className="flex gap-3">
               <button
                 onClick={handleLogin}
-                className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                style={{
-                  background:
-                    "linear-gradient(135deg, #eab308 0%, #f59e0b 100%)",
-                  color: "#000",
-                  boxShadow: "0 4px 15px rgba(234, 179, 8, 0.25)",
-                }}
+                className="flex-1 py-3 px-4 rounded-xl text-sm font-bold bg-primaryColor text-gray-900 transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] shadow-[0_4px_15px_rgba(var(--primary-color-rgb),0.3)] hover:shadow-[0_6px_20px_rgba(var(--primary-color-rgb),0.5)]"
               >
                 Đăng nhập
               </button>
               <button
                 onClick={handleRegister}
-                className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                style={{
-                  background: "rgba(255, 255, 255, 0.08)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                }}
+                className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-primaryColor transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] bg-primaryColor/10 border border-primaryColor/30 hover:bg-primaryColor/20"
               >
                 Đăng ký
               </button>
@@ -201,39 +170,28 @@ const GuestNotification = () => {
           </div>
 
           {/* Bottom decorative bar */}
-          <div
-            className="h-1 w-full"
-            style={{
-              background:
-                "linear-gradient(90deg, transparent, #eab308, #f59e0b, #eab308, transparent)",
-            }}
-          />
+          <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-primaryColor/60 to-transparent" />
         </div>
       )}
 
-      {/* Toggle Button (bell icon) — visible when popup is dismissed */}
+      {/* ====== TOGGLE BUTTON (Bell Icon) ====== */}
       {!isOpen && (
         <button
           onClick={handleToggle}
-          className={`group relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
-            pulseButton ? "animate-bounce" : ""
-          }`}
-          style={{
-            background: "linear-gradient(135deg, #eab308 0%, #f59e0b 100%)",
-            boxShadow:
-              "0 8px 25px rgba(234, 179, 8, 0.35), 0 0 0 0 rgba(234, 179, 8, 0.4)",
-            animation: pulseButton
-              ? "guestNotifPulse 2s ease-in-out infinite"
-              : "none",
-          }}
+          className="group relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 bg-bgColor2/90 backdrop-blur-xl border border-primaryColor/40 shadow-[0_0_20px_rgba(var(--primary-color-rgb),0.2)]"
           aria-label="Thông báo"
         >
+          {/* Vòng sáng nhấp nháy (Thay thế cho shadow vàng cũ) */}
+          {pulseButton && (
+            <span className="absolute inset-0 rounded-full border-2 border-primaryColor animate-ping opacity-60" />
+          )}
+
           <svg
-            width="24"
-            height="24"
+            width="22"
+            height="22"
             viewBox="0 0 24 24"
             fill="none"
-            className="text-black transition-transform duration-300 group-hover:rotate-12"
+            className="text-primaryColor transition-transform duration-300 group-hover:rotate-12 drop-shadow-md"
           >
             <path
               d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"
@@ -250,17 +208,14 @@ const GuestNotification = () => {
               strokeLinejoin="round"
             />
           </svg>
+          
           {/* Red dot indicator */}
-          <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-black" />
+          <span className="absolute top-[2px] right-[4px] w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-bgColor2 shadow-sm" />
         </button>
       )}
 
-      {/* CSS Animations */}
+      {/* CSS Animations (Được giữ lại vì tính chất keyframes riêng biệt không phụ thuộc màu) */}
       <style>{`
-        @keyframes guestNotifPulse {
-          0%, 100% { box-shadow: 0 8px 25px rgba(234, 179, 8, 0.35), 0 0 0 0 rgba(234, 179, 8, 0.4); }
-          50% { box-shadow: 0 8px 25px rgba(234, 179, 8, 0.35), 0 0 0 12px rgba(234, 179, 8, 0); }
-        }
         @keyframes guestNotifWave {
           0%, 100% { transform: rotate(0deg); }
           15% { transform: rotate(14deg); }
@@ -270,7 +225,7 @@ const GuestNotification = () => {
           75% { transform: rotate(6deg); }
         }
         @keyframes guestNotifSlideIn {
-          from { opacity: 0; transform: translateX(-10px); }
+          from { opacity: 0; transform: translateX(-15px); }
           to { opacity: 1; transform: translateX(0); }
         }
       `}</style>

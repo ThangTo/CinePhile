@@ -1,18 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "styles/Chatbot.css";
 import { getSystemInstruction } from "constants/chatbotKnowledge";
 
 const Chatbot = () => {
   const navigate = useNavigate();
   const chatBodyRef = useRef(null);
   const messageInputRef = useRef(null);
-  const sendMessageButtonRef = useRef(null);
   const fileInputRef = useRef(null);
   const fileUploadWrapperRef = useRef(null);
-  const fileCancelButtonRef = useRef(null);
   const chatbotTogglerRef = useRef(null);
-  const closeChatbotRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const chatFormRef = useRef(null);
 
@@ -21,18 +17,22 @@ const Chatbot = () => {
   const [picker, setPicker] = useState(null);
   const [isSending, setIsSending] = useState(false);
 
-  // Api setup
-  const API_KEY = process.env.REACT_APP_API_KEY_GEMINI || "";
-  // eslint-disable-next-line no-unused-vars
-  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+  // === CHUYỂN SANG DÙNG REACT STATE CHO TIN NHẮN ===
+  const [messages, setMessages] = useState([
+    {
+      id: "welcome",
+      role: "model",
+      content:
+        "Xin chào! 👋 <br /> Tôi là trợ lý AI của CinePhine. Tôi có thể giúp bạn tìm phim, gợi ý nội dung hay giải đáp thắc mắc.<br /><br />Bạn đang muốn xem gì hôm nay?",
+      isThinking: false,
+    },
+  ]);
 
   const userDataRef = useRef({
-    message: null,
     file: { data: null, mime_type: null },
   });
 
   const chatHistoryRef = useRef([]);
-  const initialInputHeightRef = useRef(null);
   const sessionIdRef = useRef(null);
 
   useEffect(() => {
@@ -51,12 +51,33 @@ const Chatbot = () => {
     }
   }, []);
 
-  const createMessageElement = (content, ...classes) => {
-    const div = document.createElement("div");
-    div.classList.add("message", ...classes);
-    div.innerHTML = content;
-    return div;
-  };
+  // Xử lý sự kiện click vào link phim bên trong tin nhắn bot (Sử dụng Event Delegation)
+  useEffect(() => {
+    const chatBody = chatBodyRef.current;
+    if (!chatBody) return;
+
+    const handleLinkClick = (e) => {
+      const link = e.target.closest(".chatbot-movie-link");
+      if (link) {
+        e.preventDefault();
+        const href = link.getAttribute("href");
+        if (href) navigate(href);
+      }
+    };
+
+    chatBody.addEventListener("click", handleLinkClick);
+    return () => chatBody.removeEventListener("click", handleLinkClick);
+  }, [navigate]);
+
+  // Cuộn xuống cuối mỗi khi có tin nhắn mới
+  useEffect(() => {
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTo({
+        top: chatBodyRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [messages]);
 
   const buildChatMetadata = () => {
     const pathname = window.location.pathname;
@@ -68,13 +89,48 @@ const Chatbot = () => {
     return metadata;
   };
 
-  const generateBotResponse = async (incomingMessageDiv) => {
-    const messageElement = incomingMessageDiv.querySelector(".message-text");
+  const handleOutgoingMessage = async (e) => {
+    e.preventDefault();
+    if (isSending) return;
+
+    const messageText = messageInputRef.current.value.trim();
+    const fileData = userDataRef.current.file.data ? { ...userDataRef.current.file } : null;
+
+    if (!messageText && !fileData) return;
+
+    setIsSending(true);
+
+    const newUserMessage = {
+      id: Date.now(),
+      role: "user",
+      content: messageText || "Gửi một ảnh",
+      file: fileData,
+      isThinking: false,
+    };
+
+    const newBotMessageId = Date.now() + 1;
+    const newBotMessage = {
+      id: newBotMessageId,
+      role: "model",
+      content: "",
+      isThinking: true,
+    };
+
+    // 1. Cập nhật UI ngay lập tức
+    setMessages((prev) => [...prev, newUserMessage, newBotMessage]);
+
+    // 2. Clear input
+    messageInputRef.current.value = "";
+    messageInputRef.current.style.height = "auto";
+    resetFileInput();
+
+    // 3. Đẩy vào history backend
     chatHistoryRef.current.push({
       role: "user",
-      parts: [{ text: userDataRef.current.message }],
+      parts: [{ text: newUserMessage.content }],
     });
 
+    // 4. Gọi API
     try {
       const historyForBackend = chatHistoryRef.current
         .filter((msg) => msg.role === "user" || msg.role === "model")
@@ -85,7 +141,7 @@ const Chatbot = () => {
         .filter((msg) => msg.content.trim().length > 0);
 
       const payload = {
-        message: userDataRef.current.message,
+        message: newUserMessage.content,
         history: historyForBackend,
         metadata: buildChatMetadata(),
         sessionId: sessionIdRef.current,
@@ -105,87 +161,36 @@ const Chatbot = () => {
       if (!res.ok) throw new Error(data.message);
 
       const answerHTML = (data.answer || "").trim();
-      messageElement.innerHTML = answerHTML;
 
-      const movieLinks = messageElement.querySelectorAll(".chatbot-movie-link");
-      movieLinks.forEach((link) => {
-        link.addEventListener("click", (e) => {
-          e.preventDefault();
-          const href = link.getAttribute("href");
-          if (href) navigate(href);
-        });
-      });
-
-      const plainText = messageElement.textContent || messageElement.innerText || "";
+      // Cập nhật text cho history (bỏ HTML tags đi)
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = answerHTML;
+      const plainText = tempDiv.textContent || tempDiv.innerText || "";
       chatHistoryRef.current.push({ role: "model", parts: [{ text: plainText }] });
+
+      // Cập nhật lại UI tin nhắn của bot
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === newBotMessageId
+            ? { ...msg, content: answerHTML, isThinking: false }
+            : msg
+        )
+      );
     } catch (error) {
-      messageElement.innerText = error.message;
-      messageElement.style.color = "#ff4d4d";
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === newBotMessageId
+            ? {
+                ...msg,
+                content: `<span class="text-red-400 font-medium">Lỗi: ${error.message}</span>`,
+                isThinking: false,
+              }
+            : msg
+        )
+      );
     } finally {
-      userDataRef.current.file = {};
-      incomingMessageDiv.classList.remove("thinking");
-      if (chatBodyRef.current) {
-        chatBodyRef.current.scrollTo({ behavior: "smooth", top: chatBodyRef.current.scrollHeight });
-      }
       setIsSending(false);
     }
-  };
-
-  const handleOutgoingMessage = (e) => {
-    e.preventDefault();
-    if (isSending) return;
-
-    const message = messageInputRef.current.value.trim();
-    if (!message && !userDataRef.current.file.data) return;
-
-    setIsSending(true);
-    userDataRef.current.message = message || "Gửi một ảnh";
-    messageInputRef.current.value = "";
-    messageInputRef.current.style.height = "auto";
-
-    // Reset file UI
-    if (fileUploadWrapperRef.current) {
-      fileUploadWrapperRef.current.classList.remove("file-uploaded");
-    }
-
-    const messageContent = `<div class="message-text"></div>
-    ${
-      userDataRef.current.file.data
-        ? `<div class="attachment-wrapper"><img src="data:${userDataRef.current.file.mime_type};base64,${userDataRef.current.file.data}" class="attachment" /></div>`
-        : ""
-    }`;
-
-    const outgoingMessageDiv = createMessageElement(messageContent, "user-message");
-    outgoingMessageDiv.querySelector(".message-text").innerText = userDataRef.current.message;
-
-    if (chatBodyRef.current) {
-      chatBodyRef.current.appendChild(outgoingMessageDiv);
-      chatBodyRef.current.scrollTo({ behavior: "smooth", top: chatBodyRef.current.scrollHeight });
-    }
-
-    setTimeout(() => {
-      // SVG AVATAR CŨ (Đã style lại màu sắc)
-      const messageContent = `
-        <div class="bot-avatar-container">
-            <svg class="bot-avatar" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-                <path d="M738.3 287.6H285.7c-59 0-106.8 47.8-106.8 106.8v303.1c0 59 47.8 106.8 106.8 106.8h81.5v111.1c0 .7.8 1.1 1.4.7l166.9-110.6 41.8-.8h117.4l43.6-.4c59 0 106.8-47.8 106.8-106.8V394.5c0-59-47.8-106.9-106.8-106.9zM351.7 448.2c0-29.5 23.9-53.5 53.5-53.5s53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5-53.5-23.9-53.5-53.5zm157.9 267.1c-67.8 0-123.8-47.5-132.3-109h264.6c-8.6 61.5-64.5 109-132.3 109zm110-213.7c-29.5 0-53.5-23.9-53.5-53.5s23.9-53.5 53.5-53.5 53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5zM867.2 644.5V453.1h26.5c19.4 0 35.1 15.7 35.1 35.1v121.1c0 19.4-15.7 35.1-35.1 35.1h-26.5zM95.2 609.4V488.2c0-19.4 15.7-35.1 35.1-35.1h26.5v191.3h-26.5c-19.4 0-35.1-15.7-35.1-35.1zM561.5 149.6c0 23.4-15.6 43.3-36.9 49.7v44.9h-30v-44.9c-21.4-6.5-36.9-26.3-36.9-49.7 0-28.6 23.3-51.9 51.9-51.9s51.9 23.3 51.9 51.9z" />
-            </svg>
-        </div>
-        <div class="message-text">
-            <div class="thinking-indicator">
-                <div class="dot"></div>
-                <div class="dot"></div>
-                <div class="dot"></div>
-            </div>
-        </div>`;
-
-      const incomingMessageDiv = createMessageElement(messageContent, "bot-message", "thinking");
-      if (chatBodyRef.current) {
-        chatBodyRef.current.appendChild(incomingMessageDiv);
-        chatBodyRef.current.scrollTo({ behavior: "smooth", top: chatBodyRef.current.scrollHeight });
-      }
-      generateBotResponse(incomingMessageDiv);
-    }, 600);
   };
 
   const resetFileInput = () => {
@@ -198,11 +203,9 @@ const Chatbot = () => {
     userDataRef.current.file = { data: null, mime_type: null };
   };
 
-  // --- EVENT LISTENERS ---
+  // --- EVENT LISTENERS (Inputs & Files) ---
   useEffect(() => {
     if (!messageInputRef.current) return;
-    initialInputHeightRef.current = messageInputRef.current.scrollHeight;
-
     const handleKeyDown = (e) => {
       const userMessage = e.target.value.trim();
       const hasFile = userDataRef.current.file.data !== null;
@@ -214,8 +217,7 @@ const Chatbot = () => {
         }
       }
     };
-
-    const handleInput = (e) => {
+    const handleInput = () => {
       const textarea = messageInputRef.current;
       textarea.style.height = "auto";
       textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
@@ -232,7 +234,7 @@ const Chatbot = () => {
     };
   }, [isSending]);
 
-  // File Change
+  // Handle File change
   useEffect(() => {
     if (!fileInputRef.current) return;
     const handleFileChange = (e) => {
@@ -259,57 +261,11 @@ const Chatbot = () => {
     };
     fileInputRef.current.addEventListener("change", handleFileChange);
     return () => {
-      if (fileInputRef.current)
-        fileInputRef.current.removeEventListener("change", handleFileChange);
+      if (fileInputRef.current) fileInputRef.current.removeEventListener("change", handleFileChange);
     };
   }, []);
 
-  // Cancel File
-  useEffect(() => {
-    if (!fileCancelButtonRef.current) return;
-    const handleCancel = (e) => {
-      e.preventDefault();
-      resetFileInput();
-    };
-    fileCancelButtonRef.current.addEventListener("click", handleCancel);
-    return () => {
-      if (fileCancelButtonRef.current)
-        fileCancelButtonRef.current.removeEventListener("click", handleCancel);
-    };
-  }, []);
-
-  // Các useEffect khác (Send, Toggle, Close) giữ nguyên
-  useEffect(() => {
-    if (!sendMessageButtonRef.current) return;
-    const handleSend = (e) => handleOutgoingMessage(e);
-    sendMessageButtonRef.current.addEventListener("click", handleSend);
-    return () => {
-      if (sendMessageButtonRef.current)
-        sendMessageButtonRef.current.removeEventListener("click", handleSend);
-    };
-  }, [isSending]);
-
-  useEffect(() => {
-    if (!chatbotTogglerRef.current) return;
-    const handleToggle = () => setShowChatbot(!showChatbot);
-    chatbotTogglerRef.current.addEventListener("click", handleToggle);
-    return () => {
-      if (chatbotTogglerRef.current)
-        chatbotTogglerRef.current.removeEventListener("click", handleToggle);
-    };
-  }, [showChatbot]);
-
-  useEffect(() => {
-    if (!closeChatbotRef.current) return;
-    const handleClose = () => setShowChatbot(false);
-    closeChatbotRef.current.addEventListener("click", handleClose);
-    return () => {
-      if (closeChatbotRef.current)
-        closeChatbotRef.current.removeEventListener("click", handleClose);
-    };
-  }, []);
-
-  // Emoji Picker - Fix z-index
+  // Emoji Picker logic (Giữ nguyên)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const initEmojiPicker = () => {
@@ -337,8 +293,7 @@ const Chatbot = () => {
           },
         });
 
-        // Append to popup container
-        const popup = document.querySelector(".chatbot-popup");
+        const popup = document.querySelector(".chatbot-popup-container");
         if (popup && emojiPicker) {
           popup.appendChild(emojiPicker);
           setPicker(emojiPicker);
@@ -374,119 +329,133 @@ const Chatbot = () => {
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.body.classList.toggle("show-chatbot", showChatbot);
-      document.body.classList.toggle("show-emoji-picker", showEmojiPicker);
     }
-  }, [showChatbot, showEmojiPicker]);
-
-  const handleEmojiClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShowEmojiPicker((prev) => !prev);
-  };
-  const handleFileUploadClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (fileInputRef.current) fileInputRef.current.click();
-  };
+  }, [showChatbot]);
 
   return (
     <>
-      <button id="chatbot-toggler" ref={chatbotTogglerRef} className={showChatbot ? "active" : ""}>
-        <span className="material-symbols-rounded icon-open">
-          <svg className="chatbot-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+      {/* ====== TOGGLER BUTTON ====== */}
+      <button
+        id="chatbot-toggler"
+        ref={chatbotTogglerRef}
+        onClick={() => setShowChatbot(!showChatbot)}
+        className={`fixed bottom-[30px] right-[35px] h-14 w-14 flex items-center justify-center rounded-full shadow-[0_0_20px_rgba(var(--primary-color-rgb),0.4)] transition-all duration-300 z-[100005] hover:-translate-y-1 hover:shadow-[0_10px_25px_rgba(var(--primary-color-rgb),0.5)] ${
+          showChatbot ? "rotate-90 bg-bgColor2/90 border border-white/10" : "bg-primaryColor"
+        }`}
+      >
+        <span className={`absolute transition-all duration-300 ${showChatbot ? "opacity-0 scale-0 rotate-180" : "opacity-100 scale-100 rotate-0"}`}>
+          <svg className="w-7 h-7 fill-gray-900 drop-shadow-md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
             <path d="M738.3 287.6H285.7c-59 0-106.8 47.8-106.8 106.8v303.1c0 59 47.8 106.8 106.8 106.8h81.5v111.1c0 .7.8 1.1 1.4.7l166.9-110.6 41.8-.8h117.4l43.6-.4c59 0 106.8-47.8 106.8-106.8V394.5c0-59-47.8-106.9-106.8-106.9zM351.7 448.2c0-29.5 23.9-53.5 53.5-53.5s53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5-53.5-23.9-53.5-53.5zm157.9 267.1c-67.8 0-123.8-47.5-132.3-109h264.6c-8.6 61.5-64.5 109-132.3 109zm110-213.7c-29.5 0-53.5-23.9-53.5-53.5s23.9-53.5 53.5-53.5 53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5zM867.2 644.5V453.1h26.5c19.4 0 35.1 15.7 35.1 35.1v121.1c0 19.4-15.7 35.1-35.1 35.1h-26.5zM95.2 609.4V488.2c0-19.4 15.7-35.1 35.1-35.1h26.5v191.3h-26.5c-19.4 0-35.1-15.7-35.1-35.1zM561.5 149.6c0 23.4-15.6 43.3-36.9 49.7v44.9h-30v-44.9c-21.4-6.5-36.9-26.3-36.9-49.7 0-28.6 23.3-51.9 51.9-51.9s51.9 23.3 51.9 51.9z" />
           </svg>
         </span>
-        <span className="material-symbols-rounded icon-close">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+        <span className={`absolute transition-all duration-300 ${showChatbot ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-0 -rotate-180"}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </span>
       </button>
 
-      <div className="chatbot-popup">
+      {/* ====== CHATBOT POPUP ====== */}
+      <div
+        className={`chatbot-popup-container fixed right-[35px] bottom-[95px] w-[380px] h-[600px] max-h-[80vh] bg-bgColor2/90 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl shadow-black/80 z-[100005] flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right max-sm:w-full max-sm:h-full max-sm:bottom-0 max-sm:right-0 max-sm:rounded-none
+        ${showChatbot ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-90 pointer-events-none"}
+        [&_em-emoji-picker]:absolute [&_em-emoji-picker]:bottom-[80px] [&_em-emoji-picker]:left-[15px] [&_em-emoji-picker]:w-[calc(100%-30px)] [&_em-emoji-picker]:max-h-[350px] [&_em-emoji-picker]:z-[10005] [&_em-emoji-picker]:shadow-2xl [&_em-emoji-picker]:rounded-2xl [&_em-emoji-picker]:border [&_em-emoji-picker]:border-white/10 ${
+          !showEmojiPicker ? "[&_em-emoji-picker]:hidden" : ""
+        }`}
+      >
         {/* Header */}
-        <div className="chat-header">
-          <div className="header-info">
-            <div className="bot-logo-wrapper">
-              <svg className="bot-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+        <div className="flex items-center justify-between px-5 py-4 bg-primaryColor/10 border-b border-white/10 relative overflow-hidden shrink-0">
+          <div className="absolute -top-10 -left-10 w-32 h-32 bg-primaryColor/20 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primaryColor/20 border border-primaryColor/30 flex items-center justify-center p-2 shadow-inner">
+              <svg className="w-full h-full fill-primaryColor drop-shadow-md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
                 <path d="M738.3 287.6H285.7c-59 0-106.8 47.8-106.8 106.8v303.1c0 59 47.8 106.8 106.8 106.8h81.5v111.1c0 .7.8 1.1 1.4.7l166.9-110.6 41.8-.8h117.4l43.6-.4c59 0 106.8-47.8 106.8-106.8V394.5c0-59-47.8-106.9-106.8-106.9zM351.7 448.2c0-29.5 23.9-53.5 53.5-53.5s53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5-53.5-23.9-53.5-53.5zm157.9 267.1c-67.8 0-123.8-47.5-132.3-109h264.6c-8.6 61.5-64.5 109-132.3 109zm110-213.7c-29.5 0-53.5-23.9-53.5-53.5s23.9-53.5 53.5-53.5 53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5zM867.2 644.5V453.1h26.5c19.4 0 35.1 15.7 35.1 35.1v121.1c0 19.4-15.7 35.1-35.1 35.1h-26.5zM95.2 609.4V488.2c0-19.4 15.7-35.1 35.1-35.1h26.5v191.3h-26.5c-19.4 0-35.1-15.7-35.1-35.1zM561.5 149.6c0 23.4-15.6 43.3-36.9 49.7v44.9h-30v-44.9c-21.4-6.5-36.9-26.3-36.9-49.7 0-28.6 23.3-51.9 51.9-51.9s51.9 23.3 51.9 51.9z" />
               </svg>
             </div>
-            <div className="header-text">
-              <h2 className="logo-text">CinePhine AI</h2>
-              <span className="logo-status">Luôn sẵn sàng hỗ trợ bạn</span>
+            <div>
+              <h2 className="text-gray-100 font-bold text-base m-0 flex items-center gap-2">
+                CinePhine AI <i className="fa-solid fa-sparkles text-primaryColor text-[10px]" />
+              </h2>
+              <span className="text-gray-400 text-xs flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" />
+                Luôn sẵn sàng hỗ trợ bạn
+              </span>
             </div>
           </div>
-          <button id="close-chatbot" ref={closeChatbotRef}>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+          <button
+            onClick={() => setShowChatbot(false)}
+            className="relative text-gray-400 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors z-10 border border-transparent hover:border-white/5"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </button>
         </div>
 
-        {/* Chat Body */}
-        <div className="chat-body" ref={chatBodyRef}>
-          <div className="message bot-message">
-            <div className="bot-avatar-container">
-              {/* SVG Avatar cũ */}
-              <svg
-                className="bot-avatar"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 1024 1024"
+        {/* ====== CHAT BODY (React Render Mảng Tin Nhắn) ====== */}
+        <div
+          ref={chatBodyRef}
+          className="flex-1 p-5 overflow-y-auto flex flex-col bg-transparent [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20 scroll-smooth"
+        >
+          {messages.map((msg, index) => (
+            <div
+              key={msg.id || index}
+              className={`flex gap-3 items-end mb-5 w-full animate-[fadeIn_0.3s_ease-out] ${
+                msg.role === "user" ? "flex-row-reverse" : ""
+              }`}
+            >
+              {msg.role === "model" && (
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primaryColor/15 border border-primaryColor/30 flex items-center justify-center text-primaryColor p-1.5 shadow-sm">
+                  <svg className="w-full h-full fill-current drop-shadow-md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+                    <path d="M738.3 287.6H285.7c-59 0-106.8 47.8-106.8 106.8v303.1c0 59 47.8 106.8 106.8 106.8h81.5v111.1c0 .7.8 1.1 1.4.7l166.9-110.6 41.8-.8h117.4l43.6-.4c59 0 106.8-47.8 106.8-106.8V394.5c0-59-47.8-106.9-106.8-106.9zM351.7 448.2c0-29.5 23.9-53.5 53.5-53.5s53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5-53.5-23.9-53.5-53.5zm157.9 267.1c-67.8 0-123.8-47.5-132.3-109h264.6c-8.6 61.5-64.5 109-132.3 109zm110-213.7c-29.5 0-53.5-23.9-53.5-53.5s23.9-53.5 53.5-53.5 53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5zM867.2 644.5V453.1h26.5c19.4 0 35.1 15.7 35.1 35.1v121.1c0 19.4-15.7 35.1-35.1 35.1h-26.5zM95.2 609.4V488.2c0-19.4 15.7-35.1 35.1-35.1h26.5v191.3h-26.5c-19.4 0-35.1-15.7-35.1-35.1zM561.5 149.6c0 23.4-15.6 43.3-36.9 49.7v44.9h-30v-44.9c-21.4-6.5-36.9-26.3-36.9-49.7 0-28.6 23.3-51.9 51.9-51.9s51.9 23.3 51.9 51.9z" />
+                  </svg>
+                </div>
+              )}
+
+              <div
+                className={`message-text px-4 py-3 rounded-2xl text-sm leading-relaxed max-w-[80%] shadow-md ${
+                  msg.role === "user"
+                    ? "bg-primaryColor/20 backdrop-blur-sm text-primaryColor border border-primaryColor/30 rounded-br-sm shadow-primaryColor/5"
+                    : "bg-bgColor/50 backdrop-blur-md text-gray-200 border border-white/10 rounded-bl-sm"
+                }`}
               >
-                <path d="M738.3 287.6H285.7c-59 0-106.8 47.8-106.8 106.8v303.1c0 59 47.8 106.8 106.8 106.8h81.5v111.1c0 .7.8 1.1 1.4.7l166.9-110.6 41.8-.8h117.4l43.6-.4c59 0 106.8-47.8 106.8-106.8V394.5c0-59-47.8-106.9-106.8-106.9zM351.7 448.2c0-29.5 23.9-53.5 53.5-53.5s53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5-53.5-23.9-53.5-53.5zm157.9 267.1c-67.8 0-123.8-47.5-132.3-109h264.6c-8.6 61.5-64.5 109-132.3 109zm110-213.7c-29.5 0-53.5-23.9-53.5-53.5s23.9-53.5 53.5-53.5 53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5zM867.2 644.5V453.1h26.5c19.4 0 35.1 15.7 35.1 35.1v121.1c0 19.4-15.7 35.1-35.1 35.1h-26.5zM95.2 609.4V488.2c0-19.4 15.7-35.1 35.1-35.1h26.5v191.3h-26.5c-19.4 0-35.1-15.7-35.1-35.1zM561.5 149.6c0 23.4-15.6 43.3-36.9 49.7v44.9h-30v-44.9c-21.4-6.5-36.9-26.3-36.9-49.7 0-28.6 23.3-51.9 51.9-51.9s51.9 23.3 51.9 51.9z" />
-              </svg>
+                {msg.isThinking ? (
+                  <div className="flex gap-1.5 py-1">
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "-0.32s" }}></div>
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "-0.16s" }}></div>
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                  </div>
+                ) : (
+                  <div dangerouslySetInnerHTML={{ __html: msg.content }} />
+                )}
+
+                {msg.file && (
+                  <div className="mt-2 w-full max-w-[200px] rounded-xl overflow-hidden border border-white/20 shadow-lg">
+                    <img src={`data:${msg.file.mime_type};base64,${msg.file.data}`} className="w-full block object-cover" alt="attachment" />
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="message-text">
-              Xin chào! 👋 <br />
-              Tôi là trợ lý AI của CinePhine. Tôi có thể giúp bạn tìm phim, gợi ý nội dung hay giải
-              đáp thắc mắc.
-              <br />
-              Bạn đang muốn xem gì hôm nay?
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Chat Footer */}
-        <div className="chat-footer">
-          {/* File Upload Preview Area - Đặt ở đây để đẩy input xuống */}
-          <div className="file-upload-preview" ref={fileUploadWrapperRef}>
-            <div className="preview-container">
-              <img alt="preview" />
-              <button type="button" className="cancel-file-btn" ref={fileCancelButtonRef}>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+        <div className="p-4 bg-bgColor2/80 backdrop-blur-xl border-t border-white/10 relative shrink-0">
+          {/* File Upload Preview */}
+          <div ref={fileUploadWrapperRef} className="hidden [&.file-uploaded]:block pb-3 transition-all duration-300">
+            <div className="relative w-16 h-16 rounded-xl border border-primaryColor/30 overflow-hidden bg-black shadow-lg">
+              <img alt="preview" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  resetFileInput();
+                }}
+                className="absolute top-1 right-1 bg-black/70 text-white border-none rounded-full w-5 h-5 flex items-center justify-center cursor-pointer hover:bg-red-500 hover:scale-110 transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
@@ -494,86 +463,68 @@ const Chatbot = () => {
             </div>
           </div>
 
-          <form action="#" className="chat-form" ref={chatFormRef} onSubmit={handleOutgoingMessage}>
-            <div className="chat-controls">
+          <form
+            ref={chatFormRef}
+            onSubmit={handleOutgoingMessage}
+            className="flex items-end gap-2.5 bg-bgColor/50 backdrop-blur-md rounded-3xl px-3 py-2 border border-white/10 focus-within:border-primaryColor/50 focus-within:shadow-[0_0_15px_rgba(var(--primary-color-rgb),0.15)] transition-all duration-300"
+          >
+            <div className="flex gap-1 items-center pb-1">
               <button
                 type="button"
                 id="emoji-picker"
                 ref={emojiPickerRef}
-                onClick={handleEmojiClick}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowEmojiPicker((prev) => !prev);
+                }}
                 title="Emoji"
+                className="p-1.5 text-gray-400 hover:text-primaryColor hover:bg-primaryColor/10 rounded-full transition-colors flex"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"></circle>
                   <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
                   <line x1="9" y1="9" x2="9.01" y2="9"></line>
                   <line x1="15" y1="9" x2="15.01" y2="9"></line>
                 </svg>
               </button>
+
               <button
                 type="button"
-                id="file-upload"
-                onClick={handleFileUploadClick}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (fileInputRef.current) fileInputRef.current.click();
+                }}
                 title="Gửi ảnh"
+                className="p-1.5 text-gray-400 hover:text-primaryColor hover:bg-primaryColor/10 rounded-full transition-colors flex"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                   <circle cx="8.5" cy="8.5" r="1.5"></circle>
                   <polyline points="21 15 16 10 5 21"></polyline>
                 </svg>
               </button>
-              <input
-                type="file"
-                id="file-input"
-                hidden
-                ref={fileInputRef}
-                accept="image/jpeg,image/png,image/gif,image/webp"
-              />
+
+              <input type="file" hidden ref={fileInputRef} accept="image/jpeg,image/png,image/gif,image/webp" />
             </div>
 
             <textarea
-              placeholder="Nhập tin nhắn..."
-              className="message-input"
               ref={messageInputRef}
+              placeholder="Nhập tin nhắn..."
               rows={1}
               disabled={isSending}
-            ></textarea>
+              className="flex-1 bg-transparent border-none outline-none text-gray-200 text-sm resize-none max-h-[100px] py-2.5 leading-relaxed placeholder:text-gray-500 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full"
+            />
 
-            <button type="submit" id="send-message" ref={sendMessageButtonRef} disabled={isSending}>
+            <button
+              type="submit"
+              disabled={isSending}
+              className="w-9 h-9 rounded-full bg-primaryColor/20 border border-primaryColor/30 text-primaryColor flex items-center justify-center shrink-0 hover:bg-primaryColor hover:text-gray-900 transition-all duration-300 disabled:opacity-50 disabled:bg-white/5 disabled:border-white/10 disabled:text-gray-500 mb-0.5 shadow-sm"
+            >
               {isSending ? (
-                <div className="spinner"></div>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-[-2px]">
                   <line x1="22" y1="2" x2="11" y2="13"></line>
                   <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                 </svg>
