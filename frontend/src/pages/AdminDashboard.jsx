@@ -7,6 +7,7 @@ import AdminSidebar from "components/admin/AdminSidebar";
 import AdminOverviewTab from "components/admin/AdminOverviewTab";
 import AdminNotificationTab from "components/admin/AdminNotificationTab";
 import AdminSettingsTab from "components/admin/AdminSettingsTab";
+import AdminViralClipsTab from "components/admin/AdminViralClipsTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminDashboard = () => {
@@ -69,6 +70,12 @@ const AdminDashboard = () => {
           <div className="animate-fade-in">
             <h1 className="text-2xl font-bold text-white mb-6">Quản Lý Bình Luận</h1>
             <CommentTable />
+          </div>
+        );
+      case ADMIN_TABS.VIRAL_CLIPS:
+        return (
+          <div className="animate-fade-in">
+            <AdminViralClipsTab />
           </div>
         );
       case ADMIN_TABS.NOTIFICATIONS:

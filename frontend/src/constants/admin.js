@@ -8,6 +8,7 @@ export const ADMIN_TABS = {
   MOVIES: "movies",
   USERS: "users",
   COMMENTS: "comments",
+  VIRAL_CLIPS: "viral-clips",
   NOTIFICATIONS: "notifications",
   SETTINGS: "settings",
 };
@@ -18,6 +19,7 @@ export const ADMIN_MENU_ITEMS = [
   { id: ADMIN_TABS.MOVIES, label: "Phim", icon: "fa-film" },
   { id: ADMIN_TABS.USERS, label: "Người Dùng", icon: "fa-users" },
   { id: ADMIN_TABS.COMMENTS, label: "Bình Luận", icon: "fa-comments" },
+  { id: ADMIN_TABS.VIRAL_CLIPS, label: "Viral Clips", icon: "fa-bolt" },
   { id: ADMIN_TABS.NOTIFICATIONS, label: "Thông Báo", icon: "fa-bell" },
   { id: ADMIN_TABS.SETTINGS, label: "Cài Đặt", icon: "fa-cog" },
 ];

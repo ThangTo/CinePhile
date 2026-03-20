@@ -70,7 +70,7 @@ services:
     restart: unless-stopped
     ports:
       - '6379:6379'
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     networks:
@@ -80,6 +80,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Self-hosted Whisper (Speech-to-Text)
+  # OpenAI-compatible API at http://localhost:8000/v1/audio/transcriptions
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: cinephine-whisper
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    environment:
+      - WHISPER__MODEL=Systran/faster-whisper-large-v3
+      - WHISPER__INFERENCE_DEVICE=cpu
+    volumes:
+      - whisper_cache:/root/.cache
+    networks:
+      - cinephine-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
 networks:
   cinephine-network:
@@ -91,4 +113,6 @@ volumes:
   mongodb_config:
     driver: local
   redis_data:
+    driver: local
+  whisper_cache:
     driver: local

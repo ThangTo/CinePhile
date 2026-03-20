@@ -19,6 +19,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             cd ~/CinePhine/backend
+            git reset --hard HEAD
             git pull origin dev
             npm install
             pm2 restart cinephine-api
