@@ -2,73 +2,85 @@ const Queue = require('bull');
 const { renderClip16x9 } = require('./videoProcessing.service');
 
 // ─── Configuration ──────────────────────────────────────────────────────────
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL;
 const CONCURRENCY = parseInt(process.env.VIDEO_QUEUE_CONCURRENCY, 10) || 2;
 
-// ─── Queue Instance ─────────────────────────────────────────────────────────
-const viralVideoQueue = new Queue('viral-video-processing', REDIS_URL, {
-  redis: {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-    tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
-  },
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000, // 5s, 10s, 20s
+let viralVideoQueue;
+
+if (REDIS_URL) {
+  // ─── Queue Instance ─────────────────────────────────────────────────────────
+  viralVideoQueue = new Queue('viral-video-processing', REDIS_URL, {
+    redis: {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
     },
-    removeOnComplete: 50,  // Keep last 50 completed jobs
-    removeOnFail: 100,     // Keep last 100 failed jobs for debugging
-    timeout: 300000,       // 5-minute timeout per job
-  },
-});
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000, 
+      },
+      removeOnComplete: 50,  
+      removeOnFail: 100,     
+      timeout: 300000,       
+    },
+  });
 
-// ─── Worker ─────────────────────────────────────────────────────────────────
-viralVideoQueue.process(CONCURRENCY, async (job) => {
-  const { videoUrl, bgMusic, bgmStartTime, bgmDuration, subtitleFile, startTime, duration, outputPath } = job.data;
+  // ─── Worker ─────────────────────────────────────────────────────────────────
+  viralVideoQueue.process(CONCURRENCY, async (job) => {
+    const { videoUrl, bgMusic, bgmStartTime, bgmDuration, subtitleFile, startTime, duration, outputPath } = job.data;
 
-  console.log(`[Queue] Processing job ${job.id}: ${JSON.stringify({
-    category: job.data.category,
-    startTime,
-    duration,
-    outputPath,
-  })}`);
+    console.log(`[Queue] Processing job ${job.id}: ${JSON.stringify({
+      category: job.data.category,
+      startTime,
+      duration,
+      outputPath,
+    })}`);
 
-  // Update progress
-  job.progress(10);
+    job.progress(10);
 
-  try {
-    const result = await renderClip16x9(videoUrl, bgMusic, subtitleFile, startTime, duration, outputPath, bgmStartTime, bgmDuration);
-    job.progress(100);
-    console.log(`[Queue] Job ${job.id} completed: ${result}`);
-    return { success: true, outputPath: result };
-  } catch (error) {
-    console.error(`[Queue] Job ${job.id} failed (attempt ${job.attemptsMade + 1}/${job.opts.attempts}): ${error.message}`);
-    throw error; // Bull will retry automatically
-  }
-});
+    try {
+      const result = await renderClip16x9(videoUrl, bgMusic, subtitleFile, startTime, duration, outputPath, bgmStartTime, bgmDuration);
+      job.progress(100);
+      console.log(`[Queue] Job ${job.id} completed: ${result}`);
+      return { success: true, outputPath: result };
+    } catch (error) {
+      console.error(`[Queue] Job ${job.id} failed (attempt ${job.attemptsMade + 1}/${job.opts.attempts}): ${error.message}`);
+      throw error; 
+    }
+  });
 
-// ─── Event Listeners ────────────────────────────────────────────────────────
-viralVideoQueue.on('completed', (job, result) => {
-  console.log(`[Queue] ✅ Job ${job.id} completed successfully:`, result);
-});
+  // ─── Event Listeners ────────────────────────────────────────────────────────
+  viralVideoQueue.on('completed', (job, result) => {
+    console.log(`[Queue] ✅ Job ${job.id} completed successfully:`, result);
+  });
 
-viralVideoQueue.on('failed', (job, err) => {
-  console.error(`[Queue] ❌ Job ${job.id} failed permanently after ${job.attemptsMade} attempts: ${err.message}`);
-});
+  viralVideoQueue.on('failed', (job, err) => {
+    console.error(`[Queue] ❌ Job ${job.id} failed permanently after ${job.attemptsMade} attempts: ${err.message}`);
+  });
 
-viralVideoQueue.on('stalled', (job) => {
-  console.warn(`[Queue] ⚠️ Job ${job.id || job} stalled — will be retried`);
-});
+  viralVideoQueue.on('stalled', (job) => {
+    console.warn(`[Queue] ⚠️ Job ${job.id || job} stalled — will be retried`);
+  });
 
-viralVideoQueue.on('error', (error) => {
-  console.error(`[Queue] Queue error: ${error.message}`);
-});
+  viralVideoQueue.on('error', (error) => {
+    console.error(`[Queue] Queue error: ${error.message}`);
+  });
 
-viralVideoQueue.on('waiting', (jobId) => {
-  console.log(`[Queue] Job ${jobId} is waiting`);
-});
+  viralVideoQueue.on('waiting', (jobId) => {
+    console.log(`[Queue] Job ${jobId} is waiting`);
+  });
+} else {
+  console.log('[Queue] Video Queue disabled: REDIS_URL missing.');
+  viralVideoQueue = {
+    add: async () => { throw new Error("Feature disabled") },
+    getJob: async () => null,
+    close: async () => {},
+    on: () => {},
+    process: () => {}
+  };
+}
 
 // ─── Helper: Add a job ──────────────────────────────────────────────────────
 /**
