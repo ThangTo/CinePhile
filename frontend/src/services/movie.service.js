@@ -210,6 +210,19 @@ const movieService = {
     }),
 
   /**
+   * Ghi nhận thời lượng xem (heartbeat 30s)
+   * @param {string} id - Movie ID hoặc slug
+   * @param {string} viewHistoryId - ID của bản ghi ViewHistory
+   * @param {number} seconds - Số giây đã xem (mặc định 30)
+   * @returns {Promise<Object>} { success: true }
+   */
+  recordWatchTime: (id, viewHistoryId, seconds = 30) =>
+    apiRequest(`/movies/${id}/watch-time`, {
+      method: "POST",
+      data: { viewHistoryId, seconds },
+    }),
+
+  /**
    * Đánh giá movie (yêu cầu auth)
    * @param {string|number} id - Movie ID
    * @param {number} rating - Rating từ 1-10

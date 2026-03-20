@@ -339,15 +339,53 @@ const postComment = async (req, res) => {
 
 /**
  * POST /movies/:id/view
- * Increment view count for a movie (no authentication required)
+ * Increment view count for a movie (Anti-Spam: 2h cooldown per user/IP)
  * @param {string} req.params.id - Movie ID or slug
  */
 const incrementView = async (req, res) => {
   try {
-    const result = await movieService.incrementView(req.params.id);
+    // Lấy IP thực của người dùng (hỗ trợ proxy/nginx)
+    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() 
+      || req.socket?.remoteAddress 
+      || '0.0.0.0';
+    
+    // Lấy userId nếu có token (optional auth)
+    let userId = null;
+    try {
+      const jwt = require('jsonwebtoken');
+      const token = req.headers.authorization?.replace('Bearer ', '') 
+        || req.cookies?.accessToken;
+      if (token) {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.id || decoded._id || null;
+      }
+    } catch (e) {
+      // Token không hợp lệ hoặc hết hạn → tiếp tục như guest
+    }
+
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+
+    const result = await movieService.incrementView(req.params.id, { userId, ipAddress, userAgent });
     res.json(result);
   } catch (error) {
     res.status(404).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /movies/:id/watch-time
+ * Record watch time heartbeat (called every 30s from frontend)
+ * @param {string} req.params.id - Movie ID or slug
+ * @param {string} req.body.viewHistoryId - ViewHistory record ID
+ * @param {number} req.body.seconds - Seconds watched since last heartbeat (default 30)
+ */
+const recordWatchTime = async (req, res) => {
+  try {
+    const { viewHistoryId, seconds = 30 } = req.body;
+    const result = await movieService.recordWatchTime(req.params.id, { viewHistoryId, seconds });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 };
 
@@ -777,6 +815,7 @@ module.exports = {
   rateMovie,
   getRatings,
   incrementView,
+  recordWatchTime,
   likeComment,
   dislikeComment,
   deleteComment,

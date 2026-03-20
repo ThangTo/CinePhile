@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import VideoPlayer from "components/watch-page/VideoPlayer";
 import ActionBar from "components/watch-page/ActionBar";
@@ -30,6 +30,7 @@ const WatchPage = () => {
   const [loading, setLoading] = useState(true);
   const [audioType, setAudioType] = useState(null);
   const viewCountedRef = useRef(false);
+  const viewHistoryIdRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
@@ -64,24 +65,20 @@ const WatchPage = () => {
     load();
   }, [id, audioParam]);
 
-  // Increment view count when page loads (only once per movie)
-  useEffect(() => {
-    if (!movie || viewCountedRef.current) return;
-
-    const incrementView = async () => {
-      try {
-        await movieService.incrementView(id);
-        viewCountedRef.current = true;
-        // Optionally update local movie state with new view count
-        // setMovie(prev => ({ ...prev, views: (prev.views || 0) + 1 }));
-      } catch (error) {
-        console.error("Error incrementing view count:", error);
-        // Silently fail - don't block user experience
+  // Chỉ tăng view khi user thực sự ấn Play (callback từ VideoPlayer)
+  const handleFirstPlay = useCallback(async () => {
+    if (viewCountedRef.current) return;
+    try {
+      const result = await movieService.incrementView(id);
+      viewCountedRef.current = true;
+      // Lưu viewHistoryId để dùng cho heartbeat watch-time
+      if (result?.viewHistoryId) {
+        viewHistoryIdRef.current = result.viewHistoryId;
       }
-    };
-
-    incrementView();
-  }, [movie, id]);
+    } catch (error) {
+      console.error("Error incrementing view count:", error);
+    }
+  }, [id]);
 
   useEffect(() => {
     setActiveEp(episodeParam);
@@ -174,6 +171,8 @@ const WatchPage = () => {
               audioType={audioType}
               onAudioTypeChange={setAudioType}
               resumeTime={startFromBeginning ? 0 : resumeTime}
+              onFirstPlay={handleFirstPlay}
+              viewHistoryIdRef={viewHistoryIdRef}
             />
 
             {/* Action Bar - Only favorite and add buttons */}

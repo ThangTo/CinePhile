@@ -633,6 +633,8 @@ const getStats = async () => {
   const previousWeekStart = new Date(currentWeekStart);
   previousWeekStart.setDate(currentWeekStart.getDate() - 7);
 
+  const ViewHistoryModel = require('../models/view_history.model');
+
   const [
     totalMovies,
     totalUsers,
@@ -653,8 +655,9 @@ const getStats = async () => {
     MovieModel.countDocuments({ createdAt: { $gte: previousWeekStart, $lt: currentWeekStart } }),
     UserModel.countDocuments({ createdAt: { $gte: currentWeekStart } }),
     UserModel.countDocuments({ createdAt: { $gte: previousWeekStart, $lt: currentWeekStart } }),
-    UserHistoryModel.countDocuments({ createdAt: { $gte: currentWeekStart } }),
-    UserHistoryModel.countDocuments({
+    // Sử dụng ViewHistoryModel thay vì UserHistoryModel để đếm lượt xem thực tế
+    ViewHistoryModel.countDocuments({ createdAt: { $gte: currentWeekStart } }),
+    ViewHistoryModel.countDocuments({
       createdAt: { $gte: previousWeekStart, $lt: currentWeekStart },
     }),
     analyticsService.getRealtimeActiveUsers(),
@@ -714,6 +717,127 @@ const getChartData = async (type) => {
       data: topGenres.map((g) => g.totalViews),
       slugs: topGenres.map((g) => g.slug),
       genres: topGenres,
+    };
+  }
+
+  // Watch Time Trend (Last 7 Days)
+  if (type === 'watch-time-trend') {
+    const ViewHistoryModel = require('../models/view_history.model');
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - 6);
+    startDate.setHours(0, 0, 0, 0);
+
+    const aggregation = await ViewHistoryModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: '+07:00' } },
+          totalDuration: { $sum: '$watchDuration' },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
+    const labels = [];
+    const data = [];
+    const dataMap = new Map();
+
+    // Convert seconds to minutes for the chart
+    aggregation.forEach((item) => {
+      dataMap.set(item._id, Math.round(item.totalDuration / 60));
+    });
+
+    // Fill the array for the last 7 days sequentially
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      // Construct date string formatted identically to MongoDB %Y-%m-%d
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      
+      const dayName = d.toLocaleDateString('vi-VN', { weekday: 'short' }); 
+      
+      labels.push(`${dayName} (${d.getDate()}/${d.getMonth() + 1})`);
+      data.push(dataMap.get(dateStr) || 0);
+    }
+
+    return {
+      labels,
+      data,
+    };
+  }
+
+  // Peak Hours Heatmap
+  if (type === 'peak-hours') {
+    const ViewHistoryModel = require('../models/view_history.model');
+    const aggregation = await ViewHistoryModel.aggregate([
+      {
+        $group: {
+          _id: { $hour: { date: '$createdAt', timezone: '+07:00' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+    const labels = Array.from({ length: 24 }, (_, i) => `${i}h`);
+    const dataMap = new Map(aggregation.map(item => [item._id, item.count]));
+    const data = Array.from({ length: 24 }, (_, i) => dataMap.get(i) || 0);
+    return { labels, data };
+  }
+
+  // Devices Doughnut
+  if (type === 'devices') {
+    const ViewHistoryModel = require('../models/view_history.model');
+    const aggregation = await ViewHistoryModel.aggregate([
+      {
+        $group: {
+          _id: '$deviceType',
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+    return {
+      labels: aggregation.map((a) => a._id),
+      data: aggregation.map((a) => a.count),
+    };
+  }
+
+  // Global Retention Rate Array (for Gauge)
+  if (type === 'retention-overview') {
+    const ViewHistoryModel = require('../models/view_history.model');
+    const views = await ViewHistoryModel.find()
+      .populate('movieId', 'time')
+      .lean();
+    
+    let totalRetention = 0;
+    let validCount = 0;
+    
+    for (const v of views) {
+      if (v.movieId && v.movieId.time) {
+        const timeMatch = v.movieId.time.match(/\d+/);
+        if (timeMatch) {
+          const totalMins = parseInt(timeMatch[0], 10);
+          if (totalMins > 0) {
+            const retention = (v.watchDuration / 60) / totalMins;
+            totalRetention += Math.min(retention, 1);
+            validCount++;
+          }
+        }
+      }
+    }
+    const avgRetention = validCount > 0 ? (totalRetention / validCount) * 100 : 0;
+    return {
+      retentionRate: Math.round(avgRetention),
     };
   }
 
@@ -1263,6 +1387,188 @@ const getUpdatingMovies = async (options = {}) => {
   };
 };
 
+/**
+ * Get top trending movies by timeframe
+ * @param {string} timeframe - 'today', 'week', 'month'
+ * @returns {Promise<Array>} List of trending movies
+ */
+const getTrendingMovies = async (timeframe = 'today') => {
+  const ViewHistoryModel = require('../models/view_history.model');
+  const MovieModel = require('../models/movie.model');
+
+  const now = new Date();
+  const startDate = new Date();
+  
+  if (timeframe === 'today') {
+    startDate.setHours(0, 0, 0, 0);
+  } else if (timeframe === 'week') {
+    startDate.setDate(now.getDate() - 7);
+  } else if (timeframe === 'month') {
+    startDate.setMonth(now.getMonth() - 1);
+  } else {
+    startDate.setHours(0, 0, 0, 0); // default today
+  }
+
+  // To calculate velocity (views in the last 3 hours)
+  const threeHoursAgo = new Date();
+  threeHoursAgo.setHours(now.getHours() - 3);
+
+  const aggregation = await ViewHistoryModel.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startDate },
+      },
+    },
+    {
+      $group: {
+        _id: '$movieId',
+        views: { $sum: 1 },
+        totalWatchTime: { $sum: '$watchDuration' },
+        uniqueUsers: { $addToSet: { $ifNull: ['$userId', '$ipAddress'] } },
+        recentViews: {
+          $sum: {
+            $cond: [{ $gte: ['$createdAt', threeHoursAgo] }, 1, 0]
+          }
+        }
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        views: 1,
+        totalWatchTime: { $round: [{ $divide: ['$totalWatchTime', 60] }, 0] }, // to minutes
+        uniqueViewers: { $size: '$uniqueUsers' },
+        recentViews: 1,
+        velocity: { 
+          // Velocity = recent views per hour (over 3h frame)
+          $round: [{ $divide: ['$recentViews', 3] }, 2]
+        }
+      }
+    },
+    {
+      $sort: { totalWatchTime: -1, views: -1 },
+    },
+    {
+      $limit: 10,
+    },
+  ]);
+
+  // Lookup movie details (faster than $lookup for 10 items)
+  const movieIds = aggregation.map(item => item._id);
+  const movies = await MovieModel.find({ _id: { $in: movieIds } })
+    .select('name slug poster_url thumb_url')
+    .lean();
+
+  const movieMap = new Map();
+  movies.forEach(m => movieMap.set(m._id.toString(), m));
+
+  // Merge & assign specific tags
+  const result = aggregation.map((item, index) => {
+    const m = movieMap.get(item._id.toString());
+    const isTrending = item.velocity > 10; // Rapid growth flag
+    
+    return {
+      rank: index + 1,
+      movieId: item._id,
+      name: m ? m.name : 'Unknown',
+      slug: m ? m.slug : '',
+      poster: m ? (m.poster_url || m.thumb_url) : '',
+      views: item.views,
+      watchMinutes: item.totalWatchTime,
+      uniqueViewers: item.uniqueViewers,
+      velocity: item.velocity,
+      isTrending: isTrending 
+    };
+  });
+
+  return result;
+};
+
+/**
+ * Get specific user's watch analytics
+ * @param {string} userId
+ * @returns {Promise<Object>} User's analytics data
+ */
+const getUserAnalytics = async (userId) => {
+  const mongoose = require('mongoose');
+  const ViewHistoryModel = require('../models/view_history.model');
+  const MovieModel = require('../models/movie.model');
+
+  let objectId;
+  try {
+    objectId = new mongoose.Types.ObjectId(userId);
+  } catch (e) {
+    throw new Error('Invalid User ID format');
+  }
+
+  const aggregation = await ViewHistoryModel.aggregate([
+    {
+      $match: { userId: objectId },
+    },
+    {
+      $group: {
+        _id: '$movieId',
+        watchMinutes: { $sum: { $divide: ['$watchDuration', 60] } },
+        totalViews: { $sum: 1 },
+        lastWatched: { $max: '$createdAt' }
+      }
+    },
+    {
+      $sort: { watchMinutes: -1 }
+    }
+  ]);
+
+  if (!aggregation || aggregation.length === 0) {
+    return { summary: { totalWatchMinutes: 0, moviesCount: 0 }, movies: [] };
+  }
+
+  const movieIds = aggregation.map(item => item._id);
+  const movies = await MovieModel.find({ _id: { $in: movieIds } })
+    .select('name slug poster_url thumb_url duration')
+    .lean();
+
+  const movieMap = new Map();
+  movies.forEach(m => movieMap.set(m._id.toString(), m));
+
+  let totalWatchMinutes = 0;
+
+  const moviesResult = aggregation.map(item => {
+    const m = movieMap.get(item._id.toString());
+    const minutes = Math.round(item.watchMinutes);
+    totalWatchMinutes += minutes;
+    
+    // Retention rate
+    let retentionRate = 0;
+    if (m && m.duration) {
+      // Assuming m.duration is a string like "120 Phút" or "1 Tập"
+      const durationMatch = String(m.duration).match(/\d+/);
+      const totalMovieMinutes = durationMatch ? parseInt(durationMatch[0], 10) : 0;
+      if (totalMovieMinutes > 0 && String(m.duration).toLowerCase().includes('phút')) {
+        retentionRate = Math.min(100, Math.round((minutes / totalMovieMinutes) * 100));
+      }
+    }
+
+    return {
+      movieId: item._id,
+      name: m ? m.name : 'Unknown',
+      slug: m ? m.slug : '',
+      poster: m ? (m.poster_url || m.thumb_url) : '',
+      watchMinutes: minutes,
+      totalViews: item.totalViews,
+      lastWatched: item.lastWatched,
+      retentionRate: retentionRate > 0 ? retentionRate : null
+    };
+  });
+
+  return {
+    summary: {
+      totalWatchMinutes,
+      moviesCount: moviesResult.length
+    },
+    movies: moviesResult
+  };
+};
+
 module.exports = {
   // Movies
   getAllMovies,
@@ -1282,6 +1588,7 @@ module.exports = {
   // Users
   getAllUsers,
   getUserById,
+  getUserAnalytics,
   createUser,
   updateUser,
   deleteUser,
@@ -1289,6 +1596,7 @@ module.exports = {
   // Stats
   getStats,
   getChartData,
+  getTrendingMovies,
   // Settings
   getTheme,
   setTheme,

@@ -135,30 +135,17 @@ class AnalyticsService {
 
       // We need to use SUNION to combine sets and get unique elements across multiple days
       // For pipelining, we'll fetch the members directly
-      const multi = redisService.client.multi();
-      
-      // 1. Today's members
-      multi.sendCommand(['SMEMBERS', todayKey]);
-      
-      // 2. This week's unique members across all days
-      if (weekKeys.length > 0) {
-        multi.sendCommand(['SUNION', ...weekKeys]);
-      } else {
-        multi.sendCommand(['SMEMBERS', 'nonexistent_key']); // Dummy command to keep array indexes aligned
-      }
-      
-      // 3. This month's unique members across all days
-      if (monthKeys.length > 0) {
-        multi.sendCommand(['SUNION', ...monthKeys]);
-      } else {
-        multi.sendCommand(['SMEMBERS', 'nonexistent_key']);
-      }
-      
-      const results = await multi.exec();
-      
-      const todayMembers = results[0] || [];
-      const weekMembers = results[1] || [];
-      const monthMembers = results[2] || [];
+      // Execute SUNION directly (no pipeline needed — avoids multi.sendCommand incompatibility)
+      const [todayMembers, weekMembers, monthMembers] = await Promise.all([
+        redisService.client.sMembers(todayKey).catch(() => []),
+        weekKeys.length > 0
+          ? redisService.client.sUnion(weekKeys).catch(() => [])
+          : Promise.resolve([]),
+        monthKeys.length > 0
+          ? redisService.client.sUnion(monthKeys).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+
 
       return {
         today: this._countUserTypes(todayMembers),
@@ -215,15 +202,15 @@ class AnalyticsService {
     }
 
     try {
-      const multi = redisService.client.multi();
-      
-      if (thisWeekKeys.length > 0) multi.sendCommand(['SUNION', ...thisWeekKeys]);
-      else multi.sendCommand(['SMEMBERS', 'nonexistent']);
-
-      if (lastWeekKeys.length > 0) multi.sendCommand(['SUNION', ...lastWeekKeys]);
-      else multi.sendCommand(['SMEMBERS', 'nonexistent']);
-
-      const results = await multi.exec();
+      const [thisWeekMembers, lastWeekMembers] = await Promise.all([
+        thisWeekKeys.length > 0
+          ? redisService.client.sUnion(thisWeekKeys).catch(() => [])
+          : Promise.resolve([]),
+        lastWeekKeys.length > 0
+          ? redisService.client.sUnion(lastWeekKeys).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+      const results = [thisWeekMembers, lastWeekMembers];
       
       return {
         thisWeek: this._countUserTypes(results[0] || []),

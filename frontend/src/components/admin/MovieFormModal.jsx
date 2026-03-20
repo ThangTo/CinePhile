@@ -301,6 +301,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         backgroundImage: movie.backgroundImage || movie.thumb_url || "",
         trailer: movie.trailer || movie.trailerUrl || movie.trailer_url || "",
         views: movie.views ?? movie.viewCount ?? 0,
+        totalWatchTime: movie.totalWatchTime || 0,
         status: movie.status || "ongoing",
         currentEpisode: movie.currentEpisode !== undefined ? String(movie.currentEpisode) : "",
         totalEpisodes: movie.totalEpisodes || 0,
@@ -324,6 +325,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         backgroundImage: "",
         trailer: "",
         views: 0,
+        totalWatchTime: 0,
         status: "ongoing",
         currentEpisode: "",
         totalEpisodes: 0,
@@ -398,6 +400,14 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const formatWatchTime = (seconds) => {
+    if (!seconds) return "0 Phút";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0) return `${h} Giờ ${m} Phút`;
+    return `${m} Phút`;
   };
 
   if (!isOpen) return null;
@@ -529,15 +539,24 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                       onChange={handleChange}
                       error={errors.rating}
                     />
-                    <FormField
-                      label="Lượt xem"
-                      name="views"
-                      type="number"
-                      icon={FiEye}
-                      value={formData.views}
-                      onChange={handleChange}
-                      placeholder="0"
-                    />
+                    
+                    {/* View & Readonly Watch Time */}
+                    <div className="space-y-1 w-full">
+                      <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider flex items-center gap-1.5">
+                        <FiEye className="text-primaryColor" /> LƯỢT XEM
+                      </label>
+                      <input
+                        type="number"
+                        name="views"
+                        value={formData.views}
+                        onChange={handleChange}
+                        className="w-full bg-black/20 border border-white/5 focus:border-primaryColor rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primaryColor/50 transition-all shadow-inner hover:bg-black/30"
+                      />
+                      {/* Thẻ Readonly hiển thị Thời Lượng Xem Thực Tế đã được Format */}
+                      <p className="text-[10px] text-amber-500/90 font-bold inline-flex items-center gap-1 mt-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        <FiClock size={10} /> Thực Tế: {formatWatchTime(formData.totalWatchTime)}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Row 2: 2 cột lớn hơn */}

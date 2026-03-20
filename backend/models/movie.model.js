@@ -86,6 +86,7 @@ const movieSchema = new mongoose.Schema(
 
     // --- THỐNG KÊ ---
     viewCount: { type: Number, default: 0 },
+    totalWatchTime: { type: Number, default: 0 }, // Tổng thời lượng xem (giây) - cộng dồn từ mọi user
     commentCount: { type: Number, default: 0 }, // Thêm field này theo Schema
     imdb: { type: Number, default: 0 }, // Thêm field này theo Schema
     rating: { type: Number, default: 0 },

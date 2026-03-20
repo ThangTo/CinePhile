@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import Hls from "hls.js";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
+import movieService from "services/movie.service";
 import VideoOverlays from "../video/VideoOverlays";
 import VideoControls from "../video/VideoControls";
 import useToast from "hooks/useToast";
@@ -19,6 +20,8 @@ const VideoPlayer = ({
   audioType,
   onAudioTypeChange,
   resumeTime = null,
+  onFirstPlay,
+  viewHistoryIdRef,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -63,6 +66,7 @@ const VideoPlayer = ({
   const hlsRef = useRef(null);
   const blobUrlRef = useRef(null); // Ref để lưu Blob URL và dọn dẹp sau này
   const downloadAbortControllerRef = useRef(null);
+  const firstPlayFiredRef = useRef(false);
 
   // 1. SỬA ĐỔI: Lấy link m3u8 trực tiếp, KHÔNG qua Proxy Backend
   const hlsSource = useMemo(() => {
@@ -159,7 +163,14 @@ const VideoPlayer = ({
       updateBufferedPercentage();
     };
 
-    const handlePlay = () => setIsPlaying(true);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      // Gọi onFirstPlay (tăng view) chỉ 1 lần duy nhất trong đời sống Component
+      if (!firstPlayFiredRef.current && onFirstPlay) {
+        firstPlayFiredRef.current = true;
+        onFirstPlay();
+      }
+    };
     const handlePause = () => setIsPlaying(false);
     const handleWaiting = () => setIsBuffering(true);
     const handleCanPlay = () => setIsBuffering(false);
@@ -190,7 +201,24 @@ const VideoPlayer = ({
       video.removeEventListener("progress", handleProgress);
       video.removeEventListener("leavepictureinpicture", handleLeavePiP);
     };
-  }, [hasNativePlayer, episode, duration]);
+  }, [hasNativePlayer, episode, duration, onFirstPlay]);
+
+  // === HEARTBEAT: Gửi Watch Time mỗi 30 giây khi video đang phát ===
+  useEffect(() => {
+    if (!isPlaying || !movie) return;
+
+    const heartbeatInterval = setInterval(() => {
+      const movieId = movie.id || movie._id || movie.slug;
+      const vhId = viewHistoryIdRef?.current;
+      if (movieId) {
+        movieService.recordWatchTime(movieId, vhId, 30).catch(() => {
+          // Heartbeat thất bại im lặng - không làm phiền user
+        });
+      }
+    }, 30000); // 30 giây
+
+    return () => clearInterval(heartbeatInterval);
+  }, [isPlaying, movie, viewHistoryIdRef]);
 
   // Reset auto-play/seek state
   useEffect(() => {

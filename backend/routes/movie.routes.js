@@ -69,8 +69,11 @@ router.get('/:id/ratings', movieController.getRatings);
 // GET /api/v1/movies/:id/recommendations - Get recommended movies (must be before /:id)
 router.get('/:id/recommendations', movieController.getRecommendations);
 
-// POST /api/v1/movies/:id/view - Increment view count (no auth required)
+// POST /api/v1/movies/:id/view - Increment view count (anti-spam protected)
 router.post('/:id/view', movieController.incrementView);
+
+// POST /api/v1/movies/:id/watch-time - Record watch time heartbeat (no auth required)
+router.post('/:id/watch-time', movieController.recordWatchTime);
 
 // POST /api/v1/movies/:id/rate - Rate movie
 router.post('/:id/rate', authMiddleware, movieController.rateMovie);

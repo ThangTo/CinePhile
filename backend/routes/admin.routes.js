@@ -80,6 +80,9 @@ router.get('/users', adminController.getAllUsers);
 // GET /api/v1/admin/users/:id - Get user by ID
 router.get('/users/:id', adminController.getUserById);
 
+// GET /api/v1/admin/users/:id/analytics - Get specific user's watch analytics
+router.get('/users/:id/analytics', adminController.getUserAnalytics);
+
 // POST /api/v1/admin/users - Create user
 router.post('/users', adminController.createUser);
 
@@ -107,6 +110,9 @@ router.get('/analytics/visits', adminController.getRealtimeVisits);
 
 // GET /api/v1/admin/analytics/locations - Get map locations
 router.get('/analytics/locations', adminController.getAnalyticsLocations);
+
+// GET /api/v1/admin/analytics/trending - Get top trending movies by timeframe
+router.get('/analytics/trending', adminController.getTrendingMovies);
 
 // ===== ADMIN SETTINGS =====
 // GET /api/v1/admin/settings/theme - Get current theme

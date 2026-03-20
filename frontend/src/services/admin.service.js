@@ -708,6 +708,18 @@ export const userAPI = {
   },
 
   /**
+   * Get specific user's watch analytics
+   * @param {string|number} id - User ID
+   * @returns {Promise<Object>} Analytics data
+   */
+  getUserAnalytics: async (id) => {
+    const response = await apiRequest(`/admin/users/${id}/analytics`, {
+      requiresAuth: true,
+    });
+    return response;
+  },
+
+  /**
    * Create new user
    * @param {Object} userData - User data
    * @returns {Promise<Object>} Created user object
@@ -838,6 +850,20 @@ export const statsAPI = {
     });
     return response;
   },
+
+  /**
+   * Get top trending movies by timeframe
+   * @param {string} timeframe - 'today', 'week', 'month'
+   * @returns {Promise<Array>} Array of trending movies
+   */
+  getTrendingMovies: async (timeframe = "today") => {
+    const response = await apiRequest("/admin/analytics/trending", {
+      params: { timeframe },
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
 
   /**
    * Get real-time active users count

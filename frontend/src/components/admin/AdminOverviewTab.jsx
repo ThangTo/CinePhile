@@ -4,6 +4,7 @@ import { statsAPI } from "services/admin.service";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 import { Chart, registerables } from "chart.js";
 import AnalyticsMap from "./AnalyticsMap";
+import TrendingRanking from "./TrendingRanking";
 import { getOptimizedImageUrl } from "constants/imageSizes";
 import {
   FiActivity,
@@ -13,10 +14,13 @@ import {
   FiTrendingUp,
   FiPieChart,
   FiBarChart2,
-  FiArrowUp,
   FiArrowDown,
   FiGlobe,
   FiMonitor,
+  FiClock,
+  FiSmartphone,
+  FiPercent,
+  FiTarget
 } from "react-icons/fi";
 
 Chart.register(...registerables);
@@ -64,6 +68,15 @@ const AdminOverviewTab = () => {
   const [isLoadingChart, setIsLoadingChart] = useState(true);
   const [genresChart, setGenresChart] = useState({ labels: [], data: [] });
   const [isLoadingGenresChart, setIsLoadingGenresChart] = useState(true);
+  const [watchTimeChart, setWatchTimeChart] = useState({ labels: [], data: [] });
+  const [isLoadingWatchTime, setIsLoadingWatchTime] = useState(true);
+
+  // New Data Sources (Phase 10.3)
+  const [peakHoursChart, setPeakHoursChart] = useState({ labels: [], data: [] });
+  const [isLoadingPeak, setIsLoadingPeak] = useState(true);
+  const [devicesChart, setDevicesChart] = useState({ labels: [], data: [] });
+  const [isLoadingDevices, setIsLoadingDevices] = useState(true);
+  const [globalRetention, setGlobalRetention] = useState(0);
 
   // Realtime Analytics States
   const [activeUsersHistory, setActiveUsersHistory] = useState([]);
@@ -132,6 +145,41 @@ const AdminOverviewTab = () => {
       }
     };
     loadGenresChart();
+
+    const loadWatchTimeChart = async () => {
+      setIsLoadingWatchTime(true);
+      try {
+        const chartData = await statsAPI.getChartData("watch-time-trend");
+        setWatchTimeChart({
+          labels: Array.isArray(chartData?.labels) ? chartData.labels : [],
+          data: Array.isArray(chartData?.data) ? chartData.data : [],
+        });
+      } catch (err) {
+        setWatchTimeChart({ labels: [], data: [] });
+      } finally {
+        setIsLoadingWatchTime(false);
+      }
+    };
+    loadWatchTimeChart();
+
+    const loadAdvancedStats = async () => {
+      try {
+        const [peak, dev, ret] = await Promise.all([
+          statsAPI.getChartData("peak-hours").catch(() => null),
+          statsAPI.getChartData("devices").catch(() => null),
+          statsAPI.getChartData("retention-overview").catch(() => null),
+        ]);
+        if (peak) setPeakHoursChart({ labels: peak.labels || [], data: peak.data || [] });
+        if (dev) setDevicesChart({ labels: dev.labels || [], data: dev.data || [] });
+        if (ret) setGlobalRetention(ret.retentionRate || 0);
+      } catch (err) {
+        console.error("Advanced Stats Error:", err);
+      } finally {
+        setIsLoadingPeak(false);
+        setIsLoadingDevices(false);
+      }
+    };
+    loadAdvancedStats();
 
     // Fetch Visits stats on mount
     const loadVisits = async () => {
@@ -359,6 +407,157 @@ const AdminOverviewTab = () => {
     []
   );
 
+  const watchTimeLineData = useMemo(
+    () => ({
+      labels: watchTimeChart.labels,
+      datasets: [
+        {
+          label: "Tổng thời gian xem (phút)",
+          data: watchTimeChart.data,
+          borderColor: "#f59e0b", // amber-500
+          backgroundColor: (context) => {
+            const ctx = context.chart.ctx;
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            // Gradient fill mượt mà, sang trọng
+            gradient.addColorStop(0, "rgba(245, 158, 11, 0.4)");
+            gradient.addColorStop(1, "rgba(245, 158, 11, 0.0)");
+            return gradient;
+          },
+          borderWidth: 3,
+          tension: 0.4, // Đường cong mềm mại
+          fill: true,
+          pointBackgroundColor: "#f59e0b",
+          pointBorderColor: "#fff",
+          pointHoverBackgroundColor: "#fff",
+          pointHoverBorderColor: "#f59e0b",
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+      ],
+    }),
+    [watchTimeChart]
+  );
+
+  const watchTimeLineOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "rgba(0, 0, 0, 0.8)",
+          titleColor: "#fff",
+          bodyColor: "#f59e0b",
+          padding: 12,
+          cornerRadius: 8,
+          displayColors: false,
+          callbacks: {
+            label: (ctx) => {
+              const minutes = ctx.raw || 0;
+              if (minutes >= 60) {
+                const h = Math.floor(minutes / 60);
+                const m = minutes % 60;
+                return ` ${h} giờ ${m} phút`;
+              }
+              return ` ${minutes} phút`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false, drawBorder: false },
+          ticks: { color: "#6b7280", font: { size: 11, family: "'Inter', sans-serif" } },
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: "rgba(255,255,255,0.05)",
+            borderDash: [5, 5],
+            drawBorder: false,
+          },
+          ticks: {
+            color: "#6b7280",
+            font: { size: 11, family: "'Inter', sans-serif" },
+            callback: (value) => (value >= 1000 ? `${value / 1000}k` : value),
+          },
+        },
+      },
+      interaction: {
+        intersect: false,
+        mode: "index",
+      },
+    }),
+    []
+  );
+
+  // Peak Hours Configuration
+  const peakHoursLineData = useMemo(() => ({
+    labels: peakHoursChart.labels,
+    datasets: [{
+      label: "Lượt Xem",
+      data: peakHoursChart.data,
+      borderColor: "#10b981", // emerald-500
+      backgroundColor: (context) => {
+        const ctx = context.chart.ctx;
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, "rgba(16, 185, 129, 0.4)");
+        gradient.addColorStop(1, "rgba(16, 185, 129, 0.0)");
+        return gradient;
+      },
+      borderWidth: 3,
+      tension: 0.4,
+      fill: true,
+      pointBackgroundColor: "#10b981",
+      pointBorderColor: "#fff",
+      pointBorderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+    }]
+  }), [peakHoursChart]);
+
+  const peakHoursLineOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "rgba(0, 0, 0, 0.9)",
+        titleColor: "#fff",
+        bodyColor: "#10b981",
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: false,
+        callbacks: {
+          label: (ctx) => `Lượng Khách Điểm Danh: ${ctx.raw} lượt xem`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: "#6b7280", font: { size: 10, family: "'Inter', sans-serif" } },
+      },
+      y: {
+        grid: { color: "rgba(255,255,255,0.05)", drawBorder: false, borderDash: [5, 5] },
+        ticks: { color: "#6b7280", font: { size: 11, family: "'Inter', sans-serif" } },
+      },
+    },
+    interaction: { mode: "index", intersect: false },
+  }), []);
+
+  // Devices Configuration
+  const devicesDoughnutData = useMemo(() => ({
+    labels: devicesChart.labels,
+    datasets: [{
+      data: devicesChart.data,
+      backgroundColor: ["#3b82f6", "#f43f5e", "#10b981", "#64748b"], // Blue, Rose, Emerald, Slate
+      borderColor: "#111827",
+      borderWidth: 3,
+      hoverOffset: 8,
+    }]
+  }), [devicesChart]);
+
   if (isLoadingStats || !stats) {
     return (
       <div className="flex h-[80vh] items-center justify-center w-full">
@@ -578,7 +777,108 @@ const AdminOverviewTab = () => {
         </div>
       </div>
 
-      {/* 2.5 Map Section */}
+      <TrendingRanking />
+
+      {/* 2.5 Watch Time Trend */}
+      <div className="bg-[#ffffff05] rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col relative overflow-hidden group w-full">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="flex items-center justify-between mb-6 z-10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+              <FiTrendingUp size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white tracking-wide">Xu Hướng Thời Lượng Xem</h3>
+              <p className="text-xs text-gray-500">Tổng thời gian tương tác thực tế trong 7 ngày qua</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-[280px] w-full z-10">
+          {isLoadingWatchTime ? (
+            <div className="h-full flex items-center justify-center">
+              <BarSpinner />
+            </div>
+          ) : watchTimeChart?.labels?.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-gray-500 opacity-50">
+              <FiTrendingUp size={48} className="mb-2" />
+              <span>Chưa có dữ liệu thống kê tuần này</span>
+            </div>
+          ) : (
+            <Line data={watchTimeLineData} options={watchTimeLineOptions} />
+          )}
+        </div>
+      </div>
+
+      {/* 2.6 ADVANCED ANALYTICS (Phase 10.3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
+        {/* Peak Hours Heatmap */}
+        <div className="xl:col-span-1 lg:col-span-2 bg-[#ffffff05] rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-[80px] -translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="flex items-center gap-3 mb-6 z-10">
+            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              <FiClock size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white tracking-wide">Khung Giờ Vàng</h3>
+              <p className="text-xs text-gray-500">Mật độ xem phân bổ theo 24 giờ</p>
+            </div>
+          </div>
+          <div className="h-[200px] w-full z-10">
+            {isLoadingPeak ? (
+               <div className="h-full flex items-center justify-center"><BarSpinner /></div>
+            ) : peakHoursChart?.labels?.length === 0 ? (
+               <div className="h-full flex items-center justify-center text-gray-500 opacity-50">Không có dữ liệu 24h</div>
+            ) : (
+               <Line data={peakHoursLineData} options={peakHoursLineOptions} />
+            )}
+          </div>
+        </div>
+
+        {/* Device Split */}
+        <div className="bg-[#ffffff05] rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col relative overflow-hidden">
+          <div className="flex items-center gap-3 mb-2 z-10">
+            <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+              <FiSmartphone size={20} />
+            </div>
+            <h3 className="text-lg font-bold text-white tracking-wide">Thiết Bị & Nền Tảng</h3>
+          </div>
+          <div className="flex-1 min-h-[200px] relative flex items-center justify-center z-10">
+            {isLoadingDevices ? (
+              <BarSpinner />
+            ) : devicesChart?.labels?.length === 0 ? (
+              <span className="text-gray-500">Chưa có dữ liệu nền tảng</span>
+            ) : (
+              <Doughnut data={devicesDoughnutData} options={doughnutChartOptions} />
+            )}
+          </div>
+        </div>
+
+        {/* Global Retention Rate */}
+        <div className="bg-[#ffffff05] rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col items-center justify-center relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 pointer-events-none" />
+          <div className="absolute bottom-0 right-0 w-48 h-48 bg-purple-500/10 rounded-full blur-[100px]" />
+          
+          <div className="z-10 text-center flex flex-col items-center gap-4">
+            <div className="p-4 bg-purple-500/20 rounded-2xl text-purple-400 shadow-[0_0_30px_rgba(168,85,247,0.3)]">
+              <FiTarget size={40} className="animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white tracking-widest uppercase mb-2">Tỷ Lệ Giữ Chân</h3>
+              <p className="text-xs text-gray-400 max-w-[200px] mx-auto leading-relaxed">
+                Là tỷ số Thời Lượng Xem thực tế trên Thời Gian Phim quy định trung bình toàn rạp.
+              </p>
+            </div>
+            <div className="relative mt-2">
+              <span className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-500">
+                {globalRetention}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2.8 Map Section */}
       <div className="w-full">
         <AnalyticsMap />
       </div>

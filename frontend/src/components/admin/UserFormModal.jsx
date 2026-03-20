@@ -9,7 +9,14 @@ import {
   FiAlertCircle,
   FiCheck,
   FiUsers,
+  FiBarChart2,
+  FiClock,
+  FiFilm,
+  FiEye,
+  FiTarget
 } from "react-icons/fi";
+import { userAPI } from "services/admin.service";
+import { BarSpinner } from "components/common/LoadingState";
 
 // --- UI COMPONENTS ---
 
@@ -80,6 +87,10 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Analytics State
+  const [analytics, setAnalytics] = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
   useEffect(() => {
     if (user) {
       setFormData({
@@ -103,6 +114,25 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
       });
     }
     setErrors({});
+  }, [user, isOpen]);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      if (user && user._id && isOpen) {
+        setLoadingAnalytics(true);
+        try {
+          const data = await userAPI.getUserAnalytics(user._id);
+          setAnalytics(data);
+        } catch (error) {
+          console.error("Failed to fetch user analytics:", error);
+        } finally {
+          setLoadingAnalytics(false);
+        }
+      } else {
+        setAnalytics(null);
+      }
+    };
+    fetchAnalytics();
   }, [user, isOpen]);
 
   const handleChange = (e) => {
@@ -220,8 +250,8 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-6">
-              {/* LEFT COLUMN */}
+            <div className={`grid grid-cols-1 ${user ? "lg:grid-cols-[1fr_1.5fr]" : ""} gap-6`}>
+              {/* LEFT COLUMN: User Info */}
               <div className="flex flex-col gap-5">
                 {/* 1. Core Info */}
                 <div className="bg-black/10 rounded-xl p-5 border border-white/5 space-y-4">
@@ -319,6 +349,85 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
                   </div>
                 </div>
               </div>
+
+              {/* RIGHT COLUMN: User Analytics (Only shown when updating, not creating new) */}
+              {user && (
+                <div className="flex flex-col gap-5">
+                  <div className="bg-[#ffffff05] rounded-xl p-6 border border-white/5 shadow-xl h-full flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primaryColor/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                    
+                    <h3 className="text-white font-bold flex items-center gap-2 mb-6 border-b border-white/5 pb-3">
+                      <FiBarChart2 className="text-primaryColor" /> Hồ Sơ Xem Phim (Lifetime Analytics)
+                    </h3>
+
+                    {loadingAnalytics ? (
+                      <div className="flex-1 flex items-center justify-center min-h-[300px]">
+                        <BarSpinner />
+                      </div>
+                    ) : !analytics || analytics.movies.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-gray-500 min-h-[300px]">
+                        <FiFilm className="text-4xl mb-3 opacity-50" />
+                        <p>User này chưa xem rạp phim nào.</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col h-full z-10">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className="bg-black/30 border border-white/5 rounded-2xl p-4 hover:border-primaryColor/30 transition-colors">
+                              <p className="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wider flex items-center gap-1.5"><FiClock className="text-primaryColor" /> Tổng Thời Lúc Xem</p>
+                              <div className="flex items-end gap-2 text-primaryColor">
+                                <span className="text-3xl font-black">{Math.floor(analytics.summary.totalWatchMinutes / 60)}</span><span className="text-sm font-semibold mb-1">h</span>
+                                <span className="text-3xl font-black">{analytics.summary.totalWatchMinutes % 60}</span><span className="text-sm font-semibold mb-1">m</span>
+                              </div>
+                            </div>
+                            <div className="bg-black/30 border border-white/5 rounded-2xl p-4 hover:border-emerald-500/30 transition-colors">
+                              <p className="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wider flex items-center gap-1.5"><FiFilm className="text-emerald-500" /> Tương Tác</p>
+                              <div className="flex items-end gap-2 text-emerald-500">
+                                <span className="text-3xl font-black">{analytics.summary.moviesCount}</span><span className="text-sm font-semibold mb-1">phim distinct</span>
+                              </div>
+                            </div>
+                        </div>
+
+                        {/* Movies List */}
+                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3 pb-2 max-h-[500px]">
+                            {analytics.movies.map((m, idx) => (
+                              <div key={m.movieId} className="flex gap-4 items-center bg-white/[0.02] border border-white/5 p-3 rounded-xl hover:bg-white/[0.05] transition-colors relative group">
+                                <div className="absolute inset-0 bg-gradient-to-r from-primaryColor/0 via-primaryColor/[0.02] to-primaryColor/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none" />
+                                
+                                <span className="text-lg font-black text-gray-600 w-6 shrink-0">{idx + 1}</span>
+                                <div className="w-12 h-16 shrink-0 rounded-lg overflow-hidden border border-white/10">
+                                  {m.poster ? (
+                                    <img src={m.poster} alt={m.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full bg-black/50 flex items-center justify-center text-gray-500"><FiFilm /></div>
+                                  )}
+                                </div>
+                                
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <h4 className="text-white font-semibold truncate group-hover:text-primaryColor transition-colors text-sm">{m.name}</h4>
+                                  
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+                                    <div className="flex items-center gap-1 text-xs text-amber-500 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded">
+                                      <FiClock /> {m.watchMinutes} phút
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs text-blue-400">
+                                      <FiEye /> {m.totalViews} lần
+                                    </div>
+                                    {m.retentionRate && (
+                                      <div className="flex items-center gap-1 text-xs text-emerald-400">
+                                        <FiTarget /> {m.retentionRate}% Retention
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </form>
         </div>

@@ -689,6 +689,33 @@ const updateQualityForMovies = async (req, res) => {
   }
 };
 
+/**
+ * GET /admin/users/:id/analytics
+ * Get specific user's watch analytics
+ */
+const getUserAnalytics = async (req, res) => {
+  try {
+    const analytics = await adminService.getUserAnalytics(req.params.id);
+    res.json(analytics);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /admin/analytics/trending
+ * Get top trending movies by timeframe (today, week, month)
+ */
+const getTrendingMovies = async (req, res) => {
+  try {
+    const { timeframe } = req.query;
+    const trending = await adminService.getTrendingMovies(timeframe);
+    res.json(trending);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   // Movies
   getAllMovies,
@@ -708,6 +735,7 @@ module.exports = {
   // Users
   getAllUsers,
   getUserById,
+  getUserAnalytics,
   createUser,
   updateUser,
   deleteUser,
@@ -719,6 +747,7 @@ module.exports = {
   getRealtimeActiveUsers,
   getRealtimeVisits,
   getAnalyticsLocations,
+  getTrendingMovies,
 
   // Crawl
   crawlMoviesByPage,

@@ -1461,27 +1461,110 @@ const deleteComment = async (commentId, userId) => {
 };
 
 /**
- * Increment view count for a movie
- * No authentication required - anyone can view
+ * Increment view count for a movie (Anti-Spam Protected)
+ * Uses 2-hour cooldown per user/IP per movie to prevent view farming
+ * @param {string} identifier - Movie slug or ID
+ * @param {Object} options - { userId, ipAddress, userAgent }
  */
-const incrementView = async (identifier) => {
+const incrementView = async (identifier, { userId = null, ipAddress = '0.0.0.0', userAgent = 'Unknown' } = {}) => {
+  const ViewHistory = require('../models/view_history.model');
   const movieDoc = await findMovie(identifier);
   if (!movieDoc) {
     throw new Error('Movie not found');
   }
 
-  // Use $inc to atomically increment viewCount
-  await Movie.findByIdAndUpdate(movieDoc._id, {
-    $inc: { viewCount: 1 },
-  });
+  // Anti-Spam: Kiểm tra xem user/IP này đã xem phim này trong 2 giờ qua chưa
+  const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
-  // Return updated view count
-  const updated = await Movie.findById(movieDoc._id).select('viewCount').lean();
+  const spamQuery = {
+    movieId: movieDoc._id,
+    createdAt: { $gte: TWO_HOURS_AGO },
+  };
+
+  // Ưu tiên kiểm tra bằng userId (nếu đã đăng nhập), fallback sang IP
+  if (userId) {
+    spamQuery.userId = userId;
+  } else {
+    spamQuery.ipAddress = ipAddress;
+  }
+
+  const recentView = await ViewHistory.findOne(spamQuery).lean();
+
+  if (recentView) {
+    // Đã xem trong 2h qua → Trả về "thành công" nhưng không tăng view
+    const current = await Movie.findById(movieDoc._id).select('viewCount').lean();
+    return {
+      message: 'View already counted (cooldown active)',
+      viewCount: current.viewCount,
+      movieId: movieDoc._id.toString(),
+      counted: false,
+      viewHistoryId: recentView._id.toString(),
+    };
+  }
+
+  // Phân tích loại thiết bị
+  let deviceType = 'Desktop';
+  if (/mobile/i.test(userAgent)) {
+    deviceType = 'Mobile';
+  } else if (/tablet|ipad/i.test(userAgent)) {
+    deviceType = 'Tablet';
+  } else if (userAgent === 'Unknown') {
+    deviceType = 'Unknown';
+  }
+
+  // View hợp lệ! Tăng viewCount + Ghi log
+  const [updated, viewRecord] = await Promise.all([
+    Movie.findByIdAndUpdate(movieDoc._id, { $inc: { viewCount: 1 } }, { new: true })
+      .select('viewCount')
+      .lean(),
+    ViewHistory.create({
+      movieId: movieDoc._id,
+      userId: userId || null,
+      ipAddress: ipAddress,
+      watchDuration: 0,
+      userAgent: userAgent,
+      deviceType: deviceType,
+    }),
+  ]);
+
   return {
     message: 'View count updated',
     viewCount: updated.viewCount,
     movieId: movieDoc._id.toString(),
+    counted: true,
+    viewHistoryId: viewRecord._id.toString(),
   };
+};
+
+/**
+ * Record watch time heartbeat (called every 30 seconds from frontend)
+ * Atomically increments totalWatchTime on Movie and watchDuration on ViewHistory
+ * @param {string} identifier - Movie slug or ID
+ * @param {Object} options - { viewHistoryId, seconds }
+ */
+const recordWatchTime = async (identifier, { viewHistoryId, seconds = 30 } = {}) => {
+  const ViewHistory = require('../models/view_history.model');
+  const movieDoc = await findMovie(identifier);
+  if (!movieDoc) {
+    throw new Error('Movie not found');
+  }
+
+  const safeSecs = Math.min(Math.max(Number(seconds) || 0, 0), 60); // Cap tối đa 60s mỗi heartbeat
+
+  // Cập nhật song song: Tổng thời lượng phim + Phiên xem cá nhân
+  const updates = [
+    Movie.findByIdAndUpdate(movieDoc._id, { $inc: { totalWatchTime: safeSecs } }),
+  ];
+
+  if (viewHistoryId) {
+    updates.push(
+      ViewHistory.findByIdAndUpdate(viewHistoryId, { $inc: { watchDuration: safeSecs } }),
+    );
+  }
+
+  await Promise.all(updates);
+
+  return { success: true };
 };
 
 /**
@@ -2354,6 +2437,7 @@ module.exports = {
   rateMovie,
   getRatings,
   incrementView,
+  recordWatchTime,
   likeComment,
   dislikeComment,
   deleteComment,

@@ -6,7 +6,7 @@ import PaginationV2 from "components/common/PaginationV2";
 import ConfirmDialog from "components/common/ConfirmDialog";
 import { formatTimeAgo } from "utils/dateUtils";
 import { handleAvatarError } from "utils/avatarUtils";
-import { FiSearch, FiPlus, FiTrash2, FiUsers, FiMail, FiCalendar, FiUser } from "react-icons/fi";
+import { FiSearch, FiPlus, FiTrash2, FiUsers, FiMail, FiCalendar, FiUser, FiEdit2 } from "react-icons/fi";
 
 const UserTable = () => {
   const [users, setUsers] = useState([]);
@@ -98,10 +98,10 @@ const UserTable = () => {
   //   }
   // };
 
-  // const handleEdit = (user) => {
-  //   setSelectedUser(user);
-  //   setIsModalOpen(true);
-  // };
+  const handleEdit = (user) => {
+    setSelectedUser(user);
+    setIsModalOpen(true);
+  };
 
   const handleAdd = () => {
     setSelectedUser(null);
@@ -321,13 +321,13 @@ const UserTable = () => {
                         {/* Actions */}
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-3 opacity-80 group-hover:opacity-100 transition-opacity">
-                            {/* <button
-                            onClick={() => handleEdit(user)}
-                            className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all"
-                            title="Chỉnh sửa"
-                          >
-                            <FiEdit2 size={18} />
-                          </button> */}
+                            <button
+                              onClick={() => handleEdit(user)}
+                              className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all"
+                              title="Chỉnh sửa"
+                            >
+                              <FiEdit2 size={18} />
+                            </button>
                             <button
                               onClick={() => {
                                 setSelectedUser(user);

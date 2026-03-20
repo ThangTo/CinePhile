@@ -18,7 +18,12 @@ const createPaymentLink = async (userId, amount, bonus = 0) => {
     throw new Error('Missing userId or amount');
   }
 
-  const orderCode = Number(String(Date.now()).slice(-6));
+  // Khắc phục OrderCode: PayOS CHỈ chấp nhận số (Integer), KHÔNG chấp nhận chữ cái hay ký tự đặc biệt.
+  // Ta dùng Timestamp (13 số) + Random (2 số) = 15 số (an toàn nằm dưới giới hạn Number.MAX_SAFE_INTEGER của JavaScript)
+  const timestamp = Date.now().toString(); // 13 digits
+  const randomSuffix = Math.floor(Math.random() * 100).toString().padStart(2, '0'); // 2 digits
+  const orderCode = Number(timestamp + randomSuffix);
+
   const money = parseInt(amount) * 10; // TODO money
 
   const body = {
