@@ -8,12 +8,12 @@ const createPaymentLink = async (req, res) => {
   } catch (error) {
     console.error("Error creating payment link:", error);
     if (error.message === "Missing userId or amount") {
-      return res.status(400).send(error.message);
+      return res.status(400).json({ message: error.message });
     }
     if (error.message === "User not found") {
-      return res.status(404).send(error.message);
+      return res.status(404).json({ message: error.message });
     }
-    res.status(500).send("Something went error");
+    res.status(500).json({ message: "Something went error" });
   }
 };
 
@@ -31,6 +31,8 @@ const handleWebhook = async (req, res) => {
     });
   }
 };
+
+
 
 module.exports = {
   createPaymentLink,

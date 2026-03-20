@@ -1,14 +1,12 @@
 const { PayOS } = require('@payos/node');
 const User = require('../models/user.model');
+const Transaction = require('../models/transaction.model');
 
 const payOS = new PayOS({
   clientId: process.env.PAYOS_CLIENT_ID,
   apiKey: process.env.PAYOS_API_KEY,
   checksumKey: process.env.PAYOS_CHECKSUM_KEY,
 });
-
-// Store pending payment requests in memory (Note: Data lost on restart)
-const pendingRequests = new Map();
 
 const createPaymentLink = async (userId, amount, bonus = 0) => {
   const YOUR_DOMAIN =
@@ -27,8 +25,8 @@ const createPaymentLink = async (userId, amount, bonus = 0) => {
     orderCode: orderCode,
     amount: money,
     description: 'Thanh toan don hang',
-    returnUrl: `${YOUR_DOMAIN}`,
-    cancelUrl: `${YOUR_DOMAIN}`,
+    returnUrl: `${YOUR_DOMAIN}/account?tabs=coin&success=true`,
+    cancelUrl: `${YOUR_DOMAIN}/account?tabs=coin&canceled=true`,
   };
 
   const user = await User.findById(userId);
@@ -36,14 +34,18 @@ const createPaymentLink = async (userId, amount, bonus = 0) => {
     throw new Error('User not found');
   }
 
-  // 1. Store request in memory instead of updating coins immediately
+  // 1. Store request in MongoDB DB instead of memory
   const parsedAmount = parseInt(amount);
   const parsedBonus = parseInt(bonus) || 0;
-  pendingRequests.set(orderCode, {
-    userId: userId,
-    amount: parsedAmount, // Original coin amount
-    bonus: parsedBonus, // Bonus coins
-    status: 'PENDING',
+  
+  await Transaction.create({
+    user: userId,
+    orderCode: orderCode.toString(),
+    amount: money,
+    coinAmount: parsedAmount,
+    bonusCoin: parsedBonus,
+    provider: 'PAYOS',
+    status: 'PENDING'
   });
 
   // 2. Create PayOS Payment Link
@@ -61,27 +63,27 @@ const handleWebhook = async (webhookData) => {
   // 2. Check if succeed
   if (webhookData.code === '00' && webhookData.success === true) {
     const { orderCode } = webhookData.data;
-    console.log(`[Webhook] Processing success payment for Order ${orderCode}`);
 
-    // 3. Find pending request
-    if (pendingRequests.has(orderCode)) {
-      const request = pendingRequests.get(orderCode);
-      const { userId, amount, bonus = 0 } = request;
+    // 3. Find pending request in Database
+    const transaction = await Transaction.findOne({ orderCode: orderCode.toString(), status: 'PENDING' });
 
-      // 4. Update User Coin (amount + bonus)
-      const user = await User.findById(userId);
+    if (transaction) {
+      console.log(`[Webhook] Processing success payment for Order ${orderCode}`);
+
+      // 4. Update User Coin
+      const user = await User.findById(transaction.user);
       if (user) {
-        const totalCoins = amount + bonus;
+        const totalCoins = transaction.coinAmount + transaction.bonusCoin;
         user.coin = (user.coin || 0) + totalCoins;
         await user.save();
       }
 
-      // 5. Cleanup
-      pendingRequests.delete(orderCode);
+      // 5. Cleanup Status
+      transaction.status = 'SUCCESS';
+      transaction.webhookData = webhookData;
+      await transaction.save();
     } else {
-      console.warn(
-        `[Webhook] Order ${orderCode} not found in pending requests (may have restarted or expired)`,
-      );
+      console.warn(`[Webhook] Order ${orderCode} not found in PENDING transactions.`);
     }
   }
 

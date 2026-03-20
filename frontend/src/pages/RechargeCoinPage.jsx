@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
 import { BarSpinner } from "components/common/LoadingState";
+import http from "lib/axios";
 
 // Import React Icons
 import { FiCheck, FiAlertCircle, FiCreditCard, FiTrendingUp } from "react-icons/fi";
@@ -92,32 +93,21 @@ const RechargeCoinPage = () => {
       const selectedPackage = coinPackages.find((pkg) => pkg.amount === selectedAmount);
       const bonus = selectedPackage?.bonus || 0;
 
-      // Call Backend to Create Payment Link
-      const response = await fetch(
-        "https://cinephine-server.up.railway.app/api/v1/create-payment-link",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: user._id,
-            amount: amount,
-            bonus: bonus, // Send bonus to backend
-          }),
-        }
-      );
+      // Call Backend to Create Payment Link using secure axios instance
+      const response = await http.post("/payment/create-payment-link", {
+        userId: user._id,
+        amount: amount,
+        bonus: bonus,
+      });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Không thể tạo link thanh toán");
-      }
+      const result = response.data;
 
       // Demo: Update coin immediately in UI (Backend already updated DB)
       if (result.updatedCoin !== undefined) {
         updateUser({ ...user, coin: result.updatedCoin });
       }
 
-      // REDIRECT to PayOS
+      // REDIRECT to Gateway
       if (result.checkoutUrl) {
         window.location.href = result.checkoutUrl;
       } else {
@@ -272,17 +262,22 @@ const RechargeCoinPage = () => {
             </h2>
 
             <div className="grid md:grid-cols-2 gap-4">
-              {/* Method 1: Bank Transfer */}
+              {/* Method 1: Bank Transfer (PayOS) */}
               <div
                 className={`p-6 rounded-2xl border transition-all cursor-pointer relative border-primaryColor bg-primaryColor/5`}
               >
+                <div className="absolute top-3 right-3 shadow-sm rounded-full">
+                  <div className="w-5 h-5 bg-primaryColor rounded-full flex items-center justify-center">
+                    <FiCheck className="text-black w-3 h-3 stroke-[3px]" />
+                  </div>
+                </div>
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-blue-600/20 flex items-center justify-center text-blue-400">
                     <FiCreditCard size={24} />
                   </div>
                   <div>
-                    <h3 className="text-white font-bold text-lg">Chuyển khoản ngân hàng</h3>
-                    <p className="text-gray-500 text-sm">Quét mã QR, xử lý tự động 24/7</p>
+                    <h3 className="text-white font-bold text-lg">Chuyển khoản / VietQR</h3>
+                    <p className="text-gray-500 text-sm">Quét mã QR, tự động xử lý 24/7</p>
                   </div>
                 </div>
               </div>

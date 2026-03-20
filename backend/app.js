@@ -199,7 +199,7 @@ app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/crawl', crawlerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/cast', castRoutes);
-app.use('/api/v1', paymentRoutes);
+app.use('/api/v1/payment', paymentRoutes);
 app.use('/api/v1', viralClipRoutes);
 
 // Debug: Log all requests to comments
