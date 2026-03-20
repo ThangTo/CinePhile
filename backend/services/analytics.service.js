@@ -133,19 +133,16 @@ class AnalyticsService {
           return { today: emptyStats, week: emptyStats, month: emptyStats };
       }
 
-      // We need to use SUNION to combine sets and get unique elements across multiple days
-      // For pipelining, we'll fetch the members directly
-      // Execute SUNION directly (no pipeline needed — avoids multi.sendCommand incompatibility)
+      // Execute commands directly on client — sendCommand() works on both node-redis v4 TCP & Upstash REST
       const [todayMembers, weekMembers, monthMembers] = await Promise.all([
-        redisService.client.sMembers(todayKey).catch(() => []),
+        redisService.client.sendCommand(['SMEMBERS', todayKey]).catch(() => []),
         weekKeys.length > 0
-          ? redisService.client.sUnion(weekKeys).catch(() => [])
+          ? redisService.client.sendCommand(['SUNION', ...weekKeys]).catch(() => [])
           : Promise.resolve([]),
         monthKeys.length > 0
-          ? redisService.client.sUnion(monthKeys).catch(() => [])
+          ? redisService.client.sendCommand(['SUNION', ...monthKeys]).catch(() => [])
           : Promise.resolve([]),
       ]);
-
 
       return {
         today: this._countUserTypes(todayMembers),
@@ -202,12 +199,13 @@ class AnalyticsService {
     }
 
     try {
+      // sendCommand() works on both node-redis v4 TCP client and Upstash REST client
       const [thisWeekMembers, lastWeekMembers] = await Promise.all([
         thisWeekKeys.length > 0
-          ? redisService.client.sUnion(thisWeekKeys).catch(() => [])
+          ? redisService.client.sendCommand(['SUNION', ...thisWeekKeys]).catch(() => [])
           : Promise.resolve([]),
         lastWeekKeys.length > 0
-          ? redisService.client.sUnion(lastWeekKeys).catch(() => [])
+          ? redisService.client.sendCommand(['SUNION', ...lastWeekKeys]).catch(() => [])
           : Promise.resolve([]),
       ]);
       const results = [thisWeekMembers, lastWeekMembers];
