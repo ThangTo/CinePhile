@@ -42,7 +42,7 @@ const movieService = {
    * @param {number} limit - Số lượng movies (default: 20)
    * @returns {Promise<Object>} { data: [] }
    */
-  getForYou: (limit = 20) => apiRequest("/movies/for-you", { params: { limit } }),
+  getForYou: (limit = 20) => apiRequest("/movies/for-you", { params: { limit }, requiresAuth: true }),
 
   /**
    * Lấy movies theo genre
