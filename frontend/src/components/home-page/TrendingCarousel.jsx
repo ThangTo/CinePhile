@@ -91,7 +91,7 @@ const TrendingCarousel = () => {
   if (movies.length === 0) return null;
 
   return (
-    <section className="w-full py-4 sm:py-8">
+    <section className="w-full py-4 sm:pt-6 sm:pb-2">
       <SectionHeader
         title="🔥 Phim Đang Viral"
         subtitle="AI phân tích xu hướng từ TMDB & Google Trends VN"
@@ -172,7 +172,7 @@ const TrendingCard = ({ movie, rank, isActive }) => {
       data-trending-card
       className={`relative flex-shrink-0 w-[85vw] sm:w-[420px] lg:w-[480px] h-[240px] sm:h-[280px] rounded-2xl overflow-hidden snap-center group cursor-pointer transition-all duration-500 ${
         isActive
-          ? "scale-100 opacity-100 ring-2 ring-primaryColor/50 shadow-lg md:shadow-xl shadow-primaryColor/20"
+          ? "scale-100 opacity-100 ring-2 ring-primaryColor/50 shadow-lg shadow-primaryColor/20 sm:shadow-xl sm:shadow-primaryColor/30"
           : "scale-[0.95] opacity-70 hover:opacity-90"
       }`}
     >
