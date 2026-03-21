@@ -44,6 +44,20 @@ const episodeSchema = new mongoose.Schema(
     thumbnail_vtt: {
       type: String, // URL của VTT file (WebVTT format)
     },
+    // --- THỐNG KÊ ---
+    viewCount: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
+    totalWatchTime: {
+      type: Number,
+      default: 0, // Tổng thời lượng xem (giây)
+    },
+    uniqueViewers: {
+      type: Number,
+      default: 0, // Số người dùng duy nhất đã xem tập này
+    },
   },
   {
     timestamps: true, // Tự động thêm createdAt và updatedAt

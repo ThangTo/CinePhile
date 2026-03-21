@@ -4,6 +4,7 @@ import CategoryChips from "components/home-page/CategoryChips";
 import SectionRow from "components/home-page/SectionRow";
 import Top10Movie from "components/home-page/Top10Movie";
 import ContinueWatching from "components/home-page/ContinueWatching";
+import TrendingCarousel from "components/home-page/TrendingCarousel";
 import LazySection from "components/common/LazySection";
 // import QuickAdminLogin from "components/general/QuickAdminLogin";
 
@@ -23,6 +24,11 @@ const HomePage = () => {
           <ContinueWatching />
         </LazySection>
 
+        {/* AI Trending Social - TMDB + Google Trends + LLM curated */}
+        <LazySection rootMargin="200px">
+          <TrendingCarousel />
+        </LazySection>
+
         {/* For You Section - Personalized recommendations based on watch history */}
         <LazySection rootMargin="150px">
           <SectionRow
@@ -34,11 +40,6 @@ const HomePage = () => {
           />
         </LazySection>
 
-        {/* Trending Section - Uses mock data */}
-        <LazySection rootMargin="200px">
-          <SectionRow title="Phim Đang Thịnh Hành" sectionType="trending" linkHref="/trending" />
-        </LazySection>
-
         {/* New Releases Section - Uses mock data */}
         <LazySection rootMargin="200px">
           <SectionRow
@@ -47,6 +48,13 @@ const HomePage = () => {
             linkHref="/new-releases"
           />
         </LazySection>
+
+        {/* Trending Section - Uses mock data */}
+        <LazySection rootMargin="200px">
+          <SectionRow title="Phim Đang Thịnh Hành" sectionType="trending" linkHref="/trending" />
+        </LazySection>
+
+        
 
         {/* Top 10 Phim Bộ Hôm Nay */}
         <LazySection rootMargin="200px">

@@ -1461,109 +1461,139 @@ const deleteComment = async (commentId, userId) => {
 };
 
 /**
- * Increment view count for a movie (Anti-Spam Protected)
- * Uses 2-hour cooldown per user/IP per movie to prevent view farming
+ * Increment view count for a movie + episode (Anti-Spam Protected)
+ * - Movie level: 2h cooldown per user/IP per show
+ * - Episode level: 2h cooldown per user/IP per episode
  * @param {string} identifier - Movie slug or ID
- * @param {Object} options - { userId, ipAddress, userAgent }
+ * @param {Object} options - { episodeId, userId, ipAddress, userAgent }
  */
-const incrementView = async (identifier, { userId = null, ipAddress = '0.0.0.0', userAgent = 'Unknown' } = {}) => {
+const incrementView = async (
+  identifier,
+  { episodeId = null, userId = null, ipAddress = '0.0.0.0', userAgent = 'Unknown' } = {},
+) => {
   const ViewHistory = require('../models/view_history.model');
   const movieDoc = await findMovie(identifier);
   if (!movieDoc) {
     throw new Error('Movie not found');
   }
 
-  // Anti-Spam: Kiểm tra xem user/IP này đã xem phim này trong 2 giờ qua chưa
   const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
-  const spamQuery = {
+  // 1. Anti-Spam cho MOVIE (Show Level)
+  const movieSpamQuery = {
     movieId: movieDoc._id,
     createdAt: { $gte: TWO_HOURS_AGO },
+    ...(userId ? { userId } : { ipAddress }),
   };
 
-  // Ưu tiên kiểm tra bằng userId (nếu đã đăng nhập), fallback sang IP
-  if (userId) {
-    spamQuery.userId = userId;
-  } else {
-    spamQuery.ipAddress = ipAddress;
-  }
+  // 2. Anti-Spam cho EPISODE (Granular Level)
+  const episodeSpamQuery = episodeId
+    ? {
+        episodeId,
+        createdAt: { $gte: TWO_HOURS_AGO },
+        ...(userId ? { userId } : { ipAddress }),
+      }
+    : null;
 
-  const recentView = await ViewHistory.findOne(spamQuery).lean();
-
-  if (recentView) {
-    // Đã xem trong 2h qua → Trả về "thành công" nhưng không tăng view
-    const current = await Movie.findById(movieDoc._id).select('viewCount').lean();
-    return {
-      message: 'View already counted (cooldown active)',
-      viewCount: current.viewCount,
-      movieId: movieDoc._id.toString(),
-      counted: false,
-      viewHistoryId: recentView._id.toString(),
-    };
-  }
+  const [recentMovieView, recentEpisodeView] = await Promise.all([
+    ViewHistory.findOne(movieSpamQuery).lean(),
+    episodeSpamQuery ? ViewHistory.findOne(episodeSpamQuery).lean() : Promise.resolve(null),
+  ]);
 
   // Phân tích loại thiết bị
   let deviceType = 'Desktop';
-  if (/mobile/i.test(userAgent)) {
-    deviceType = 'Mobile';
-  } else if (/tablet|ipad/i.test(userAgent)) {
-    deviceType = 'Tablet';
-  } else if (userAgent === 'Unknown') {
-    deviceType = 'Unknown';
+  if (/mobile/i.test(userAgent)) deviceType = 'Mobile';
+  else if (/tablet|ipad/i.test(userAgent)) deviceType = 'Tablet';
+  else if (userAgent === 'Unknown') deviceType = 'Unknown';
+
+  const results = {
+    movieId: movieDoc._id.toString(),
+    episodeId: episodeId ? episodeId.toString() : null,
+    showCounted: false,
+    episodeCounted: false,
+  };
+
+  const updates = [];
+
+  // Logic đếm view cho MOVIE (Luôn ưu tiên tính view nếu chưa có trong 2h)
+  if (!recentMovieView) {
+    updates.push(Movie.findByIdAndUpdate(movieDoc._id, { $inc: { viewCount: 1 } }));
+    results.showCounted = true;
   }
 
-  // View hợp lệ! Tăng viewCount + Ghi log
-  const [updated, viewRecord] = await Promise.all([
-    Movie.findByIdAndUpdate(movieDoc._id, { $inc: { viewCount: 1 } }, { new: true })
-      .select('viewCount')
-      .lean(),
-    ViewHistory.create({
+  // Logic đếm view cho EPISODE
+  if (episodeId && !recentEpisodeView) {
+    // Tăng Episode View và Movie Total Episode Views
+    updates.push(Episode.findByIdAndUpdate(episodeId, { $inc: { viewCount: 1 } }));
+    updates.push(Movie.findByIdAndUpdate(movieDoc._id, { $inc: { totalEpisodeViews: 1 } }));
+    results.episodeCounted = true;
+
+    // KIỂM TRA UNIQUE VIEWERS (Đã từng xem tập này bao giờ chưa?) - Tính trọn đời
+    const everWatchedQuery = {
+      episodeId,
+      ...(userId ? { userId } : { ipAddress }),
+    };
+    const hasEverWatched = await ViewHistory.findOne(everWatchedQuery).lean();
+    if (!hasEverWatched) {
+      updates.push(Episode.findByIdAndUpdate(episodeId, { $inc: { uniqueViewers: 1 } }));
+      results.isNewUniqueViewer = true;
+    }
+  }
+
+  // Ghi log ViewHistory (Luôn ghi log phiên xem mới nếu không phải spam trong 2h cho chính tập đó)
+  let viewRecordId = recentEpisodeView?._id?.toString() || recentMovieView?._id?.toString();
+
+  if (!recentEpisodeView) {
+    const newRecord = await ViewHistory.create({
       movieId: movieDoc._id,
+      episodeId: episodeId || null,
       userId: userId || null,
       ipAddress: ipAddress,
       watchDuration: 0,
       userAgent: userAgent,
       deviceType: deviceType,
-    }),
-  ]);
+    });
+    viewRecordId = newRecord._id.toString();
+  }
+
+  await Promise.all(updates);
+
+  // Lấy viewCount mới nhất để trả về
+  const finalMovie = await Movie.findById(movieDoc._id).select('viewCount').lean();
 
   return {
-    message: 'View count updated',
-    viewCount: updated.viewCount,
-    movieId: movieDoc._id.toString(),
-    counted: true,
-    viewHistoryId: viewRecord._id.toString(),
+    ...results,
+    message: 'View status updated',
+    viewCount: finalMovie.viewCount,
+    viewHistoryId: viewRecordId,
   };
 };
 
 /**
  * Record watch time heartbeat (called every 30 seconds from frontend)
- * Atomically increments totalWatchTime on Movie and watchDuration on ViewHistory
- * @param {string} identifier - Movie slug or ID
- * @param {Object} options - { viewHistoryId, seconds }
+ * Atomically increments watch duration across Movie, Episode, and ViewHistory
  */
 const recordWatchTime = async (identifier, { viewHistoryId, seconds = 30 } = {}) => {
   const ViewHistory = require('../models/view_history.model');
-  const movieDoc = await findMovie(identifier);
-  if (!movieDoc) {
-    throw new Error('Movie not found');
-  }
+  if (!viewHistoryId) return { success: false, message: 'Missing viewHistoryId' };
 
-  const safeSecs = Math.min(Math.max(Number(seconds) || 0, 0), 60); // Cap tối đa 60s mỗi heartbeat
+  const viewRecord = await ViewHistory.findById(viewHistoryId).lean();
+  if (!viewRecord) throw new Error('View history record not found');
 
-  // Cập nhật song song: Tổng thời lượng phim + Phiên xem cá nhân
+  const safeSecs = Math.min(Math.max(Number(seconds) || 0, 0), 60);
+
   const updates = [
-    Movie.findByIdAndUpdate(movieDoc._id, { $inc: { totalWatchTime: safeSecs } }),
+    Movie.findByIdAndUpdate(viewRecord.movieId, { $inc: { totalWatchTime: safeSecs } }),
+    ViewHistory.findByIdAndUpdate(viewHistoryId, { $inc: { watchDuration: safeSecs } }),
   ];
 
-  if (viewHistoryId) {
-    updates.push(
-      ViewHistory.findByIdAndUpdate(viewHistoryId, { $inc: { watchDuration: safeSecs } }),
-    );
+  if (viewRecord.episodeId) {
+    updates.push(Episode.findByIdAndUpdate(viewRecord.episodeId, { $inc: { totalWatchTime: safeSecs } }));
+    // Đồng bộ vào Movie level
+    updates.push(Movie.findByIdAndUpdate(viewRecord.movieId, { $inc: { totalEpisodeWatchTime: safeSecs } }));
   }
 
   await Promise.all(updates);
-
   return { success: true };
 };
 

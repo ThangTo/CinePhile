@@ -38,6 +38,8 @@ const transformMovie = (movieDoc) => {
     // Stats
     viewCount: 'views',
     commentCount: 'comments',
+    totalEpisodeViews: 'totalEpisodeViews',
+    totalEpisodeWatchTime: 'totalEpisodeWatchTime',
 
     // Other
     age_rating: 'ageRating',

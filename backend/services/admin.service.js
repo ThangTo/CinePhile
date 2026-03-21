@@ -1395,6 +1395,7 @@ const getUpdatingMovies = async (options = {}) => {
 const getTrendingMovies = async (timeframe = 'today') => {
   const ViewHistoryModel = require('../models/view_history.model');
   const MovieModel = require('../models/movie.model');
+  const EpisodeModel = require('../models/episode.model');
 
   const now = new Date();
   const startDate = new Date();
@@ -1409,16 +1410,11 @@ const getTrendingMovies = async (timeframe = 'today') => {
     startDate.setHours(0, 0, 0, 0); // default today
   }
 
-  // To calculate velocity (views in the last 3 hours)
   const threeHoursAgo = new Date();
   threeHoursAgo.setHours(now.getHours() - 3);
 
   const aggregation = await ViewHistoryModel.aggregate([
-    {
-      $match: {
-        createdAt: { $gte: startDate },
-      },
-    },
+    { $match: { createdAt: { $gte: startDate } } },
     {
       $group: {
         _id: '$movieId',
@@ -1426,9 +1422,7 @@ const getTrendingMovies = async (timeframe = 'today') => {
         totalWatchTime: { $sum: '$watchDuration' },
         uniqueUsers: { $addToSet: { $ifNull: ['$userId', '$ipAddress'] } },
         recentViews: {
-          $sum: {
-            $cond: [{ $gte: ['$createdAt', threeHoursAgo] }, 1, 0]
-          }
+          $sum: { $cond: [{ $gte: ['$createdAt', threeHoursAgo] }, 1, 0] }
         }
       },
     },
@@ -1436,48 +1430,79 @@ const getTrendingMovies = async (timeframe = 'today') => {
       $project: {
         _id: 1,
         views: 1,
-        totalWatchTime: { $round: [{ $divide: ['$totalWatchTime', 60] }, 0] }, // to minutes
+        totalWatchTime: { $round: [{ $divide: ['$totalWatchTime', 60] }, 0] },
         uniqueViewers: { $size: '$uniqueUsers' },
         recentViews: 1,
-        velocity: { 
-          // Velocity = recent views per hour (over 3h frame)
-          $round: [{ $divide: ['$recentViews', 3] }, 2]
-        }
+        velocity: { $round: [{ $divide: ['$recentViews', 3] }, 2] }
       }
     },
-    {
-      $sort: { totalWatchTime: -1, views: -1 },
-    },
-    {
-      $limit: 10,
-    },
+    { $sort: { totalWatchTime: -1, views: -1 } },
+    { $limit: 10 },
   ]);
 
-  // Lookup movie details (faster than $lookup for 10 items)
+  // Lookup movie details
   const movieIds = aggregation.map(item => item._id);
   const movies = await MovieModel.find({ _id: { $in: movieIds } })
-    .select('name slug poster_url thumb_url')
+    .select('name slug poster_url thumb_url type totalEpisodes totalEpisodeViews totalEpisodeWatchTime')
     .lean();
 
   const movieMap = new Map();
   movies.forEach(m => movieMap.set(m._id.toString(), m));
 
-  // Merge & assign specific tags
+  // For TV shows: get their top episodes by viewCount
+  const seriesIds = movies
+    .filter(m => m.type === 'series' || m.type === 'tvshows' || (m.totalEpisodes || 0) > 1)
+    .map(m => m._id);
+
+  const topEpisodesPerShow = await EpisodeModel.aggregate([
+    { $match: { movieId: { $in: seriesIds }, viewCount: { $gt: 0 } } },
+    { $sort: { viewCount: -1 } },
+    {
+      $group: {
+        _id: '$movieId',
+        topEpisodeNum: { $first: '$episodeId' },
+        topEpisodeViews: { $first: '$viewCount' },
+        topEpisodeUniqueViewers: { $first: '$uniqueViewers' },
+        topEpisodeWatchTime: { $first: '$totalWatchTime' },
+        totalEps: { $sum: 1 },
+      }
+    }
+  ]);
+
+  const topEpMap = new Map();
+  topEpisodesPerShow.forEach(e => topEpMap.set(e._id.toString(), e));
+
   const result = aggregation.map((item, index) => {
     const m = movieMap.get(item._id.toString());
-    const isTrending = item.velocity > 10; // Rapid growth flag
-    
+    const isTrending = item.velocity > 10;
+    const isSeries = m && ((m.totalEpisodes || 0) > 1);
+    const topEp = topEpMap.get(item._id.toString());
+
     return {
       rank: index + 1,
       movieId: item._id,
       name: m ? m.name : 'Unknown',
       slug: m ? m.slug : '',
       poster: m ? (m.poster_url || m.thumb_url) : '',
+      type: m ? m.type : 'single',
+      totalEpisodes: m ? m.totalEpisodes : 0,
+      // Show-level metrics
       views: item.views,
       watchMinutes: item.totalWatchTime,
       uniqueViewers: item.uniqueViewers,
       velocity: item.velocity,
-      isTrending: isTrending 
+      isTrending,
+      // Episode-level aggregates (TV shows only)
+      ...(isSeries && {
+        totalEpisodeViews: m.totalEpisodeViews || 0,
+        totalEpisodeWatchHours: Math.round((m.totalEpisodeWatchTime || 0) / 3600),
+        topEpisode: topEp ? {
+          episodeNum: topEp.topEpisodeNum,
+          views: topEp.topEpisodeViews,
+          uniqueViewers: topEp.topEpisodeUniqueViewers,
+          watchMinutes: Math.round((topEp.topEpisodeWatchTime || 0) / 60),
+        } : null,
+      }),
     };
   });
 

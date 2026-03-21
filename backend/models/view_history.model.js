@@ -9,6 +9,13 @@ const viewHistorySchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // Tập phim (optional - cho phim bộ)
+    episodeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Episode',
+      default: null,
+      index: true,
+    },
     // User đã đăng nhập (optional - guest sẽ null)
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -47,6 +54,10 @@ const viewHistorySchema = new mongoose.Schema(
 // Compound index: Truy vấn nhanh "user/ip này đã xem phim này trong 2h qua chưa?"
 viewHistorySchema.index({ movieId: 1, userId: 1, createdAt: -1 });
 viewHistorySchema.index({ movieId: 1, ipAddress: 1, createdAt: -1 });
+
+// Chi tiết tập phim
+viewHistorySchema.index({ episodeId: 1, userId: 1, createdAt: -1 });
+viewHistorySchema.index({ episodeId: 1, ipAddress: 1, createdAt: -1 });
 
 // Index cho Dashboard thống kê theo tuần
 viewHistorySchema.index({ createdAt: -1 });

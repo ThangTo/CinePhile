@@ -78,6 +78,9 @@ router.post('/:id/watch-time', movieController.recordWatchTime);
 // POST /api/v1/movies/:id/rate - Rate movie
 router.post('/:id/rate', authMiddleware, movieController.rateMovie);
 
+// GET /api/v1/movies/trending-social - AI-curated trending movies (TMDB + Google Trends + LLM)
+router.get('/trending-social', movieController.getTrendingSocial);
+
 // GET /api/v1/movies/:id - Get movie by ID (must be LAST to avoid conflicts)
 router.get('/:id', movieController.getById);
 module.exports = router;

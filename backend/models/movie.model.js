@@ -92,6 +92,10 @@ const movieSchema = new mongoose.Schema(
     rating: { type: Number, default: 0 },
     totalRatings: { type: Number, default: 0 },
 
+    // --- AGGREGATED EPISODE STATS ---
+    totalEpisodeViews: { type: Number, default: 0 },
+    totalEpisodeWatchTime: { type: Number, default: 0 },
+
     isNewRelease: { type: Boolean, default: false },
     isHidden: { type: Boolean, default: false, index: true }, // Admin có thể ẩn phim
     isFeatured: { type: Boolean, default: false, index: true }, // Admin đưa phim lên banner

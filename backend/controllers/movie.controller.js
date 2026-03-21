@@ -1,4 +1,5 @@
 const movieService = require('../services/movie.service');
+const trendingService = require('../services/trending.service');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const os = require('os');
@@ -364,8 +365,14 @@ const incrementView = async (req, res) => {
     }
 
     const userAgent = req.headers['user-agent'] || 'Unknown';
+    const { episodeId } = req.body;
 
-    const result = await movieService.incrementView(req.params.id, { userId, ipAddress, userAgent });
+    const result = await movieService.incrementView(req.params.id, { 
+      episodeId, 
+      userId, 
+      ipAddress, 
+      userAgent 
+    });
     res.json(result);
   } catch (error) {
     res.status(404).json({ message: error.message });
@@ -795,6 +802,20 @@ const downloadMovieMobile = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/movies/trending-social
+ * Get AI-curated trending movies (Dual-Source: TMDB + Google Trends)
+ */
+const getTrendingSocial = async (req, res) => {
+  try {
+    const movies = await trendingService.getTrendingSocial();
+    res.json({ success: true, data: movies });
+  } catch (error) {
+    console.error('Error in getTrendingSocial:', error);
+    res.status(500).json({ success: false, message: 'Không thể lấy danh sách phim trending.' });
+  }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -826,4 +847,5 @@ module.exports = {
   downloadMovieMobile,
   getCast,
   getForYou,
+  getTrendingSocial,
 };

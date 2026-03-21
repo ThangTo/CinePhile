@@ -335,4 +335,6 @@ export async function fetchEpisodes(movieId, season) {
   }
 }
 
+movieService.getTrendingSocial = () => apiRequest("/movies/trending-social");
+
 export default movieService;

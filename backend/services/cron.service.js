@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const MovieModel = require('../models/movie.model');
 const { updateEpisodesForMovies } = require('./admin.service');
 const { runPageRange } = require('./crawler.service');
+const { runPipeline: runTrendingPipeline } = require('./trending.service');
 
 /**
  * Cron Service
@@ -99,6 +100,30 @@ const scheduleMovieCrawling = () => {
 };
 
 /**
+ * Auto-update AI Trending Movies (TMDB + Google Trends + LLM)
+ * Runs every 12 hours at 00:00 and 12:00
+ */
+const scheduleTrendingUpdate = () => {
+  cron.schedule(
+    '0 0,12 * * *',
+    async () => {
+      console.log('\n🔄 [CRON] Starting AI Trending Pipeline...');
+      try {
+        await runTrendingPipeline();
+        console.log('✅ [CRON] AI Trending Pipeline completed successfully.');
+      } catch (error) {
+        console.error('❌ [CRON] AI Trending Pipeline failed:', error.message);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: 'Asia/Ho_Chi_Minh',
+    },
+  );
+  console.log('✅ Scheduled: AI Trending Update every 12 hours (00:00 & 12:00 Vietnam Time)');
+};
+
+/**
  * Initialize all cron jobs
  */
 const initCronJobs = () => {
@@ -106,6 +131,7 @@ const initCronJobs = () => {
 
   scheduleEpisodeUpdates();
   scheduleMovieCrawling();
+  scheduleTrendingUpdate();
 
   console.log('✅ All cron jobs initialized successfully\n');
 };
@@ -114,4 +140,5 @@ module.exports = {
   initCronJobs,
   scheduleEpisodeUpdates,
   scheduleMovieCrawling,
+  scheduleTrendingUpdate,
 };
