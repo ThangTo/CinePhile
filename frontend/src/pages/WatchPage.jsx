@@ -69,7 +69,16 @@ const WatchPage = () => {
   const handleFirstPlay = useCallback(async () => {
     if (viewCountedRef.current) return;
     try {
-      const result = await movieService.incrementView(id);
+      let epId = null;
+      if (movie && episodes && episodes.length > 0) {
+        const isTrailer = movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0;
+        if (!isTrailer) {
+          const match = episodes.find((e) => e.episode === activeEp || e.episodeId === activeEp) || episodes[0];
+          epId = match?._id || match?.id;
+        }
+      }
+
+      const result = await movieService.incrementView(id, epId);
       viewCountedRef.current = true;
       // Lưu viewHistoryId để dùng cho heartbeat watch-time
       if (result?.viewHistoryId) {
@@ -78,7 +87,7 @@ const WatchPage = () => {
     } catch (error) {
       console.error("Error incrementing view count:", error);
     }
-  }, [id]);
+  }, [id, movie, episodes, activeEp]);
 
   useEffect(() => {
     setActiveEp(episodeParam);

@@ -90,7 +90,7 @@ const MovieCard = ({
       <div
         data-movie-id={movie.id}
         className={`group bg-bgColor4 rounded-2xl ${
-          compact ? "p-2" : "p-2 md:p-4"
+          compact ? "p-2" : "p-1 pb-3 md:pb-4 md:p-4"
         } shadow-lg border border-white/5 cursor-pointer transition-all duration-300 hover:border-primaryColor/60`}
         onClick={handleClick}
       >
@@ -137,8 +137,8 @@ const MovieCard = ({
           </div>
         </div>
 
-        <div className={`${compact ? "mt-2" : "mt-4"} text-center`}>
-          {!compact && <p className="text-[10px] text-gray-400 mb-1">{movie.year || "N/A"}</p>}
+        <div className={`${compact ? "mt-2" : "mt-2 sm:mt-4"} text-center`}>
+          {!compact && <p className="text-[10px] text-gray-400 mb-0.5 sm:mb-1">{movie.year || "N/A"}</p>}
           <h3
             className={`${
               compact ? "text-sm" : "text-base"
@@ -147,7 +147,7 @@ const MovieCard = ({
             {movie.title}
           </h3>
           {movie.englishTitle && (
-            <p className={`${compact ? "text-xs" : "text-sm"} text-gray-400 mt-1 line-clamp-1`}>
+            <p className={`${compact ? "text-xs" : "text-sm"} text-gray-400 mt-0.5 sm:mt-1 line-clamp-1`}>
               {movie.englishTitle}
             </p>
           )}

@@ -202,11 +202,13 @@ const movieService = {
   /**
    * Tăng view count cho movie (không yêu cầu auth)
    * @param {string|number} id - Movie ID
+   * @param {string|number} episodeId - Episode ID
    * @returns {Promise<Object>} { message, viewCount, movieId }
    */
-  incrementView: (id) =>
+  incrementView: (id, episodeId) =>
     apiRequest(`/movies/${id}/view`, {
       method: "POST",
+      data: { episodeId },
     }),
 
   /**

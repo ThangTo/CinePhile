@@ -365,7 +365,7 @@ const incrementView = async (req, res) => {
     }
 
     const userAgent = req.headers['user-agent'] || 'Unknown';
-    const { episodeId } = req.body;
+    const { episodeId } = req.body || {};
 
     const result = await movieService.incrementView(req.params.id, { 
       episodeId, 

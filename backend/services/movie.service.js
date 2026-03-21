@@ -14,7 +14,7 @@ const {
 } = require('../utils/movieTransformer');
 const { isLatinName } = require('../utils/castUtils');
 
-const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
+const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value) && /^[0-9a-fA-F]{24}$/.test(value);
 
 /**
  * Remove Vietnamese accents/diacritics from a string

@@ -192,7 +192,7 @@ const ContinueWatching = () => {
             return (
               <div
                 key={`${item.movieId || item.id}-${item.lastWatchedEpisode || 0}`}
-                className="bg-[#10121b] rounded-2xl p-3 shadow-lg border border-white/5 cursor-pointer hover:border-primaryColor/60 hover:opacity-60 transition-all duration-300 flex-shrink-0 w-[140px] md:w-auto md:flex-shrink"
+                className="bg-[#10121b] rounded-2xl p-1 sm:p-3 shadow-lg border border-white/5 cursor-pointer hover:border-primaryColor/60 hover:opacity-60 transition-all duration-300 flex-shrink-0 w-[140px] md:w-auto md:flex-shrink"
                 onClick={() => handleMovieClick(item)}
               >
                 <div className="relative rounded-2xl overflow-hidden">
