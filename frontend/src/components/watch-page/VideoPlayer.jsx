@@ -203,21 +203,37 @@ const VideoPlayer = ({
     };
   }, [hasNativePlayer, episode, duration, onFirstPlay]);
 
-  // === HEARTBEAT: Gửi Watch Time mỗi 30 giây khi video đang phát ===
+  // === HEARTBEAT: Gửi Watch Time mỗi 60 giây khi video đang phát ===
   useEffect(() => {
     if (!isPlaying || !movie) return;
 
+    let isBufferingNow = false;
+    const handleWaiting = () => { isBufferingNow = true; };
+    const handleCanPlay = () => { isBufferingNow = false; };
+
+    const video = videoRef.current;
+    if (video) {
+      video.addEventListener('waiting', handleWaiting);
+      video.addEventListener('canplay', handleCanPlay);
+    }
+
     const heartbeatInterval = setInterval(() => {
+      if (isBufferingNow) return;
+      
       const movieId = movie.id || movie._id || movie.slug;
       const vhId = viewHistoryIdRef?.current;
       if (movieId) {
-        movieService.recordWatchTime(movieId, vhId, 30).catch(() => {
-          // Heartbeat thất bại im lặng - không làm phiền user
-        });
+        movieService.recordWatchTime(movieId, vhId, 60).catch(() => {});
       }
-    }, 30000); // 30 giây
+    }, 60000);
 
-    return () => clearInterval(heartbeatInterval);
+    return () => {
+      clearInterval(heartbeatInterval);
+      if (video) {
+        video.removeEventListener('waiting', handleWaiting);
+        video.removeEventListener('canplay', handleCanPlay);
+      }
+    };
   }, [isPlaying, movie, viewHistoryIdRef]);
 
   // Reset auto-play/seek state
@@ -262,7 +278,19 @@ const VideoPlayer = ({
     const movieId = movie?._id || movie?.id;
     if (!user || !movieId || !hasNativePlayer) return;
 
+    let isBufferingNow = false;
+    const handleWaiting = () => { isBufferingNow = true; };
+    const handleCanPlay = () => { isBufferingNow = false; };
+
+    const video = videoRef.current;
+    if (video) {
+      video.addEventListener('waiting', handleWaiting);
+      video.addEventListener('canplay', handleCanPlay);
+    }
+
     const saveProgress = async () => {
+      if (isBufferingNow) return;
+      
       const video = videoRef.current;
       if (!video || video.paused || !duration || duration <= 0) return;
 
@@ -280,11 +308,15 @@ const VideoPlayer = ({
       } catch (error) {}
     };
 
-    saveProgressIntervalRef.current = setInterval(saveProgress, 15000);
+    saveProgressIntervalRef.current = setInterval(saveProgress, 30000);
 
     return () => {
       if (saveProgressIntervalRef.current) {
         clearInterval(saveProgressIntervalRef.current);
+      }
+      if (video) {
+        video.removeEventListener('waiting', handleWaiting);
+        video.removeEventListener('canplay', handleCanPlay);
       }
     };
   }, [user, movie?._id, movie?.id, episode?._id, episode?.id, duration, hasNativePlayer]);
@@ -375,16 +407,16 @@ const VideoPlayer = ({
 
           // === BƯỚC 2: Khởi tạo HLS NGAY LẬP TỨC ===
           const hls = new Hls({
-            maxBufferLength: 40,
-            maxMaxBufferLength: 80,
-            maxBufferSize: 2 * 1000 * 1000,
+            maxBufferLength: 60,
+            maxMaxBufferLength: 120,
+            maxBufferSize: 5 * 1000 * 1000,
             startFragPrefetch: true,
             autoStartLoad: false,
             manifestLoadingTimeOut: 20000,
             fragLoadingTimeOut: 25000,
-            manifestLoadingMaxRetry: 5,
-            fragLoadingMaxRetry: 5,
-            levelLoadingMaxRetry: 5,
+            manifestLoadingMaxRetry: 3,
+            fragLoadingMaxRetry: 3,
+            levelLoadingMaxRetry: 3,
           });
 
           try {

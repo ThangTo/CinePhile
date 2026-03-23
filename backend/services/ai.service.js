@@ -26,18 +26,18 @@ async function speechToText(audioPath, onProgress) {
   const form = new FormData();
 
   form.append('file', fs.createReadStream(audioPath));
-  form.append('model', 'Systran/faster-whisper-large-v3');
+  form.append('model', process.env.WHISPER_MODEL || 'Systran/faster-whisper-medium');
   form.append('response_format', 'vtt');
   form.append('language', 'vi'); // Vietnamese primary, Whisper auto-detects bilingual
 
   // Whisper HTTP API doesn't stream progress natively.
-  // We simulate a living connection by incrementing percent slowly (1% / 3s).
+  // We simulate a living connection by incrementing percent slowly (1% / 10s).
   let progressVal = 0;
   const progressInterval = setInterval(() => {
     progressVal += 1;
     if (progressVal > 99) progressVal = 99;
     if (onProgress) onProgress(progressVal);
-  }, 3000);
+  }, 10000);
 
   try {
     const response = await axios.post(
@@ -49,7 +49,7 @@ async function speechToText(audioPath, onProgress) {
         },
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
-        timeout: 0, // Disabled. Long movies can take hours!
+        timeout: 1800000, // 30 minutes. Prevents infinite hangs.
       },
     );
 

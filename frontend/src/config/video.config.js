@@ -8,20 +8,15 @@ export const USE_SERVER_ADBLOCK = process.env.REACT_APP_USE_SERVER_ADBLOCK || tr
 /**
  * Danh sách domains KHÔNG CẦN proxy
  * Các domain này có CORS headers tốt, có thể phát trực tiếp từ browser
+ * LƯU Ý: Để trống mảng này để tránh bypass proxy (chặn IP nước ngoài khi dùng VPN)
  */
-export const BYPASS_PROXY_DOMAINS = [
-  "opstream90.com",
-  "opstream",
-];
+export const BYPASS_PROXY_DOMAINS = [];
 
 /**
- * Danh sách domains CẦN proxy
- * Các domain này block CORS, cần proxy để phát
+ * Danh sách domains CẦN proxy (vì block CORS)
+ * LƯU Ý: Logic hiện tại đã luôn dùng proxy nếu USE_SERVER_ADBLOCK=true
  */
-export const REQUIRE_PROXY_DOMAINS = [
-  "phim1280.tv",
-  "phimmoichillb.net",
-];
+export const REQUIRE_PROXY_DOMAINS = [];
 
 /**
  * Check xem URL có cần proxy không
@@ -53,12 +48,12 @@ export function getVideoSource(m3u8Url, proxyEndpoint) {
   // Nếu sử dụng proxy lọc quảng cáo trên server hoặc CẦN proxy CORS, ta luôn gọi proxyEndpoint
   if (USE_SERVER_ADBLOCK || shouldUseProxy(m3u8Url)) {
     let finalUrl = `${proxyEndpoint}?url=${encodeURIComponent(m3u8Url)}`;
-    
+
     // Fix Mixed Content: Nếu trang đang chạy HTTPS, ép proxy URL cũng phải HTTPS
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-      finalUrl = finalUrl.replace(/^http:\/\//i, 'https://');
+    if (typeof window !== "undefined" && window.location.protocol === "https:") {
+      finalUrl = finalUrl.replace(/^http:\/\//i, "https://");
     }
-    
+
     return finalUrl;
   }
 

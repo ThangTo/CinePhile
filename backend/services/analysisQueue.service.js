@@ -43,10 +43,12 @@ if (REDIS_URL) {
       job.progress(40);
       
       // 2. Speech to Text (Mapping 0-100% to 40-70% global progress)
-      job.log('Running faster-whisper speech to text...');
+      const startTimeSTT = new Date().toISOString();
+      job.log(`[${startTimeSTT}] Running faster-whisper speech to text...`);
       vttPath = await speechToText(mp3Path, (p) => {
         job.progress(Math.round(40 + (p * 0.3)));
       });
+      job.log(`[${new Date().toISOString()}] Finished faster-whisper speech to text.`);
       job.progress(70);
 
       // 3. Analyze Scenes
