@@ -4,9 +4,9 @@ const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebo
 
 /**
  * Process M3U8 stream - returns content with DIRECT URLs (for hybrid approach)
- * Frontend will handle CORS detection and switch to proxy if needed
+ * Filters ads but keeps original segment URLs (client will fetch directly)
  */
-async function processM3u8StreamDirect(url) {
+async function processM3u8StreamDirect(url, proxyBase = null) {
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -31,7 +31,12 @@ async function processM3u8StreamDirect(url) {
         const absoluteUrl = trimmed.startsWith('http')
           ? trimmed
           : new URL(trimmed, baseUrl).toString();
-        return `${proxyBase}?url=${encodeURIComponent(absoluteUrl)}`;
+        // Sub-playlists must still go through proxy for ad filtering,
+        // only TS segments (in media playlists) will be direct
+        if (proxyBase) {
+          return `${proxyBase}?url=${encodeURIComponent(absoluteUrl)}&mode=direct`;
+        }
+        return absoluteUrl;
       }
       return line;
     });

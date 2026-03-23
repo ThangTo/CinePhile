@@ -38,52 +38,67 @@ const server = httpServer.listen(PORT, () => {
 });
 
 // Graceful shutdown
+let isShuttingDown = false;
 const gracefulShutdown = async (signal) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
   console.log(`\n${signal} received. Shutting down gracefully...`);
-  server.close(async () => {
-    console.log('✅ HTTP server closed');
 
-    // Close Bull queue
+  // Stop accepting new connections
+  await new Promise((resolve) => server.close(resolve));
+  console.log('✅ HTTP server closed');
+
+  // Close Bull queues
+  try {
+    const { closeQueue } = require('./services/videoQueue.service');
+    await closeQueue();
+    const { closeAnalysisQueue } = require('./services/analysisQueue.service');
+    await closeAnalysisQueue();
+  } catch (err) {
+    console.warn('⚠️ Queue close error:', err.message);
+  }
+
+  // Close Redis connection
+  if (redisService.isConnected) {
     try {
-      const { closeQueue } = require('./services/videoQueue.service');
-      await closeQueue();
-      const { closeAnalysisQueue } = require('./services/analysisQueue.service');
-      await closeAnalysisQueue();
-    } catch (err) {
-      console.warn('⚠️ Queue close error:', err.message);
-    }
-
-    // Close Redis connection
-    if (redisService.isConnected) {
       await redisService.disconnect();
+    } catch (err) {
+      console.warn('⚠️ Redis close error:', err.message);
     }
+  }
 
-    // Close MongoDB connection
-    mongoose.connection.close(false, () => {
-      console.log('✅ MongoDB connection closed');
-      process.exit(0);
-    });
-  });
+  // Close MongoDB connection (Mongoose 8+ returns Promise, no callback)
+  try {
+    await mongoose.connection.close(false);
+    console.log('✅ MongoDB connection closed');
+  } catch (err) {
+    console.warn('⚠️ MongoDB close error:', err.message);
+  }
 
-  // Force close after 10 seconds
-  setTimeout(() => {
-    console.error('❌ Forcing shutdown...');
-    process.exit(1);
-  }, 10000);
+  process.exit(0);
+};
+
+// Force close after 10 seconds
+const forceExit = () => {
+  console.error('❌ Forcing shutdown...');
+  process.exit(1);
 };
 
 // PM2 graceful shutdown signals
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => { gracefulShutdown('SIGTERM').catch(() => {}); setTimeout(forceExit, 10000); });
+process.on('SIGINT',  () => { gracefulShutdown('SIGINT').catch(() => {});  setTimeout(forceExit, 10000); });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.error('❌ Uncaught Exception:', err);
-  gracefulShutdown('uncaughtException');
+  gracefulShutdown('uncaughtException').catch(() => {});
+  setTimeout(forceExit, 10000);
 });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  gracefulShutdown('unhandledRejection');
+// Handle unhandled promise rejections — log but do NOT shut down (avoids cascade loops)
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled Rejection reason:', reason);
+  // Only shut down for truly fatal errors, not routine operational rejections
 });
+

@@ -4,6 +4,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { Readable } = require('stream');
 const { processM3u8Stream, processM3u8StreamDirect, processM3u8StreamWithProxy } = require('../utils/m3u8Utils');
 
 let activeDownloads = 0;
@@ -590,7 +591,7 @@ const proxyM3u8 = async (req, res) => {
 
     let cleanContent;
     if (mode === 'direct') {
-      cleanContent = await processM3u8StreamDirect(url);
+      cleanContent = await processM3u8StreamDirect(url, proxyBase);
     } else {
       cleanContent = await processM3u8StreamWithProxy(url, proxyBase, tsProxyBase);
     }
@@ -617,34 +618,45 @@ const proxyTs = async (req, res) => {
       return res.status(400).send('Missing url parameter');
     }
 
+    // Do NOT forward Range headers from client — TS segments are complete files
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Range': req.headers.range,
       },
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch TS segment: ${response.statusText}`);
+      console.error(`[proxyTs] Fetch failed: ${response.status} ${response.statusText}`);
+      return res.status(502).send('Failed to fetch segment from source');
     }
 
-    // Forward headers from source
     const contentType = response.headers.get('content-type');
     const contentLength = response.headers.get('content-length');
-    const contentRange = response.headers.get('content-range');
 
     if (contentType) res.setHeader('Content-Type', contentType);
     if (contentLength) res.setHeader('Content-Length', contentLength);
-    if (contentRange) res.setHeader('Content-Range', contentRange);
     
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=3600');
 
-    // Stream the segment directly to client
-    response.body.pipe(res);
+    // Node 18+ native fetch returns Web ReadableStream, convert to Node stream for piping
+    const nodeStream = Readable.fromWeb(response.body);
+    nodeStream.pipe(res);
+
+    // Handle stream errors gracefully
+    nodeStream.on('error', (err) => {
+      console.error('[proxyTs] Stream error:', err.message);
+      if (!res.headersSent) {
+        res.status(502).send('Stream error');
+      } else {
+        res.end();
+      }
+    });
   } catch (error) {
     console.error('[proxyTs] Error:', error.message);
-    res.status(500).send('Error fetching TS segment');
+    if (!res.headersSent) {
+      res.status(500).send('Error fetching TS segment');
+    }
   }
 };
 
