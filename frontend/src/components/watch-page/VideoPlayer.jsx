@@ -595,13 +595,19 @@ const VideoPlayer = ({
            hls.on(Hls.Events.ERROR, (event, data) => {
              // Detect CORS error - switch to proxy mode
              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-               const err = data?.response?.text || data?.msg || '';
-               if (err.includes('CORS') || err.includes('blocked by CORS policy') || err.includes('Access-Control-Allow-Origin')) {
-                 console.log('🚫 CORS Error detected, switching to proxy mode');
+               const errText = data?.response?.text || data?.msg || '';
+               const statusCode = data?.response?.code;
+               const isCorsOrBlocked = statusCode === 0 || statusCode === 403 || statusCode === 404 || 
+                                       errText.includes('CORS') || errText.includes('blocked by CORS policy') || 
+                                       errText.includes('Access-Control-Allow-Origin');
+               if (isCorsOrBlocked) {
+                 console.log(`🚫 Network Error (Status: ${statusCode}) detected, switching to proxy mode`);
                  const domain = sourceDomainRef.current;
                  if (domain && !needsProxyForSource(domain)) {
                    setProxySource(domain, true);
                    setUseProxyMode(true);
+                   // Do NOT call hls.startLoad() here.
+                 } else {
                    hls.startLoad();
                  }
                } else {
