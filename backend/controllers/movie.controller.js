@@ -4,7 +4,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { processM3u8Stream } = require('../utils/m3u8Utils');
+const { processM3u8Stream, processM3u8StreamDirect, processM3u8StreamWithProxy } = require('../utils/m3u8Utils');
 
 let activeDownloads = 0;
 const MAX_CONCURRENT_DOWNLOADS = 3;/**
@@ -556,13 +556,12 @@ const getForYou = async (req, res) => {
 /**
  * GET /movies/proxy-m3u8
  * Proxy M3U8 stream to filter out advertisements
- * Master Playlist: rewrites sub-playlist URLs to go through this proxy (adaptive bitrate + ad filtering)
- * Media Playlist: filters ad segments and rewrites relative URLs to absolute
  * @param {string} req.query.url - Target M3U8 URL
+ * @param {string} req.query.mode - 'proxy' (default) or 'direct'
  */
 const proxyM3u8 = async (req, res) => {
   try {
-    const { url } = req.query;
+    const { url, mode } = req.query;
     if (!url) {
       return res.status(400).send('Missing url parameter');
     }
@@ -576,35 +575,76 @@ const proxyM3u8 = async (req, res) => {
       throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
     }
     const content = await response.text();
-    const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
 
-    // Build proxy base URL from request (e.g. "https://your-server/api/v1/movies/proxy-m3u8")
-    // Fix Mixed Content: Ensure HTTPS is used behind reverse proxies (like DuckDNS/Cloudflare)
+    // Build proxy base URLs from request
     const forwardedProto = req.headers['x-forwarded-proto'];
     const host = req.get('host');
     let protocol = forwardedProto || req.protocol;
     
-    // Force HTTPS in production/non-localhost if protocol is somehow still HTTP
     if (protocol === 'http' && host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
       protocol = 'https';
     }
     
     const proxyBase = `${protocol}://${host}${req.baseUrl || ''}/proxy-m3u8`;
+    const tsProxyBase = `${protocol}://${host}${req.baseUrl || ''}/proxy-ts`;
 
-    const isMasterPlaylist = content.includes('#EXT-X-STREAM-INF');
+    let cleanContent;
+    if (mode === 'direct') {
+      cleanContent = await processM3u8StreamDirect(url);
+    } else {
+      cleanContent = await processM3u8StreamWithProxy(url, proxyBase, tsProxyBase);
+    }
 
-    // Use the extracted utility function to ensure 100% exact logic
-    const cleanContent = await processM3u8Stream(url, proxyBase);
-
-    // Send the processed M3U8 playlist back to the client
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    // Cache 5 minutes to reduce repeated fetches
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.send(cleanContent);
   } catch (error) {
     console.error('[proxyM3u8] Error:', error.message);
     res.status(500).send('Error processing M3U8 stream');
+  }
+};
+
+/**
+ * GET /movies/proxy-ts
+ * Proxy TS segment requests to hide client IP from source server
+ * @param {string} req.query.url - Target TS segment URL
+ */
+const proxyTs = async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) {
+      return res.status(400).send('Missing url parameter');
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Range': req.headers.range,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch TS segment: ${response.statusText}`);
+    }
+
+    // Forward headers from source
+    const contentType = response.headers.get('content-type');
+    const contentLength = response.headers.get('content-length');
+    const contentRange = response.headers.get('content-range');
+
+    if (contentType) res.setHeader('Content-Type', contentType);
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+    
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    // Stream the segment directly to client
+    response.body.pipe(res);
+  } catch (error) {
+    console.error('[proxyTs] Error:', error.message);
+    res.status(500).send('Error fetching TS segment');
   }
 };
 
@@ -843,6 +883,7 @@ module.exports = {
   getRecommendations,
   getEpisodes,
   proxyM3u8,
+  proxyTs,
   downloadMovie,
   downloadMovieMobile,
   getCast,

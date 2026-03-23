@@ -11,6 +11,31 @@ import PremiumRequiredModal from "../common/PremiumRequiredModal";
 import { isPremiumActive } from "utils/premiumUtils";
 import { getVideoSource, USE_SERVER_ADBLOCK } from "config/video.config";
 
+const HYBRID_PROXY_STORAGE_KEY = 'cinephine_proxy_sources';
+
+function getProxySources() {
+  try {
+    return JSON.parse(sessionStorage.getItem(HYBRID_PROXY_STORAGE_KEY) || '{}');
+  } catch { return {}; }
+}
+
+function setProxySource(sourceDomain, needsProxy) {
+  const sources = getProxySources();
+  sources[sourceDomain] = needsProxy;
+  sessionStorage.setItem(HYBRID_PROXY_STORAGE_KEY, JSON.stringify(sources));
+}
+
+function needsProxyForSource(sourceDomain) {
+  const sources = getProxySources();
+  return sources[sourceDomain] === true;
+}
+
+function extractDomain(url) {
+  try {
+    return new URL(url).hostname;
+  } catch { return null; }
+}
+
 const VideoPlayer = ({
   movie,
   episode,
@@ -48,6 +73,7 @@ const VideoPlayer = ({
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadTotalSegments, setDownloadTotalSegments] = useState(0);
   const [downloadCompletedSegments, setDownloadCompletedSegments] = useState(0);
+  const [useProxyMode, setUseProxyMode] = useState(false);
 
   const { user, openAuthModal } = useAuth();
   const isPremium = isPremiumActive(user);
@@ -64,11 +90,12 @@ const VideoPlayer = ({
   const lastEpisodeIdRef = useRef(null);
 
   const hlsRef = useRef(null);
-  const blobUrlRef = useRef(null); // Ref để lưu Blob URL và dọn dẹp sau này
+  const blobUrlRef = useRef(null);
   const downloadAbortControllerRef = useRef(null);
   const firstPlayFiredRef = useRef(false);
+  const sourceDomainRef = useRef(null);
 
-  // 1. SỬA ĐỔI: Lấy link m3u8 trực tiếp, KHÔNG qua Proxy Backend
+  // Hybrid Proxy: Check if source needs proxy mode
   const hlsSource = useMemo(() => {
     let rawM3u8 = null;
     if (episode?.link_m3u8) {
@@ -81,11 +108,17 @@ const VideoPlayer = ({
 
     if (rawM3u8) {
       const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
-      return getVideoSource(rawM3u8, `${apiUrl}/movies/proxy-m3u8`);
+      const domain = extractDomain(rawM3u8);
+      sourceDomainRef.current = domain;
+      
+      const needsProxy = needsProxyForSource(domain) || useProxyMode;
+      const mode = needsProxy ? 'proxy' : 'direct';
+      
+      return getVideoSource(rawM3u8, `${apiUrl}/movies/proxy-m3u8`) + `&mode=${mode}`;
     }
     
     return null;
-  }, [episode, videoUrl]);
+  }, [episode, videoUrl, useProxyMode]);
 
   const fileSource = useMemo(() => {
     const candidate = videoUrl || episode?.videoUrl;
@@ -550,30 +583,36 @@ const VideoPlayer = ({
             }
           });
 
-          hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false));
-          
-          // ... (Các event error, level switched giữ nguyên) ...
+           hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false));
+           
+           // CORS Error Detection: Switch to proxy if CORS error detected
            hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-            const currentLevel = hls.levels[data.level];
-            const actualHeight = currentLevel?.height || null;
-            setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
-          });
+             const currentLevel = hls.levels[data.level];
+             const actualHeight = currentLevel?.height || null;
+             setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+           });
 
-          hls.on(Hls.Events.ERROR, (event, data) => {
-            if (data.fatal) {
-              switch (data.type) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                  hls.startLoad();
-                  break;
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                  hls.recoverMediaError();
-                  break;
-                default:
-                  hls.destroy();
-                  break;
-              }
-            }
-          });
+           hls.on(Hls.Events.ERROR, (event, data) => {
+             // Detect CORS error - switch to proxy mode
+             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+               const err = data?.response?.text || data?.msg || '';
+               if (err.includes('CORS') || err.includes('blocked by CORS policy') || err.includes('Access-Control-Allow-Origin')) {
+                 console.log('🚫 CORS Error detected, switching to proxy mode');
+                 const domain = sourceDomainRef.current;
+                 if (domain && !needsProxyForSource(domain)) {
+                   setProxySource(domain, true);
+                   setUseProxyMode(true);
+                   hls.startLoad();
+                 }
+               } else {
+                 hls.startLoad();
+               }
+             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+               hls.recoverMediaError();
+             } else {
+               hls.destroy();
+             }
+           });
 
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
           // Safari Native
