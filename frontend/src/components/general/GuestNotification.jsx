@@ -86,7 +86,7 @@ const GuestNotification = () => {
   ];
 
   return (
-    <div className="fixed bottom-6 left-6 z-[100000] flex flex-col items-start gap-4">
+    <div className="fixed bottom-6 left-6 z-[100000] max-h-[80vh] flex flex-col items-start gap-4">
       {/* ====== POPUP PANEL ====== */}
       {isOpen && (
         <div
@@ -106,14 +106,23 @@ const GuestNotification = () => {
               aria-label="Đóng"
             >
               <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                <path
+                  d="M1 1L13 13M1 13L13 1"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
 
             {/* Animated greeting icon */}
             <div className="flex items-center gap-4 mb-2">
               <div className="w-12 h-12 rounded-2xl bg-primaryColor/15 border border-primaryColor/30 flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(var(--primary-color-rgb),0.15)]">
-                <span style={{ animation: "guestNotifWave 2.5s ease-in-out infinite origin-bottom-right" }}>
+                <span
+                  style={{
+                    animation: "guestNotifWave 2.5s ease-in-out infinite origin-bottom-right",
+                  }}
+                >
                   👋
                 </span>
               </div>
@@ -132,7 +141,9 @@ const GuestNotification = () => {
           <div className="relative px-6 pb-6 z-10">
             <p className="text-gray-300 text-sm leading-relaxed mb-5">
               Đăng nhập hoặc đăng ký tài khoản để có{" "}
-              <span className="text-primaryColor font-bold drop-shadow-sm">trải nghiệm tốt nhất</span>{" "}
+              <span className="text-primaryColor font-bold drop-shadow-sm">
+                trải nghiệm tốt nhất
+              </span>{" "}
               cùng nhiều tính năng dịch vụ của toàn hệ thống.
             </p>
 
@@ -142,7 +153,9 @@ const GuestNotification = () => {
                 <div
                   key={index}
                   className="flex items-center gap-3 text-sm"
-                  style={{ animation: `guestNotifSlideIn 0.5s ease-out ${0.1 + index * 0.08}s both` }}
+                  style={{
+                    animation: `guestNotifSlideIn 0.5s ease-out ${0.1 + index * 0.08}s both`,
+                  }}
                 >
                   <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 text-[11px] shadow-inner">
                     {feature.icon}
@@ -208,7 +221,7 @@ const GuestNotification = () => {
               strokeLinejoin="round"
             />
           </svg>
-          
+
           {/* Red dot indicator */}
           <span className="absolute top-[2px] right-[4px] w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-bgColor2 shadow-sm" />
         </button>

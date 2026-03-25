@@ -61,7 +61,7 @@ const Header = () => {
           scrolled ? "md:bg-black/80 md:backdrop-blur" : "md:bg-transparent"
         }`}
       >
-        <nav className="w-full px-2 md:px-4 py-2 lg:py-3 flex items-center gap-3">
+        <nav className="w-full px-2 xl:px-4 py-2 lg:py-3 flex items-center gap-3">
           {/* Mobile Menu Button */}
           <button
             onClick={() => {
@@ -151,7 +151,7 @@ const Header = () => {
               />
             </button>
             {/* Desktop Search */}
-            <SearchBar className="hidden lg:block w-80" />
+            <SearchBar className="hidden lg:block laptop-sm:w-60 laptop-xs:w-44 xl:w-80" />
             {isAuthenticated ? (
               <DesktopUserMenu
                 user={user}
@@ -163,7 +163,7 @@ const Header = () => {
             ) : (
               <button
                 onClick={() => openAuthModal("login")}
-                className="hidden sm:hidden md:hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor hover:from-hoverPrimaryColor hover:to-primaryColor text-primaryColorButtonText font-semibold px-5 py-2 text-sm transition-all shadow-lg shadow-primaryColor/30"
+                className="hidden sm:hidden md:hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor hover:from-hoverPrimaryColor hover:to-primaryColor text-primaryColorButtonText font-semibold px-5 laptop-xs:px-4 py-2 text-sm transition-all shadow-lg shadow-primaryColor/30"
               >
                 <i className="fa-solid fa-user" />
                 <span>Đăng nhập</span>

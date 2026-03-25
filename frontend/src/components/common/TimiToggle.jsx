@@ -13,7 +13,8 @@ const TimiToggle = () => {
 
   // Hiển thị promo card mỗi khi load trang (nếu bề mặt Timi chưa được bật)
   useEffect(() => {
-    if (!isEnabled) {
+    const isPromoDismissed = localStorage.getItem("timiPromoDismissed");
+    if (!isEnabled && isPromoDismissed !== "true") {
       // Delay nhỏ để tránh flash
       const timer = setTimeout(() => setShowPromo(true), 2000);
       return () => clearTimeout(timer);
@@ -21,6 +22,11 @@ const TimiToggle = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDismissPromo = () => {
+    setShowPromo(false);
+  };
+
+  const handleGotIt = () => {
+    localStorage.setItem("timiPromoDismissed", "true");
     setShowPromo(false);
   };
 
@@ -37,28 +43,36 @@ const TimiToggle = () => {
         className={`
           relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
           transition-all duration-300 border backdrop-blur-md
-          ${isEnabled
-            ? "bg-primaryColor/15 border-primaryColor/30 text-primaryColor shadow-lg shadow-primaryColor/10"
-            : "bg-bgColor/50 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200"
+          ${
+            isEnabled
+              ? "bg-primaryColor/15 border-primaryColor/30 text-primaryColor shadow-lg shadow-primaryColor/10"
+              : "bg-bgColor/50 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200"
           }
         `}
         title={isEnabled ? "Tắt trợ lý Timi" : "Bật trợ lý Timi"}
       >
-        <i className={`fa-solid fa-robot text-sm ${isEnabled ? "text-primaryColor drop-shadow-md" : "text-gray-400"}`} />
-        <span className="hidden sm:inline">Timi</span>
+        <i
+          className={`fa-solid fa-robot text-sm ${isEnabled ? "text-primaryColor drop-shadow-md" : "text-gray-400"}`}
+        />
+        <span className="hidden xl:inline ">Timi</span>
 
         {/* Toggle dot */}
-        <div className={`
+        <div
+          className={`
           w-8 h-4 rounded-full relative transition-colors duration-300 border
           ${isEnabled ? "bg-primaryColor/30 border-primaryColor/50" : "bg-white/10 border-white/5"}
-        `}>
-          <div className={`
+        `}
+        >
+          <div
+            className={`
             absolute top-[1px] w-3 h-3 rounded-full transition-all duration-300 shadow-sm
-            ${isEnabled
-              ? "left-[17px] bg-primaryColor shadow-[0_0_8px_currentColor]" // Cục dot phát sáng nhẹ
-              : "left-[2px] bg-gray-400"
+            ${
+              isEnabled
+                ? "left-[17px] bg-primaryColor shadow-[0_0_8px_currentColor]" // Cục dot phát sáng nhẹ
+                : "left-[2px] bg-gray-400"
             }
-          `} />
+          `}
+          />
         </div>
 
         {/* Loading pulse khi đang tải model */}
@@ -73,13 +87,11 @@ const TimiToggle = () => {
       {/* ====== PROMO TOOLTIP CARD ====== */}
       {showPromo && (
         <div className="absolute top-full right-0 mt-3 z-[100002] animate-[fadeIn_0.4s_ease-out]">
-          
           {/* Mũi tên chỉ lên (kết nối với button) */}
           <div className="absolute -top-2 right-6 w-4 h-4 bg-bgColor2/90 border-t border-l border-white/10 rotate-45 rounded-sm backdrop-blur-xl z-0" />
 
           {/* Main Card Container */}
-          <div className="relative w-[300px] bg-bgColor2/90 backdrop-blur-xl rounded-2xl sm:p-4 p-3.5 shadow-2xl shadow-black/60 border border-white/10 overflow-hidden z-10">
-            
+          <div className="relative w-[300px] bg-bgColor2/90 backdrop-blur-xl rounded-2xl sm:p-4 sm:pb-2 p-3.5 shadow-2xl shadow-black/60 border border-white/10 overflow-hidden z-10">
             {/* Decorative glows (Hiệu ứng ánh sáng sang trọng) */}
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-primaryColor/15 rounded-full blur-2xl pointer-events-none" />
             <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-primaryColor/10 rounded-full blur-2xl pointer-events-none" />
@@ -104,19 +116,32 @@ const TimiToggle = () => {
                 <i className="fa-solid fa-brain text-primaryColor"></i>
                 Trợ lý Timi AI
               </h3>
-              
+
               <p className="text-gray-300 text-xs leading-relaxed sm:mb-5 mb-2">
-                Trợ lý đã được nâng cấp với <span className="text-primaryColor font-semibold">AI thông minh</span>! Trò chuyện tìm phim, chuyển tập, thao tác tự nhiên như người thật mà không cần chạm tay vào chuột!
+                Trợ lý đã được nâng cấp với{" "}
+                <span className="text-primaryColor font-semibold">AI thông minh</span>! Trò chuyện
+                tìm phim, chuyển tập, thao tác tự nhiên như người thật mà không cần chạm tay vào
+                chuột!
               </p>
 
-              {/* CTA Button */}
-              <button
-                onClick={handleTryNow}
-                className="w-full py-2.5 rounded-xl bg-primaryColor/15 border border-primaryColor/30 text-primaryColor font-bold text-sm transition-all duration-300 shadow-lg shadow-primaryColor/5 hover:bg-primaryColor hover:text-gray-900 hover:shadow-primaryColor/20 active:scale-95 flex items-center justify-center gap-2"
-              >
-                <i className="fa-solid fa-microphone" />
-                Thử ngay!
-              </button>
+              {/* Actions */}
+              <div className="flex flex-col gap-2">
+                {/* CTA Button */}
+                <button
+                  onClick={handleTryNow}
+                  className="w-full py-2.5 rounded-xl bg-primaryColor/15 border border-primaryColor/30 text-primaryColor font-bold text-sm transition-all duration-300 shadow-lg shadow-primaryColor/5 hover:bg-primaryColor hover:text-gray-900 hover:shadow-primaryColor/20 active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <i className="fa-solid fa-microphone" />
+                  Thử ngay!
+                </button>
+                {/* Got it Button */}
+                <button
+                  onClick={handleGotIt}
+                  className="w-full py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors text-xs font-medium"
+                >
+                  Tôi đã biết
+                </button>
+              </div>
             </div>
           </div>
         </div>

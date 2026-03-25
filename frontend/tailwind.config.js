@@ -100,6 +100,10 @@ module.exports = {
           },
         },
       },
+      screens: {
+        "laptop-sm": { min: "1024px", max: "1207px" },
+        "laptop-xs": { min: "1024px", max: "1081px" },
+      },
     },
   },
   plugins: [],
