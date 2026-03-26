@@ -56,6 +56,17 @@ function buildPlaybackSource(rawM3u8, proxyEndpoint, needsProxy) {
   }
 }
 
+function getHlsErrorUrl(data) {
+  return (
+    data?.context?.url ||
+    data?.url ||
+    data?.frag?.url ||
+    data?.part?.url ||
+    data?.networkDetails?.responseURL ||
+    null
+  );
+}
+
 const VideoPlayer = ({
   movie,
   episode,
@@ -279,8 +290,9 @@ const VideoPlayer = ({
   }, []);
 
   const shouldEscalateToProxyMode = useCallback((data) => {
-    const failedUrl = data?.context?.url || data?.url || "";
+    const failedUrl = getHlsErrorUrl(data) || "";
     const statusCode = data?.response?.code ?? data?.response?.status ?? null;
+    const errorDetails = String(data?.details || "").toLowerCase();
     const errText = [
       data?.response?.text,
       data?.reason,
@@ -291,7 +303,7 @@ const VideoPlayer = ({
       .join(" ")
       .toLowerCase();
 
-    if (!failedUrl || failedUrl.includes("/proxy-ts")) {
+    if (failedUrl.includes("/proxy-ts")) {
       return false;
     }
 
@@ -301,11 +313,16 @@ const VideoPlayer = ({
       statusCode === 403 ||
       statusCode === 429 ||
       errText.includes("cors") ||
-      errText.includes("access-control-allow-origin");
+      errText.includes("access-control-allow-origin") ||
+      (statusCode === 0 && errorDetails.includes("fragloaderror"));
 
     if (!looksBlocked) {
       networkErrorCountRef.current = 0;
       return false;
+    }
+
+    if (data?.fatal) {
+      return true;
     }
 
     networkErrorCountRef.current += 1;
@@ -701,12 +718,16 @@ const VideoPlayer = ({
              setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
            });
 
+           hls.on(Hls.Events.FRAG_LOADED, () => {
+             resetNetworkRecoveryState();
+           });
+
            hls.on(Hls.Events.ERROR, (event, data) => {
              console.warn("[VideoPlayer] HLS error:", {
                type: data.type,
                details: data.details,
                fatal: data.fatal,
-               url: data?.context?.url || data?.url || null,
+               url: getHlsErrorUrl(data),
                code: data?.response?.code ?? data?.response?.status ?? null,
              });
 
@@ -718,14 +739,12 @@ const VideoPlayer = ({
                  setUseProxyMode(true);
                  setShowControls(true);
                  setIsBuffering(true);
+                 hls.destroy();
                  return;
                }
              }
 
              if (!data.fatal) {
-               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                 resetNetworkRecoveryState();
-               }
                return;
              }
 
