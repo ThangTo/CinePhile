@@ -5,8 +5,7 @@ const ratingSchema = new mongoose.Schema({
   movieId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Movie', 
-    required: true, 
-    index: true 
+    required: true
   },
   // Tham chiếu đến User (ObjId)
   userId: { 

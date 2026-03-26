@@ -12,8 +12,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
+      unique: true,
       lowercase: true,
       trim: true,
     },
@@ -61,8 +60,6 @@ const userSchema = new mongoose.Schema(
   },
 );
 
-// Index
-userSchema.index({ email: 1 });
 
 // 2. Kích hoạt Plugin (QUAN TRỌNG)
 // Dòng này sẽ tự động thêm các hàm: authenticate(), serializeUser(), ... vào User model

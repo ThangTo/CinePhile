@@ -39,7 +39,6 @@ const transactionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Create indexes for fast lookup and webhook mapping
-transactionSchema.index({ orderCode: 1 });
 transactionSchema.index({ user: 1, status: 1 });
 
 module.exports = mongoose.model('Transaction', transactionSchema);

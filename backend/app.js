@@ -75,6 +75,22 @@ app.use(optionalAuth);
 app.use(trackingMiddleware);
 
 // Rate limiting
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+const INTERNAL_PROXY_PATHS = ['/movies/proxy-m3u8', '/movies/proxy-ts'];
+
+function getRequestHost(req) {
+  const host = req.get('host') || '';
+  return host.replace(/:\d+$/, '').toLowerCase();
+}
+
+function isInternalStreamingProxyRequest(req) {
+  const host = getRequestHost(req);
+  return (
+    LOOPBACK_HOSTS.has(host) &&
+    INTERNAL_PROXY_PATHS.some((proxyPath) => (req.path || '').startsWith(proxyPath))
+  );
+}
+
 const createRateLimiter = (windowMs, max, message) => {
   // RedisStore works if Redis client has sendCommand — both TCP and REST clients support this
   const store =
@@ -101,7 +117,10 @@ const createRateLimiter = (windowMs, max, message) => {
       if (forwardedFor) return forwardedFor.split(',')[0].trim();
       return req.ip || req.connection.remoteAddress || 'unknown';
     },
-    skip: (req) => req.path === '/' || req.path === '/health',
+    skip: (req) =>
+      req.path === '/' ||
+      req.path === '/health' ||
+      isInternalStreamingProxyRequest(req),
   });
 };
 
@@ -271,7 +290,7 @@ app.get('/health', async (req, res) => {
       mode: redisService.mode,
       latencyMs: redisLatency,
       urlConfigured: !!process.env.REDIS_URL || !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
-      protocol: process.env.UPSTASH_REDIS_REST_URL ? 'https (REST)' : (process.env.REDIS_URL ? process.env.REDIS_URL.split('://')[0] : null),
+      protocol: process.env.REDIS_URL ? process.env.REDIS_URL.split('://')[0] : (process.env.UPSTASH_REDIS_REST_URL ? 'https (REST)' : null),
       error: redisError,
     },
   });

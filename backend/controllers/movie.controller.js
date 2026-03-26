@@ -598,6 +598,7 @@ const proxyM3u8 = async (req, res) => {
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.send(cleanContent);
   } catch (error) {
@@ -637,6 +638,7 @@ const proxyTs = async (req, res) => {
     if (contentLength) res.setHeader('Content-Length', contentLength);
     
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('Cache-Control', 'public, max-age=3600');
 
     // Node 18+ native fetch returns Web ReadableStream, convert to Node stream for piping

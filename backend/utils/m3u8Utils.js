@@ -66,8 +66,6 @@ async function processM3u8StreamDirect(url, proxyBase = null) {
         continue;
       }
 
-      if (line.includes('#EXT-X-DISCONTINUITY')) continue;
-
       if (!line.startsWith('#')) {
         if (!line.startsWith('http')) {
           line = new URL(line, baseUrl).toString();
@@ -142,8 +140,6 @@ async function processM3u8StreamWithProxy(url, proxyBase, tsProxyBase) {
         skipNext = false;
         continue;
       }
-
-      if (line.includes('#EXT-X-DISCONTINUITY')) continue;
 
       if (!line.startsWith('#')) {
         let segmentUrl = line;

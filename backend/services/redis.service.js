@@ -26,14 +26,14 @@ class RedisService {
    * Auto-detects Upstash REST API vs TCP based on env vars
    */
   async connect() {
-    // Priority 1: Upstash REST API (works on HF Spaces, serverless, etc.)
-    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-      return this._connectRest();
-    }
-
-    // Priority 2: Standard TCP Redis client
+    // Priority 1: Standard TCP Redis client for local/VPS Redis
     if (process.env.REDIS_URL) {
       return this._connectTcp();
+    }
+
+    // Priority 2: Upstash REST API (works on HF Spaces, serverless, etc.)
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      return this._connectRest();
     }
 
     console.log('⚠️ Redis: No REDIS_URL or UPSTASH_REDIS_REST_URL provided, caching disabled');

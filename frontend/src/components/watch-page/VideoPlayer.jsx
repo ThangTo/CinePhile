@@ -12,6 +12,8 @@ import { isPremiumActive } from "utils/premiumUtils";
 import { getVideoSource, USE_SERVER_ADBLOCK } from "config/video.config";
 
 const HYBRID_PROXY_STORAGE_KEY = 'cinephine_proxy_sources';
+const PROXY_ESCALATION_THRESHOLD = 2;
+const START_POSITION_BUDGET_MS = 1200;
 
 function getProxySources() {
   try {
@@ -34,6 +36,24 @@ function extractDomain(url) {
   try {
     return new URL(url).hostname;
   } catch { return null; }
+}
+
+function buildPlaybackSource(rawM3u8, proxyEndpoint, needsProxy) {
+  const baseSource = getVideoSource(rawM3u8, proxyEndpoint);
+  if (!baseSource) return null;
+
+  if (!baseSource.startsWith(proxyEndpoint)) {
+    return baseSource;
+  }
+
+  try {
+    const playbackUrl = new URL(baseSource);
+    playbackUrl.searchParams.set("mode", needsProxy ? "proxy" : "direct");
+    return playbackUrl.toString();
+  } catch {
+    const separator = baseSource.includes("?") ? "&" : "?";
+    return `${baseSource}${separator}mode=${needsProxy ? "proxy" : "direct"}`;
+  }
 }
 
 const VideoPlayer = ({
@@ -94,6 +114,8 @@ const VideoPlayer = ({
   const downloadAbortControllerRef = useRef(null);
   const firstPlayFiredRef = useRef(false);
   const sourceDomainRef = useRef(null);
+  const networkErrorCountRef = useRef(0);
+  const lastPlaybackModeRef = useRef("direct");
 
   // Hybrid Proxy: Check if source needs proxy mode
   const hlsSource = useMemo(() => {
@@ -112,9 +134,9 @@ const VideoPlayer = ({
       sourceDomainRef.current = domain;
       
       const needsProxy = needsProxyForSource(domain) || useProxyMode;
-      const mode = needsProxy ? 'proxy' : 'direct';
-      
-      return getVideoSource(rawM3u8, `${apiUrl}/movies/proxy-m3u8`) + `&mode=${mode}`;
+      lastPlaybackModeRef.current = needsProxy ? "proxy" : "direct";
+
+      return buildPlaybackSource(rawM3u8, `${apiUrl}/movies/proxy-m3u8`, needsProxy);
     }
     
     return null;
@@ -205,8 +227,14 @@ const VideoPlayer = ({
       }
     };
     const handlePause = () => setIsPlaying(false);
-    const handleWaiting = () => setIsBuffering(true);
+    const handleWaiting = () => {
+      setIsBuffering(true);
+      setShowControls(true);
+    };
     const handleCanPlay = () => setIsBuffering(false);
+    const handlePlaying = () => setIsBuffering(false);
+    const handleSeekStart = () => setIsBuffering(true);
+    const handleSeekEnd = () => setIsBuffering(false);
     const handleProgress = () => updateBufferedPercentage();
 
     const handleLeavePiP = () => {
@@ -220,7 +248,12 @@ const VideoPlayer = ({
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handlePause);
     video.addEventListener("waiting", handleWaiting);
+    video.addEventListener("stalled", handleWaiting);
+    video.addEventListener("seeking", handleSeekStart);
+    video.addEventListener("seeked", handleSeekEnd);
     video.addEventListener("canplay", handleCanPlay);
+    video.addEventListener("loadeddata", handleCanPlay);
+    video.addEventListener("playing", handlePlaying);
     video.addEventListener("progress", handleProgress);
     video.addEventListener("leavepictureinpicture", handleLeavePiP);
 
@@ -230,11 +263,66 @@ const VideoPlayer = ({
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("waiting", handleWaiting);
+      video.removeEventListener("stalled", handleWaiting);
+      video.removeEventListener("seeking", handleSeekStart);
+      video.removeEventListener("seeked", handleSeekEnd);
       video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("loadeddata", handleCanPlay);
+      video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("progress", handleProgress);
       video.removeEventListener("leavepictureinpicture", handleLeavePiP);
     };
   }, [hasNativePlayer, episode, duration, onFirstPlay]);
+
+  const resetNetworkRecoveryState = useCallback(() => {
+    networkErrorCountRef.current = 0;
+  }, []);
+
+  const shouldEscalateToProxyMode = useCallback((data) => {
+    const failedUrl = data?.context?.url || data?.url || "";
+    const statusCode = data?.response?.code ?? data?.response?.status ?? null;
+    const errText = [
+      data?.response?.text,
+      data?.reason,
+      data?.msg,
+      data?.details,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    if (!failedUrl || failedUrl.includes("/proxy-ts")) {
+      return false;
+    }
+
+    const looksBlocked =
+      statusCode === 0 ||
+      statusCode === 401 ||
+      statusCode === 403 ||
+      statusCode === 429 ||
+      errText.includes("cors") ||
+      errText.includes("access-control-allow-origin");
+
+    if (!looksBlocked) {
+      networkErrorCountRef.current = 0;
+      return false;
+    }
+
+    networkErrorCountRef.current += 1;
+    return networkErrorCountRef.current >= PROXY_ESCALATION_THRESHOLD;
+  }, []);
+
+  useEffect(() => {
+    if (!hasNativePlayer || !isBuffering) return;
+    setShowControls(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+  }, [hasNativePlayer, isBuffering]);
+
+  useEffect(() => {
+    resetNetworkRecoveryState();
+  }, [hlsSource, resetNetworkRecoveryState]);
 
   // === HEARTBEAT: Gửi Watch Time mỗi 60 giây khi video đang phát ===
   useEffect(() => {
@@ -440,11 +528,13 @@ const VideoPlayer = ({
 
           // === BƯỚC 2: Khởi tạo HLS NGAY LẬP TỨC ===
           const hls = new Hls({
-            maxBufferLength: 60,
-            maxMaxBufferLength: 120,
-            maxBufferSize: 5 * 1000 * 1000,
+            maxBufferLength: 90,
+            maxMaxBufferLength: 180,
+            backBufferLength: 90,
+            maxBufferSize: 30 * 1000 * 1000,
             startFragPrefetch: true,
             autoStartLoad: false,
+            lowLatencyMode: false,
             manifestLoadingTimeOut: 20000,
             fragLoadingTimeOut: 25000,
             manifestLoadingMaxRetry: 3,
@@ -453,7 +543,7 @@ const VideoPlayer = ({
           });
 
           try {
-              console.log("🚀 Bắt đầu tải M3U8:", hlsSource);
+              console.log("🚀 Bắt đầu tải M3U8:", hlsSource, `mode=${lastPlaybackModeRef.current}`);
               
               if (USE_SERVER_ADBLOCK) {
                 // Server proxy xử lý toàn bộ: lọc quảng cáo + adaptive bitrate
@@ -526,8 +616,6 @@ const VideoPlayer = ({
                       continue;
                   }
 
-                  if (line.includes('#EXT-X-DISCONTINUITY')) continue;
-
                   if (!line.startsWith('#')) {
                       if (!line.startsWith('http')) {
                           line = new URL(line, baseUrl).toString();
@@ -559,21 +647,10 @@ const VideoPlayer = ({
 
           hls.attachMedia(video);
           hlsRef.current = hls;
+          resetNetworkRecoveryState();
 
           // ... (Giữ nguyên phần Event Listeners bên dưới) ...
           hls.on(Hls.Events.MANIFEST_PARSED, async () => {
-             // === BƯỚC 3: M3U8 tải xong, chờ xem API progress trả về vị trí chưa ===
-             const startPos = await progressPromise;
-             console.log(`🎬 Start Load at Position: ${startPos >= 0 ? startPos + 's' : 'default'}`);
-             
-             if (startPos >= 0) {
-               video.currentTime = startPos;
-               hls.startLoad(startPos);
-             } else {
-               hls.startLoad();
-             }
-
-             // Logic quality giữ nguyên...
              const levels = hls.levels || [];
              setAvailableLevels(levels);
              if (levels.length > 0) {
@@ -581,10 +658,42 @@ const VideoPlayer = ({
                  const actualHeight = currentLevel?.height || null;
                  setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
             }
+
+             const normalizedProgressPromise = Promise.resolve(progressPromise)
+               .then((value) => (typeof value === "number" ? value : -1))
+               .catch(() => -1);
+
+             const startPos = await Promise.race([
+               normalizedProgressPromise,
+               new Promise((resolve) => setTimeout(() => resolve(null), START_POSITION_BUDGET_MS)),
+             ]);
+
+             if (typeof startPos === "number") {
+               console.log(`[VideoPlayer] Start load at position: ${startPos >= 0 ? `${startPos}s` : "default"}`);
+
+               if (startPos >= 0) {
+                 hasAutoSeekedRef.current = true;
+                 video.currentTime = startPos;
+                 hls.startLoad(startPos);
+               } else {
+                 hls.startLoad();
+               }
+               return;
+             }
+
+             console.log("[VideoPlayer] Start load immediately while waiting for resume position...");
+             hls.startLoad();
+
+             normalizedProgressPromise.then((lateStartPos) => {
+               if (lateStartPos < 0 || hasAutoSeekedRef.current) return;
+               if (video.seeking || video.currentTime > 5) return;
+
+               hasAutoSeekedRef.current = true;
+               video.currentTime = lateStartPos;
+               console.log(`[VideoPlayer] Applied delayed resume position: ${lateStartPos}s`);
+             });
           });
 
-           hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false));
-           
            // CORS Error Detection: Switch to proxy if CORS error detected
            hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
              const currentLevel = hls.levels[data.level];
@@ -593,26 +702,36 @@ const VideoPlayer = ({
            });
 
            hls.on(Hls.Events.ERROR, (event, data) => {
-             // Detect CORS error - switch to proxy mode
-             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-               const errText = data?.response?.text || data?.msg || '';
-               const statusCode = data?.response?.code;
-               const isCorsOrBlocked = statusCode === 0 || statusCode === 403 || statusCode === 404 || 
-                                       errText.includes('CORS') || errText.includes('blocked by CORS policy') || 
-                                       errText.includes('Access-Control-Allow-Origin');
-               if (isCorsOrBlocked) {
-                 console.log(`🚫 Network Error (Status: ${statusCode}) detected, switching to proxy mode`);
-                 const domain = sourceDomainRef.current;
-                 if (domain && !needsProxyForSource(domain)) {
-                   setProxySource(domain, true);
-                   setUseProxyMode(true);
-                   // Do NOT call hls.startLoad() here.
-                 } else {
-                   hls.startLoad();
-                 }
-               } else {
-                 hls.startLoad();
+             console.warn("[VideoPlayer] HLS error:", {
+               type: data.type,
+               details: data.details,
+               fatal: data.fatal,
+               url: data?.context?.url || data?.url || null,
+               code: data?.response?.code ?? data?.response?.status ?? null,
+             });
+
+             if (data.type === Hls.ErrorTypes.NETWORK_ERROR && shouldEscalateToProxyMode(data)) {
+               const domain = sourceDomainRef.current;
+               if (domain && !needsProxyForSource(domain) && lastPlaybackModeRef.current !== "proxy") {
+                 console.log("[VideoPlayer] Escalating this source to proxy-ts mode after repeated blocked segment errors");
+                 setProxySource(domain, true);
+                 setUseProxyMode(true);
+                 setShowControls(true);
+                 setIsBuffering(true);
+                 return;
                }
+             }
+
+             if (!data.fatal) {
+               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                 resetNetworkRecoveryState();
+               }
+               return;
+             }
+
+             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+               setIsBuffering(true);
+               hls.startLoad();
              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
                hls.recoverMediaError();
              } else {
@@ -666,7 +785,7 @@ const VideoPlayer = ({
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       setShowControls(true);
     } else {
-      if (isPlaying && hasNativePlayer) {
+      if (isPlaying && hasNativePlayer && !isBuffering) {
         const delay = isFullscreen ? 2000 : 3000;
         controlsTimeoutRef.current = setTimeout(() => {
           setShowControls(false);
@@ -677,7 +796,7 @@ const VideoPlayer = ({
         }, delay);
       }
     }
-  }, [isDraggingProgress, isPlaying, isFullscreen, hasNativePlayer]);
+  }, [isDraggingProgress, isPlaying, isFullscreen, hasNativePlayer, isBuffering]);
 
   const handlePlayPause = () => {
     const video = videoRef.current;
@@ -695,7 +814,7 @@ const VideoPlayer = ({
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       const delay = isFullscreen ? 2000 : 3000;
       controlsTimeoutRef.current = setTimeout(() => {
-        if (!isDraggingProgress && isPlaying) setShowControls(false);
+        if (!isDraggingProgress && isPlaying && !isBuffering) setShowControls(false);
       }, delay);
     }
   };
@@ -829,7 +948,7 @@ const VideoPlayer = ({
     if (!hasNativePlayer) return;
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    if (!isDraggingProgress) {
+    if (!isDraggingProgress && !isBuffering) {
       const delay = isFullscreen ? 2000 : 3000;
       controlsTimeoutRef.current = setTimeout(() => {
         if (!isDraggingProgress && isPlaying) {
@@ -1299,7 +1418,7 @@ const VideoPlayer = ({
       style={{ cursor: isFullscreen && !showControls ? 'none' : 'default' }}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
-        if (isPlaying) setShowControls(false);
+        if (isPlaying && !isBuffering) setShowControls(false);
         setShowMoreMenu(false);
         setShowSpeedMenu(false);
         setShowQualityMenu(false);
@@ -1356,6 +1475,7 @@ const VideoPlayer = ({
 
       <VideoControls
         showControls={showControls}
+        isBuffering={isBuffering}
         hasNativePlayer={hasNativePlayer}
         currentTime={currentTime}
         duration={duration}

@@ -5,15 +5,13 @@ const commentSchema = new mongoose.Schema({
   movieId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Movie', 
-    required: true, 
-    index: true 
+    required: true
   }, 
   // Tham chiếu đến User (ObjId)
   userId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
-    required: true, 
-    index: true 
+    required: true
   },
   content: { 
     type: String, 

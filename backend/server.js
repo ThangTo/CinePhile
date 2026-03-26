@@ -6,6 +6,7 @@ const { connectDB } = require('./config/db/db');
 const redisService = require('./services/redis.service');
 const { initCronJobs } = require('./services/cron.service');
 const { initVoiceSocket } = require('./services/voiceSocket.service');
+const { initProgressSocket } = require('./services/progressSocket.service');
 const app = require('./app');
 const PORT = process.env.PORT || 5000;
 // Connect to database
@@ -25,6 +26,9 @@ const httpServer = http.createServer(app);
 
 // Attach Voice WebSocket (Deepgram + Timi)
 initVoiceSocket(httpServer);
+
+// Attach Viral Progress WebSocket
+initProgressSocket(httpServer);
 
 // Start server
 const server = httpServer.listen(PORT, () => {

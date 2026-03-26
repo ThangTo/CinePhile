@@ -9,6 +9,7 @@ import { formatTime } from "utils/ultils";
 
 const VideoControls = ({
   showControls,
+  isBuffering,
   hasNativePlayer,
   // Progress Bar
   currentTime,
@@ -68,7 +69,7 @@ const VideoControls = ({
   isDownloadMinimized,
   onToggleDownloadMinimize,
 }) => {
-  if (!showControls || !hasNativePlayer) {
+  if ((!showControls && !isBuffering) || !hasNativePlayer) {
     return null;
   }
 

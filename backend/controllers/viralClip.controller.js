@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { extractAudio, cleanupTempFile, tempFilePath } = require('../services/videoProcessing.service');
-const { speechToText, analyzeScenes } = require('../services/ai.service');
+const { cleanupTempFile } = require('../services/audio.service');
 const { addClipJob, getJobStatus } = require('../services/videoQueue.service');
 const Episode = require('../models/episode.model');
 
@@ -55,10 +54,11 @@ exports.generateViralClips = async (req, res) => {
       finalBgMusic = bgmFile.path;
     }
 
-    // Wrap the M3U8 URL in the local proxy to ensure 100% ad filtering
+    // Use direct mode for server-side FFmpeg so only playlists go through the
+    // local proxy; TS segments are fetched from source directly after ad filtering.
     const localPort = process.env.PORT || 5000;
     const protocol = req.protocol === 'https' ? 'https' : 'http';
-    const proxyM3u8Url = `${protocol}://127.0.0.1:${localPort}/api/v1/movies/proxy-m3u8?url=${encodeURIComponent(m3u8Url)}`;
+    const proxyM3u8Url = `${protocol}://127.0.0.1:${localPort}/api/v1/movies/proxy-m3u8?url=${encodeURIComponent(m3u8Url)}&mode=direct`;
     // ── Enqueue Analysis Job ────────────────────────────────────────────
     console.log(`[ViralClip] Queueing analysis pipeline for movie: ${movieId}`);
     

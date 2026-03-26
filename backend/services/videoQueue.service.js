@@ -1,5 +1,5 @@
 const Queue = require('bull');
-const { renderClip16x9 } = require('./videoProcessing.service');
+const { renderClip16x9 } = require('./render.service');
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 const REDIS_URL = process.env.REDIS_URL;
@@ -52,12 +52,27 @@ if (REDIS_URL) {
   });
 
   // ─── Event Listeners ────────────────────────────────────────────────────────
+  viralVideoQueue.on('progress', (job, progress) => {
+    const { emitJobProgress } = require('./progressSocket.service');
+    emitJobProgress(job.id, { step: 'render', percent: progress });
+    if (job.data && job.data.movieId) {
+      emitJobProgress(job.data.movieId, { step: 'render', renderJobId: job.id, percent: progress });
+    }
+  });
+  
   viralVideoQueue.on('completed', (job, result) => {
     console.log(`[Queue] ✅ Job ${job.id} completed successfully:`, result);
+    const { emitJobProgress } = require('./progressSocket.service');
+    emitJobProgress(job.id, { step: 'render', percent: 100, status: 'completed', result });
+    if (job.data && job.data.movieId) {
+      emitJobProgress(job.data.movieId, { step: 'render', renderJobId: job.id, percent: 100, status: 'completed', result });
+    }
   });
 
   viralVideoQueue.on('failed', (job, err) => {
-    console.error(`[Queue] ❌ Job ${job.id} failed permanently after ${job.attemptsMade} attempts: ${err.message}`);
+    console.error(`[Queue] ❌ DLQ: Job ${job.id} failed permanently after ${job.attemptsMade} attempts: ${err.message}`);
+    const { emitJobProgress } = require('./progressSocket.service');
+    emitJobProgress(job.id, { step: 'render', status: 'failed', error: err.message });
   });
 
   viralVideoQueue.on('stalled', (job) => {

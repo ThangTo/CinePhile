@@ -2,8 +2,22 @@
  * Video Player Configuration
  */
 
+function parseEnvBoolean(value, fallback) {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return fallback;
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+
+  return fallback;
+}
+
 // Toggle: True to filter ads on backend proxy, False to filter ads on frontend client
-export const USE_SERVER_ADBLOCK = process.env.REACT_APP_USE_SERVER_ADBLOCK || true;
+export const USE_SERVER_ADBLOCK = parseEnvBoolean(
+  process.env.REACT_APP_USE_SERVER_ADBLOCK,
+  true
+);
 
 /**
  * Danh sách domains KHÔNG CẦN proxy
