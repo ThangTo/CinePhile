@@ -17,6 +17,13 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - REDIS_URL=redis://redis:6379
       - TMDB_API_KEY=${TMDB_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - TIKTOK_ENABLED=${TIKTOK_ENABLED:-true}
+      - TIKTOK_WORKER_URL=${TIKTOK_WORKER_URL:-http://tiktok-worker:8787}
+      - TIKTOK_FETCH_TIMEOUT_MS=${TIKTOK_FETCH_TIMEOUT_MS:-30000}
+      - TIKTOK_FETCH_RETRIES=${TIKTOK_FETCH_RETRIES:-2}
+      - TIKTOK_TMDB_SEARCH_LIMIT=${TIKTOK_TMDB_SEARCH_LIMIT:-10}
+      - TRENDING_AUTO_CRAWL_LIMIT=${TRENDING_AUTO_CRAWL_LIMIT:-6}
     env_file:
       - .env
     depends_on:
@@ -101,6 +108,36 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s
+
+  tiktok-worker:
+    build:
+      context: ./tiktok_worker
+      dockerfile: Dockerfile
+    container_name: cinephine-tiktok-worker
+    restart: unless-stopped
+    ports:
+      - '8787:8787'
+    environment:
+      - TIKTOK_MS_TOKEN=${TIKTOK_MS_TOKEN}
+      - TIKTOK_PROXY_URL=${TIKTOK_PROXY_URL}
+      - TIKTOK_TRENDING_COUNT=${TIKTOK_TRENDING_COUNT:-30}
+      - TIKTOK_BROWSER=${TIKTOK_BROWSER:-chromium}
+      - TIKTOK_WORKER_HOST=0.0.0.0
+      - TIKTOK_WORKER_PORT=8787
+    networks:
+      - cinephine-network
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 networks:
   cinephine-network:

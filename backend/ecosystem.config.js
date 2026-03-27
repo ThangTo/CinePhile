@@ -1,6 +1,6 @@
-/**
+﻿/**
  * PM2 Ecosystem Configuration
- * Quản lý processes với PM2 thay vì Node.js cluster module
+ * Quan ly processes voi PM2 thay vi Node.js cluster module
  */
 
 module.exports = {
@@ -8,8 +8,8 @@ module.exports = {
     {
       name: 'cinephine-api',
       script: './server.js',
-      instances: 'max', // Sử dụng tất cả CPU cores, hoặc set số cụ thể: 4
-      exec_mode: 'cluster', // Cluster mode để load balancing
+      instances: 'max',
+      exec_mode: 'cluster',
       env: {
         NODE_ENV: 'development',
         PORT: 5000,
@@ -18,31 +18,53 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 5000,
       },
-      // Auto restart settings
       autorestart: true,
-      watch: false, // Set true để auto restart khi code thay đổi (chỉ dùng trong dev)
-      max_memory_restart: '1G', // Restart nếu memory vượt quá 1GB
-
-      // Logging
+      watch: false,
+      max_memory_restart: '1G',
       error_file: './logs/pm2-error.log',
       out_file: './logs/pm2-out.log',
       log_file: './logs/pm2-combined.log',
-      time: true, // Thêm timestamp vào logs
-      merge_logs: true, // Merge logs từ tất cả instances
+      time: true,
+      merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-
-      // Advanced settings
-      min_uptime: '10s', // Minimum uptime để coi là stable
-      max_restarts: 10, // Max restarts trong 1 phút
-      restart_delay: 4000, // Delay trước khi restart (ms)
-
-      // Graceful shutdown
-      kill_timeout: 5000, // Timeout để graceful shutdown
-      wait_ready: true, // Đợi app ready trước khi coi là online
-      listen_timeout: 10000, // Timeout để app listen
-
-      // Environment variables
-      env_file: '.env', // Load từ .env file
+      min_uptime: '10s',
+      max_restarts: 10,
+      restart_delay: 4000,
+      kill_timeout: 5000,
+      wait_ready: true,
+      listen_timeout: 10000,
+      env_file: '.env',
+    },
+    {
+      name: 'cinephine-tiktok-worker',
+      script: './tiktok_worker/app.py',
+      interpreter: process.env.PYTHON_BIN || 'python3',
+      instances: 1,
+      exec_mode: 'fork',
+      env: {
+        TIKTOK_ENABLED: 'true',
+        TIKTOK_WORKER_HOST: '127.0.0.1',
+        TIKTOK_WORKER_PORT: 8787,
+      },
+      env_production: {
+        TIKTOK_ENABLED: 'true',
+        TIKTOK_WORKER_HOST: '127.0.0.1',
+        TIKTOK_WORKER_PORT: 8787,
+      },
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '512M',
+      error_file: './logs/tiktok-worker-error.log',
+      out_file: './logs/tiktok-worker-out.log',
+      log_file: './logs/tiktok-worker-combined.log',
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      min_uptime: '10s',
+      max_restarts: 10,
+      restart_delay: 4000,
+      env_file: '.env',
     },
   ],
 };
+
