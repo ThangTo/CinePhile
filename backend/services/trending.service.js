@@ -29,7 +29,7 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const TIKTOK_ENABLED = (process.env.TIKTOK_ENABLED || 'true').toLowerCase() !== 'false';
 const TIKTOK_WORKER_URL = (process.env.TIKTOK_WORKER_URL || '').trim();
 const TIKTOK_WORKER_CMD = (process.env.TIKTOK_WORKER_CMD || '').trim();
-const TIKTOK_FETCH_TIMEOUT_MS = Number(process.env.TIKTOK_FETCH_TIMEOUT_MS || 30000);
+const TIKTOK_FETCH_TIMEOUT_MS = Number(process.env.TIKTOK_FETCH_TIMEOUT_MS || 45000);
 const TIKTOK_FETCH_RETRIES = Math.max(1, Number(process.env.TIKTOK_FETCH_RETRIES || 2));
 const TIKTOK_TRENDING_COUNT = Math.max(1, Number(process.env.TIKTOK_TRENDING_COUNT || 30));
 const TIKTOK_TMDB_SEARCH_LIMIT = Math.max(1, Number(process.env.TIKTOK_TMDB_SEARCH_LIMIT || 10));

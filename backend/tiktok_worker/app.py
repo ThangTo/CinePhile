@@ -15,11 +15,13 @@ DEFAULT_COUNT = max(1, int(os.getenv("TIKTOK_TRENDING_COUNT", "30")))
 DEFAULT_BROWSER = os.getenv("TIKTOK_BROWSER", "chromium")
 DEFAULT_HOST = os.getenv("TIKTOK_WORKER_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.getenv("TIKTOK_WORKER_PORT", "8787"))
+IGNORE_HTTPS_ERRORS = os.getenv("TIKTOK_IGNORE_HTTPS_ERRORS", "true").lower() != "false"
 
 # Keep worker output machine-readable for Node command mode.
 logging.getLogger("TikTokApi").setLevel(logging.CRITICAL)
 logging.getLogger("TikTokApi.tiktok").setLevel(logging.CRITICAL)
 logging.getLogger("playwright").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 GENERIC_TERMS = {
     "phim",
@@ -143,6 +145,12 @@ async def fetch_tiktok_payload(count: int):
     if proxy_url:
         sessions_args["proxies"] = [proxy_url]
 
+    async def browser_context_factory(browser_instance, **kwargs):
+        context_kwargs = dict(kwargs or {})
+        if IGNORE_HTTPS_ERRORS:
+            context_kwargs["ignore_https_errors"] = True
+        return await browser_instance.new_context(**context_kwargs)
+
     api = TikTokApi()
 
     try:
@@ -150,6 +158,14 @@ async def fetch_tiktok_payload(count: int):
             num_sessions=1,
             browser=browser,
             headless=True,
+            browser_context_factory=browser_context_factory,
+            enable_session_recovery=True,
+            allow_partial_sessions=True,
+            browser_args=[
+                "--ignore-certificate-errors",
+                "--ignore-ssl-errors",
+                "--allow-insecure-localhost",
+            ],
             **sessions_args,
         )
 
@@ -233,7 +249,10 @@ def write_json(handler: BaseHTTPRequestHandler, status_code: int, payload):
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(data)))
     handler.end_headers()
-    handler.wfile.write(data)
+    try:
+        handler.wfile.write(data)
+    except BrokenPipeError:
+        pass
 
 
 class TikTokWorkerHandler(BaseHTTPRequestHandler):
