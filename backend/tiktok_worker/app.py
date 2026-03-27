@@ -158,14 +158,10 @@ async def fetch_tiktok_payload(count: int):
             num_sessions=1,
             browser=browser,
             headless=True,
+            sleep_after=3,
             browser_context_factory=browser_context_factory,
             enable_session_recovery=True,
             allow_partial_sessions=True,
-            browser_args=[
-                "--ignore-certificate-errors",
-                "--ignore-ssl-errors",
-                "--allow-insecure-localhost",
-            ],
             **sessions_args,
         )
 
