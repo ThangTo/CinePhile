@@ -495,18 +495,50 @@ async function sleep(ms) {
 }
 
 async function executeTikTokWorkerCommand(command) {
-  const { stdout } = await execAsync(command, {
-    timeout: TIKTOK_FETCH_TIMEOUT_MS,
-    maxBuffer: 5 * 1024 * 1024,
-    windowsHide: true,
-  });
+  const parsePayload = (rawOutput) => {
+    const output = String(rawOutput || '').trim();
+    if (!output) {
+      throw new Error('TikTok worker command returned empty stdout.');
+    }
 
-  const output = String(stdout || '').trim();
-  if (!output) {
-    throw new Error('TikTok worker command returned empty stdout.');
+    const lines = output
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const candidate = lines[index];
+      if (!candidate.startsWith('{')) continue;
+
+      try {
+        return JSON.parse(candidate);
+      } catch (error) {
+        // Scan upward in case logs were printed above the final JSON line.
+      }
+    }
+
+    return JSON.parse(output);
+  };
+
+  try {
+    const { stdout } = await execAsync(command, {
+      timeout: TIKTOK_FETCH_TIMEOUT_MS,
+      maxBuffer: 8 * 1024 * 1024,
+      windowsHide: true,
+    });
+
+    return parsePayload(stdout);
+  } catch (error) {
+    if (error?.stdout) {
+      try {
+        return parsePayload(error.stdout);
+      } catch (parseError) {
+        // Fall through and rethrow the original command error.
+      }
+    }
+
+    throw error;
   }
-
-  return JSON.parse(output);
 }
 
 async function fetchTikTokTrending() {

@@ -1,6 +1,7 @@
 ﻿import argparse
 import asyncio
 import json
+import logging
 import os
 import re
 import sys
@@ -14,6 +15,11 @@ DEFAULT_COUNT = max(1, int(os.getenv("TIKTOK_TRENDING_COUNT", "30")))
 DEFAULT_BROWSER = os.getenv("TIKTOK_BROWSER", "chromium")
 DEFAULT_HOST = os.getenv("TIKTOK_WORKER_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.getenv("TIKTOK_WORKER_PORT", "8787"))
+
+# Keep worker output machine-readable for Node command mode.
+logging.getLogger("TikTokApi").setLevel(logging.CRITICAL)
+logging.getLogger("TikTokApi.tiktok").setLevel(logging.CRITICAL)
+logging.getLogger("playwright").setLevel(logging.ERROR)
 
 GENERIC_TERMS = {
     "phim",
