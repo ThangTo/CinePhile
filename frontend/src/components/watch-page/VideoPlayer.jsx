@@ -14,6 +14,7 @@ import { getVideoSource, USE_SERVER_ADBLOCK } from "config/video.config";
 const HYBRID_PROXY_STORAGE_KEY = 'cinephine_proxy_sources';
 const PROXY_ESCALATION_THRESHOLD = 2;
 const START_POSITION_BUDGET_MS = 1200;
+const BUFFERING_INDICATOR_DELAY_MS = 400;
 
 function getProxySources() {
   try {
@@ -116,6 +117,7 @@ const VideoPlayer = ({
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+  const bufferingTimeoutRef = useRef(null);
   const saveProgressIntervalRef = useRef(null);
   const hasAutoSeekedRef = useRef(false);
   const lastEpisodeIdRef = useRef(null);
@@ -127,6 +129,7 @@ const VideoPlayer = ({
   const sourceDomainRef = useRef(null);
   const networkErrorCountRef = useRef(0);
   const lastPlaybackModeRef = useRef("direct");
+  const lastPlaybackProgressRef = useRef(0);
 
   // Hybrid Proxy: Check if source needs proxy mode
   const hlsSource = useMemo(() => {
@@ -201,6 +204,17 @@ const VideoPlayer = ({
 
   const currentAudioLabel = audioOptions.find((o) => o.key === audioType)?.label || "Âm thanh";
 
+  const resetNetworkRecoveryState = useCallback(() => {
+    networkErrorCountRef.current = 0;
+  }, []);
+
+  const clearPendingBuffering = useCallback(() => {
+    if (bufferingTimeoutRef.current) {
+      clearTimeout(bufferingTimeoutRef.current);
+      bufferingTimeoutRef.current = null;
+    }
+  }, []);
+
   // --- Logic Video Event Listeners (Giữ nguyên) ---
   useEffect(() => {
     const video = videoRef.current;
@@ -220,8 +234,16 @@ const VideoPlayer = ({
     };
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
+      const nextTime = video.currentTime;
+      setCurrentTime(nextTime);
       updateBufferedPercentage();
+
+      if (!video.paused && nextTime > lastPlaybackProgressRef.current + 0.05) {
+        clearPendingBuffering();
+        setIsBuffering(false);
+      }
+
+      lastPlaybackProgressRef.current = nextTime;
     };
 
     const handleDurationChange = () => {
@@ -230,22 +252,64 @@ const VideoPlayer = ({
     };
 
     const handlePlay = () => {
+      clearPendingBuffering();
+      setIsBuffering(false);
       setIsPlaying(true);
-      // Gọi onFirstPlay (tăng view) chỉ 1 lần duy nhất trong đời sống Component
+      // Fire the first-play callback only once per component lifetime.
       if (!firstPlayFiredRef.current && onFirstPlay) {
         firstPlayFiredRef.current = true;
         onFirstPlay();
       }
     };
-    const handlePause = () => setIsPlaying(false);
+    const handlePause = () => {
+      clearPendingBuffering();
+      setIsBuffering(false);
+      setIsPlaying(false);
+    };
     const handleWaiting = () => {
+      clearPendingBuffering();
+
+      bufferingTimeoutRef.current = setTimeout(() => {
+        const currentVideo = videoRef.current;
+        if (!currentVideo || currentVideo.paused) return;
+
+        let bufferedAhead = 0;
+        const currentBuffered = currentVideo.buffered;
+        for (let index = 0; index < currentBuffered.length; index += 1) {
+          const start = currentBuffered.start(index);
+          const end = currentBuffered.end(index);
+          if (currentVideo.currentTime >= start && currentVideo.currentTime <= end) {
+            bufferedAhead = end - currentVideo.currentTime;
+            break;
+          }
+        }
+
+        const isLikelyStillPlayingSmoothly =
+          currentVideo.readyState >= 3 && bufferedAhead > 1;
+
+        if (!isLikelyStillPlayingSmoothly) {
+          setIsBuffering(true);
+          setShowControls(true);
+        }
+      }, BUFFERING_INDICATOR_DELAY_MS);
+    };
+    const handleCanPlay = () => {
+      clearPendingBuffering();
+      setIsBuffering(false);
+    };
+    const handlePlaying = () => {
+      clearPendingBuffering();
+      setIsBuffering(false);
+    };
+    const handleSeekStart = () => {
+      clearPendingBuffering();
       setIsBuffering(true);
       setShowControls(true);
     };
-    const handleCanPlay = () => setIsBuffering(false);
-    const handlePlaying = () => setIsBuffering(false);
-    const handleSeekStart = () => setIsBuffering(true);
-    const handleSeekEnd = () => setIsBuffering(false);
+    const handleSeekEnd = () => {
+      clearPendingBuffering();
+      setIsBuffering(false);
+    };
     const handleProgress = () => updateBufferedPercentage();
 
     const handleLeavePiP = () => {
@@ -269,6 +333,7 @@ const VideoPlayer = ({
     video.addEventListener("leavepictureinpicture", handleLeavePiP);
 
     return () => {
+      clearPendingBuffering();
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("durationchange", handleDurationChange);
       video.removeEventListener("play", handlePlay);
@@ -283,11 +348,7 @@ const VideoPlayer = ({
       video.removeEventListener("progress", handleProgress);
       video.removeEventListener("leavepictureinpicture", handleLeavePiP);
     };
-  }, [hasNativePlayer, episode, duration, onFirstPlay]);
-
-  const resetNetworkRecoveryState = useCallback(() => {
-    networkErrorCountRef.current = 0;
-  }, []);
+  }, [clearPendingBuffering, hasNativePlayer, episode, duration, onFirstPlay]);
 
   const shouldEscalateToProxyMode = useCallback((data) => {
     const failedUrl = getHlsErrorUrl(data) || "";
@@ -339,7 +400,9 @@ const VideoPlayer = ({
 
   useEffect(() => {
     resetNetworkRecoveryState();
-  }, [hlsSource, resetNetworkRecoveryState]);
+    clearPendingBuffering();
+    lastPlaybackProgressRef.current = 0;
+  }, [hlsSource, resetNetworkRecoveryState, clearPendingBuffering]);
 
   // === HEARTBEAT: Gửi Watch Time mỗi 60 giây khi video đang phát ===
   useEffect(() => {
@@ -410,6 +473,79 @@ const VideoPlayer = ({
       video.removeEventListener("canplay", handleCanPlay);
     };
   }, [hasNativePlayer, hasAutoPlayed]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !hasNativePlayer || !("mediaSession" in navigator)) return;
+
+    const { mediaSession } = navigator;
+    const currentEpisodeNumber = episode?.episode || episode?.episodeId || null;
+    const episodeLabel = currentEpisodeNumber ? ` - Tap ${currentEpisodeNumber}` : "";
+
+    const setActionHandler = (action, handler) => {
+      try {
+        mediaSession.setActionHandler(action, handler);
+      } catch {}
+    };
+
+    const safeSeek = (targetTime) => {
+      if (!Number.isFinite(targetTime)) return;
+      const maxTime = Number.isFinite(video.duration) ? video.duration : targetTime;
+      video.currentTime = Math.max(0, Math.min(maxTime, targetTime));
+    };
+
+    setActionHandler("play", async () => {
+      try {
+        await video.play();
+      } catch {}
+    });
+
+    setActionHandler("pause", () => {
+      video.pause();
+    });
+
+    setActionHandler("stop", () => {
+      video.pause();
+    });
+
+    setActionHandler("seekbackward", (details) => {
+      const offset = details?.seekOffset || 10;
+      safeSeek(video.currentTime - offset);
+    });
+
+    setActionHandler("seekforward", (details) => {
+      const offset = details?.seekOffset || 10;
+      safeSeek(video.currentTime + offset);
+    });
+
+    setActionHandler("seekto", (details) => {
+      if (typeof details?.seekTime !== "number") return;
+      safeSeek(details.seekTime);
+    });
+
+    try {
+      mediaSession.playbackState = isPlaying ? "playing" : "paused";
+    } catch {}
+
+    if (typeof window.MediaMetadata !== "undefined") {
+      try {
+        mediaSession.metadata = new window.MediaMetadata({
+          title: `${movie?.name || movie?.title || "CinePhine"}${episodeLabel}`,
+          artist: currentAudioLabel,
+          album: "CinePhine",
+        });
+      } catch {}
+    }
+
+    return () => {
+      setActionHandler("play", null);
+      setActionHandler("pause", null);
+      setActionHandler("stop", null);
+      setActionHandler("seekbackward", null);
+      setActionHandler("seekforward", null);
+      setActionHandler("seekto", null);
+    };
+  }, [currentAudioLabel, episode?.episode, episode?.episodeId, hasNativePlayer, isPlaying, movie?.name, movie?.title]);
 
   // Save progress logic (Giữ nguyên)
   useEffect(() => {
@@ -796,8 +932,9 @@ const VideoPlayer = ({
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
+      clearPendingBuffering();
     };
-  }, []);
+  }, [clearPendingBuffering]);
 
   useEffect(() => {
     if (isDraggingProgress) {
@@ -1592,3 +1729,4 @@ const VideoPlayer = ({
 };
 
 export default VideoPlayer;
+
