@@ -145,11 +145,22 @@ async def fetch_tiktok_payload(count: int):
     if proxy_url:
         sessions_args["proxies"] = [proxy_url]
 
-    async def browser_context_factory(browser_instance, **kwargs):
+    async def browser_context_factory(browser_or_playwright, **kwargs):
         context_kwargs = dict(kwargs or {})
         if IGNORE_HTTPS_ERRORS:
             context_kwargs["ignore_https_errors"] = True
-        return await browser_instance.new_context(**context_kwargs)
+
+        if hasattr(browser_or_playwright, "new_context"):
+            return await browser_or_playwright.new_context(**context_kwargs)
+
+        browser_launcher = getattr(browser_or_playwright, browser, None)
+        if browser_launcher and hasattr(browser_launcher, "launch"):
+            launched_browser = await browser_launcher.launch(headless=True)
+            return await launched_browser.new_context(**context_kwargs)
+
+        raise TypeError(
+            f"Unsupported browser_context_factory input type: {type(browser_or_playwright)!r}"
+        )
 
     api = TikTokApi()
 
