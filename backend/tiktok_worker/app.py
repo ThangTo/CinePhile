@@ -16,12 +16,25 @@ DEFAULT_BROWSER = os.getenv("TIKTOK_BROWSER", "chromium")
 DEFAULT_HOST = os.getenv("TIKTOK_WORKER_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.getenv("TIKTOK_WORKER_PORT", "8787"))
 IGNORE_HTTPS_ERRORS = os.getenv("TIKTOK_IGNORE_HTTPS_ERRORS", "true").lower() != "false"
+DEFAULT_NAVIGATION_TIMEOUT_MS = max(
+    10000, int(os.getenv("TIKTOK_NAVIGATION_TIMEOUT_MS", "60000"))
+)
+DEFAULT_OPERATION_TIMEOUT_MS = max(
+    DEFAULT_NAVIGATION_TIMEOUT_MS,
+    int(os.getenv("TIKTOK_OPERATION_TIMEOUT_MS", str(DEFAULT_NAVIGATION_TIMEOUT_MS))),
+)
 
 # Keep worker output machine-readable for Node command mode.
-logging.getLogger("TikTokApi").setLevel(logging.CRITICAL)
-logging.getLogger("TikTokApi.tiktok").setLevel(logging.CRITICAL)
-logging.getLogger("playwright").setLevel(logging.ERROR)
-logging.getLogger("urllib3").setLevel(logging.ERROR)
+for logger_name, logger_level in (
+    ("TikTokApi", logging.CRITICAL),
+    ("TikTokApi.tiktok", logging.CRITICAL),
+    ("playwright", logging.CRITICAL),
+    ("urllib3", logging.CRITICAL),
+):
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logger_level)
+    logger.propagate = False
+    logger.handlers.clear()
 
 GENERIC_TERMS = {
     "phim",
@@ -150,13 +163,19 @@ async def fetch_tiktok_payload(count: int):
         if IGNORE_HTTPS_ERRORS:
             context_kwargs["ignore_https_errors"] = True
 
+        context = None
         if hasattr(browser_or_playwright, "new_context"):
-            return await browser_or_playwright.new_context(**context_kwargs)
+            context = await browser_or_playwright.new_context(**context_kwargs)
+        else:
+            browser_launcher = getattr(browser_or_playwright, browser, None)
+            if browser_launcher and hasattr(browser_launcher, "launch"):
+                launched_browser = await browser_launcher.launch(headless=True)
+                context = await launched_browser.new_context(**context_kwargs)
 
-        browser_launcher = getattr(browser_or_playwright, browser, None)
-        if browser_launcher and hasattr(browser_launcher, "launch"):
-            launched_browser = await browser_launcher.launch(headless=True)
-            return await launched_browser.new_context(**context_kwargs)
+        if context is not None:
+            context.set_default_navigation_timeout(DEFAULT_NAVIGATION_TIMEOUT_MS)
+            context.set_default_timeout(DEFAULT_OPERATION_TIMEOUT_MS)
+            return context
 
         raise TypeError(
             f"Unsupported browser_context_factory input type: {type(browser_or_playwright)!r}"

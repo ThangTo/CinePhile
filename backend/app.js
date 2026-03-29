@@ -109,6 +109,7 @@ const createRateLimiter = (windowMs, max, message) => {
     windowMs,
     max,
     message: { error: message },
+    passOnStoreError: true,
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => {

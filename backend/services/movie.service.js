@@ -15,6 +15,25 @@ const {
 const { isLatinName } = require('../utils/castUtils');
 
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value) && /^[0-9a-fA-F]{24}$/.test(value);
+const LOGO_FETCH_CONCURRENCY = Math.max(1, Number(process.env.TMDB_LOGO_FETCH_CONCURRENCY || 3));
+
+async function runWithConcurrency(items, limit, task) {
+  const queue = [...items];
+  const workerCount = Math.max(1, Math.min(limit, queue.length));
+
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (queue.length > 0) {
+      const item = queue.shift();
+      if (item === undefined) {
+        return;
+      }
+
+      await task(item);
+    }
+  });
+
+  await Promise.allSettled(workers);
+}
 
 /**
  * Remove Vietnamese accents/diacritics from a string
@@ -662,7 +681,7 @@ const getTrending = async (limit = 10) => {
 
   // Auto-fetch logos for movies without them (if they have TMDB ID)
   const tmdbService = require('../integrations/tmdb.service');
-  const logoFetchPromises = validatedData.map(async (movie) => {
+  await runWithConcurrency(validatedData, LOGO_FETCH_CONCURRENCY, async (movie) => {
     // Skip if movie already has logo or doesn't have TMDB ID
     if (movie.images?.logo || !movie.tmdb?.id) {
       return;
@@ -685,10 +704,6 @@ const getTrending = async (limit = 10) => {
       console.error(`❌ Failed to fetch logo for ${movie.name || movie.title}:`, error.message);
     }
   });
-
-  // Wait for all logo fetches to complete (with timeout to avoid blocking)
-  await Promise.allSettled(logoFetchPromises);
-
   const result = {
     data: transformMovies(validatedData),
   };

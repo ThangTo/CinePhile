@@ -42,6 +42,14 @@ function getIpv4Agent(parsedUrl) {
   return parsedUrl.protocol === 'http:' ? httpAgent : httpsAgent;
 }
 
+function getHttpAgent() {
+  return httpAgent;
+}
+
+function getHttpsAgent() {
+  return httpsAgent;
+}
+
 function buildSourceHeaders(url, overrides = {}) {
   const headers = {
     Accept: '*/*',
@@ -62,12 +70,23 @@ function buildSourceHeaders(url, overrides = {}) {
 }
 
 async function fetchWithIpv4(url, options = {}) {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...rest } = options;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, signal: externalSignal, ...rest } = options;
   const controller = new AbortController();
+  let removeAbortListener = null;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   if (typeof timeout.unref === 'function') {
     timeout.unref();
+  }
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort(externalSignal.reason);
+    } else {
+      const onAbort = () => controller.abort(externalSignal.reason);
+      externalSignal.addEventListener('abort', onAbort, { once: true });
+      removeAbortListener = () => externalSignal.removeEventListener('abort', onAbort);
+    }
   }
 
   try {
@@ -77,6 +96,9 @@ async function fetchWithIpv4(url, options = {}) {
       signal: controller.signal,
     });
   } finally {
+    if (removeAbortListener) {
+      removeAbortListener();
+    }
     clearTimeout(timeout);
   }
 }
@@ -85,5 +107,7 @@ module.exports = {
   SOURCE_TLS_MIN_VERSION,
   buildSourceHeaders,
   fetchWithIpv4,
+  getHttpAgent,
+  getHttpsAgent,
   getIpv4Agent,
 };

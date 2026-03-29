@@ -1,37 +1,80 @@
 const mongoose = require('mongoose');
 
-const connectDB = async () => {
-  try {
-    const options = {
-      maxPoolSize: 30, // Tăng từ default 10 lên 50 connections
-      minPoolSize: 10, // Giữ tối thiểu 10 connections
-      serverSelectionTimeoutMS: 5000, // Timeout sau 5 giây
-      socketTimeoutMS: 45000, // Socket timeout 45 giây
-      family: 4, // Sử dụng IPv4
-      // bufferMaxEntries và bufferCommands đã bị deprecated trong Mongoose 6+
-      // Mongoose tự động xử lý buffering
-    };
+const MONGO_RETRY_DELAY_MS = Math.max(5000, Number(process.env.MONGODB_RETRY_DELAY_MS || 10000));
 
+let isConnecting = false;
+let reconnectTimer = null;
+let hasLoggedInitialSuccess = false;
+
+const options = {
+  maxPoolSize: 30,
+  minPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  family: 4,
+};
+
+function scheduleReconnect() {
+  if (reconnectTimer) {
+    return;
+  }
+
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectDB().catch(() => {});
+  }, MONGO_RETRY_DELAY_MS);
+
+  if (typeof reconnectTimer.unref === 'function') {
+    reconnectTimer.unref();
+  }
+}
+
+const connectDB = async () => {
+  if (!process.env.MONGODB_URI) {
+    console.error('MongoDB connection skipped: MONGODB_URI is missing');
+    return null;
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (isConnecting) {
+    return mongoose.connection;
+  }
+
+  isConnecting = true;
+
+  try {
     await mongoose.connect(process.env.MONGODB_URI, options);
-    console.log('✅ MongoDB connected');
-    console.log(`📊 Connection pool: min=${options.minPoolSize}, max=${options.maxPoolSize}`);
+
+    if (!hasLoggedInitialSuccess) {
+      console.log('MongoDB connected');
+      console.log(`Connection pool: min=${options.minPoolSize}, max=${options.maxPoolSize}`);
+      hasLoggedInitialSuccess = true;
+    }
+
+    return mongoose.connection;
   } catch (err) {
-    console.error('❌ DB connection failed:', err);
-    process.exit(1);
+    console.error(`DB connection failed: ${err.message}`);
+    scheduleReconnect();
+    return null;
+  } finally {
+    isConnecting = false;
   }
 };
 
-// Handle connection events
 mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️ MongoDB disconnected');
+  console.warn('MongoDB disconnected');
+  scheduleReconnect();
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('❌ MongoDB connection error:', err);
+  console.error(`MongoDB connection error: ${err.message}`);
 });
 
 mongoose.connection.on('reconnected', () => {
-  console.log('✅ MongoDB reconnected');
+  console.log('MongoDB reconnected');
 });
 
 module.exports = {

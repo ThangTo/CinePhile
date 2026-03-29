@@ -1,5 +1,6 @@
 const dotenv = require('dotenv');
 dotenv.config();
+
 const dns = require('dns');
 const mongoose = require('mongoose');
 const http = require('http');
@@ -9,6 +10,7 @@ const { initCronJobs } = require('./services/cron.service');
 const { initVoiceSocket } = require('./services/voiceSocket.service');
 const { initProgressSocket } = require('./services/progressSocket.service');
 const app = require('./app');
+
 const PORT = process.env.PORT || 5000;
 const DNS_RESULT_ORDER = process.env.DNS_RESULT_ORDER || 'ipv4first';
 const SOURCE_TLS_MIN_VERSION = process.env.SOURCE_TLS_MIN_VERSION || 'TLSv1.2';
@@ -17,102 +19,167 @@ if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder(DNS_RESULT_ORDER);
 }
 
-// Connect to database
-connectDB();
+connectDB().catch(() => {});
 
-// Connect to Redis (async, doesn't block server start)
 redisService.connect().catch((err) => {
-  console.error('Redis connection error:', err.message);
-  console.log('⚠️ Server will continue without Redis cache');
+  console.error(`Redis connection error: ${err.message}`);
+  console.log('Server will continue without Redis cache');
 });
 
-// Initialize cron jobs for automated tasks
 initCronJobs();
 
-// Create HTTP server from Express app (required for Socket.IO)
 const httpServer = http.createServer(app);
+const openSockets = new Set();
 
-// Attach Voice WebSocket (Deepgram + Timi)
+httpServer.on('connection', (socket) => {
+  openSockets.add(socket);
+  socket.on('close', () => {
+    openSockets.delete(socket);
+  });
+});
+
 initVoiceSocket(httpServer);
-
-// Attach Viral Progress WebSocket
 initProgressSocket(httpServer);
 
-// Start server
 const server = httpServer.listen(PORT, () => {
-  console.log(`🚀 Server (PID: ${process.pid}) listening at http://localhost:${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Server (PID: ${process.pid}) listening at http://localhost:${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`DNS result order: ${DNS_RESULT_ORDER}`);
   console.log(`Proxy TLS min version: ${SOURCE_TLS_MIN_VERSION}`);
 
-  // Signal PM2 that app is ready (for wait_ready: true)
   if (process.send) {
     process.send('ready');
   }
 });
 
-// Graceful shutdown
 let isShuttingDown = false;
-const gracefulShutdown = async (signal) => {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
+let forceExitTimer = null;
 
+const closeHttpServer = async () =>
+  new Promise((resolve) => {
+    const destroyHungSocketsTimer = setTimeout(() => {
+      if (typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections();
+      }
+
+      openSockets.forEach((socket) => {
+        try {
+          socket.destroy();
+        } catch (_error) {
+          // Ignore socket destroy race conditions during shutdown.
+        }
+      });
+    }, 2000);
+
+    if (typeof destroyHungSocketsTimer.unref === 'function') {
+      destroyHungSocketsTimer.unref();
+    }
+
+    server.close(() => {
+      clearTimeout(destroyHungSocketsTimer);
+      resolve();
+    });
+
+    if (typeof server.closeIdleConnections === 'function') {
+      server.closeIdleConnections();
+    }
+  });
+
+const gracefulShutdown = async (signal) => {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
   console.log(`\n${signal} received. Shutting down gracefully...`);
 
-  // Stop accepting new connections
-  await new Promise((resolve) => server.close(resolve));
-  console.log('✅ HTTP server closed');
+  await closeHttpServer();
+  console.log('HTTP server closed');
 
-  // Close Bull queues
+  const queueClosers = [];
+
   try {
     const { closeQueue } = require('./services/videoQueue.service');
-    await closeQueue();
-    const { closeAnalysisQueue } = require('./services/analysisQueue.service');
-    await closeAnalysisQueue();
+    queueClosers.push(closeQueue());
   } catch (err) {
-    console.warn('⚠️ Queue close error:', err.message);
+    console.warn(`Video queue close setup error: ${err.message}`);
   }
 
-  // Close Redis connection
-  if (redisService.isConnected) {
-    try {
-      await redisService.disconnect();
-    } catch (err) {
-      console.warn('⚠️ Redis close error:', err.message);
-    }
-  }
-
-  // Close MongoDB connection (Mongoose 8+ returns Promise, no callback)
   try {
-    await mongoose.connection.close(false);
-    console.log('✅ MongoDB connection closed');
+    const { closeAnalysisQueue } = require('./services/analysisQueue.service');
+    queueClosers.push(closeAnalysisQueue());
   } catch (err) {
-    console.warn('⚠️ MongoDB close error:', err.message);
+    console.warn(`Analysis queue close setup error: ${err.message}`);
+  }
+
+  if (queueClosers.length > 0) {
+    const queueResults = await Promise.allSettled(queueClosers);
+    queueResults
+      .filter((result) => result.status === 'rejected')
+      .forEach((result) => {
+        console.warn(`Queue close error: ${result.reason?.message || result.reason}`);
+      });
+  }
+
+  try {
+    await redisService.disconnect();
+  } catch (err) {
+    console.warn(`Redis close error: ${err.message}`);
+  }
+
+  try {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close(false);
+      console.log('MongoDB connection closed');
+    }
+  } catch (err) {
+    console.warn(`MongoDB close error: ${err.message}`);
+  }
+
+  if (forceExitTimer) {
+    clearTimeout(forceExitTimer);
+    forceExitTimer = null;
   }
 
   process.exit(0);
 };
 
-// Force close after 10 seconds
 const forceExit = () => {
-  console.error('❌ Forcing shutdown...');
+  console.error('Forcing shutdown...');
+  openSockets.forEach((socket) => {
+    try {
+      socket.destroy();
+    } catch (_error) {
+      // Ignore socket destroy race conditions during forced shutdown.
+    }
+  });
   process.exit(1);
 };
 
-// PM2 graceful shutdown signals
-process.on('SIGTERM', () => { gracefulShutdown('SIGTERM').catch(() => {}); setTimeout(forceExit, 10000); });
-process.on('SIGINT',  () => { gracefulShutdown('SIGINT').catch(() => {});  setTimeout(forceExit, 10000); });
+const scheduleForceExit = () => {
+  if (forceExitTimer) {
+    clearTimeout(forceExitTimer);
+  }
 
-// Handle uncaught exceptions
+  forceExitTimer = setTimeout(forceExit, 10000);
+};
+
+process.on('SIGTERM', () => {
+  gracefulShutdown('SIGTERM').catch(() => {});
+  scheduleForceExit();
+});
+
+process.on('SIGINT', () => {
+  gracefulShutdown('SIGINT').catch(() => {});
+  scheduleForceExit();
+});
+
 process.on('uncaughtException', (err) => {
-  console.error('❌ Uncaught Exception:', err);
+  console.error('Uncaught Exception:', err);
   gracefulShutdown('uncaughtException').catch(() => {});
-  setTimeout(forceExit, 10000);
+  scheduleForceExit();
 });
 
-// Handle unhandled promise rejections — log but do NOT shut down (avoids cascade loops)
 process.on('unhandledRejection', (reason) => {
-  console.error('❌ Unhandled Rejection reason:', reason);
-  // Only shut down for truly fatal errors, not routine operational rejections
+  console.error('Unhandled Rejection reason:', reason);
 });
-

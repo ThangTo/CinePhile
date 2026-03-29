@@ -8,7 +8,13 @@ const { processM3u8StreamDirect, processM3u8StreamWithProxy } = require('../util
 const { buildSourceHeaders, fetchWithIpv4 } = require('../utils/httpFetch');
 
 let activeDownloads = 0;
-const MAX_CONCURRENT_DOWNLOADS = 3;/**
+const MAX_CONCURRENT_DOWNLOADS = 3;
+const TS_PROXY_TIMEOUT_MS = Math.max(10000, Number(process.env.TS_PROXY_TIMEOUT_MS || 30000));
+const DOWNLOAD_M3U8_TIMEOUT_MS = Math.max(
+  10000,
+  Number(process.env.DOWNLOAD_M3U8_TIMEOUT_MS || 30000),
+);
+/**
  * Helper: Parse array query parameters (genres, countries)
  * @param {string|string[]} param - Query parameter value
  * @returns {string[]|undefined} Parsed array or undefined
@@ -603,6 +609,12 @@ const proxyM3u8 = async (req, res) => {
  * @param {string} req.query.url - Target TS segment URL
  */
 const proxyTs = async (req, res) => {
+  const upstreamController = new AbortController();
+  const abortUpstream = () => upstreamController.abort();
+
+  req.on('close', abortUpstream);
+  res.on('close', abortUpstream);
+
   try {
     const { url } = req.query;
     if (!url) {
@@ -612,6 +624,8 @@ const proxyTs = async (req, res) => {
     // Do NOT forward Range headers from client — TS segments are complete files
     const response = await fetchWithIpv4(url, {
       headers: buildSourceHeaders(url),
+      timeoutMs: TS_PROXY_TIMEOUT_MS,
+      signal: upstreamController.signal,
     });
 
     if (!response.ok) {
@@ -645,10 +659,16 @@ const proxyTs = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[proxyTs] Error:', error.message);
-    if (!res.headersSent) {
+    if (error.name !== 'AbortError') {
+      console.error('[proxyTs] Error:', error.message);
+    }
+
+    if (!res.headersSent && error.name !== 'AbortError') {
       res.status(500).send('Error fetching TS segment');
     }
+  } finally {
+    req.off('close', abortUpstream);
+    res.off('close', abortUpstream);
   }
 };
 
@@ -668,6 +688,7 @@ const downloadMovie = async (req, res) => {
     let currentUrl = url;
     let response = await fetchWithIpv4(currentUrl, {
       headers: buildSourceHeaders(currentUrl),
+      timeoutMs: DOWNLOAD_M3U8_TIMEOUT_MS,
     });
     if (!response.ok) {
       throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
@@ -695,6 +716,7 @@ const downloadMovie = async (req, res) => {
         currentUrl = new URL(bestUri, currentUrl).toString();
         response = await fetchWithIpv4(currentUrl, {
           headers: buildSourceHeaders(currentUrl, { 'User-Agent': 'Mozilla/5.0' }),
+          timeoutMs: DOWNLOAD_M3U8_TIMEOUT_MS,
         });
         content = await response.text();
       }

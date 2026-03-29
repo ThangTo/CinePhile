@@ -1,17 +1,59 @@
 const redis = require('redis');
+const { fetchWithIpv4 } = require('../utils/httpFetch');
 
-/**
- * Redis Service
- * Handles Redis connection and provides caching utilities.
- * 
- * Supports TWO modes (auto-detected):
- * 1. Upstash REST API (HTTPS) — for production on Hugging Face / serverless platforms
- *    Set env: UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN
- * 2. TCP Redis client — for local development or VPS
- *    Set env: REDIS_URL
- * 
- * Gracefully falls back if Redis is unavailable.
- */
+const REST_TIMEOUT_MS = Math.max(1000, Number(process.env.REDIS_REST_TIMEOUT_MS || 10000));
+const REST_COOLDOWN_MS = Math.max(5000, Number(process.env.REDIS_REST_COOLDOWN_MS || 30000));
+const REST_ERROR_LOG_INTERVAL_MS = Math.max(5000, Number(process.env.REDIS_REST_ERROR_LOG_INTERVAL_MS || 15000));
+
+function describeError(error) {
+  const parts = [error?.message || 'Unknown error'];
+
+  if (error?.code) {
+    parts.push(`code=${error.code}`);
+  }
+
+  if (error?.cause?.code && error.cause.code !== error.code) {
+    parts.push(`causeCode=${error.cause.code}`);
+  }
+
+  if (error?.cause?.message) {
+    parts.push(`cause=${error.cause.message}`);
+  }
+
+  return parts.join(' | ');
+}
+
+function isConnectivityError(error) {
+  const codes = new Set([
+    'ABORT_ERR',
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'ETIMEDOUT',
+    'UND_ERR_CONNECT_TIMEOUT',
+    'UND_ERR_HEADERS_TIMEOUT',
+    'UND_ERR_SOCKET',
+    'REDIS_REST_CIRCUIT_OPEN',
+  ]);
+
+  const candidates = [error, error?.cause].filter(Boolean);
+
+  return candidates.some((candidate) => {
+    const message = String(candidate.message || '').toLowerCase();
+    return (
+      codes.has(candidate.code) ||
+      message.includes('fetch failed') ||
+      message.includes('timeout') ||
+      message.includes('socket hang up') ||
+      message.includes('terminated') ||
+      message.includes('network')
+    );
+  });
+}
+
 class RedisService {
   constructor() {
     this.client = null;
@@ -19,60 +61,126 @@ class RedisService {
     this.connectionAttempts = 0;
     this.maxConnectionAttempts = 5;
     this.mode = null; // 'rest' or 'tcp'
+    this.restProbeTimer = null;
+    this.lastRestFailureLogAt = 0;
   }
 
-  /**
-   * Connect to Redis
-   * Auto-detects Upstash REST API vs TCP based on env vars
-   */
   async connect() {
-    // Priority 1: Standard TCP Redis client for local/VPS Redis
     if (process.env.REDIS_URL) {
       return this._connectTcp();
     }
 
-    // Priority 2: Upstash REST API (works on HF Spaces, serverless, etc.)
     if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
       return this._connectRest();
     }
 
-    console.log('⚠️ Redis: No REDIS_URL or UPSTASH_REDIS_REST_URL provided, caching disabled');
+    console.log('Redis: No REDIS_URL or UPSTASH_REDIS_REST_URL provided, caching disabled');
     return null;
   }
 
-  /**
-   * Connect via Upstash REST API (HTTPS, port 443)
-   * No TCP connection needed — works on platforms that block port 6379
-   */
+  _shouldLogOperationalError(error) {
+    return !(this.mode === 'rest' && isConnectivityError(error));
+  }
+
+  _logOperationalError(label, error) {
+    if (!this._shouldLogOperationalError(error)) {
+      return;
+    }
+
+    console.error(`${label}: ${describeError(error)}`);
+  }
+
+  _scheduleRestProbe(delayMs = REST_COOLDOWN_MS) {
+    if (this.restProbeTimer || this.mode !== 'rest' || !this.client) {
+      return;
+    }
+
+    this.restProbeTimer = setTimeout(async () => {
+      this.restProbeTimer = null;
+
+      if (this.mode !== 'rest' || !this.client) {
+        return;
+      }
+
+      try {
+        const pong = await this.client.ping();
+        if (pong === 'PONG') {
+          this.isConnected = true;
+          this.lastRestFailureLogAt = 0;
+          console.log('Redis: Upstash REST connectivity restored');
+        }
+      } catch (error) {
+        this._logOperationalError('Redis REST health probe error', error);
+        this._handleRestConnectivityError(error, { fromProbe: true });
+      }
+    }, Math.max(1000, delayMs));
+
+    if (typeof this.restProbeTimer.unref === 'function') {
+      this.restProbeTimer.unref();
+    }
+  }
+
+  _handleRestConnectivityError(error, { fromProbe = false } = {}) {
+    const now = Date.now();
+    const shouldLog = now - this.lastRestFailureLogAt >= REST_ERROR_LOG_INTERVAL_MS;
+
+    this.isConnected = false;
+
+    if (shouldLog) {
+      const suffix = fromProbe ? ' during health probe' : '';
+      console.warn(
+        `Redis: Upstash REST unavailable${suffix}; falling back without Redis for ${REST_COOLDOWN_MS}ms. ${describeError(error)}`,
+      );
+      this.lastRestFailureLogAt = now;
+    }
+
+    const retryInMs =
+      typeof this.client?.getRemainingCooldownMs === 'function'
+        ? this.client.getRemainingCooldownMs()
+        : REST_COOLDOWN_MS;
+
+    this._scheduleRestProbe(retryInMs || REST_COOLDOWN_MS);
+  }
+
   async _connectRest() {
     try {
       const url = process.env.UPSTASH_REDIS_REST_URL;
       const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
       this.mode = 'rest';
-      this.client = new UpstashRestClient(url, token);
+      this.client =
+        this.client instanceof UpstashRestClient
+          ? this.client
+          : new UpstashRestClient(url, token, {
+              timeoutMs: REST_TIMEOUT_MS,
+              circuitBreakMs: REST_COOLDOWN_MS,
+              onConnectivityError: (error) => this._handleRestConnectivityError(error),
+            });
 
-      // Test the connection
       const pong = await this.client.ping();
-      if (pong === 'PONG') {
-        this.isConnected = true;
-        console.log('✅ Redis: Connected via Upstash REST API');
-        return this.client;
-      } else {
+      if (pong !== 'PONG') {
         throw new Error(`Unexpected PING response: ${pong}`);
       }
+
+      this.isConnected = true;
+      this.lastRestFailureLogAt = 0;
+      console.log('Redis: Connected via Upstash REST API');
+      return this.client;
     } catch (error) {
-      console.error('❌ Redis (REST) connection failed:', error.message);
-      console.log('⚠️ Continuing without Redis cache');
+      console.error(`Redis (REST) connection failed: ${describeError(error)}`);
+      console.log('Continuing without Redis cache');
       this.isConnected = false;
-      this.client = null;
+
+      if (this.client instanceof UpstashRestClient) {
+        this._scheduleRestProbe(REST_COOLDOWN_MS);
+      } else {
+        this.client = null;
+      }
+
       return null;
     }
   }
 
-  /**
-   * Connect via standard TCP Redis protocol
-   */
   async _connectTcp() {
     if (this.isConnected && this.client) {
       return this.client;
@@ -85,13 +193,15 @@ class RedisService {
         socket: {
           reconnectStrategy: (retries) => {
             this.connectionAttempts = retries;
+
             if (retries > this.maxConnectionAttempts) {
-              console.error('❌ Redis: Too many reconnection attempts, giving up');
+              console.error('Redis: Too many reconnection attempts, giving up');
               this.isConnected = false;
               return new Error('Too many retries');
             }
+
             const delay = Math.min(retries * 500 + Math.random() * 100, 5000);
-            console.log(`🔄 Redis: Reconnecting in ${Math.round(delay)}ms (attempt ${retries})`);
+            console.log(`Redis: Reconnecting in ${Math.round(delay)}ms (attempt ${retries})`);
             return delay;
           },
           connectTimeout: 10000,
@@ -100,120 +210,106 @@ class RedisService {
       });
 
       this.client.on('error', (err) => {
-        console.error('❌ Redis Client Error:', err.message);
+        console.error(`Redis client error: ${err.message}`);
         this.isConnected = false;
       });
 
       this.client.on('connect', () => {
-        console.log('🔄 Redis: Connecting...');
+        console.log('Redis: Connecting...');
       });
 
       this.client.on('ready', () => {
-        console.log('✅ Redis: Connected via TCP');
+        console.log('Redis: Connected via TCP');
         this.isConnected = true;
         this.connectionAttempts = 0;
       });
 
       this.client.on('end', () => {
-        console.log('⚠️ Redis: Connection ended');
+        console.log('Redis: Connection ended');
         this.isConnected = false;
       });
 
       this.client.on('reconnecting', () => {
-        console.log('🔄 Redis: Reconnecting...');
+        console.log('Redis: Reconnecting...');
       });
 
       await this.client.connect();
       return this.client;
     } catch (error) {
-      console.error('❌ Redis (TCP) connection failed:', error.message);
-      console.log('⚠️ Continuing without Redis cache');
+      console.error(`Redis (TCP) connection failed: ${describeError(error)}`);
+      console.log('Continuing without Redis cache');
       this.isConnected = false;
       this.client = null;
       return null;
     }
   }
 
-  /**
-   * Get value from cache
-   */
   async get(key) {
     if (!this.isConnected || !this.client) return null;
+
     try {
       const value = await this.client.get(key);
       if (!value) return null;
-      try { return JSON.parse(value); } catch { return value; }
+      try {
+        return JSON.parse(value);
+      } catch (_error) {
+        return value;
+      }
     } catch (error) {
-      console.error('Redis GET error:', error.message);
+      this._logOperationalError('Redis GET error', error);
       return null;
     }
   }
 
-  /**
-   * Set value in cache
-   */
   async set(key, value, expirationSeconds = 3600) {
     if (!this.isConnected || !this.client) return false;
+
     try {
       const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-      if (this.mode === 'rest') {
-        if (expirationSeconds > 0) {
-          await this.client.setEx(key, expirationSeconds, stringValue);
-        } else {
-          await this.client.set(key, stringValue);
-        }
+      if (expirationSeconds > 0) {
+        await this.client.setEx(key, expirationSeconds, stringValue);
       } else {
-        if (expirationSeconds > 0) {
-          await this.client.setEx(key, expirationSeconds, stringValue);
-        } else {
-          await this.client.set(key, stringValue);
-        }
+        await this.client.set(key, stringValue);
       }
       return true;
     } catch (error) {
-      console.error('Redis SET error:', error.message);
+      this._logOperationalError('Redis SET error', error);
       return false;
     }
   }
 
-  /**
-   * Delete key from cache
-   */
   async del(key) {
     if (!this.isConnected || !this.client) return false;
+
     try {
       await this.client.del(key);
       return true;
     } catch (error) {
-      console.error('Redis DEL error:', error.message);
+      this._logOperationalError('Redis DEL error', error);
       return false;
     }
   }
 
-  /**
-   * Check if key exists
-   */
   async exists(key) {
     if (!this.isConnected || !this.client) return false;
+
     try {
       const result = await this.client.exists(key);
       return result === 1 || result === true;
     } catch (error) {
-      console.error('Redis EXISTS error:', error.message);
+      this._logOperationalError('Redis EXISTS error', error);
       return false;
     }
   }
 
-  /**
-   * Delete multiple keys by pattern
-   */
   async delByPattern(pattern) {
     if (!this.isConnected || !this.client) return 0;
+
     try {
       if (this.mode === 'rest') {
-        return await this.client.delByPattern(pattern);
+        return this.client.delByPattern(pattern);
       }
-      // TCP mode — use SCAN
+
       let cursor = 0;
       let deletedCount = 0;
       do {
@@ -224,163 +320,177 @@ class RedisService {
           deletedCount += deleted;
         }
       } while (cursor !== 0);
+
       return deletedCount;
     } catch (error) {
-      console.error('Redis DEL pattern error:', error.message);
+      this._logOperationalError('Redis DEL pattern error', error);
       return 0;
     }
   }
 
-  /**
-   * Get TTL of a key
-   */
   async getTTL(key) {
     if (!this.isConnected || !this.client) return -2;
+
     try {
-      return await this.client.ttl(key);
+      return this.client.ttl(key);
     } catch (error) {
-      console.error('Redis TTL error:', error.message);
+      this._logOperationalError('Redis TTL error', error);
       return -2;
     }
   }
 
-  /**
-   * Disconnect from Redis
-   */
   async disconnect() {
-    if (this.client) {
-      try {
-        if (this.mode === 'tcp') {
-          await this.client.quit();
-        }
-        // REST mode doesn't need explicit disconnect
-        this.isConnected = false;
-        console.log('✅ Redis: Disconnected');
-      } catch (error) {
-        console.error('Redis disconnect error:', error.message);
+    if (this.restProbeTimer) {
+      clearTimeout(this.restProbeTimer);
+      this.restProbeTimer = null;
+    }
+
+    if (!this.client) {
+      return;
+    }
+
+    try {
+      if (this.mode === 'tcp') {
+        await this.client.quit();
       }
+
+      this.isConnected = false;
+      console.log('Redis: Disconnected');
+    } catch (error) {
+      console.error(`Redis disconnect error: ${describeError(error)}`);
     }
   }
 }
 
-
-/**
- * Upstash REST API Client
- * Wraps Upstash's HTTP REST API to provide same interface as node-redis client.
- * Uses native fetch (Node 18+) — no extra dependencies needed.
- */
 class UpstashRestClient {
-  constructor(baseUrl, token) {
+  constructor(baseUrl, token, options = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.token = token;
+    this.timeoutMs = Math.max(1000, Number(options.timeoutMs || REST_TIMEOUT_MS));
+    this.circuitBreakMs = Math.max(5000, Number(options.circuitBreakMs || REST_COOLDOWN_MS));
+    this.onConnectivityError =
+      typeof options.onConnectivityError === 'function' ? options.onConnectivityError : null;
+    this.cooldownUntil = 0;
   }
 
-  /**
-   * Execute a raw Redis command via REST API
-   */
-  async _exec(command) {
-    const res = await fetch(`${this.baseUrl}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(command),
-    });
+  getRemainingCooldownMs() {
+    return Math.max(0, this.cooldownUntil - Date.now());
+  }
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Upstash REST error ${res.status}: ${text}`);
+  _assertCircuitClosed() {
+    const retryInMs = this.getRemainingCooldownMs();
+    if (retryInMs <= 0) {
+      return;
     }
 
-    const data = await res.json();
+    const error = new Error(`Upstash REST circuit open (${retryInMs}ms remaining)`);
+    error.code = 'REDIS_REST_CIRCUIT_OPEN';
+    throw error;
+  }
+
+  _markConnectivityFailure(error) {
+    if (!isConnectivityError(error)) {
+      return;
+    }
+
+    this.cooldownUntil = Date.now() + this.circuitBreakMs;
+    if (this.onConnectivityError) {
+      this.onConnectivityError(error);
+    }
+  }
+
+  async _request(path, payload, errorPrefix) {
+    this._assertCircuitClosed();
+
+    try {
+      const response = await fetchWithIpv4(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        timeoutMs: this.timeoutMs,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`${errorPrefix} ${response.status}: ${text}`);
+      }
+
+      this.cooldownUntil = 0;
+      return response.json();
+    } catch (error) {
+      this._markConnectivityFailure(error);
+      throw error;
+    }
+  }
+
+  async _exec(command) {
+    const data = await this._request('', command, 'Upstash REST error');
     if (data.error) {
       throw new Error(`Upstash error: ${data.error}`);
     }
     return data.result;
   }
 
-  /**
-   * Execute a pipeline of commands (replacement for multi().exec())
-   */
   async _pipeline(commands) {
-    const res = await fetch(`${this.baseUrl}/pipeline`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(commands),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Upstash pipeline error ${res.status}: ${text}`);
-    }
-
-    const data = await res.json();
-    return data.map(item => {
-      if (item.error) throw new Error(`Upstash pipeline error: ${item.error}`);
+    const data = await this._request('/pipeline', commands, 'Upstash pipeline error');
+    return data.map((item) => {
+      if (item.error) {
+        throw new Error(`Upstash pipeline error: ${item.error}`);
+      }
       return item.result;
     });
   }
 
   async ping() {
-    return await this._exec(['PING']);
+    return this._exec(['PING']);
   }
 
   async get(key) {
-    return await this._exec(['GET', key]);
+    return this._exec(['GET', key]);
   }
 
   async set(key, value) {
-    return await this._exec(['SET', key, value]);
+    return this._exec(['SET', key, value]);
   }
 
   async setEx(key, seconds, value) {
-    return await this._exec(['SET', key, value, 'EX', seconds]);
+    return this._exec(['SET', key, value, 'EX', seconds]);
   }
 
   async del(keyOrKeys) {
     if (Array.isArray(keyOrKeys)) {
-      return await this._exec(['DEL', ...keyOrKeys]);
+      return this._exec(['DEL', ...keyOrKeys]);
     }
-    return await this._exec(['DEL', keyOrKeys]);
+    return this._exec(['DEL', keyOrKeys]);
   }
 
   async exists(key) {
-    return await this._exec(['EXISTS', key]);
+    return this._exec(['EXISTS', key]);
   }
 
   async ttl(key) {
-    return await this._exec(['TTL', key]);
+    return this._exec(['TTL', key]);
   }
 
   async sCard(key) {
-    return await this._exec(['SCARD', key]);
+    return this._exec(['SCARD', key]);
   }
 
-  /**
-   * sendCommand — compatibility with node-redis client.sendCommand()
-   * Used by analytics middleware/service and rate-limit-redis
-   */
   async sendCommand(args) {
-    return await this._exec(args);
+    return this._exec(args);
   }
 
-  /**
-   * multi() — returns a pipeline builder compatible with node-redis multi()
-   */
   multi() {
     return new UpstashPipeline(this);
   }
 
-  /**
-   * Delete keys by pattern using SCAN
-   */
   async delByPattern(pattern) {
     let cursor = '0';
     let deletedCount = 0;
+
     do {
       const result = await this._exec(['SCAN', cursor, 'MATCH', pattern, 'COUNT', '100']);
       cursor = String(result[0]);
@@ -390,14 +500,11 @@ class UpstashRestClient {
         deletedCount += deleted;
       }
     } while (cursor !== '0');
+
     return deletedCount;
   }
 }
 
-
-/**
- * Pipeline builder that mimics node-redis multi() interface
- */
 class UpstashPipeline {
   constructor(client) {
     this._client = client;
@@ -415,11 +522,12 @@ class UpstashPipeline {
   }
 
   async exec() {
-    if (this._commands.length === 0) return [];
-    return await this._client._pipeline(this._commands);
+    if (this._commands.length === 0) {
+      return [];
+    }
+
+    return this._client._pipeline(this._commands);
   }
 }
 
-
-// Export singleton instance
 module.exports = new RedisService();
