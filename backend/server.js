@@ -1,5 +1,6 @@
 const dotenv = require('dotenv');
 dotenv.config();
+const dns = require('dns');
 const mongoose = require('mongoose');
 const http = require('http');
 const { connectDB } = require('./config/db/db');
@@ -9,6 +10,13 @@ const { initVoiceSocket } = require('./services/voiceSocket.service');
 const { initProgressSocket } = require('./services/progressSocket.service');
 const app = require('./app');
 const PORT = process.env.PORT || 5000;
+const DNS_RESULT_ORDER = process.env.DNS_RESULT_ORDER || 'ipv4first';
+const SOURCE_TLS_MIN_VERSION = process.env.SOURCE_TLS_MIN_VERSION || 'TLSv1.2';
+
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder(DNS_RESULT_ORDER);
+}
+
 // Connect to database
 connectDB();
 
@@ -34,6 +42,8 @@ initProgressSocket(httpServer);
 const server = httpServer.listen(PORT, () => {
   console.log(`🚀 Server (PID: ${process.pid}) listening at http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`DNS result order: ${DNS_RESULT_ORDER}`);
+  console.log(`Proxy TLS min version: ${SOURCE_TLS_MIN_VERSION}`);
 
   // Signal PM2 that app is ready (for wait_ready: true)
   if (process.send) {

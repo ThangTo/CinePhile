@@ -4,8 +4,8 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { Readable } = require('stream');
-const { processM3u8Stream, processM3u8StreamDirect, processM3u8StreamWithProxy } = require('../utils/m3u8Utils');
+const { processM3u8StreamDirect, processM3u8StreamWithProxy } = require('../utils/m3u8Utils');
+const { buildSourceHeaders, fetchWithIpv4 } = require('../utils/httpFetch');
 
 let activeDownloads = 0;
 const MAX_CONCURRENT_DOWNLOADS = 3;/**
@@ -567,16 +567,6 @@ const proxyM3u8 = async (req, res) => {
       return res.status(400).send('Missing url parameter');
     }
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
-    }
-    const content = await response.text();
-
     // Build proxy base URLs from request
     const forwardedProto = req.headers['x-forwarded-proto'];
     const host = req.get('host');
@@ -620,10 +610,8 @@ const proxyTs = async (req, res) => {
     }
 
     // Do NOT forward Range headers from client — TS segments are complete files
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
+    const response = await fetchWithIpv4(url, {
+      headers: buildSourceHeaders(url),
     });
 
     if (!response.ok) {
@@ -641,12 +629,14 @@ const proxyTs = async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('Cache-Control', 'public, max-age=3600');
 
-    // Node 18+ native fetch returns Web ReadableStream, convert to Node stream for piping
-    const nodeStream = Readable.fromWeb(response.body);
-    nodeStream.pipe(res);
+    if (!response.body) {
+      return res.status(502).send('Failed to fetch segment from source');
+    }
+
+    response.body.pipe(res);
 
     // Handle stream errors gracefully
-    nodeStream.on('error', (err) => {
+    response.body.on('error', (err) => {
       console.error('[proxyTs] Stream error:', err.message);
       if (!res.headersSent) {
         res.status(502).send('Stream error');
@@ -676,10 +666,8 @@ const downloadMovie = async (req, res) => {
     }
 
     let currentUrl = url;
-    let response = await fetch(currentUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
+    let response = await fetchWithIpv4(currentUrl, {
+      headers: buildSourceHeaders(currentUrl),
     });
     if (!response.ok) {
       throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
@@ -705,8 +693,8 @@ const downloadMovie = async (req, res) => {
 
       if (bestUri) {
         currentUrl = new URL(bestUri, currentUrl).toString();
-        response = await fetch(currentUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' }
+        response = await fetchWithIpv4(currentUrl, {
+          headers: buildSourceHeaders(currentUrl, { 'User-Agent': 'Mozilla/5.0' }),
         });
         content = await response.text();
       }

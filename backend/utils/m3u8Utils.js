@@ -1,4 +1,4 @@
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const { buildSourceHeaders, fetchWithIpv4 } = require('./httpFetch');
 
 const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
 
@@ -7,10 +7,8 @@ const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebo
  * Filters ads but keeps original segment URLs (client will fetch directly)
  */
 async function processM3u8StreamDirect(url, proxyBase = null) {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    },
+  const response = await fetchWithIpv4(url, {
+    headers: buildSourceHeaders(url),
   });
   
   if (!response.ok) {
@@ -87,10 +85,8 @@ async function processM3u8StreamDirect(url, proxyBase = null) {
  * Process M3U8 stream - returns content with PROXY URLs (for VPN users)
  */
 async function processM3u8StreamWithProxy(url, proxyBase, tsProxyBase) {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    },
+  const response = await fetchWithIpv4(url, {
+    headers: buildSourceHeaders(url),
   });
   
   if (!response.ok) {
