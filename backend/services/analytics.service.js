@@ -1,5 +1,6 @@
 const redisService = require('./redis.service');
 const moment = require('moment-timezone');
+const DailyAnalytics = require('../models/daily_analytics.model');
 
 /**
  * Analytics Service
@@ -338,6 +339,194 @@ class AnalyticsService {
       console.error(`Error in getLocationsByPeriod(${period}):`, error);
       return [];
     }
+  }
+
+  // =========================================================================
+  // PERSISTENT ANALYTICS — MongoDB snapshot layer
+  // =========================================================================
+
+  /**
+   * Snapshot one day's Redis visit data into MongoDB.
+   * Safe to call multiple times (upsert), so cron retries are harmless.
+   * @param {string} dateStr - "YYYY-MM-DD" in Asia/Ho_Chi_Minh
+   * @returns {Promise<Object>} The saved document
+   */
+  async snapshotDailyVisits(dateStr) {
+    const key = `analytics:visits:${dateStr}`;
+    let identifiers = [];
+
+    if (redisService.isConnected && redisService.client) {
+      try {
+        identifiers = await redisService.client.sendCommand(['SMEMBERS', key]);
+      } catch (err) {
+        console.warn(`[Analytics] Redis SMEMBERS failed for ${key}:`, err.message);
+      }
+    }
+
+    // Also merge any in-memory fallback data
+    const localSet = this.localVisits.get(key);
+    if (localSet) {
+      localSet.forEach((id) => identifiers.push(id));
+      identifiers = [...new Set(identifiers)];
+    }
+
+    const { total, guestCount, userCount } = this._countUserTypes(identifiers);
+
+    const m = moment.tz(dateStr, 'YYYY-MM-DD', 'Asia/Ho_Chi_Minh');
+    const doc = {
+      date: dateStr,
+      year: m.year(),
+      month: m.month() + 1, // moment month() is 0-indexed
+      week: m.isoWeek(),
+      dayOfWeek: m.isoWeekday(),
+      total,
+      guestCount,
+      userCount,
+    };
+
+    const result = await DailyAnalytics.findOneAndUpdate(
+      { date: dateStr },
+      { $set: doc },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return result;
+  }
+
+  /**
+   * Backfill historical data from Redis for all days still in TTL window.
+   * Called once at server startup. Skips days already in MongoDB.
+   * @returns {Promise<{processed: number, skipped: number}>}
+   */
+  async backfillHistoricalData() {
+    let processed = 0;
+    let skipped = 0;
+    const now = moment().tz('Asia/Ho_Chi_Minh');
+
+    // Scan up to 60 days back (current Redis TTL)
+    for (let i = 0; i < 60; i++) {
+      const dateStr = now.clone().subtract(i, 'days').format('YYYY-MM-DD');
+
+      // Skip if already snapshotted
+      const existing = await DailyAnalytics.findOne({ date: dateStr }).lean();
+      if (existing && existing.total > 0) {
+        skipped++;
+        continue;
+      }
+
+      try {
+        await this.snapshotDailyVisits(dateStr);
+        processed++;
+      } catch (err) {
+        console.error(`[Analytics] Backfill failed for ${dateStr}:`, err.message);
+      }
+    }
+
+    return { processed, skipped };
+  }
+
+  /**
+   * Get historical analytics grouped by granularity from MongoDB.
+   * @param {Object} options
+   * @param {string} options.granularity - 'day' | 'week' | 'month' | 'year'
+   * @param {string} options.from - Start date 'YYYY-MM-DD'
+   * @param {string} options.to - End date 'YYYY-MM-DD'
+   * @returns {Promise<Array>} Array of { label, total, guestCount, userCount }
+   */
+  async getHistoricalStats({ granularity = 'day', from, to } = {}) {
+    const now = moment().tz('Asia/Ho_Chi_Minh');
+    const fromDate = from || now.clone().subtract(30, 'days').format('YYYY-MM-DD');
+    const toDate = to || now.format('YYYY-MM-DD');
+
+    const matchStage = { $match: { date: { $gte: fromDate, $lte: toDate } } };
+
+    let groupStage;
+    let labelField;
+
+    if (granularity === 'year') {
+      groupStage = {
+        $group: {
+          _id: { year: '$year' },
+          total: { $sum: '$total' },
+          guestCount: { $sum: '$guestCount' },
+          userCount: { $sum: '$userCount' },
+        },
+      };
+      labelField = (doc) => `${doc._id.year}`;
+    } else if (granularity === 'month') {
+      groupStage = {
+        $group: {
+          _id: { year: '$year', month: '$month' },
+          total: { $sum: '$total' },
+          guestCount: { $sum: '$guestCount' },
+          userCount: { $sum: '$userCount' },
+        },
+      };
+      labelField = (doc) => `${doc._id.year}-${String(doc._id.month).padStart(2, '0')}`;
+    } else if (granularity === 'week') {
+      groupStage = {
+        $group: {
+          _id: { year: '$year', week: '$week' },
+          total: { $sum: '$total' },
+          guestCount: { $sum: '$guestCount' },
+          userCount: { $sum: '$userCount' },
+        },
+      };
+      labelField = (doc) => `${doc._id.year}-W${String(doc._id.week).padStart(2, '0')}`;
+    } else {
+      // Default: day
+      groupStage = {
+        $group: {
+          _id: { date: '$date' },
+          total: { $sum: '$total' },
+          guestCount: { $sum: '$guestCount' },
+          userCount: { $sum: '$userCount' },
+        },
+      };
+      labelField = (doc) => doc._id.date;
+    }
+
+    const sortStage = { $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1, '_id.date': 1 } };
+
+    const results = await DailyAnalytics.aggregate([
+      matchStage,
+      groupStage,
+      sortStage,
+    ]);
+
+    return results.map((doc) => ({
+      label: labelField(doc),
+      total: doc.total,
+      guestCount: doc.guestCount,
+      userCount: doc.userCount,
+    }));
+  }
+
+  /**
+   * Get all-time cumulative visitor totals from MongoDB.
+   * @returns {Promise<Object>} { total, guestCount, userCount, oldestDate, newestDate, totalDays }
+   */
+  async getAllTimeSummary() {
+    const result = await DailyAnalytics.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$total' },
+          guestCount: { $sum: '$guestCount' },
+          userCount: { $sum: '$userCount' },
+          oldestDate: { $min: '$date' },
+          newestDate: { $max: '$date' },
+          totalDays: { $sum: 1 },
+        },
+      },
+    ]);
+
+    if (!result || result.length === 0) {
+      return { total: 0, guestCount: 0, userCount: 0, oldestDate: null, newestDate: null, totalDays: 0 };
+    }
+
+    const { _id, ...summary } = result[0];
+    return summary;
   }
 }
 

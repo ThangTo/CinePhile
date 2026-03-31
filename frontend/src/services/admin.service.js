@@ -899,6 +899,30 @@ export const statsAPI = {
     });
     return response.data || response;
   },
+
+  /**
+   * Get historical visit data grouped by granularity from MongoDB
+   * @param {Object} params - { granularity: 'day'|'week'|'month'|'year', from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
+   * @returns {Promise<Object>} { success, granularity, data: [ { label, total, guestCount, userCount } ] }
+   */
+  getHistoricalVisits: async (params = {}) => {
+    const response = await apiRequest("/admin/analytics/historical", {
+      params,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Get all-time cumulative visitor totals from MongoDB
+   * @returns {Promise<Object>} { success, summary: { total, guestCount, userCount, oldestDate, newestDate, totalDays } }
+   */
+  getAnalyticsSummary: async () => {
+    const response = await apiRequest("/admin/analytics/summary", {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };
 
 /**

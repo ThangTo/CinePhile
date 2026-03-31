@@ -3,6 +3,7 @@ const MovieModel = require('../models/movie.model');
 const { updateEpisodesForMovies } = require('./admin.service');
 const { runPageRange } = require('./crawler.service');
 const { runPipeline: runTrendingPipeline } = require('./trending.service');
+const analyticsService = require('./analytics.service');
 
 /**
  * Cron Service
@@ -124,6 +125,50 @@ const scheduleTrendingUpdate = () => {
 };
 
 /**
+ * Snapshot today's analytics into MongoDB every night at 23:55 VN time
+ * Also runs a one-time backfill of recent Redis data on startup.
+ */
+const scheduleDailyAnalyticsSnapshot = () => {
+  cron.schedule(
+    '55 23 * * *',
+    async () => {
+      const moment = require('moment-timezone');
+      const today = moment().tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD');
+      console.log(`\n📊 [CRON] Snapshotting analytics for ${today} into MongoDB...`);
+      try {
+        const doc = await analyticsService.snapshotDailyVisits(today);
+        console.log(`✅ [CRON] Analytics snapshot saved: ${today} — total=${doc.total}, users=${doc.userCount}, guests=${doc.guestCount}`);
+      } catch (error) {
+        console.error('❌ [CRON] Analytics snapshot failed:', error.message);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: 'Asia/Ho_Chi_Minh',
+    }
+  );
+
+  console.log('✅ Scheduled: Daily analytics snapshot at 23:55 (Vietnam Time)');
+};
+
+/**
+ * Backfill recent analytics data from Redis into MongoDB on startup.
+ * Runs asynchronously without blocking server boot.
+ */
+const runAnalyticsBackfill = () => {
+  // Defer slightly to ensure DB connection is ready
+  setTimeout(async () => {
+    console.log('\n💬 [Analytics] Running historical backfill from Redis...');
+    try {
+      const result = await analyticsService.backfillHistoricalData();
+      console.log(`✅ [Analytics] Backfill complete: ${result.processed} days written, ${result.skipped} days skipped (already in DB)`);
+    } catch (err) {
+      console.error('❌ [Analytics] Backfill failed:', err.message);
+    }
+  }, 5000); // 5 second delay
+};
+
+/**
  * Initialize all cron jobs
  */
 const initCronJobs = () => {
@@ -132,6 +177,10 @@ const initCronJobs = () => {
   scheduleEpisodeUpdates();
   scheduleMovieCrawling();
   scheduleTrendingUpdate();
+  scheduleDailyAnalyticsSnapshot();
+
+  // Run one-time backfill to seed MongoDB from existing Redis data
+  runAnalyticsBackfill();
 
   console.log('✅ All cron jobs initialized successfully\n');
 };
@@ -141,4 +190,6 @@ module.exports = {
   scheduleEpisodeUpdates,
   scheduleMovieCrawling,
   scheduleTrendingUpdate,
+  scheduleDailyAnalyticsSnapshot,
+  runAnalyticsBackfill,
 };

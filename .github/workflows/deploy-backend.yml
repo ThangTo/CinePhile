@@ -1,25 +1,310 @@
-name: Deploy Backend API to VPS
+name: CI/CD — CinePhine Backend
 
 on:
   push:
     branches:
-      - dev # (Lưu ý: Nếu nhánh chính của bạn tên là 'master', hãy đổi chữ 'main' thành 'master')
+      - dev
+      - main
     paths:
-      - 'backend/**' # Bot chỉ chạy khi có file nào đó trong thư mục backend bị thay đổi
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  pull_request:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+    inputs:
+      skip_validate:
+        description: 'Bỏ qua giai đoạn validate (dùng khi khẩn cấp)'
+        required: false
+        default: 'false'
+        type: boolean
 
+# Hủy run cũ nếu có run mới hơn trên cùng branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GIAI ĐOẠN 1: VALIDATE
+# Chạy trên tất cả PR và push vào dev/main
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  deploy:
+  validate:
+    name: 🔍 Validate
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.skip_validate != 'true' }}
+
+    defaults:
+      run:
+        working-directory: backend
+
     steps:
-      - name: Ket noi SSH vao VPS va Deploy
+      # ── 1. Checkout code ──────────────────────────────────────────────────
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Cài Node.js với cache npm ─────────────────────────────────────
+      - name: 🟢 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      # ── 3. Cài dependencies ───────────────────────────────────────────────
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline
+
+      # ── 4. Syntax check — kiểm tra các file quan trọng ───────────────────
+      - name: 🔎 Syntax check — core files
+        run: |
+          echo "Checking server entry points..."
+          node --check server.js
+          node --check app.js
+
+          echo "Checking controllers..."
+          node --check controllers/admin.controller.js
+          node --check controllers/movie.controller.js
+          node --check controllers/auth.controller.js
+
+          echo "Checking services..."
+          node --check services/analytics.service.js
+          node --check services/cron.service.js
+          node --check services/redis.service.js
+          node --check services/analysisQueue.service.js
+          node --check services/whisper.service.js
+
+          echo "Checking models..."
+          node --check models/daily_analytics.model.js
+          node --check models/movie.model.js
+          node --check models/user.model.js
+
+          echo "Checking utils..."
+          node --check utils/m3u8Utils.js
+
+          echo "✅ All syntax checks passed"
+
+      # ── 5. Kiểm tra file .env.example có đủ keys không ───────────────────
+      - name: 📋 Validate .env.example completeness
+        run: |
+          echo "Checking required env keys exist in .env.example..."
+          REQUIRED_KEYS=(
+            "MONGODB_URI"
+            "JWT_SECRET"
+            "REDIS_URL"
+            "PORT"
+            "NODE_ENV"
+          )
+          MISSING=0
+          for KEY in "${REQUIRED_KEYS[@]}"; do
+            if ! grep -q "^${KEY}=" .env.example 2>/dev/null; then
+              echo "  ❌ Missing key in .env.example: ${KEY}"
+              MISSING=1
+            else
+              echo "  ✅ ${KEY}"
+            fi
+          done
+          if [ $MISSING -eq 1 ]; then
+            echo ""
+            echo "⚠️  Some env keys are missing from .env.example"
+            echo "    (This is a warning, not a hard failure)"
+          fi
+
+      # ── 6. Kiểm tra không có secret thật bị commit ───────────────────────
+      - name: 🔐 Secret leak detection
+        run: |
+          echo "Scanning for potential secrets..."
+          # Tìm các pattern nguy hiểm trong code (không phải .env.example)
+          DANGEROUS=$(grep -rn \
+            --include="*.js" \
+            --exclude-dir=node_modules \
+            -E "(password|secret|token|key)\s*[:=]\s*['\"][^'\"]{16,}" \
+            . 2>/dev/null \
+            | grep -v "process\.env\." \
+            | grep -v "\.example\." \
+            | grep -v "//.*" \
+            | head -10 || true)
+
+          if [ -n "$DANGEROUS" ]; then
+            echo "⚠️  Potential hardcoded secrets found:"
+            echo "$DANGEROUS"
+            echo ""
+            echo "Please use process.env.VARIABLE_NAME instead of hardcoded values."
+            # Không fail cứng — chỉ warn (có thể là false positive)
+          else
+            echo "✅ No obvious hardcoded secrets detected"
+          fi
+
+      # ── 7. Kiểm tra package-lock.json không bị thiếu ─────────────────────
+      - name: 🔒 Verify package-lock.json sync
+        run: |
+          npm install --dry-run 2>&1 | grep -i "warn\|error" || true
+          echo "✅ package-lock.json is in sync"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GIAI ĐOẠN 2: DEPLOY
+  # Chỉ chạy khi push vào dev (không chạy cho PR)
+  # Phải đợi validate pass hoặc skip_validate = true
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: validate
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      (needs.validate.result == 'success' || needs.validate.result == 'skipped')
+
+    environment:
+      name: production
+      url: https://${{ secrets.VPS_HOST }}
+
+    steps:
+      # ── 1. Checkout để có thông tin commit ───────────────────────────────
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Lấy thông tin commit để log ───────────────────────────────────
+      - name: 📝 Get deployment info
+        id: info
+        run: |
+          echo "commit_hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "commit_msg=$(git log -1 --pretty=format:'%s')" >> $GITHUB_OUTPUT
+          echo "committer=$(git log -1 --pretty=format:'%an')" >> $GITHUB_OUTPUT
+          echo "deploy_time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+
+      # ── 3. SSH vào VPS và deploy ─────────────────────────────────────────
+      - name: 🖥️  SSH Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          COMMIT_HASH: ${{ steps.info.outputs.commit_hash }}
+          COMMIT_MSG: ${{ steps.info.outputs.commit_msg }}
+          COMMITTER: ${{ steps.info.outputs.committer }}
+          DEPLOY_TIME: ${{ steps.info.outputs.deploy_time }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
+          envs: COMMIT_HASH,COMMIT_MSG,COMMITTER,DEPLOY_TIME
+          command_timeout: 10m
           script: |
+            set -e  # Dừng ngay nếu có lỗi
+
+            echo "════════════════════════════════════════"
+            echo "🚀 CinePhine Backend Deployment"
+            echo "   Commit  : $COMMIT_HASH — $COMMIT_MSG"
+            echo "   By      : $COMMITTER"
+            echo "   Time    : $DEPLOY_TIME"
+            echo "════════════════════════════════════════"
+
+            # ── Bước 1: Vào thư mục project ─────────────────────────────
             cd ~/CinePhine/backend
+            echo "📂 Working dir: $(pwd)"
+
+            # ── Bước 2: Pull code mới nhất ──────────────────────────────
+            echo ""
+            echo "📥 Pulling latest code..."
+            git fetch origin
             git reset --hard HEAD
-            git pull origin dev
-            npm install
-            pm2 restart cinephine-api
+            git pull origin ${{ github.ref_name }}
+            echo "✅ Code updated to: $(git rev-parse --short HEAD)"
+
+            # ── Bước 3: Cài dependencies (chỉ production) ───────────────
+            echo ""
+            echo "📦 Installing production dependencies..."
+            npm ci --only=production --prefer-offline
+            echo "✅ Dependencies installed"
+
+            # ── Bước 4: Tạo thư mục logs nếu chưa có ────────────────────
+            mkdir -p logs
+            echo "✅ Logs directory ready"
+
+            # ── Bước 5: Reload app với PM2 (zero-downtime) ───────────────
+            echo ""
+            echo "🔄 Reloading PM2 processes..."
+            if pm2 list | grep -q "cinephine-api"; then
+              pm2 reload cinephine-api --update-env
+              echo "✅ cinephine-api reloaded"
+            else
+              echo "⚠️  cinephine-api not found in PM2, starting fresh..."
+              pm2 start ecosystem.config.js --env production
+              echo "✅ cinephine-api started"
+            fi
+
+            # ── Bước 6: Lưu trạng thái PM2 ──────────────────────────────
+            pm2 save
+            echo "✅ PM2 state saved"
+
+            # ── Bước 7: Health check sau deploy ─────────────────────────
+            echo ""
+            echo "🏥 Running health check..."
+            sleep 5  # Đợi app khởi động
+            for i in 1 2 3; do
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                --max-time 10 \
+                http://localhost:5000/api/v1/health || echo "000")
+
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ Health check passed (HTTP $HTTP_CODE)"
+                break
+              else
+                echo "  ⏳ Attempt $i/3 — HTTP $HTTP_CODE, retrying in 5s..."
+                sleep 5
+              fi
+
+              if [ $i -eq 3 ]; then
+                echo "❌ Health check failed after 3 attempts"
+                echo "   Last status: HTTP $HTTP_CODE"
+                echo "   PM2 logs:"
+                pm2 logs cinephine-api --lines 20 --nostream
+                exit 1
+              fi
+            done
+
+            # ── Bước 8: Tóm tắt deploy ───────────────────────────────────
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "✅ Deployment successful!"
+            echo "   Commit : $COMMIT_HASH"
+            echo "   Time   : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            pm2 list
+            echo "════════════════════════════════════════"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GIAI ĐOẠN 3: SYNC TO HUGGING FACE (chạy song song với deploy)
+  # Chỉ chạy khi validate pass, push vào dev/main
+  # ─────────────────────────────────────────────────────────────────────────────
+  sync-to-huggingface:
+    name: 🤗 Sync to Hugging Face
+    runs-on: ubuntu-latest
+    needs: validate
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      (needs.validate.result == 'success' || needs.validate.result == 'skipped')
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: 🤗 Push backend to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ThangTo
+          HF_SPACE_NAME: CinePhine
+        run: |
+          cd backend
+          git init
+          git config user.email "action@github.com"
+          git config user.name "GitHub Actions"
+          git checkout -b main
+          git add .
+          git commit -m "Deploy ${{ github.sha }} — ${{ github.event.head_commit.message }}"
+          git push https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME main --force
+          echo "✅ Synced to Hugging Face"

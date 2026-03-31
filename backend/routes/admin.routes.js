@@ -114,6 +114,12 @@ router.get('/analytics/locations', adminController.getAnalyticsLocations);
 // GET /api/v1/admin/analytics/trending - Get top trending movies by timeframe
 router.get('/analytics/trending', adminController.getTrendingMovies);
 
+// GET /api/v1/admin/analytics/historical - Get historical visits by granularity + date range
+router.get('/analytics/historical', adminController.getHistoricalVisits);
+
+// GET /api/v1/admin/analytics/summary - Get all-time cumulative totals
+router.get('/analytics/summary', adminController.getAnalyticsSummary);
+
 // ===== ADMIN SETTINGS =====
 // GET /api/v1/admin/settings/theme - Get current theme
 router.get('/settings/theme', adminController.getTheme);

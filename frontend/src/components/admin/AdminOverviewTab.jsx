@@ -5,6 +5,7 @@ import { Bar, Doughnut, Line } from "react-chartjs-2";
 import { Chart, registerables } from "chart.js";
 import AnalyticsMap from "./AnalyticsMap";
 import TrendingRanking from "./TrendingRanking";
+import AnalyticsHistoryChart from "./AnalyticsHistoryChart";
 import { getOptimizedImageUrl } from "constants/imageSizes";
 import {
   FiActivity,
@@ -775,6 +776,11 @@ const AdminOverviewTab = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Historical Analytics Chart */}
+      <div className="w-full">
+        <AnalyticsHistoryChart />
       </div>
 
       <TrendingRanking />

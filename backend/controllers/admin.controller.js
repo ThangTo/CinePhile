@@ -716,6 +716,40 @@ const getTrendingMovies = async (req, res) => {
   }
 };
 
+/**
+ * GET /admin/analytics/historical
+ * Get historical visits grouped by granularity (day|week|month|year)
+ * Query: ?granularity=day&from=YYYY-MM-DD&to=YYYY-MM-DD
+ */
+const getHistoricalVisits = async (req, res) => {
+  try {
+    const { granularity = 'day', from, to } = req.query;
+    const validGranularities = ['day', 'week', 'month', 'year'];
+    if (!validGranularities.includes(granularity)) {
+      return res.status(400).json({ message: 'Invalid granularity. Use: day, week, month, year' });
+    }
+    const data = await analyticsService.getHistoricalStats({ granularity, from, to });
+    res.status(200).json({ success: true, granularity, from, to, data });
+  } catch (error) {
+    console.error('Error in getHistoricalVisits:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /admin/analytics/summary
+ * Get all-time cumulative visitor totals from MongoDB
+ */
+const getAnalyticsSummary = async (req, res) => {
+  try {
+    const summary = await analyticsService.getAllTimeSummary();
+    res.status(200).json({ success: true, summary });
+  } catch (error) {
+    console.error('Error in getAnalyticsSummary:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   // Movies
   getAllMovies,
@@ -748,6 +782,8 @@ module.exports = {
   getRealtimeVisits,
   getAnalyticsLocations,
   getTrendingMovies,
+  getHistoricalVisits,
+  getAnalyticsSummary,
 
   // Crawl
   crawlMoviesByPage,
