@@ -3,9 +3,11 @@ name: Deploy Backend API to VPS
 on:
   push:
     branches:
-      - dev # (Lưu ý: Nếu nhánh chính của bạn tên là 'master', hãy đổi chữ 'main' thành 'master')
+      - dev
     paths:
-      - 'backend/**' # Bot chỉ chạy khi có file nào đó trong thư mục backend bị thay đổi
+      - 'backend/**'
+      - '.github/workflows/**' # Thêm dòng này để khi cấu hình file YAML nó cũng tự trigger
+  workflow_dispatch: # Bắt buộc nên có để hiện nút "Run workflow" chạy thủ công trên Github
 
 jobs:
   deploy:
