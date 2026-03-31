@@ -107,3 +107,13 @@
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* ====================================================================
+   VIDEO PLAYER - DOUBLE TAP SEEK ANIMATIONS
+   ==================================================================== */
+@keyframes seekChevron {
+  0%   { opacity: 0.2; transform: translateX(0); }
+  40%  { opacity: 1;   transform: translateX(2px); }
+  80%  { opacity: 0.5; transform: translateX(4px); }
+  100% { opacity: 0.2; transform: translateX(0); }
+}

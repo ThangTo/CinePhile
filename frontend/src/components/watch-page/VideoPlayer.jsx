@@ -11,15 +11,17 @@ import PremiumRequiredModal from "../common/PremiumRequiredModal";
 import { isPremiumActive } from "utils/premiumUtils";
 import { getVideoSource, USE_SERVER_ADBLOCK } from "config/video.config";
 
-const HYBRID_PROXY_STORAGE_KEY = 'cinephine_proxy_sources';
+const HYBRID_PROXY_STORAGE_KEY = "cinephine_proxy_sources";
 const PROXY_ESCALATION_THRESHOLD = 2;
 const START_POSITION_BUDGET_MS = 1200;
 const BUFFERING_INDICATOR_DELAY_MS = 400;
 
 function getProxySources() {
   try {
-    return JSON.parse(sessionStorage.getItem(HYBRID_PROXY_STORAGE_KEY) || '{}');
-  } catch { return {}; }
+    return JSON.parse(sessionStorage.getItem(HYBRID_PROXY_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
 }
 
 function setProxySource(sourceDomain, needsProxy) {
@@ -36,7 +38,9 @@ function needsProxyForSource(sourceDomain) {
 function extractDomain(url) {
   try {
     return new URL(url).hostname;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function buildPlaybackSource(rawM3u8, proxyEndpoint, needsProxy) {
@@ -106,6 +110,7 @@ const VideoPlayer = ({
   const [downloadTotalSegments, setDownloadTotalSegments] = useState(0);
   const [downloadCompletedSegments, setDownloadCompletedSegments] = useState(0);
   const [useProxyMode, setUseProxyMode] = useState(false);
+  const [doubleTapInfo, setDoubleTapInfo] = useState(null); // { side, totalSeconds, id }
 
   const { user, openAuthModal } = useAuth();
   const isPremium = isPremiumActive(user);
@@ -121,6 +126,9 @@ const VideoPlayer = ({
   const saveProgressIntervalRef = useRef(null);
   const hasAutoSeekedRef = useRef(false);
   const lastEpisodeIdRef = useRef(null);
+  const lastTapRef = useRef({ time: 0 });
+  const singleTapTimeoutRef = useRef(null);
+  const doubleTapDismissRef = useRef(null);
 
   const hlsRef = useRef(null);
   const blobUrlRef = useRef(null);
@@ -146,13 +154,13 @@ const VideoPlayer = ({
       const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
       const domain = extractDomain(rawM3u8);
       sourceDomainRef.current = domain;
-      
+
       const needsProxy = needsProxyForSource(domain) || useProxyMode;
       lastPlaybackModeRef.current = needsProxy ? "proxy" : "direct";
 
       return buildPlaybackSource(rawM3u8, `${apiUrl}/movies/proxy-m3u8`, needsProxy);
     }
-    
+
     return null;
   }, [episode, videoUrl, useProxyMode]);
 
@@ -284,8 +292,7 @@ const VideoPlayer = ({
           }
         }
 
-        const isLikelyStillPlayingSmoothly =
-          currentVideo.readyState >= 3 && bufferedAhead > 1;
+        const isLikelyStillPlayingSmoothly = currentVideo.readyState >= 3 && bufferedAhead > 1;
 
         if (!isLikelyStillPlayingSmoothly) {
           setIsBuffering(true);
@@ -354,12 +361,7 @@ const VideoPlayer = ({
     const failedUrl = getHlsErrorUrl(data) || "";
     const statusCode = data?.response?.code ?? data?.response?.status ?? null;
     const errorDetails = String(data?.details || "").toLowerCase();
-    const errText = [
-      data?.response?.text,
-      data?.reason,
-      data?.msg,
-      data?.details,
-    ]
+    const errText = [data?.response?.text, data?.reason, data?.msg, data?.details]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
@@ -409,18 +411,22 @@ const VideoPlayer = ({
     if (!isPlaying || !movie) return;
 
     let isBufferingNow = false;
-    const handleWaiting = () => { isBufferingNow = true; };
-    const handleCanPlay = () => { isBufferingNow = false; };
+    const handleWaiting = () => {
+      isBufferingNow = true;
+    };
+    const handleCanPlay = () => {
+      isBufferingNow = false;
+    };
 
     const video = videoRef.current;
     if (video) {
-      video.addEventListener('waiting', handleWaiting);
-      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener("waiting", handleWaiting);
+      video.addEventListener("canplay", handleCanPlay);
     }
 
     const heartbeatInterval = setInterval(() => {
       if (isBufferingNow) return;
-      
+
       const movieId = movie.id || movie._id || movie.slug;
       const vhId = viewHistoryIdRef?.current;
       if (movieId) {
@@ -431,8 +437,8 @@ const VideoPlayer = ({
     return () => {
       clearInterval(heartbeatInterval);
       if (video) {
-        video.removeEventListener('waiting', handleWaiting);
-        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener("waiting", handleWaiting);
+        video.removeEventListener("canplay", handleCanPlay);
       }
     };
   }, [isPlaying, movie, viewHistoryIdRef]);
@@ -545,7 +551,15 @@ const VideoPlayer = ({
       setActionHandler("seekforward", null);
       setActionHandler("seekto", null);
     };
-  }, [currentAudioLabel, episode?.episode, episode?.episodeId, hasNativePlayer, isPlaying, movie?.name, movie?.title]);
+  }, [
+    currentAudioLabel,
+    episode?.episode,
+    episode?.episodeId,
+    hasNativePlayer,
+    isPlaying,
+    movie?.name,
+    movie?.title,
+  ]);
 
   // Save progress logic (Giữ nguyên)
   useEffect(() => {
@@ -553,18 +567,22 @@ const VideoPlayer = ({
     if (!user || !movieId || !hasNativePlayer) return;
 
     let isBufferingNow = false;
-    const handleWaiting = () => { isBufferingNow = true; };
-    const handleCanPlay = () => { isBufferingNow = false; };
+    const handleWaiting = () => {
+      isBufferingNow = true;
+    };
+    const handleCanPlay = () => {
+      isBufferingNow = false;
+    };
 
     const video = videoRef.current;
     if (video) {
-      video.addEventListener('waiting', handleWaiting);
-      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener("waiting", handleWaiting);
+      video.addEventListener("canplay", handleCanPlay);
     }
 
     const saveProgress = async () => {
       if (isBufferingNow) return;
-      
+
       const video = videoRef.current;
       if (!video || video.paused || !duration || duration <= 0) return;
 
@@ -589,8 +607,8 @@ const VideoPlayer = ({
         clearInterval(saveProgressIntervalRef.current);
       }
       if (video) {
-        video.removeEventListener('waiting', handleWaiting);
-        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener("waiting", handleWaiting);
+        video.removeEventListener("canplay", handleCanPlay);
       }
     };
   }, [user, movie?._id, movie?.id, episode?._id, episode?.id, duration, hasNativePlayer]);
@@ -640,270 +658,279 @@ const VideoPlayer = ({
     }
 
     const initHlsPlayer = async () => {
-        if (Hls.isSupported()) {
-          // === BƯỚC 1: Chỉ KHỞI TẠO progress fetching (Không await để tranh thủ làm việc khác) ===
-          const movieId = movie?._id || movie?.id;
+      if (Hls.isSupported()) {
+        // === BƯỚC 1: Chỉ KHỞI TẠO progress fetching (Không await để tranh thủ làm việc khác) ===
+        const movieId = movie?._id || movie?.id;
 
-          const currentKey = window.history.state?.key || window.location.pathname;
-          const lastKey = sessionStorage.getItem("watchPageKey");
-          const isReload = lastKey === currentKey;
-          if (!isReload) {
-            localStorage.removeItem("resumeTime");
-            sessionStorage.setItem("watchPageKey", currentKey);
-          }
-          const resumeTimeRef = localStorage.getItem("resumeTime");
+        const currentKey = window.history.state?.key || window.location.pathname;
+        const lastKey = sessionStorage.getItem("watchPageKey");
+        const isReload = lastKey === currentKey;
+        if (!isReload) {
+          localStorage.removeItem("resumeTime");
+          sessionStorage.setItem("watchPageKey", currentKey);
+        }
+        const resumeTimeRef = localStorage.getItem("resumeTime");
 
-          let progressPromise;
-          if (resumeTime === 0 && resumeTimeRef === null) {
-            localStorage.setItem("resumeTime", "1");
-            progressPromise = Promise.resolve(0);
-          } else if (user && movieId) {
-            progressPromise = userService.getProgress(movieId)
-              .then(response => {
-                if (response?.success && response?.data) {
-                  const progress = response.data;
-                  if (progress.progress < 95 && progress.watchTime > 5) {
-                    let matched = true;
-                    if (episode?._id || episode?.id) {
-                      const savedEpisodeId = progress.episodeId?._id || progress.episodeId?.id || progress.episodeId;
-                      const currentEpisodeId = episode._id || episode.id;
-                      matched = savedEpisodeId && savedEpisodeId.toString() === currentEpisodeId.toString();
-                    }
-                    if (matched) return Math.max(0, progress.watchTime - 3);
+        let progressPromise;
+        if (resumeTime === 0 && resumeTimeRef === null) {
+          localStorage.setItem("resumeTime", "1");
+          progressPromise = Promise.resolve(0);
+        } else if (user && movieId) {
+          progressPromise = userService
+            .getProgress(movieId)
+            .then((response) => {
+              if (response?.success && response?.data) {
+                const progress = response.data;
+                if (progress.progress < 95 && progress.watchTime > 5) {
+                  let matched = true;
+                  if (episode?._id || episode?.id) {
+                    const savedEpisodeId =
+                      progress.episodeId?._id || progress.episodeId?.id || progress.episodeId;
+                    const currentEpisodeId = episode._id || episode.id;
+                    matched =
+                      savedEpisodeId && savedEpisodeId.toString() === currentEpisodeId.toString();
                   }
+                  if (matched) return Math.max(0, progress.watchTime - 3);
                 }
-                return (resumeTime !== null && resumeTime > 0) ? Math.max(0, resumeTime - 3) : -1;
-              })
-              .catch(() => (resumeTime !== null && resumeTime > 0) ? Math.max(0, resumeTime - 3) : -1);
+              }
+              return resumeTime !== null && resumeTime > 0 ? Math.max(0, resumeTime - 3) : -1;
+            })
+            .catch(() =>
+              resumeTime !== null && resumeTime > 0 ? Math.max(0, resumeTime - 3) : -1
+            );
+        } else {
+          progressPromise = Promise.resolve(
+            resumeTime !== null && resumeTime > 0 ? Math.max(0, resumeTime - 3) : -1
+          );
+        }
+
+        // === BƯỚC 2: Khởi tạo HLS NGAY LẬP TỨC ===
+        const hls = new Hls({
+          maxBufferLength: 90,
+          maxMaxBufferLength: 180,
+          backBufferLength: 90,
+          maxBufferSize: 30 * 1000 * 1000,
+          startFragPrefetch: true,
+          autoStartLoad: false,
+          lowLatencyMode: false,
+          manifestLoadingTimeOut: 20000,
+          fragLoadingTimeOut: 25000,
+          manifestLoadingMaxRetry: 3,
+          fragLoadingMaxRetry: 3,
+          levelLoadingMaxRetry: 3,
+        });
+
+        try {
+          console.log("🚀 Bắt đầu tải M3U8:", hlsSource, `mode=${lastPlaybackModeRef.current}`);
+
+          if (USE_SERVER_ADBLOCK) {
+            // Server proxy xử lý toàn bộ: lọc quảng cáo + adaptive bitrate
+            // Chỉ cần truyền URL proxy trực tiếp cho HLS.js
+            console.log("✅ Server-side Adblock Active");
+            hls.loadSource(hlsSource);
           } else {
-            progressPromise = Promise.resolve((resumeTime !== null && resumeTime > 0) ? Math.max(0, resumeTime - 3) : -1);
-          }
+            // --- CHẠY LOGIC LỌC QUẢNG CÁO Ở CLIENT ---
 
-          // === BƯỚC 2: Khởi tạo HLS NGAY LẬP TỨC ===
-          const hls = new Hls({
-            maxBufferLength: 90,
-            maxMaxBufferLength: 180,
-            backBufferLength: 90,
-            maxBufferSize: 30 * 1000 * 1000,
-            startFragPrefetch: true,
-            autoStartLoad: false,
-            lowLatencyMode: false,
-            manifestLoadingTimeOut: 20000,
-            fragLoadingTimeOut: 25000,
-            manifestLoadingMaxRetry: 3,
-            fragLoadingMaxRetry: 3,
-            levelLoadingMaxRetry: 3,
-          });
+            // 1. Fetch file gốc
+            let currentUrl = hlsSource;
+            let response = await fetch(currentUrl);
+            let content = await response.text();
 
-          try {
-              console.log("🚀 Bắt đầu tải M3U8:", hlsSource, `mode=${lastPlaybackModeRef.current}`);
-              
-              if (USE_SERVER_ADBLOCK) {
-                // Server proxy xử lý toàn bộ: lọc quảng cáo + adaptive bitrate
-                // Chỉ cần truyền URL proxy trực tiếp cho HLS.js
-                console.log("✅ Server-side Adblock Active");
-                hls.loadSource(hlsSource);
-              } else {
-                // --- CHẠY LOGIC LỌC QUẢNG CÁO Ở CLIENT ---
-                
-                // 1. Fetch file gốc
-                let currentUrl = hlsSource;
-                let response = await fetch(currentUrl);
-                let content = await response.text();
+            // --- GIAI ĐOẠN 1: XỬ LÝ MASTER PLAYLIST ---
+            if (content.includes("#EXT-X-STREAM-INF")) {
+              console.log("⚠️ Phát hiện Master Playlist -> Đang tìm luồng chất lượng cao nhất...");
 
-                // --- GIAI ĐOẠN 1: XỬ LÝ MASTER PLAYLIST ---
-                if (content.includes('#EXT-X-STREAM-INF')) {
-                    console.log("⚠️ Phát hiện Master Playlist -> Đang tìm luồng chất lượng cao nhất...");
-                    
-                    const lines = content.split('\n');
-                    let maxBandwidth = 0;
-                    let bestUri = '';
+              const lines = content.split("\n");
+              let maxBandwidth = 0;
+              let bestUri = "";
 
-                    for (let i = 0; i < lines.length; i++) {
-                        if (lines[i].includes('BANDWIDTH=')) {
-                            const match = lines[i].match(/BANDWIDTH=(\d+)/);
-                            const bandwidth = match ? parseInt(match[1]) : 0;
-                            
-                            const nextLine = (lines[i + 1] || '').trim();
-                            if (nextLine && !nextLine.startsWith('#') && bandwidth > maxBandwidth) {
-                                maxBandwidth = bandwidth;
-                                bestUri = nextLine;
-                            }
-                        }
-                    }
+              for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes("BANDWIDTH=")) {
+                  const match = lines[i].match(/BANDWIDTH=(\d+)/);
+                  const bandwidth = match ? parseInt(match[1]) : 0;
 
-                    if (bestUri) {
-                        currentUrl = new URL(bestUri, currentUrl).toString();
-                        console.log("👉 Chuyển hướng sang Media Playlist:", currentUrl);
-                        
-                        response = await fetch(currentUrl);
-                        content = await response.text();
-                    }
+                  const nextLine = (lines[i + 1] || "").trim();
+                  if (nextLine && !nextLine.startsWith("#") && bandwidth > maxBandwidth) {
+                    maxBandwidth = bandwidth;
+                    bestUri = nextLine;
+                  }
                 }
-
-                // --- GIAI ĐOẠN 2: LỌC QUẢNG CÁO & REWRITE LINK ---
-                const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-                const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
-                const lines = content.split('\n');
-                const cleanLines = [];
-                let skipNext = false;
-
-                for (let i = 0; i < lines.length; i++) {
-                  let line = lines[i].trim();
-                  if (!line) continue;
-
-                  if (line.startsWith('#EXTINF')) {
-                      let nextLine = (lines[i + 1] || '').trim();
-                      if (nextLine && !nextLine.startsWith('#')) {
-                          const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
-                          if (isAd) {
-                              console.log("🚫 Đã chặn 1 quảng cáo:", nextLine);
-                              skipNext = true;
-                              continue;
-                          }
-                      }
-                  }
-
-                  if (skipNext) {
-                      skipNext = false;
-                      continue;
-                  }
-
-                  if (!line.startsWith('#')) {
-                      if (!line.startsWith('http')) {
-                          line = new URL(line, baseUrl).toString();
-                      }
-                      if (line.includes('convertv7/')) {
-                          line = line.replace('convertv7/', '');
-                      }
-                  }
-                  cleanLines.push(line);
-                }
-
-                const cleanM3u8Content = cleanLines.join('\n');
-
-                // 3. Tạo Blob URL
-                const blob = new Blob([cleanM3u8Content], { type: 'application/vnd.apple.mpegurl' });
-                
-                if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-                blobUrlRef.current = URL.createObjectURL(blob);
-                
-                console.log("✅ Client-side Adblock Active (Blob Created)");
-                hls.loadSource(blobUrlRef.current);
               }
 
-          } catch (err) {
-              console.error("❌ Lỗi xử lý M3U8:", err);
-              // Fallback về link gốc (hlsSource) nếu lỗi, chấp nhận có ads
-              hls.loadSource(hlsSource);
-          }
+              if (bestUri) {
+                currentUrl = new URL(bestUri, currentUrl).toString();
+                console.log("👉 Chuyển hướng sang Media Playlist:", currentUrl);
 
-          hls.attachMedia(video);
-          hlsRef.current = hls;
-          resetNetworkRecoveryState();
-
-          // ... (Giữ nguyên phần Event Listeners bên dưới) ...
-          hls.on(Hls.Events.MANIFEST_PARSED, async () => {
-             const levels = hls.levels || [];
-             setAvailableLevels(levels);
-             if (levels.length > 0) {
-                 const currentLevel = hls.currentLevel >= 0 ? levels[hls.currentLevel] : levels[0];
-                 const actualHeight = currentLevel?.height || null;
-                 setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+                response = await fetch(currentUrl);
+                content = await response.text();
+              }
             }
 
-             const normalizedProgressPromise = Promise.resolve(progressPromise)
-               .then((value) => (typeof value === "number" ? value : -1))
-               .catch(() => -1);
+            // --- GIAI ĐOẠN 2: LỌC QUẢNG CÁO & REWRITE LINK ---
+            const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf("/") + 1);
+            const AD_KEYWORDS = ["/v7/", "/adjump/", "google", "ads", "doubleclick", "facebook"];
+            const lines = content.split("\n");
+            const cleanLines = [];
+            let skipNext = false;
 
-             const startPos = await Promise.race([
-               normalizedProgressPromise,
-               new Promise((resolve) => setTimeout(() => resolve(null), START_POSITION_BUDGET_MS)),
-             ]);
+            for (let i = 0; i < lines.length; i++) {
+              let line = lines[i].trim();
+              if (!line) continue;
 
-             if (typeof startPos === "number") {
-               console.log(`[VideoPlayer] Start load at position: ${startPos >= 0 ? `${startPos}s` : "default"}`);
+              if (line.startsWith("#EXTINF")) {
+                let nextLine = (lines[i + 1] || "").trim();
+                if (nextLine && !nextLine.startsWith("#")) {
+                  const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
+                  if (isAd) {
+                    console.log("🚫 Đã chặn 1 quảng cáo:", nextLine);
+                    skipNext = true;
+                    continue;
+                  }
+                }
+              }
 
-               if (startPos >= 0) {
-                 hasAutoSeekedRef.current = true;
-                 video.currentTime = startPos;
-                 hls.startLoad(startPos);
-               } else {
-                 hls.startLoad();
-               }
-               return;
-             }
+              if (skipNext) {
+                skipNext = false;
+                continue;
+              }
 
-             console.log("[VideoPlayer] Start load immediately while waiting for resume position...");
-             hls.startLoad();
+              if (!line.startsWith("#")) {
+                if (!line.startsWith("http")) {
+                  line = new URL(line, baseUrl).toString();
+                }
+                if (line.includes("convertv7/")) {
+                  line = line.replace("convertv7/", "");
+                }
+              }
+              cleanLines.push(line);
+            }
 
-             normalizedProgressPromise.then((lateStartPos) => {
-               if (lateStartPos < 0 || hasAutoSeekedRef.current) return;
-               if (video.seeking || video.currentTime > 5) return;
+            const cleanM3u8Content = cleanLines.join("\n");
 
-               hasAutoSeekedRef.current = true;
-               video.currentTime = lateStartPos;
-               console.log(`[VideoPlayer] Applied delayed resume position: ${lateStartPos}s`);
-             });
+            // 3. Tạo Blob URL
+            const blob = new Blob([cleanM3u8Content], { type: "application/vnd.apple.mpegurl" });
+
+            if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = URL.createObjectURL(blob);
+
+            console.log("✅ Client-side Adblock Active (Blob Created)");
+            hls.loadSource(blobUrlRef.current);
+          }
+        } catch (err) {
+          console.error("❌ Lỗi xử lý M3U8:", err);
+          // Fallback về link gốc (hlsSource) nếu lỗi, chấp nhận có ads
+          hls.loadSource(hlsSource);
+        }
+
+        hls.attachMedia(video);
+        hlsRef.current = hls;
+        resetNetworkRecoveryState();
+
+        // ... (Giữ nguyên phần Event Listeners bên dưới) ...
+        hls.on(Hls.Events.MANIFEST_PARSED, async () => {
+          const levels = hls.levels || [];
+          setAvailableLevels(levels);
+          if (levels.length > 0) {
+            const currentLevel = hls.currentLevel >= 0 ? levels[hls.currentLevel] : levels[0];
+            const actualHeight = currentLevel?.height || null;
+            setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+          }
+
+          const normalizedProgressPromise = Promise.resolve(progressPromise)
+            .then((value) => (typeof value === "number" ? value : -1))
+            .catch(() => -1);
+
+          const startPos = await Promise.race([
+            normalizedProgressPromise,
+            new Promise((resolve) => setTimeout(() => resolve(null), START_POSITION_BUDGET_MS)),
+          ]);
+
+          if (typeof startPos === "number") {
+            console.log(
+              `[VideoPlayer] Start load at position: ${startPos >= 0 ? `${startPos}s` : "default"}`
+            );
+
+            if (startPos >= 0) {
+              hasAutoSeekedRef.current = true;
+              video.currentTime = startPos;
+              hls.startLoad(startPos);
+            } else {
+              hls.startLoad();
+            }
+            return;
+          }
+
+          console.log("[VideoPlayer] Start load immediately while waiting for resume position...");
+          hls.startLoad();
+
+          normalizedProgressPromise.then((lateStartPos) => {
+            if (lateStartPos < 0 || hasAutoSeekedRef.current) return;
+            if (video.seeking || video.currentTime > 5) return;
+
+            hasAutoSeekedRef.current = true;
+            video.currentTime = lateStartPos;
+            console.log(`[VideoPlayer] Applied delayed resume position: ${lateStartPos}s`);
+          });
+        });
+
+        // CORS Error Detection: Switch to proxy if CORS error detected
+        hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+          const currentLevel = hls.levels[data.level];
+          const actualHeight = currentLevel?.height || null;
+          setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
+        });
+
+        hls.on(Hls.Events.FRAG_LOADED, () => {
+          resetNetworkRecoveryState();
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.warn("[VideoPlayer] HLS error:", {
+            type: data.type,
+            details: data.details,
+            fatal: data.fatal,
+            url: getHlsErrorUrl(data),
+            code: data?.response?.code ?? data?.response?.status ?? null,
           });
 
-           // CORS Error Detection: Switch to proxy if CORS error detected
-           hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-             const currentLevel = hls.levels[data.level];
-             const actualHeight = currentLevel?.height || null;
-             setCurrentActualQuality(actualHeight ? `${actualHeight}p` : null);
-           });
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && shouldEscalateToProxyMode(data)) {
+            const domain = sourceDomainRef.current;
+            if (domain && !needsProxyForSource(domain) && lastPlaybackModeRef.current !== "proxy") {
+              console.log(
+                "[VideoPlayer] Escalating this source to proxy-ts mode after repeated blocked segment errors"
+              );
+              setProxySource(domain, true);
+              setUseProxyMode(true);
+              setShowControls(true);
+              setIsBuffering(true);
+              hls.destroy();
+              return;
+            }
+          }
 
-           hls.on(Hls.Events.FRAG_LOADED, () => {
-             resetNetworkRecoveryState();
-           });
+          if (!data.fatal) {
+            return;
+          }
 
-           hls.on(Hls.Events.ERROR, (event, data) => {
-             console.warn("[VideoPlayer] HLS error:", {
-               type: data.type,
-               details: data.details,
-               fatal: data.fatal,
-               url: getHlsErrorUrl(data),
-               code: data?.response?.code ?? data?.response?.status ?? null,
-             });
-
-             if (data.type === Hls.ErrorTypes.NETWORK_ERROR && shouldEscalateToProxyMode(data)) {
-               const domain = sourceDomainRef.current;
-               if (domain && !needsProxyForSource(domain) && lastPlaybackModeRef.current !== "proxy") {
-                 console.log("[VideoPlayer] Escalating this source to proxy-ts mode after repeated blocked segment errors");
-                 setProxySource(domain, true);
-                 setUseProxyMode(true);
-                 setShowControls(true);
-                 setIsBuffering(true);
-                 hls.destroy();
-                 return;
-               }
-             }
-
-             if (!data.fatal) {
-               return;
-             }
-
-             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-               setIsBuffering(true);
-               hls.startLoad();
-             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-               hls.recoverMediaError();
-             } else {
-               hls.destroy();
-             }
-           });
-
-        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-          // Safari Native
-           try {
-              // Với Safari, logic Drill down này phức tạp hơn vì Safari không hỗ trợ Blob URL tốt cho stream dài
-              // Nên tạm thời fallback về source gốc
-              video.src = hlsSource; 
-           } catch(e) {
-              video.src = hlsSource;
-           }
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            setIsBuffering(true);
+            hls.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+          } else {
+            hls.destroy();
+          }
+        });
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        // Safari Native
+        try {
+          // Với Safari, logic Drill down này phức tạp hơn vì Safari không hỗ trợ Blob URL tốt cho stream dài
+          // Nên tạm thời fallback về source gốc
+          video.src = hlsSource;
+        } catch (e) {
+          video.src = hlsSource;
         }
+      }
     };
 
     initHlsPlayer();
@@ -925,16 +952,27 @@ const VideoPlayer = ({
   }, [hlsSource, fileSource]);
 
   // --- Các helper function xử lý giao diện (Controls, Menu...) giữ nguyên ---
-  
+
   // Clear timeout on unmount
   useEffect(() => {
     return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+      if (singleTapTimeoutRef.current) clearTimeout(singleTapTimeoutRef.current);
+      if (doubleTapDismissRef.current) clearTimeout(doubleTapDismissRef.current);
       clearPendingBuffering();
     };
   }, [clearPendingBuffering]);
+
+  // Clear double tap feedback animation after 800ms of no new taps
+  useEffect(() => {
+    if (doubleTapInfo) {
+      if (doubleTapDismissRef.current) clearTimeout(doubleTapDismissRef.current);
+      doubleTapDismissRef.current = setTimeout(() => setDoubleTapInfo(null), 800);
+      return () => {
+        if (doubleTapDismissRef.current) clearTimeout(doubleTapDismissRef.current);
+      };
+    }
+  }, [doubleTapInfo]);
 
   useEffect(() => {
     if (isDraggingProgress) {
@@ -963,16 +1001,48 @@ const VideoPlayer = ({
 
   const handleVideoClick = (e) => {
     if (e.target.closest(".pointer-events-auto")) return;
-    if (showControls) {
-      handlePlayPause();
-    } else {
-      setShowControls(true);
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-      const delay = isFullscreen ? 2000 : 3000;
-      controlsTimeoutRef.current = setTimeout(() => {
-        if (!isDraggingProgress && isPlaying && !isBuffering) setShowControls(false);
-      }, delay);
+
+    const now = Date.now();
+    const timeDiff = now - lastTapRef.current.time;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    const isLeftSide = clickX < rect.left + rect.width / 2;
+    const side = isLeftSide ? "left" : "right";
+
+    lastTapRef.current = { time: now };
+
+    if (timeDiff < 300 && timeDiff > 0) {
+      // === DOUBLE TAP — tua 10s, cộng dồn nếu tap liên tục ===
+      if (singleTapTimeoutRef.current) clearTimeout(singleTapTimeoutRef.current);
+
+      const seekAmount = isLeftSide ? -10 : 10;
+      handleSkip(seekAmount);
+
+      setDoubleTapInfo((prev) => {
+        // Cộng dồn nếu cùng phía, reset nếu đổi phía
+        const prevSeconds = prev && prev.side === side ? prev.totalSeconds : 0;
+        return {
+          side,
+          totalSeconds: prevSeconds + 10,
+          id: now, // key mới để trigger animation lại
+        };
+      });
+      return;
     }
+
+    // === SINGLE TAP — delay 200ms để phân biệt ===
+    singleTapTimeoutRef.current = setTimeout(() => {
+      if (showControls) {
+        handlePlayPause();
+      } else {
+        setShowControls(true);
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        const delay = isFullscreen ? 2000 : 3000;
+        controlsTimeoutRef.current = setTimeout(() => {
+          if (!isDraggingProgress && isPlaying && !isBuffering) setShowControls(false);
+        }, delay);
+      }
+    }, 200);
   };
 
   const handleSeek = async (timeOrEvent) => {
@@ -1057,12 +1127,15 @@ const VideoPlayer = ({
         container.msRequestFullscreen;
 
       if (requestFullscreen) {
-        requestFullscreen.call(container).then(() => {
+        requestFullscreen
+          .call(container)
+          .then(() => {
             setIsFullscreen(true);
             if (window.screen?.orientation?.lock) {
               window.screen.orientation.lock("landscape").catch(() => {});
             }
-          }).catch((err) => console.error(err));
+          })
+          .catch((err) => console.error(err));
       }
     } else {
       const exitFullscreen =
@@ -1072,12 +1145,15 @@ const VideoPlayer = ({
         document.msExitFullscreen;
 
       if (exitFullscreen) {
-        exitFullscreen.call(document).then(() => {
+        exitFullscreen
+          .call(document)
+          .then(() => {
             setIsFullscreen(false);
             if (window.screen?.orientation?.unlock) {
               window.screen.orientation.unlock();
             }
-          }).catch((err) => console.error(err));
+          })
+          .catch((err) => console.error(err));
       }
     }
   }, []);
@@ -1097,7 +1173,9 @@ const VideoPlayer = ({
     try {
       if (document.pictureInPictureElement) await document.exitPictureInPicture();
       else await video.requestPictureInPicture();
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleMouseMove = () => {
@@ -1133,21 +1211,30 @@ const VideoPlayer = ({
 
   const toggleAudioMenu = () => {
     setShowAudioMenu((prev) => {
-      if (!prev) { setShowSpeedMenu(false); setShowQualityMenu(false); }
+      if (!prev) {
+        setShowSpeedMenu(false);
+        setShowQualityMenu(false);
+      }
       return !prev;
     });
   };
 
   const toggleSpeedMenu = () => {
     setShowSpeedMenu((prev) => {
-      if (!prev) { setShowAudioMenu(false); setShowQualityMenu(false); }
+      if (!prev) {
+        setShowAudioMenu(false);
+        setShowQualityMenu(false);
+      }
       return !prev;
     });
   };
 
   const toggleQualityMenu = () => {
     setShowQualityMenu((prev) => {
-      if (!prev) { setShowAudioMenu(false); setShowSpeedMenu(false); }
+      if (!prev) {
+        setShowAudioMenu(false);
+        setShowSpeedMenu(false);
+      }
       return !prev;
     });
   };
@@ -1156,7 +1243,9 @@ const VideoPlayer = ({
     const standardOptions = ["Auto", "1080p", "720p", "480p", "360p"];
     const levels = Array.isArray(availableLevels) ? availableLevels : [];
     if (levels.length > 0) {
-      const heightsFromLevels = [...new Set(levels.map((l) => l?.height).filter(Boolean))].sort((a, b) => b - a);
+      const heightsFromLevels = [...new Set(levels.map((l) => l?.height).filter(Boolean))].sort(
+        (a, b) => b - a
+      );
       const options = ["Auto"];
       heightsFromLevels.forEach((h) => {
         const label = `${h}p`;
@@ -1178,19 +1267,26 @@ const VideoPlayer = ({
     if (!levels || levels.length === 0 || qualityStr === "Auto") return -1;
     const targetHeight = parseInt(qualityStr.replace("p", ""), 10);
     if (isNaN(targetHeight)) return -1;
-    let bestMatch = -1, minDiff = Infinity;
+    let bestMatch = -1,
+      minDiff = Infinity;
     for (let i = 0; i < levels.length; i++) {
       const level = levels[i];
       if (!level.height) continue;
       const diff = Math.abs(level.height - targetHeight);
-      if (diff < minDiff) { minDiff = diff; bestMatch = i; }
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestMatch = i;
+      }
     }
     return minDiff > 100 ? -1 : bestMatch;
   };
 
   const getMaxAllowedQuality = useCallback(() => {
     if (!availableLevels || availableLevels.length === 0) return null;
-    const heightsFromLevels = [...availableLevels].map((l) => l?.height).filter(Boolean).sort((a, b) => b - a);
+    const heightsFromLevels = [...availableLevels]
+      .map((l) => l?.height)
+      .filter(Boolean)
+      .sort((a, b) => b - a);
     const sortedLevels = heightsFromLevels.length > 0 ? heightsFromLevels : [1080, 720, 480, 360];
     if (sortedLevels.length === 0) return null;
     if (isPremium || isAdmin) return sortedLevels[0];
@@ -1201,37 +1297,43 @@ const VideoPlayer = ({
     return sortedLevels[0];
   }, [availableLevels, isPremium, isAdmin, isRegularUser]);
 
-  const isQualityPremium = useCallback((qualityStr) => {
-    if (qualityStr === "Auto") return false;
-    const height = parseInt(qualityStr.replace("p", ""), 10);
-    if (isNaN(height) || isPremium || isAdmin) return false;
-    return height > 720;
-  }, [isPremium, isAdmin]);
+  const isQualityPremium = useCallback(
+    (qualityStr) => {
+      if (qualityStr === "Auto") return false;
+      const height = parseInt(qualityStr.replace("p", ""), 10);
+      if (isNaN(height) || isPremium || isAdmin) return false;
+      return height > 720;
+    },
+    [isPremium, isAdmin]
+  );
 
-  const applyQualityLevel = useCallback((hls, qualityStr) => {
-    if (!hls || !hls.levels || hls.levels.length === 0) return;
-    if (qualityStr === "Auto") {
-      if (isAdmin || isPremium) hls.currentLevel = -1;
-      else if (isRegularUser) {
-        const level720Index = hls.levels.findIndex((l) => l?.height && l.height <= 720);
-        hls.currentLevel = level720Index >= 0 ? level720Index : (hls.levels.length - 1);
-      } else hls.currentLevel = -1;
-      if (hls.media && hls.media.readyState >= 2) hls.startLoad();
-      return;
-    }
-    const levelIndex = getLevelIndexForQuality(qualityStr, hls.levels);
-    if (levelIndex >= 0 && levelIndex < hls.levels.length) {
-      const selectedLevel = hls.levels[levelIndex];
-      const selectedHeight = selectedLevel?.height;
-      if (isRegularUser && selectedHeight > 720) {
-        const allowedLevelIndex = hls.levels.findIndex((l) => l?.height && l.height <= 720);
-        hls.currentLevel = allowedLevelIndex >= 0 ? allowedLevelIndex : (hls.levels.length - 1);
-      } else {
-        if (hls.currentLevel !== levelIndex) hls.currentLevel = levelIndex;
+  const applyQualityLevel = useCallback(
+    (hls, qualityStr) => {
+      if (!hls || !hls.levels || hls.levels.length === 0) return;
+      if (qualityStr === "Auto") {
+        if (isAdmin || isPremium) hls.currentLevel = -1;
+        else if (isRegularUser) {
+          const level720Index = hls.levels.findIndex((l) => l?.height && l.height <= 720);
+          hls.currentLevel = level720Index >= 0 ? level720Index : hls.levels.length - 1;
+        } else hls.currentLevel = -1;
+        if (hls.media && hls.media.readyState >= 2) hls.startLoad();
+        return;
       }
-      if (hls.media && hls.media.readyState >= 2) hls.startLoad();
-    }
-  }, [isRegularUser, isAdmin, isPremium]);
+      const levelIndex = getLevelIndexForQuality(qualityStr, hls.levels);
+      if (levelIndex >= 0 && levelIndex < hls.levels.length) {
+        const selectedLevel = hls.levels[levelIndex];
+        const selectedHeight = selectedLevel?.height;
+        if (isRegularUser && selectedHeight > 720) {
+          const allowedLevelIndex = hls.levels.findIndex((l) => l?.height && l.height <= 720);
+          hls.currentLevel = allowedLevelIndex >= 0 ? allowedLevelIndex : hls.levels.length - 1;
+        } else {
+          if (hls.currentLevel !== levelIndex) hls.currentLevel = levelIndex;
+        }
+        if (hls.media && hls.media.readyState >= 2) hls.startLoad();
+      }
+    },
+    [isRegularUser, isAdmin, isPremium]
+  );
 
   const handleQualityChange = (newQuality) => {
     if (isQualityPremium(newQuality) && !isPremium) {
@@ -1290,11 +1392,17 @@ const VideoPlayer = ({
     };
     const onMute = () => {
       const video = videoRef.current;
-      if (video) { video.volume = 0; setIsMuted(true); }
+      if (video) {
+        video.volume = 0;
+        setIsMuted(true);
+      }
     };
     const onUnmute = () => {
       const video = videoRef.current;
-      if (video) { video.volume = volume; setIsMuted(false); }
+      if (video) {
+        video.volume = volume;
+        setIsMuted(false);
+      }
     };
     const onDuckAudio = () => {
       const video = videoRef.current;
@@ -1419,46 +1527,59 @@ const VideoPlayer = ({
       if (isMobile || !supportsDirectDisk) {
         // --- NHÁNH 1: SERVER PROXY (Dành cho Mobile hoặc Desktop Firefox/HTTP) ---
         setIsDownloading(false);
-        const reason = isMobile ? "thiết bị di động" : "Trình duyệt của bạn. (Chuyển tiếp qua máy chủ phụ trợ)";
+        const reason = isMobile
+          ? "thiết bị di động"
+          : "Trình duyệt của bạn. (Chuyển tiếp qua máy chủ phụ trợ)";
         showToast(`Đang kết nối luồng tải MP4 dành riêng cho ${reason}...`, "info");
-        
+
         const mobileDownloadUrl = `${apiUrl}/movies/download-mobile?url=${encodeURIComponent(rawM3u8)}&filename=${encodeURIComponent(baseFilename)}`;
-        
+
         // Gõ cửa kiểm tra xem Server có full chỗ không (Pre-flight HEAD request)
-        const checkRes = await fetch(mobileDownloadUrl, { method: 'HEAD' });
-        
+        const checkRes = await fetch(mobileDownloadUrl, { method: "HEAD" });
+
         if (checkRes.status === 429) {
-           showToast("Server đang có quá nhiều (+3) giao dịch tải phim cùng lúc! Vui lòng thử lại sau vài phút.", "error");
-           return; // Hủy không tải
+          showToast(
+            "Server đang có quá nhiều (+3) giao dịch tải phim cùng lúc! Vui lòng thử lại sau vài phút.",
+            "error"
+          );
+          return; // Hủy không tải
         } else if (!checkRes.ok) {
-           throw new Error("Lỗi kết nối đến luồng tải phụ trợ. " + checkRes.status);
+          throw new Error("Lỗi kết nối đến luồng tải phụ trợ. " + checkRes.status);
         }
 
         // Nếu còn slot, ra lệnh tải
-        showToast("Máy chủ đang rải luồng phim gốc. Trình duyệt của bạn sẽ từ từ nhặt lưu về máy ngay lập tức!", "success");
-        const a = document.createElement('a');
+        showToast(
+          "Máy chủ đang rải luồng phim gốc. Trình duyệt của bạn sẽ từ từ nhặt lưu về máy ngay lập tức!",
+          "success"
+        );
+        const a = document.createElement("a");
         a.href = mobileDownloadUrl;
         a.setAttribute("download", `${baseFilename}.mp4`);
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-
       } else {
         // --- NHÁNH 2: DESKTOP NATIVE FILE SYSTEM (Chrome/Edge/Brave - Tối ưu đỉnh cao - 0% RAM & CPU) ---
-        const response = await fetch(`${apiUrl}/movies/download?url=${encodeURIComponent(rawM3u8)}`);
+        const response = await fetch(
+          `${apiUrl}/movies/download?url=${encodeURIComponent(rawM3u8)}`
+        );
         if (!response.ok) throw new Error("Lỗi khi lấy thông tin tải phim từ Server");
 
         const { segments } = await response.json();
-        if (!segments || segments.length === 0) throw new Error("Không tìm thấy dữ liệu video stream hợp lệ");
+        if (!segments || segments.length === 0)
+          throw new Error("Không tìm thấy dữ liệu video stream hợp lệ");
 
         setDownloadTotalSegments(segments.length);
         setDownloadCompletedSegments(0);
 
-        showToast(`Bắt đầu kéo ${segments.length} phân đoạn video xuống đĩa cứng (Bỏ qua RAM)...`, "info");
+        showToast(
+          `Bắt đầu kéo ${segments.length} phân đoạn video xuống đĩa cứng (Bỏ qua RAM)...`,
+          "info"
+        );
         try {
           const fileHandle = await window.showSaveFilePicker({
             suggestedName: `${baseFilename}.ts`,
-            types: [{ description: 'TS Video File', accept: { 'video/mp2t': ['.ts'] } }]
+            types: [{ description: "TS Video File", accept: { "video/mp2t": [".ts"] } }],
           });
 
           const writable = await fileHandle.createWritable();
@@ -1466,9 +1587,12 @@ const VideoPlayer = ({
 
           for (let i = 0; i < segments.length; i += 4) {
             const batch = segments.slice(i, i + 4);
-            const buffers = await Promise.all(batch.map(async (segUrl) => {
-              const res = await fetch(segUrl, { signal }); return await res.arrayBuffer();
-            }));
+            const buffers = await Promise.all(
+              batch.map(async (segUrl) => {
+                const res = await fetch(segUrl, { signal });
+                return await res.arrayBuffer();
+              })
+            );
             for (const buffer of buffers) {
               await writable.write(buffer);
               completed++;
@@ -1479,13 +1603,16 @@ const VideoPlayer = ({
           await writable.close();
           showToast(`Đã lưu thành công phim vào máy của bạn!`, "success");
         } catch (err) {
-          if (err.name !== 'AbortError') throw err; // Chống lỗi khi user huỷ
+          if (err.name !== "AbortError") throw err; // Chống lỗi khi user huỷ
         }
       }
     } catch (error) {
-      if (error.name === 'AbortError') return; // Bỏ qua lốc lỗi nếu người dùng chủ động huỷ
+      if (error.name === "AbortError") return; // Bỏ qua lốc lỗi nếu người dùng chủ động huỷ
       console.error("Lỗi tải phim", error);
-      showToast(error.message || "Có lỗi xảy ra trong quá trình tải. Giao thức bị từ chối.", "error");
+      showToast(
+        error.message || "Có lỗi xảy ra trong quá trình tải. Giao thức bị từ chối.",
+        "error"
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -1513,9 +1640,14 @@ const VideoPlayer = ({
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+      const isCurrentlyFullscreen =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
       setIsFullscreen(!!isCurrentlyFullscreen);
-      if (!isCurrentlyFullscreen && window.screen?.orientation?.unlock) window.screen.orientation.unlock();
+      if (!isCurrentlyFullscreen && window.screen?.orientation?.unlock)
+        window.screen.orientation.unlock();
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
@@ -1533,15 +1665,32 @@ const VideoPlayer = ({
     const handleKeyDown = (e) => {
       const video = videoRef.current;
       if (!video) return;
-      if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
-      if (["Space", "ArrowLeft", "ArrowRight", "KeyF", "KeyM", "KeyK"].includes(e.code)) e.preventDefault();
+      if (
+        ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName) ||
+        document.activeElement.isContentEditable
+      )
+        return;
+      if (["Space", "ArrowLeft", "ArrowRight", "KeyF", "KeyM", "KeyK"].includes(e.code))
+        e.preventDefault();
       switch (e.code) {
-        case "Space": case "KeyK": video.paused ? video.play() : video.pause(); break;
-        case "ArrowLeft": video.currentTime = Math.max(0, video.currentTime - 10); break;
-        case "ArrowRight": video.currentTime = Math.min(duration, video.currentTime + 10); break;
-        case "KeyF": toggleFullscreen(); break;
-        case "KeyM": toggleMute(); break;
-        default: break;
+        case "Space":
+        case "KeyK":
+          video.paused ? video.play() : video.pause();
+          break;
+        case "ArrowLeft":
+          video.currentTime = Math.max(0, video.currentTime - 10);
+          break;
+        case "ArrowRight":
+          video.currentTime = Math.min(duration, video.currentTime + 10);
+          break;
+        case "KeyF":
+          toggleFullscreen();
+          break;
+        case "KeyM":
+          toggleMute();
+          break;
+        default:
+          break;
       }
     };
     document.addEventListener("keydown", handleKeyDown);
@@ -1552,7 +1701,8 @@ const VideoPlayer = ({
     const handleClickOutside = (e) => {
       if (showMoreMenu && !e.target.closest(".more-menu-container")) setShowMoreMenu(false);
       if (showSpeedMenu && !e.target.closest(".speed-menu-container")) setShowSpeedMenu(false);
-      if (showQualityMenu && !e.target.closest(".quality-menu-container")) setShowQualityMenu(false);
+      if (showQualityMenu && !e.target.closest(".quality-menu-container"))
+        setShowQualityMenu(false);
       if (showAudioMenu && !e.target.closest(".audio-menu-container")) setShowAudioMenu(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -1571,7 +1721,7 @@ const VideoPlayer = ({
     <div
       ref={containerRef}
       className="relative w-full bg-black rounded-lg aspect-[16/9] max-w-full touch-none"
-      style={{ cursor: isFullscreen && !showControls ? 'none' : 'default' }}
+      style={{ cursor: isFullscreen && !showControls ? "none" : "default" }}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
         if (isPlaying && !isBuffering) setShowControls(false);
@@ -1597,7 +1747,7 @@ const VideoPlayer = ({
             width: "100%",
             height: "100%",
             objectFit: "contain",
-            cursor: isFullscreen && !showControls ? 'none' : 'pointer',
+            cursor: isFullscreen && !showControls ? "none" : "pointer",
             filter: blurAmount > 0 ? `blur(${blurAmount}px)` : "none",
             transition: "filter 0.3s ease-in-out",
             WebkitTouchCallout: "none",
@@ -1617,6 +1767,80 @@ const VideoPlayer = ({
       ) : (
         <div className="w-full h-full flex items-center justify-center text-white text-sm text-center px-4">
           Chưa có nguồn phát cho tập phim này. Vui lòng thử tập khác hoặc quay lại sau.
+        </div>
+      )}
+
+      {/* ═══ Double Tap Seek Overlay ═══ */}
+      {doubleTapInfo && (
+        <div
+          key={doubleTapInfo.id}
+          className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none overflow-hidden z-40"
+        >
+          {/* Radial glow background — chỉ hiện ở phía tua */}
+          <div
+            className="absolute top-0 bottom-0 w-1/2"
+            style={{
+              [doubleTapInfo.side === "left" ? "left" : "right"]: 0,
+              background:
+                doubleTapInfo.side === "left"
+                  ? "radial-gradient(ellipse at 25% 50%, rgba(255,255,255,0.07) 0%, transparent 65%)"
+                  : "radial-gradient(ellipse at 75% 50%, rgba(255,255,255,0.07) 0%, transparent 65%)",
+            }}
+          />
+
+          {/* Ripple circle — neo vào cạnh ngoài */}
+          <div
+            className="absolute animate-ripple rounded-full bg-white/[0.07]"
+            style={{
+              width: 130,
+              height: 130,
+              top: "calc(50% - 65px)",
+              [doubleTapInfo.side === "left" ? "left" : "right"]: "8%",
+            }}
+          />
+
+          {/* Glass indicator — cố định gần cạnh ngoài */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 animate-fade-in-up"
+            style={{
+              [doubleTapInfo.side === "left" ? "left" : "right"]: "16%",
+            }}
+          >
+            {/* Animated seek chevrons */}
+            <div
+              className={`flex items-center gap-[2px] ${
+                doubleTapInfo.side === "left" ? "flex-row-reverse" : "flex-row"
+              }`}
+            >
+              {[0, 1, 2].map((i) => (
+                <svg
+                  key={i}
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="text-white"
+                  style={{
+                    animation: `seekChevron 0.6s ease-in-out ${i * 0.1}s infinite`,
+                    opacity: 0.4 + i * 0.3,
+                  }}
+                >
+                  <path
+                    d={doubleTapInfo.side === "left" ? "M15 19l-7-7 7-7" : "M9 5l7 7-7 7"}
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ))}
+            </div>
+
+            {/* Seconds label */}
+            <span className="text-white text-sm font-bold tabular-nums drop-shadow-lg">
+              {doubleTapInfo.totalSeconds} giây
+            </span>
+          </div>
         </div>
       )}
 
@@ -1681,14 +1905,15 @@ const VideoPlayer = ({
 
       {/* Download Progress Overlay */}
       {isDownloading && (
-        <div 
+        <div
           className={`absolute z-50 bg-black/85 p-6 flex flex-col items-center justify-center border border-white/10 min-w-[320px] backdrop-blur-xl shadow-2xl transition-all duration-500 ease-in-out origin-bottom
-            ${isDownloadMinimized
-              ? "left-1/2 top-full -translate-x-1/2 -translate-y-[120px] scale-50 opacity-0 pointer-events-none rounded-full"
-              : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 scale-100 opacity-100 rounded-xl"
+            ${
+              isDownloadMinimized
+                ? "left-1/2 top-full -translate-x-1/2 -translate-y-[120px] scale-50 opacity-0 pointer-events-none rounded-full"
+                : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 scale-100 opacity-100 rounded-xl"
             }`}
         >
-          <button 
+          <button
             onClick={() => setIsDownloadMinimized(true)}
             className="absolute top-3 right-4 text-white/40 hover:text-white transition-colors"
             title="Thu nhỏ tiến trình"
@@ -1696,12 +1921,14 @@ const VideoPlayer = ({
             <i className="fa-solid fa-compress text-lg"></i>
           </button>
           <div className="text-white text-lg font-bold mb-4 flex items-center gap-3">
-            <i className="fa-solid fa-cloud-arrow-down text-primaryColor md:text-xl relative"><span className="absolute inline-flex h-full w-full rounded-full bg-primaryColor opacity-20 animate-ping inset-0"></span></i>
+            <i className="fa-solid fa-cloud-arrow-down text-primaryColor md:text-xl relative">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-primaryColor opacity-20 animate-ping inset-0"></span>
+            </i>
             Đang ghép nối phim...
           </div>
           <div className="w-full bg-white/10 rounded-full h-3 mb-3 relative overflow-hidden">
-            <div 
-              className="bg-primaryColor h-3 rounded-full transition-all duration-300 relative" 
+            <div
+              className="bg-primaryColor h-3 rounded-full transition-all duration-300 relative"
               style={{ width: `${downloadProgress}%` }}
             >
               <div className="absolute top-0 right-0 bottom-0 left-0 bg-white/20 animate-pulse"></div>
@@ -1711,13 +1938,14 @@ const VideoPlayer = ({
             {downloadProgress}% ({downloadCompletedSegments}/{downloadTotalSegments} đoạn vỡ)
           </div>
           <div className="text-white/50 text-xs mt-2 text-center leading-relaxed">
-            Vui lòng <span className="text-yellow-400">không đóng tab</span> trình duyệt <br/> cho đến khi tiến trình đạt 100%.
+            Vui lòng <span className="text-yellow-400">không đóng tab</span> trình duyệt <br /> cho
+            đến khi tiến trình đạt 100%.
           </div>
-          <button 
-             onClick={handleCancelDownload}
-             className="mt-4 px-5 py-2 bg-red-600/80 hover:bg-red-500 text-white rounded-lg text-sm font-semibold transition-colors"
+          <button
+            onClick={handleCancelDownload}
+            className="mt-4 px-5 py-2 bg-red-600/80 hover:bg-red-500 text-white rounded-lg text-sm font-semibold transition-colors"
           >
-             Hủy Tải
+            Hủy Tải
           </button>
         </div>
       )}
@@ -1729,4 +1957,3 @@ const VideoPlayer = ({
 };
 
 export default VideoPlayer;
-

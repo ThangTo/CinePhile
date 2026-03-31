@@ -51,6 +51,8 @@ module.exports = {
         fadeIn: "fadeIn 0.2s ease-out",
         "pop-up": "popUp 0.4s ease forwards",
         slideDown: "slideDown 0.3s ease-out",
+        ripple: "ripple 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards",
+        "fade-in-up": "fadeInUp 0.25s ease-out forwards",
       },
       keyframes: {
         spin: {
@@ -98,6 +100,15 @@ module.exports = {
             opacity: "1",
             transform: "translateY(0)",
           },
+        },
+        ripple: {
+          "0%": { transform: "scale(0)", opacity: "0.4" },
+          "50%": { opacity: "0.2" },
+          "100%": { transform: "scale(3)", opacity: "0" },
+        },
+        fadeInUp: {
+          "0%": { transform: "translateY(8px) scale(0.95)", opacity: "0" },
+          "100%": { transform: "translateY(0) scale(1)", opacity: "1" },
         },
       },
       screens: {
