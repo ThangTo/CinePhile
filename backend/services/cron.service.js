@@ -137,7 +137,14 @@ const scheduleDailyAnalyticsSnapshot = () => {
       console.log(`\n📊 [CRON] Snapshotting analytics for ${today} into MongoDB...`);
       try {
         const doc = await analyticsService.snapshotDailyVisits(today);
-        console.log(`✅ [CRON] Analytics snapshot saved: ${today} — total=${doc.total}, users=${doc.userCount}, guests=${doc.guestCount}`);
+        console.log(`✅ [CRON] Daily snapshot: ${today} — total=${doc.total}, users=${doc.userCount}, guests=${doc.guestCount}`);
+
+        // Also snapshot true-unique counts for current week and month
+        const [weekDoc, monthDoc] = await Promise.all([
+          analyticsService.snapshotPeriodUnique('week'),
+          analyticsService.snapshotPeriodUnique('month'),
+        ]);
+        console.log(`✅ [CRON] Period unique snapshot — week=${weekDoc.total} unique, month=${monthDoc.total} unique`);
       } catch (error) {
         console.error('❌ [CRON] Analytics snapshot failed:', error.message);
       }
@@ -160,12 +167,16 @@ const runAnalyticsBackfill = () => {
   setTimeout(async () => {
     console.log('\n💬 [Analytics] Running historical backfill from Redis...');
     try {
-      const result = await analyticsService.backfillHistoricalData();
-      console.log(`✅ [Analytics] Backfill complete: ${result.processed} days written, ${result.skipped} days skipped (already in DB)`);
+      const [daily, period] = await Promise.all([
+        analyticsService.backfillHistoricalData(),
+        analyticsService.backfillPeriodData(),
+      ]);
+      console.log(`✅ [Analytics] Daily backfill: ${daily.processed} written, ${daily.skipped} skipped`);
+      console.log(`✅ [Analytics] Period backfill: ${period.processed} written, ${period.skipped} skipped`);
     } catch (err) {
       console.error('❌ [Analytics] Backfill failed:', err.message);
     }
-  }, 5000); // 5 second delay
+  }, 5000);
 };
 
 /**

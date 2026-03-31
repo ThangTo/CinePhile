@@ -1,6 +1,7 @@
 const redisService = require('./redis.service');
 const moment = require('moment-timezone');
 const DailyAnalytics = require('../models/daily_analytics.model');
+const PeriodAnalytics = require('../models/period_analytics.model');
 
 /**
  * Analytics Service
@@ -528,6 +529,285 @@ class AnalyticsService {
     const { _id, ...summary } = result[0];
     return summary;
   }
+
+  // =========================================================================
+  // UNIQUE ANALYTICS — PeriodAnalytics (true deduplicated counts via SUNION)
+  // =========================================================================
+
+  /**
+   * Snapshot TRUE unique visitors for the current week or month via Redis SUNION.
+   * Unlike daily snapshot (which stores per-day unique), this stores unique
+   * across the entire period — e.g. one user visiting Mon+Wed counts as 1.
+   *
+   * @param {'week'|'month'} periodType
+   * @returns {Promise<Object>} The saved document
+   */
+  async snapshotPeriodUnique(periodType) {
+    const now = moment().tz('Asia/Ho_Chi_Minh');
+    let periodKey, year, keys;
+
+    if (periodType === 'week') {
+      year = now.isoWeekYear();
+      periodKey = `${year}-W${String(now.isoWeek()).padStart(2, '0')}`;
+      const startOfWeek = now.clone().startOf('isoWeek');
+      keys = [];
+      let curr = startOfWeek.clone();
+      while (curr.isSameOrBefore(now, 'day')) {
+        keys.push(`analytics:visits:${curr.format('YYYY-MM-DD')}`);
+        curr.add(1, 'days');
+      }
+    } else if (periodType === 'month') {
+      year = now.year();
+      periodKey = now.format('YYYY-MM');
+      const startOfMonth = now.clone().startOf('month');
+      keys = [];
+      let curr = startOfMonth.clone();
+      while (curr.isSameOrBefore(now, 'day')) {
+        keys.push(`analytics:visits:${curr.format('YYYY-MM-DD')}`);
+        curr.add(1, 'days');
+      }
+    } else {
+      throw new Error(`Invalid periodType: ${periodType}`);
+    }
+
+    let identifiers = [];
+
+    if (redisService.isConnected && redisService.client && keys.length > 0) {
+      try {
+        if (keys.length === 1) {
+          identifiers = await redisService.client.sendCommand(['SMEMBERS', keys[0]]);
+        } else {
+          identifiers = await redisService.client.sendCommand(['SUNION', ...keys]);
+        }
+      } catch (err) {
+        console.warn(`[Analytics] Redis SUNION failed for ${periodType} ${periodKey}:`, err.message);
+      }
+    }
+
+    const { total, guestCount, userCount } = this._countUserTypes(identifiers);
+    const doc = { periodType, periodKey, year, total, guestCount, userCount };
+
+    const result = await PeriodAnalytics.findOneAndUpdate(
+      { periodType, periodKey },
+      { $set: doc },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return result;
+  }
+
+  /**
+   * Backfill period analytics from Redis for past weeks and months still in TTL.
+   * Skips periods already present in MongoDB.
+   * @returns {Promise<{processed: number, skipped: number}>}
+   */
+  async backfillPeriodData() {
+    let processed = 0;
+    let skipped = 0;
+    const now = moment().tz('Asia/Ho_Chi_Minh');
+
+    // Last 8 weeks
+    for (let w = 0; w < 8; w++) {
+      const weekMoment = now.clone().subtract(w, 'weeks');
+      const year = weekMoment.isoWeekYear();
+      const periodKey = `${year}-W${String(weekMoment.isoWeek()).padStart(2, '0')}`;
+
+      const existing = await PeriodAnalytics.findOne({ periodType: 'week', periodKey }).lean();
+      if (existing && existing.total > 0) {
+        skipped++;
+        continue;
+      }
+
+      // Temporarily override "now" context for past weeks by computing exact keys
+      const startOfWeek = weekMoment.clone().startOf('isoWeek');
+      const endOfWeek = weekMoment.clone().endOf('isoWeek');
+      const keys = [];
+      let curr = startOfWeek.clone();
+      while (curr.isSameOrBefore(endOfWeek, 'day') && curr.isSameOrBefore(now, 'day')) {
+        keys.push(`analytics:visits:${curr.format('YYYY-MM-DD')}`);
+        curr.add(1, 'days');
+      }
+
+      try {
+        let identifiers = [];
+        if (redisService.isConnected && redisService.client && keys.length > 0) {
+          identifiers = keys.length === 1
+            ? await redisService.client.sendCommand(['SMEMBERS', keys[0]])
+            : await redisService.client.sendCommand(['SUNION', ...keys]);
+        }
+        const { total, guestCount, userCount } = this._countUserTypes(identifiers);
+        await PeriodAnalytics.findOneAndUpdate(
+          { periodType: 'week', periodKey },
+          { $set: { periodType: 'week', periodKey, year, total, guestCount, userCount } },
+          { upsert: true, new: true }
+        );
+        processed++;
+      } catch (err) {
+        console.error(`[Analytics] Period backfill failed for week ${periodKey}:`, err.message);
+      }
+    }
+
+    // Last 3 months
+    for (let m = 0; m < 3; m++) {
+      const monthMoment = now.clone().subtract(m, 'months');
+      const year = monthMoment.year();
+      const periodKey = monthMoment.format('YYYY-MM');
+
+      const existing = await PeriodAnalytics.findOne({ periodType: 'month', periodKey }).lean();
+      if (existing && existing.total > 0) {
+        skipped++;
+        continue;
+      }
+
+      const startOfMonth = monthMoment.clone().startOf('month');
+      const endOfMonth = monthMoment.clone().endOf('month');
+      const keys = [];
+      let curr = startOfMonth.clone();
+      while (curr.isSameOrBefore(endOfMonth, 'day') && curr.isSameOrBefore(now, 'day')) {
+        keys.push(`analytics:visits:${curr.format('YYYY-MM-DD')}`);
+        curr.add(1, 'days');
+      }
+
+      try {
+        let identifiers = [];
+        if (redisService.isConnected && redisService.client && keys.length > 0) {
+          identifiers = keys.length === 1
+            ? await redisService.client.sendCommand(['SMEMBERS', keys[0]])
+            : await redisService.client.sendCommand(['SUNION', ...keys]);
+        }
+        const { total, guestCount, userCount } = this._countUserTypes(identifiers);
+        await PeriodAnalytics.findOneAndUpdate(
+          { periodType: 'month', periodKey },
+          { $set: { periodType: 'month', periodKey, year, total, guestCount, userCount } },
+          { upsert: true, new: true }
+        );
+        processed++;
+      } catch (err) {
+        console.error(`[Analytics] Period backfill failed for month ${periodKey}:`, err.message);
+      }
+    }
+
+    return { processed, skipped };
+  }
+
+  /**
+   * Get TRUE unique visitor stats grouped by granularity.
+   * - day:   reads DailyAnalytics (daily unique = per-day unique, correct)
+   * - week:  reads PeriodAnalytics type='week' (SUNION per week)
+   * - month: reads PeriodAnalytics type='month' (SUNION per month)
+   * - year:  groups monthly PeriodAnalytics by year (approx — cross-month
+   *          visitors counted once per month, so slight over-count)
+   *
+   * @param {Object} options
+   * @param {string} options.granularity - 'day' | 'week' | 'month' | 'year'
+   * @param {string} options.from - Start date 'YYYY-MM-DD'
+   * @param {string} options.to   - End date   'YYYY-MM-DD'
+   * @returns {Promise<Array>} [{ label, total, guestCount, userCount }]
+   */
+  async getUniqueStats({ granularity = 'day', from, to } = {}) {
+    const now = moment().tz('Asia/Ho_Chi_Minh');
+    const fromDate = from || now.clone().subtract(30, 'days').format('YYYY-MM-DD');
+    const toDate = to || now.format('YYYY-MM-DD');
+
+    // Day: re-use DailyAnalytics (per-day unique IS unique that day)
+    if (granularity === 'day') {
+      return this.getHistoricalStats({ granularity: 'day', from: fromDate, to: toDate });
+    }
+
+    if (granularity === 'week') {
+      const fromMoment = moment.tz(fromDate, 'YYYY-MM-DD', 'Asia/Ho_Chi_Minh');
+      const toMoment = moment.tz(toDate, 'YYYY-MM-DD', 'Asia/Ho_Chi_Minh');
+      const fromKey = `${fromMoment.isoWeekYear()}-W${String(fromMoment.isoWeek()).padStart(2, '0')}`;
+      const toKey = `${toMoment.isoWeekYear()}-W${String(toMoment.isoWeek()).padStart(2, '0')}`;
+
+      const docs = await PeriodAnalytics.find({
+        periodType: 'week',
+        periodKey: { $gte: fromKey, $lte: toKey },
+      }).sort({ periodKey: 1 }).lean();
+
+      return docs.map((d) => ({
+        label: d.periodKey,
+        total: d.total,
+        guestCount: d.guestCount,
+        userCount: d.userCount,
+      }));
+    }
+
+    if (granularity === 'month') {
+      const fromKey = fromDate.slice(0, 7); // 'YYYY-MM'
+      const toKey = toDate.slice(0, 7);
+
+      const docs = await PeriodAnalytics.find({
+        periodType: 'month',
+        periodKey: { $gte: fromKey, $lte: toKey },
+      }).sort({ periodKey: 1 }).lean();
+
+      return docs.map((d) => ({
+        label: d.periodKey,
+        total: d.total,
+        guestCount: d.guestCount,
+        userCount: d.userCount,
+      }));
+    }
+
+    if (granularity === 'year') {
+      // Aggregate monthly periods by year
+      const fromKey = fromDate.slice(0, 7);
+      const toKey = toDate.slice(0, 7);
+
+      const results = await PeriodAnalytics.aggregate([
+        { $match: { periodType: 'month', periodKey: { $gte: fromKey, $lte: toKey } } },
+        {
+          $group: {
+            _id: { year: '$year' },
+            total: { $sum: '$total' },
+            guestCount: { $sum: '$guestCount' },
+            userCount: { $sum: '$userCount' },
+          },
+        },
+        { $sort: { '_id.year': 1 } },
+      ]);
+
+      return results.map((d) => ({
+        label: String(d._id.year),
+        total: d.total,
+        guestCount: d.guestCount,
+        userCount: d.userCount,
+      }));
+    }
+
+    return [];
+  }
+
+  /**
+   * Get all-time unique summary from PeriodAnalytics (monthly level).
+   * @returns {Promise<Object>} { total, guestCount, userCount, oldestPeriod, newestPeriod, totalPeriods }
+   */
+  async getAllTimeUniqueSummary() {
+    // Sum monthly uniques for all-time (best approximation without storing identifiers)
+    const result = await PeriodAnalytics.aggregate([
+      { $match: { periodType: 'month' } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$total' },
+          guestCount: { $sum: '$guestCount' },
+          userCount: { $sum: '$userCount' },
+          oldestPeriod: { $min: '$periodKey' },
+          newestPeriod: { $max: '$periodKey' },
+          totalPeriods: { $sum: 1 },
+        },
+      },
+    ]);
+
+    if (!result || result.length === 0) {
+      return { total: 0, guestCount: 0, userCount: 0, oldestPeriod: null, newestPeriod: null, totalPeriods: 0 };
+    }
+
+    const { _id, ...summary } = result[0];
+    return summary;
+  }
 }
 
 module.exports = new AnalyticsService();
+

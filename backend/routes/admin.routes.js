@@ -120,6 +120,12 @@ router.get('/analytics/historical', adminController.getHistoricalVisits);
 // GET /api/v1/admin/analytics/summary - Get all-time cumulative totals
 router.get('/analytics/summary', adminController.getAnalyticsSummary);
 
+// GET /api/v1/admin/analytics/unique - Get TRUE unique visitors by granularity + date range
+router.get('/analytics/unique', adminController.getUniqueVisits);
+
+// GET /api/v1/admin/analytics/unique-summary - Get all-time unique totals from PeriodAnalytics
+router.get('/analytics/unique-summary', adminController.getUniqueAnalyticsSummary);
+
 // ===== ADMIN SETTINGS =====
 // GET /api/v1/admin/settings/theme - Get current theme
 router.get('/settings/theme', adminController.getTheme);

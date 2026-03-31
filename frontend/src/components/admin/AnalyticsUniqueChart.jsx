@@ -4,19 +4,18 @@ import { statsAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
 import {
   FiCalendar,
-  FiTrendingUp,
   FiUsers,
-  FiEye,
   FiDatabase,
   FiRefreshCw,
   FiClock,
+  FiUserCheck,
 } from "react-icons/fi";
 
 const GRANULARITIES = [
-  { key: "day",   label: "Theo Ngày",   icon: FiCalendar },
-  { key: "week",  label: "Theo Tuần",   icon: FiClock },
-  { key: "month", label: "Theo Tháng",  icon: FiTrendingUp },
-  { key: "year",  label: "Theo Năm",    icon: FiDatabase },
+  { key: "day",   label: "Theo Ngày" },
+  { key: "week",  label: "Theo Tuần" },
+  { key: "month", label: "Theo Tháng" },
+  { key: "year",  label: "Theo Năm" },
 ];
 
 // Helper: format a Date to 'YYYY-MM-DD' using VN timezone via Intl
@@ -31,14 +30,12 @@ function toVNDateStr(date) {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-// Helper: subtract days from today in VN timezone
 function subtractDays(d, n) {
   const result = new Date(d);
   result.setDate(result.getDate() - n);
   return result;
 }
 
-// Default date ranges for each granularity
 function getDefaultRange(granularity) {
   const nowVN = new Date(
     new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" })
@@ -50,7 +47,7 @@ function getDefaultRange(granularity) {
       return { from: toVNDateStr(subtractDays(nowVN, 29)), to: today };
     case "week": {
       const startOfWeek = new Date(nowVN);
-      startOfWeek.setDate(nowVN.getDate() - ((nowVN.getDay() + 6) % 7)); // Monday
+      startOfWeek.setDate(nowVN.getDate() - ((nowVN.getDay() + 6) % 7));
       const from11WeeksAgo = new Date(startOfWeek);
       from11WeeksAgo.setDate(startOfWeek.getDate() - 77);
       return { from: toVNDateStr(from11WeeksAgo), to: today };
@@ -70,26 +67,19 @@ function getDefaultRange(granularity) {
   }
 }
 
-// Format label for display
 function formatLabel(label, granularity) {
   if (!label) return "";
   if (granularity === "day") {
-    // "2026-03-15" → "15/03"
     const parts = label.split("-");
     return `${parts[2]}/${parts[1]}`;
   }
   if (granularity === "week") {
-    // "2026-W12" → "T12/26"
     const parts = label.split("-W");
     return `Tuần ${parts[1]}/${parts[0]?.slice(2)}`;
   }
   if (granularity === "month") {
-    // "2026-03" → "Th3/2026"
     const [y, m] = label.split("-");
     return `Th${parseInt(m, 10)}/${y}`;
-  }
-  if (granularity === "year") {
-    return label;
   }
   return label;
 }
@@ -109,14 +99,16 @@ const SummaryBadge = ({ icon: Icon, label, value, color, tooltip }) => (
         {label}
         {tooltip && <span className="text-gray-600">ⓘ</span>}
       </p>
-      <p className="text-lg font-bold text-white leading-tight">{value?.toLocaleString() ?? "—"}</p>
+      <p className="text-lg font-bold text-white leading-tight">
+        {value?.toLocaleString() ?? "—"}
+      </p>
     </div>
   </div>
 );
 
-const AnalyticsHistoryChart = () => {
-  const [granularity, setGranularity] = useState("day");
-  const [dateRange, setDateRange] = useState(getDefaultRange("day"));
+const AnalyticsUniqueChart = () => {
+  const [granularity, setGranularity] = useState("month");
+  const [dateRange, setDateRange] = useState(getDefaultRange("month"));
   const [chartData, setChartData] = useState([]);
   const [summary, setSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,25 +122,24 @@ const AnalyticsHistoryChart = () => {
       setError(null);
 
       try {
-        const [historicalRes, summaryRes] = await Promise.all([
-          statsAPI.getHistoricalVisits({
+        const [uniqueRes, summaryRes] = await Promise.all([
+          statsAPI.getUniqueVisits({
             granularity,
             from: dateRange.from,
             to: dateRange.to,
           }),
-          statsAPI.getAnalyticsSummary(),
+          statsAPI.getUniqueAnalyticsSummary(),
         ]);
 
-        // Handle both { data: [...] } and direct array forms
-        const rows = Array.isArray(historicalRes)
-          ? historicalRes
-          : historicalRes?.data || [];
+        const rows = Array.isArray(uniqueRes)
+          ? uniqueRes
+          : uniqueRes?.data || [];
 
         setChartData(rows);
         setSummary(summaryRes?.summary || summaryRes || null);
       } catch (err) {
-        console.error("AnalyticsHistoryChart error:", err);
-        setError("Không thể tải dữ liệu lịch sử. Vui lòng thử lại.");
+        console.error("AnalyticsUniqueChart error:", err);
+        setError("Không thể tải dữ liệu unique visitors. Vui lòng thử lại.");
         setChartData([]);
       } finally {
         setIsLoading(false);
@@ -158,18 +149,15 @@ const AnalyticsHistoryChart = () => {
     [granularity, dateRange]
   );
 
-  // Refetch when granularity or date range changes
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // When granularity changes, reset date range
   const handleGranularityChange = (key) => {
     setGranularity(key);
     setDateRange(getDefaultRange(key));
   };
 
-  // Chart.js datasets
   const labels = useMemo(
     () => chartData.map((d) => formatLabel(d.label, granularity)),
     [chartData, granularity]
@@ -180,20 +168,20 @@ const AnalyticsHistoryChart = () => {
       labels,
       datasets: [
         {
-          label: "Tổng truy cập",
+          label: "Unique Visitors",
           data: chartData.map((d) => d.total),
-          borderColor: "#6366f1",
+          borderColor: "#10b981",
           backgroundColor: (ctx) => {
             const canvas = ctx.chart.ctx;
             const grad = canvas.createLinearGradient(0, 0, 0, 320);
-            grad.addColorStop(0, "rgba(99, 102, 241, 0.35)");
-            grad.addColorStop(1, "rgba(99, 102, 241, 0.0)");
+            grad.addColorStop(0, "rgba(16, 185, 129, 0.35)");
+            grad.addColorStop(1, "rgba(16, 185, 129, 0.0)");
             return grad;
           },
           borderWidth: 2.5,
           tension: 0.4,
           fill: true,
-          pointBackgroundColor: "#6366f1",
+          pointBackgroundColor: "#10b981",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
           pointRadius: chartData.length <= 31 ? 4 : 2,
@@ -260,7 +248,7 @@ const AnalyticsHistoryChart = () => {
               return chartData[idx]?.label || items[0].label;
             },
             label: (ctx) => {
-              const labels = ["Tổng", "Thành viên", "Khách"];
+              const labels = ["Unique", "Thành viên", "Khách"];
               return ` ${labels[ctx.datasetIndex] ?? ctx.dataset.label}: ${ctx.raw?.toLocaleString()}`;
             },
           },
@@ -273,7 +261,6 @@ const AnalyticsHistoryChart = () => {
             color: "#6b7280",
             font: { size: 10, family: "'Inter', sans-serif" },
             maxRotation: 45,
-            minRotation: 0,
             maxTicksLimit: 20,
           },
         },
@@ -292,21 +279,33 @@ const AnalyticsHistoryChart = () => {
     [chartData]
   );
 
+  // Granularity note
+  const granularityNote = {
+    day: "Unique visitors trong từng ngày",
+    week: "Unique visitors thực sự trong từng tuần (SUNION Redis)",
+    month: "Unique visitors thực sự trong từng tháng (SUNION Redis)",
+    year: "Tổng unique theo tháng gộp lại theo năm",
+  };
+
   return (
     <div className="bg-[#ffffff05] rounded-2xl border border-white/5 shadow-xl relative overflow-hidden">
-      {/* Header glow */}
-      <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-[100px] -translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+      {/* Header glow — emerald */}
+      <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[100px] -translate-x-1/3 -translate-y-1/3 pointer-events-none" />
 
       {/* Card Header */}
       <div className="p-6 pb-4 border-b border-white/5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-              <FiTrendingUp size={20} />
+            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              <FiUserCheck size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white tracking-wide">Lịch Sử Lưu Lượng Truy Cập</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Dữ liệu lâu dài từ MongoDB · Cập nhật 23:55 mỗi ngày</p>
+              <h3 className="text-lg font-bold text-white tracking-wide">
+                Người Dùng Unique
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {granularityNote[granularity]} · Cập nhật 23:55 mỗi ngày
+              </p>
             </div>
           </div>
 
@@ -317,11 +316,11 @@ const AnalyticsHistoryChart = () => {
               {GRANULARITIES.map(({ key, label }) => (
                 <button
                   key={key}
-                  id={`analytics-granularity-${key}`}
+                  id={`unique-granularity-${key}`}
                   onClick={() => handleGranularityChange(key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
                     granularity === key
-                      ? "bg-indigo-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]"
+                      ? "bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.4)]"
                       : "text-gray-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
@@ -335,7 +334,7 @@ const AnalyticsHistoryChart = () => {
               <FiCalendar size={13} className="text-gray-500" />
               <input
                 type="date"
-                id="analytics-date-from"
+                id="unique-date-from"
                 value={dateRange.from}
                 max={dateRange.to}
                 onChange={(e) => setDateRange((r) => ({ ...r, from: e.target.value }))}
@@ -344,7 +343,7 @@ const AnalyticsHistoryChart = () => {
               <span className="text-gray-600 text-xs">→</span>
               <input
                 type="date"
-                id="analytics-date-to"
+                id="unique-date-to"
                 value={dateRange.to}
                 min={dateRange.from}
                 onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
@@ -352,9 +351,8 @@ const AnalyticsHistoryChart = () => {
               />
             </div>
 
-            {/* Refresh button */}
             <button
-              id="analytics-refresh-btn"
+              id="unique-refresh-btn"
               onClick={() => fetchData(true)}
               disabled={isRefreshing}
               className="p-2 bg-white/5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all border border-white/5 disabled:opacity-50"
@@ -370,11 +368,11 @@ const AnalyticsHistoryChart = () => {
       {summary && (
         <div className="px-6 pt-4 pb-2 grid grid-cols-2 sm:grid-cols-4 gap-3 z-10 relative">
           <SummaryBadge
-            icon={FiEye}
-            label="Tổng Lượt/Ngày"
+            icon={FiUserCheck}
+            label="Unique/Tháng"
             value={summary.total}
-            color="bg-indigo-500"
-            tooltip="Tổng cộng lượt truy cập theo từng ngày (Daily Sessions). Khác với Unique Visitors — cùng 1 người vào 3 ngày khác nhau = 3 lượt."
+            color="bg-emerald-500"
+            tooltip="Tổng cộng unique visitors theo tháng. Mỗi tháng tính riêng — 1 người vào 2 tháng = 2."
           />
           <SummaryBadge
             icon={FiUsers}
@@ -390,17 +388,17 @@ const AnalyticsHistoryChart = () => {
           />
           <SummaryBadge
             icon={FiDatabase}
-            label="Ngày Ghi Nhận"
-            value={summary.totalDays}
+            label="Tháng Ghi Nhận"
+            value={summary.totalPeriods}
             color="bg-emerald-500"
           />
         </div>
       )}
 
-      {summary?.oldestDate && (
+      {summary?.oldestPeriod && (
         <p className="text-[10px] text-gray-600 px-6 pb-1 z-10 relative">
-          Từ <span className="text-gray-400">{summary.oldestDate}</span>{" "}
-          đến <span className="text-gray-400">{summary.newestDate}</span>
+          Từ <span className="text-gray-400">{summary.oldestPeriod}</span>{" "}
+          đến <span className="text-gray-400">{summary.newestPeriod}</span>
         </p>
       )}
 
@@ -412,11 +410,11 @@ const AnalyticsHistoryChart = () => {
           </div>
         ) : error ? (
           <div className="h-[300px] flex flex-col items-center justify-center text-gray-500">
-            <FiTrendingUp size={40} className="mb-3 opacity-30" />
+            <FiUserCheck size={40} className="mb-3 opacity-30" />
             <p className="text-sm">{error}</p>
             <button
               onClick={() => fetchData()}
-              className="mt-3 px-4 py-1.5 text-xs bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30 transition-colors"
+              className="mt-3 px-4 py-1.5 text-xs bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors"
             >
               Thử lại
             </button>
@@ -424,9 +422,11 @@ const AnalyticsHistoryChart = () => {
         ) : chartData.length === 0 ? (
           <div className="h-[300px] flex flex-col items-center justify-center text-gray-500">
             <FiDatabase size={40} className="mb-3 opacity-30" />
-            <p className="text-sm">Chưa có dữ liệu trong khoảng thời gian này</p>
+            <p className="text-sm">Chưa có dữ liệu unique cho khoảng này</p>
             <p className="text-xs text-gray-600 mt-1">
-              Snapshot đầu tiên sẽ được tạo tự động lúc 23:55 hôm nay
+              {granularity === "day"
+                ? "Snapshot đầu tiên lúc 23:55 hôm nay"
+                : "Dữ liệu tuần/tháng sẽ được tạo sau khi backend restart và snapshot chạy"}
             </p>
           </div>
         ) : (
@@ -435,14 +435,14 @@ const AnalyticsHistoryChart = () => {
               <Line data={lineChartData} options={lineChartOptions} />
             </div>
 
-            {/* Data table for small counts */}
+            {/* Data table for small count */}
             {chartData.length <= 14 && (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-xs text-gray-400">
                   <thead>
                     <tr className="border-b border-white/5 text-gray-600 uppercase tracking-wider">
                       <th className="text-left py-2 pr-4">Thời Gian</th>
-                      <th className="text-right pr-4">Tổng</th>
+                      <th className="text-right pr-4">Unique</th>
                       <th className="text-right pr-4">Thành Viên</th>
                       <th className="text-right">Khách</th>
                     </tr>
@@ -456,7 +456,7 @@ const AnalyticsHistoryChart = () => {
                         }`}
                       >
                         <td className="py-1.5 pr-4">{row.label}</td>
-                        <td className="text-right pr-4 text-indigo-400">
+                        <td className="text-right pr-4 text-emerald-400">
                           {row.total?.toLocaleString()}
                         </td>
                         <td className="text-right pr-4 text-blue-400">
@@ -478,4 +478,4 @@ const AnalyticsHistoryChart = () => {
   );
 };
 
-export default AnalyticsHistoryChart;
+export default AnalyticsUniqueChart;

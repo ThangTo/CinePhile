@@ -923,6 +923,30 @@ export const statsAPI = {
     });
     return response.data || response;
   },
+
+  /**
+   * Get TRUE unique visitor stats per period from PeriodAnalytics
+   * @param {Object} params - { granularity: 'day'|'week'|'month'|'year', from, to }
+   * @returns {Promise<Object>} { success, data: [ { label, total, guestCount, userCount } ] }
+   */
+  getUniqueVisits: async (params = {}) => {
+    const response = await apiRequest("/admin/analytics/unique", {
+      params,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Get all-time unique visitor totals from PeriodAnalytics
+   * @returns {Promise<Object>} { success, summary: { total, guestCount, userCount, oldestPeriod, newestPeriod, totalPeriods } }
+   */
+  getUniqueAnalyticsSummary: async () => {
+    const response = await apiRequest("/admin/analytics/unique-summary", {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };
 
 /**

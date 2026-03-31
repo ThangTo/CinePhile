@@ -6,6 +6,7 @@ import { Chart, registerables } from "chart.js";
 import AnalyticsMap from "./AnalyticsMap";
 import TrendingRanking from "./TrendingRanking";
 import AnalyticsHistoryChart from "./AnalyticsHistoryChart";
+import AnalyticsUniqueChart from "./AnalyticsUniqueChart";
 import { getOptimizedImageUrl } from "constants/imageSizes";
 import {
   FiActivity,
@@ -781,6 +782,10 @@ const AdminOverviewTab = () => {
       {/* Historical Analytics Chart */}
       <div className="w-full">
         <AnalyticsHistoryChart />
+      </div>
+
+      <div className="w-full">
+        <AnalyticsUniqueChart />
       </div>
 
       <TrendingRanking />

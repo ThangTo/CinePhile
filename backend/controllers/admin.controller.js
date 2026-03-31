@@ -750,6 +750,40 @@ const getAnalyticsSummary = async (req, res) => {
   }
 };
 
+/**
+ * GET /admin/analytics/unique
+ * Get TRUE unique visitor stats per period
+ * Query: ?granularity=day|week|month|year&from=YYYY-MM-DD&to=YYYY-MM-DD
+ */
+const getUniqueVisits = async (req, res) => {
+  try {
+    const { granularity = 'day', from, to } = req.query;
+    const validGranularities = ['day', 'week', 'month', 'year'];
+    if (!validGranularities.includes(granularity)) {
+      return res.status(400).json({ message: 'Invalid granularity. Use: day, week, month, year' });
+    }
+    const data = await analyticsService.getUniqueStats({ granularity, from, to });
+    res.status(200).json({ success: true, granularity, from, to, data });
+  } catch (error) {
+    console.error('Error in getUniqueVisits:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /admin/analytics/unique-summary
+ * Get all-time unique visitor totals from PeriodAnalytics
+ */
+const getUniqueAnalyticsSummary = async (req, res) => {
+  try {
+    const summary = await analyticsService.getAllTimeUniqueSummary();
+    res.status(200).json({ success: true, summary });
+  } catch (error) {
+    console.error('Error in getUniqueAnalyticsSummary:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   // Movies
   getAllMovies,
@@ -784,6 +818,8 @@ module.exports = {
   getTrendingMovies,
   getHistoricalVisits,
   getAnalyticsSummary,
+  getUniqueVisits,
+  getUniqueAnalyticsSummary,
 
   // Crawl
   crawlMoviesByPage,
