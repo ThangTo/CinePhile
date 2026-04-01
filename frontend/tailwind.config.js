@@ -57,6 +57,8 @@ module.exports = {
         "premium-shimmer": "premiumShimmer 3s ease-in-out infinite",
         "crown-float": "crownFloat 3s ease-in-out infinite",
         "premium-pulse": "premiumPulse 2s ease-in-out infinite",
+        wiggle: "wiggle 0.5s ease-in-out",
+        streakCardIn: "streakCardIn 0.25s ease-out forwards",
       },
       keyframes: {
         spin: {
@@ -129,6 +131,15 @@ module.exports = {
         premiumPulse: {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.6" },
+        },
+        wiggle: {
+          "0%, 100%": { transform: "rotate(0deg)" },
+          "25%": { transform: "rotate(-8deg)" },
+          "75%": { transform: "rotate(8deg)" },
+        },
+        streakCardIn: {
+          "0%": { opacity: "0", transform: "scale(0.92) translateY(-8px)" },
+          "100%": { opacity: "1", transform: "scale(1) translateY(0)" },
         },
       },
       screens: {

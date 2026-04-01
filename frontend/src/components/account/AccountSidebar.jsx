@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 import { handleAvatarError } from "utils/avatarUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
+import WatchStreak from "components/common/WatchStreak";
 
 const DEFAULT_TAB = "profile";
 
@@ -31,6 +32,11 @@ const navItems = [
     tab: "profile",
     icon: "fa-user",
     label: "Tài khoản",
+  },
+  {
+    tab: "streak",
+    icon: "fa-fire",
+    label: "Chuỗi xem",
   },
 ];
 

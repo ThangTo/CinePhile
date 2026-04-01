@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
 const authMiddleware = require('../middleware/auth.middleware');
+const watchStreakController = require('../controllers/watchStreak.controller');
 
 // GET /api/v1/users/:id - Get user profile
 router.get('/', authMiddleware, userController.getProfile);
@@ -47,5 +48,11 @@ router.post('/upgrade-premium', authMiddleware, userController.upgradePremium);
 
 // POST /api/v1/users/add-coins - Add coins to user account (for testing)
 router.post('/add-coins', authMiddleware, userController.addCoins);
+
+// GET /api/v1/users/streak - Get watch streak
+router.get('/streak', authMiddleware, watchStreakController.getStreak);
+
+// POST /api/v1/users/streak - Record watch session
+router.post('/streak', authMiddleware, watchStreakController.recordStreak);
 
 module.exports = router;

@@ -11,6 +11,7 @@ import NotificationPanel from "components/notifications/NotificationPanel";
 import useAuth from "hooks/useAuth";
 import ThemeSelector from "components/common/ThemeSelector";
 import TimiToggle from "components/common/TimiToggle";
+import WatchStreak from "components/common/WatchStreak";
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -90,10 +91,14 @@ const Header = () => {
           <NavigationLinks className="hidden lg:flex items-center gap-5 text-sm" isMobile={false} />
 
           {/* Right: Search + actions */}
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 laptop-sm:gap-1">
             {/* Timi Toggle - Desktop */}
             <div className="hidden lg:block">
               <TimiToggle />
+            </div>
+            {/* Watch Streak - Desktop */}
+            <div className="hidden lg:block">
+              <WatchStreak compact />
             </div>
             {/* Theme Selector - Desktop */}
             <div className="hidden lg:block">
@@ -206,6 +211,11 @@ const Header = () => {
               <div className="lg:hidden mb-4 flex items-center justify-between px-2">
                 <span className="text-sm text-gray-300">Trợ lý Timi</span>
                 <TimiToggle />
+              </div>
+
+              {/* Watch Streak - Mobile */}
+              <div className="lg:hidden px-2">
+                <WatchStreak compact />
               </div>
 
               <NavigationLinks isMobile={true} />

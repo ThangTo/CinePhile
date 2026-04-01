@@ -129,6 +129,7 @@ const VideoPlayer = ({
   const lastTapRef = useRef({ time: 0 });
   const singleTapTimeoutRef = useRef(null);
   const doubleTapDismissRef = useRef(null);
+  const streakSessionRef = useRef(0); // cumulative seconds in session
 
   const hlsRef = useRef(null);
   const blobUrlRef = useRef(null);
@@ -404,6 +405,7 @@ const VideoPlayer = ({
     resetNetworkRecoveryState();
     clearPendingBuffering();
     lastPlaybackProgressRef.current = 0;
+    streakSessionRef.current = 0;
   }, [hlsSource, resetNetworkRecoveryState, clearPendingBuffering]);
 
   // === HEARTBEAT: Gửi Watch Time mỗi 60 giây khi video đang phát ===
@@ -432,6 +434,10 @@ const VideoPlayer = ({
       if (movieId) {
         movieService.recordWatchTime(movieId, vhId, 60).catch(() => {});
       }
+
+      // Update watch streak every 60s
+      streakSessionRef.current += 60;
+      userService.recordStreak(streakSessionRef.current).catch(() => {});
     }, 60000);
 
     return () => {
@@ -439,6 +445,10 @@ const VideoPlayer = ({
       if (video) {
         video.removeEventListener("waiting", handleWaiting);
         video.removeEventListener("canplay", handleCanPlay);
+      }
+      // Flush final streak on unmount
+      if (streakSessionRef.current > 0) {
+        userService.recordStreak(streakSessionRef.current).catch(() => {});
       }
     };
   }, [isPlaying, movie, viewHistoryIdRef]);

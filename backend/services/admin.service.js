@@ -1510,16 +1510,16 @@ const getUpdatingMovies = async (options = {}) => {
 /**
  * Get top trending movies by timeframe
  * @param {string} timeframe - 'today', 'week', 'month'
- * @returns {Promise<Array>} List of trending movies
+ * @returns {Promise<Array>} List of trending movies with per-episode breakdown
  */
 const getTrendingMovies = async (timeframe = 'today') => {
   const ViewHistoryModel = require('../models/view_history.model');
   const MovieModel = require('../models/movie.model');
   const EpisodeModel = require('../models/episode.model');
+  const UserModel = require('../models/user.model');
 
   const now = new Date();
   const startDate = new Date();
-  
   if (timeframe === 'today') {
     startDate.setHours(0, 0, 0, 0);
   } else if (timeframe === 'week') {
@@ -1527,12 +1527,11 @@ const getTrendingMovies = async (timeframe = 'today') => {
   } else if (timeframe === 'month') {
     startDate.setMonth(now.getMonth() - 1);
   } else {
-    startDate.setHours(0, 0, 0, 0); // default today
+    startDate.setHours(0, 0, 0, 0);
   }
+  const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
 
-  const threeHoursAgo = new Date();
-  threeHoursAgo.setHours(now.getHours() - 3);
-
+  // 1. Movie-level trending aggregation
   const aggregation = await ViewHistoryModel.aggregate([
     { $match: { createdAt: { $gte: startDate } } },
     {
@@ -1541,9 +1540,7 @@ const getTrendingMovies = async (timeframe = 'today') => {
         views: { $sum: 1 },
         totalWatchTime: { $sum: '$watchDuration' },
         uniqueUsers: { $addToSet: { $ifNull: ['$userId', '$ipAddress'] } },
-        recentViews: {
-          $sum: { $cond: [{ $gte: ['$createdAt', threeHoursAgo] }, 1, 0] }
-        }
+        recentViews: { $sum: { $cond: [{ $gte: ['$createdAt', threeHoursAgo] }, 1, 0] } },
       },
     },
     {
@@ -1553,50 +1550,194 @@ const getTrendingMovies = async (timeframe = 'today') => {
         totalWatchTime: { $round: [{ $divide: ['$totalWatchTime', 60] }, 0] },
         uniqueViewers: { $size: '$uniqueUsers' },
         recentViews: 1,
-        velocity: { $round: [{ $divide: ['$recentViews', 3] }, 2] }
+        velocity: { $round: [{ $divide: ['$recentViews', 3] }, 2] },
       }
     },
     { $sort: { totalWatchTime: -1, views: -1 } },
     { $limit: 10 },
   ]);
 
-  // Lookup movie details
   const movieIds = aggregation.map(item => item._id);
   const movies = await MovieModel.find({ _id: { $in: movieIds } })
     .select('name slug poster_url thumb_url type totalEpisodes totalEpisodeViews totalEpisodeWatchTime')
     .lean();
+  const movieMap = new Map(movies.map(m => [m._id.toString(), m]));
 
-  const movieMap = new Map();
-  movies.forEach(m => movieMap.set(m._id.toString(), m));
-
-  // For TV shows: get their top episodes by viewCount
-  const seriesIds = movies
-    .filter(m => m.type === 'series' || m.type === 'tvshows' || (m.totalEpisodes || 0) > 1)
+  const seriesMovies = movies
+    .filter(m => m.type === 'series' || m.type === 'tvshows' || m.type === 'hoathinh' || (m.totalEpisodes || 0) > 1)
     .map(m => m._id);
 
-  const topEpisodesPerShow = await EpisodeModel.aggregate([
-    { $match: { movieId: { $in: seriesIds }, viewCount: { $gt: 0 } } },
-    { $sort: { viewCount: -1 } },
+  // 2. Fetch episodes from DB (with audio type info)
+  const seriesEpisodeMap = new Map();
+  if (seriesMovies.length > 0) {
+    const eps = await EpisodeModel.find({ movieId: { $in: seriesMovies } })
+      .select('movieId episodeId slug serverName audioType')
+      .sort({ movieId: 1, episodeId: 1, audioType: 1 })
+      .lean();
+    eps.forEach(ep => {
+      const mId = ep.movieId.toString();
+      if (!seriesEpisodeMap.has(mId)) seriesEpisodeMap.set(mId, []);
+      seriesEpisodeMap.get(mId).push(ep);
+    });
+  }
+
+  // 3. Episode-level stats within timeframe — join ViewHistory with Episode to get episodeId number + audioType
+  const episodeStatsWithAudio = await ViewHistoryModel.aggregate([
+    { $match: { createdAt: { $gte: startDate }, movieId: { $in: seriesMovies }, episodeId: { $ne: null } } },
+    {
+      $lookup: {
+        from: 'episodes',
+        localField: 'episodeId',
+        foreignField: '_id',
+        as: 'epDoc',
+      }
+    },
+    { $unwind: { path: '$epDoc', preserveNullAndEmptyArrays: false } },
     {
       $group: {
-        _id: '$movieId',
-        topEpisodeNum: { $first: '$episodeId' },
-        topEpisodeViews: { $first: '$viewCount' },
-        topEpisodeUniqueViewers: { $first: '$uniqueViewers' },
-        topEpisodeWatchTime: { $first: '$totalWatchTime' },
-        totalEps: { $sum: 1 },
+        _id: {
+          movieId: '$movieId',
+          episodeNum: '$epDoc.episodeId',
+          audioType: { $ifNull: ['$epDoc.audioType', 'unknown'] },
+        },
+        views: { $sum: 1 },
+        totalWatchTime: { $sum: '$watchDuration' },
+        uniqueUserSet: { $addToSet: { $ifNull: ['$userId', '$ipAddress'] } },
+        viewerDetails: {
+          $push: {
+            userId: '$userId',
+            watchMinutes: { $divide: ['$watchDuration', 60] },
+          },
+        },
       }
-    }
+    },
+    {
+      $project: {
+        _id: 1,
+        views: 1,
+        totalWatchTime: 1,
+        uniqueViewers: { $size: '$uniqueUserSet' },
+        viewerDetails: 1,
+      }
+    },
+    { $sort: { '_id.movieId': 1, '_id.episodeNum': 1, '_id.audioType': 1 } },
   ]);
 
-  const topEpMap = new Map();
-  topEpisodesPerShow.forEach(e => topEpMap.set(e._id.toString(), e));
+  // Map: movieId → [{ episodeNum, audioType, views, watchMinutes, uniqueViewers, viewerDetails }]
+  const epStatsMap = new Map();
+  episodeStatsWithAudio.forEach(e => {
+    const mId = e._id.movieId.toString();
+    if (!epStatsMap.has(mId)) epStatsMap.set(mId, []);
+    epStatsMap.get(mId).push({
+      episodeNum: e._id.episodeNum,
+      audioType: e._id.audioType,
+      views: e.views,
+      watchMinutes: Math.round((e.totalWatchTime || 0) / 60),
+      uniqueViewers: e.uniqueViewers,
+      viewerDetails: e.viewerDetails || [],
+    });
+  });
 
+  // 4. Aggregate per episode-number (sum across audio variants) — for "most watched episode"
+  const epNumAggMap = new Map();
+  episodeStatsWithAudio.forEach(e => {
+    const mId = e._id.movieId.toString();
+    const epNum = e._id.episodeNum;
+    if (!epNumAggMap.has(mId)) epNumAggMap.set(mId, new Map());
+    const epMap = epNumAggMap.get(mId);
+    if (!epMap.has(epNum)) epMap.set(epNum, { views: 0, watchMinutes: 0, uniqueViewers: 0, viewerDetails: [] });
+    const agg = epMap.get(epNum);
+    agg.views += e.views;
+    agg.watchMinutes += Math.round((e.totalWatchTime || 0) / 60);
+    agg.uniqueViewers += e.uniqueViewers;
+    agg.viewerDetails.push(...(e.viewerDetails || []));
+  });
+
+  // 5. Resolve user names for all viewers
+  const allUserIds = new Set();
+  episodeStatsWithAudio.forEach(e => (e.viewerDetails || []).forEach(v => { if (v.userId) allUserIds.add(v.userId.toString()); }));
+  const uniqueUserIds = [...allUserIds];
+  const users = uniqueUserIds.length > 0
+    ? await UserModel.find({ _id: { $in: uniqueUserIds } }).select('_id username name avatar').lean()
+    : [];
+  const userMap = new Map(users.map(u => [u._id.toString(), u]));
+
+  // 6. Assemble final result
   const result = aggregation.map((item, index) => {
     const m = movieMap.get(item._id.toString());
     const isTrending = item.velocity > 10;
-    const isSeries = m && ((m.totalEpisodes || 0) > 1);
-    const topEp = topEpMap.get(item._id.toString());
+    const isSeries = m && (
+      m.type === 'series' || m.type === 'tvshows' || m.type === 'hoathinh' || (m.totalEpisodes || 0) > 1
+    );
+    const mId = item._id.toString();
+
+    const audioTypes = [...new Set((epStatsMap.get(mId) || []).map(e => e.audioType).filter(Boolean))];
+
+    // Group DB episodes by episodeNum
+    const dbEps = seriesEpisodeMap.get(mId) || [];
+    const epGrouped = new Map();
+    dbEps.forEach(ep => {
+      if (!epGrouped.has(ep.episodeId)) epGrouped.set(ep.episodeId, []);
+      epGrouped.get(ep.episodeId).push(ep);
+    });
+
+    const episodeNumbers = [...new Set(dbEps.map(ep => ep.episodeId))].sort((a, b) => a - b);
+    const episodeList = episodeNumbers.map(epNum => {
+      const variants = epGrouped.get(epNum) || [];
+      const statsForNum = epStatsMap.get(mId) || [];
+
+      const variantDetails = variants.map(v => {
+        const stat = statsForNum.find(s => s.episodeNum === epNum && s.audioType === v.audioType);
+        // Top 3 viewers for this variant
+        const topViewers = (stat?.viewerDetails || [])
+          .filter(vd => vd.userId)
+          .sort((a, b) => b.watchMinutes - a.watchMinutes)
+          .slice(0, 3)
+          .map(vd => {
+            const u = userMap.get(vd.userId.toString());
+            return {
+              userId: vd.userId,
+              name: u ? (u.name || u.username) : 'Ẩn danh',
+              avatar: u ? u.avatar : null,
+              watchMinutes: Math.round(vd.watchMinutes),
+            };
+          });
+
+        return {
+          audioType: v.audioType || 'unknown',
+          serverName: v.serverName || null,
+          slug: v.slug,
+          views: stat ? stat.views : 0,
+          watchMinutes: stat ? stat.watchMinutes : 0,
+          uniqueViewers: stat ? stat.uniqueViewers : 0,
+          topViewers,
+        };
+      });
+
+      const agg = epNumAggMap.get(mId)?.get(epNum);
+      return {
+        episodeNum: epNum,
+        views: variantDetails.reduce((s, v) => s + v.views, 0),
+        watchMinutes: variantDetails.reduce((s, v) => s + v.watchMinutes, 0),
+        uniqueViewers: variantDetails.reduce((s, v) => s + v.uniqueViewers, 0),
+        variants: variantDetails,
+      };
+    });
+
+    // Most watched episode (across all audio types)
+    let topEpisode = null;
+    if (episodeList.length > 0) {
+      const top = [...episodeList].sort((a, b) => b.views - a.views)[0];
+      const topVariant = [...top.variants].sort((a, b) => b.views - a.views)[0];
+      topEpisode = {
+        episodeNum: top.episodeNum,
+        views: top.views,
+        watchMinutes: top.watchMinutes,
+        uniqueViewers: top.uniqueViewers,
+        audioType: topVariant?.audioType || null,
+        serverName: topVariant?.serverName || null,
+      };
+    }
 
     return {
       rank: index + 1,
@@ -1605,23 +1746,18 @@ const getTrendingMovies = async (timeframe = 'today') => {
       slug: m ? m.slug : '',
       poster: m ? (m.poster_url || m.thumb_url) : '',
       type: m ? m.type : 'single',
-      totalEpisodes: m ? m.totalEpisodes : 0,
-      // Show-level metrics
+      totalEpisodes: isSeries ? (m.totalEpisodes || 0) : 0,
       views: item.views,
       watchMinutes: item.totalWatchTime,
       uniqueViewers: item.uniqueViewers,
       velocity: item.velocity,
       isTrending,
-      // Episode-level aggregates (TV shows only)
       ...(isSeries && {
+        episodes: episodeList,
+        audioTypes,
+        topEpisode,
         totalEpisodeViews: m.totalEpisodeViews || 0,
         totalEpisodeWatchHours: Math.round((m.totalEpisodeWatchTime || 0) / 3600),
-        topEpisode: topEp ? {
-          episodeNum: topEp.topEpisodeNum,
-          views: topEp.topEpisodeViews,
-          uniqueViewers: topEp.topEpisodeUniqueViewers,
-          watchMinutes: Math.round((topEp.topEpisodeWatchTime || 0) / 60),
-        } : null,
       }),
     };
   });
@@ -1631,7 +1767,7 @@ const getTrendingMovies = async (timeframe = 'today') => {
 
 /**
  * Get specific user's watch analytics
- * @param {string} userId
+ * @param {string} userId - User's MongoDB _id
  * @returns {Promise<Object>} User's analytics data
  */
 const getUserAnalytics = async (userId) => {
@@ -1639,11 +1775,21 @@ const getUserAnalytics = async (userId) => {
   const ViewHistoryModel = require('../models/view_history.model');
   const MovieModel = require('../models/movie.model');
 
-  let objectId;
+  // Try to convert to ObjectId; if it's not a valid 24-char hex string,
+  // the aggregation will simply return no results (which is correct for custom IDs)
+  let objectId = null;
   try {
-    objectId = new mongoose.Types.ObjectId(userId);
+    // Only attempt ObjectId conversion for valid hex strings
+    if (/^[0-9a-fA-F]{24}$/.test(userId)) {
+      objectId = new mongoose.Types.ObjectId(userId);
+    }
   } catch (e) {
-    throw new Error('Invalid User ID format');
+    // Not a valid ObjectId - return empty
+    return { summary: { totalWatchMinutes: 0, moviesCount: 0 }, movies: [] };
+  }
+
+  if (!objectId) {
+    return { summary: { totalWatchMinutes: 0, moviesCount: 0 }, movies: [] };
   }
 
   const aggregation = await ViewHistoryModel.aggregate([
@@ -1663,6 +1809,9 @@ const getUserAnalytics = async (userId) => {
     }
   ]);
 
+  // TEMP DEBUG
+  console.log('[DEBUG getUserAnalytics] userId:', userId, '| aggregation count:', aggregation?.length || 0);
+
   if (!aggregation || aggregation.length === 0) {
     return { summary: { totalWatchMinutes: 0, moviesCount: 0 }, movies: [] };
   }
@@ -1681,7 +1830,7 @@ const getUserAnalytics = async (userId) => {
     const m = movieMap.get(item._id.toString());
     const minutes = Math.round(item.watchMinutes);
     totalWatchMinutes += minutes;
-    
+
     // Retention rate
     let retentionRate = 0;
     if (m && m.duration) {

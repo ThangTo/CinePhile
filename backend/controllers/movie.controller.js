@@ -353,32 +353,40 @@ const postComment = async (req, res) => {
 const incrementView = async (req, res) => {
   try {
     // Lấy IP thực của người dùng (hỗ trợ proxy/nginx)
-    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() 
-      || req.socket?.remoteAddress 
+    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      || req.socket?.remoteAddress
       || '0.0.0.0';
-    
+
     // Lấy userId nếu có token (optional auth)
     let userId = null;
+    let tokenUsed = false;
     try {
       const jwt = require('jsonwebtoken');
-      const token = req.headers.authorization?.replace('Bearer ', '') 
+      const token = req.headers.authorization?.replace('Bearer ', '')
         || req.cookies?.accessToken;
       if (token) {
+        tokenUsed = true;
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        userId = decoded.id || decoded._id || null;
+        userId = decoded.userId || decoded.id || decoded._id || null;
+        // TEMP DEBUG: log full decoded payload
+        console.log('[DEBUG incrementView] decoded keys:', Object.keys(decoded), '| userId result:', userId);
       }
     } catch (e) {
-      // Token không hợp lệ hoặc hết hạn → tiếp tục như guest
+      console.log('[DEBUG incrementView] JWT verify failed:', e.message);
+    }
+
+    if (!tokenUsed) {
+      console.log('[DEBUG incrementView] No token found in request');
     }
 
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const { episodeId } = req.body || {};
 
-    const result = await movieService.incrementView(req.params.id, { 
-      episodeId, 
-      userId, 
-      ipAddress, 
-      userAgent 
+    const result = await movieService.incrementView(req.params.id, {
+      episodeId,
+      userId,
+      ipAddress,
+      userAgent
     });
     res.json(result);
   } catch (error) {

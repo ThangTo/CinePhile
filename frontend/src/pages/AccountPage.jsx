@@ -12,6 +12,7 @@ import { BarSpinner } from "components/common/LoadingState";
 import ContinueWatchingSection from "components/account/ContinueWatchingSection";
 import FavoritesSection from "components/account/FavoritesSection";
 import WatchlistSection from "components/account/WatchlistSection";
+import WatchStreak from "components/common/WatchStreak";
 
 const DEFAULT_TAB = "profile";
 
@@ -21,6 +22,7 @@ const TAB_TITLES = {
   watchlist: "Danh sách của bạn",
   notifications: "Thông báo",
   "continue-watching": "Xem tiếp của bạn",
+  streak: "Chuỗi xem",
 };
 
 const AccountPage = () => {
@@ -99,6 +101,10 @@ const AccountPage = () => {
 
     if (activeTab === "notifications") {
       return <NotificationsTab />;
+    }
+
+    if (activeTab === "streak") {
+      return <WatchStreak />;
     }
 
     return (

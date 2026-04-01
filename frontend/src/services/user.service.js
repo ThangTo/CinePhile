@@ -181,6 +181,27 @@ const userService = {
       data: { amount },
       requiresAuth: true,
     }),
+
+  /**
+   * Lấy streak hiện tại
+   * @returns {Promise<Object>} { currentStreak, longestStreak, lastWatchDate, isActiveToday }
+   */
+  getStreak: () =>
+    apiRequest(`/users/streak`, {
+      requiresAuth: true,
+    }),
+
+  /**
+   * Ghi nhận session xem — cập nhật streak
+   * @param {number} secondsWatched - Tổng giây đã xem trong ngày (cumulative)
+   * @returns {Promise<Object>} Updated streak info
+   */
+  recordStreak: (secondsWatched) =>
+    apiRequest(`/users/streak`, {
+      method: "POST",
+      data: { secondsWatched },
+      requiresAuth: true,
+    }),
 };
 
 export default userService;

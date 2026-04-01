@@ -127,6 +127,8 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         setLoadingAnalytics(true);
         try {
           const data = await userAPI.getUserAnalytics(user._id);
+          // TEMP DEBUG
+          console.log('[DEBUG UserFormModal] user._id:', user._id, '| analytics:', JSON.stringify(data));
           setAnalytics(data);
         } catch (error) {
           console.error("Failed to fetch user analytics:", error);
