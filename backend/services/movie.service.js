@@ -248,16 +248,20 @@ const mapEpisode = (episode) => ({
  * Helper: shape comment
  */
 const mapComment = (comment) => {
+  const user = comment.userId;
+  const isPremium = user?.role === 'premium' &&
+    (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
   return {
     id: comment._id?.toString() || comment.id,
-    userId: comment.userId?._id?.toString() || comment.userId?.toString() || comment.userId,
-    user: comment.userId?.username || 'Ẩn danh',
-    avatar: comment.userId?.avatar || 'https://i.pravatar.cc/150?img=5',
+    userId: user?._id?.toString() || user?.toString() || comment.userId,
+    user: user?.username || 'Ẩn danh',
+    avatar: user?.avatar || 'https://i.pravatar.cc/150?img=5',
     content: comment.content,
     episode: comment.episodeId,
     likes: comment.likes || 0,
     dislikes: comment.dislikes || 0,
     createdAt: comment.createdAt,
+    isPremium,
   };
 };
 
@@ -1374,7 +1378,7 @@ const getComments = async (identifier, filters = {}) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(perPage)
-      .populate('userId', 'username avatar')
+      .populate('userId', 'username avatar role premiumExpiresAt')
       .lean(),
     Comment.countDocuments({ movieId: movieDoc._id, status: 'allowed' }),
   ]);
@@ -1434,7 +1438,7 @@ const postComment = async (identifier, userId, data = {}) => {
     flagReason: moderationResult.reason,
     status: status,
   });
-  const populated = await comment.populate('userId', 'username avatar');
+  const populated = await comment.populate('userId', 'username avatar role premiumExpiresAt');
 
   // Only map if allowed (technically frontend should handle hiding pending, but API usually returns created object)
   // We return it, frontend will see status=pending and might show "Pending approval" message
@@ -1678,19 +1682,25 @@ const getRatings = async (identifier, filters = {}) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(perPage)
-      .populate('userId', 'username avatar')
+      .populate('userId', 'username avatar role premiumExpiresAt')
       .lean(),
     Rating.countDocuments({ movieId: movieDoc._id }),
   ]);
 
-  const ratings = rows.map((rating) => ({
-    id: rating._id.toString(),
-    userId: rating.userId?._id?.toString() || rating.userId?.toString() || rating.userId,
-    user: rating.userId?.username || 'Ẩn danh',
-    avatar: rating.userId?.avatar || 'https://i.pravatar.cc/150?img=5',
-    rating: rating.rating,
-    createdAt: rating.createdAt,
-  }));
+  const ratings = rows.map((rating) => {
+    const user = rating.userId;
+    const isPremium = user?.role === 'premium' &&
+      (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
+    return {
+      id: rating._id.toString(),
+      userId: user?._id?.toString() || user?.toString() || rating.userId,
+      user: user?.username || 'Ẩn danh',
+      avatar: user?.avatar || 'https://i.pravatar.cc/150?img=5',
+      rating: rating.rating,
+      createdAt: rating.createdAt,
+      isPremium,
+    };
+  });
 
   return {
     data: ratings,

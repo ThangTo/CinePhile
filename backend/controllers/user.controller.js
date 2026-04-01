@@ -4,6 +4,8 @@ const UserWatchlist = require('../models/user_watchlist.model');
 const UserHistory = require('../models/user_history.model');
 
 const userService = require('../services/user.service');
+const adminService = require('../services/admin.service');
+const { PLANS } = require('../config/premium.config');
 // Helper to get user ID from authenticated request (via auth middleware)
 const getUserId = (req) => {
   if (req.user && req.user._id) {
@@ -384,14 +386,16 @@ const upgradePremium = async (req, res) => {
     const userId = await getUserId(req);
     const { plan = 'monthly' } = req.body;
 
-    // Premium pricing (in coins)
-    const PRICING = {
-      weekly: 30, // 30 coins for 1 week
-      monthly: 100, // 100 coins for 1 month
-      yearly: 1000, // 1000 coins for 1 year (better deal)
-    };
+    // Read price from Settings DB first; fall back to config file
+    const dbPlan = await adminService.getPremiumPlanPrice(plan);
+    const planConfig = dbPlan
+      ? { days: dbPlan.days, coins: dbPlan.coins }
+      : PLANS[plan];
+    if (!planConfig) {
+      return res.status(400).json({ message: 'Invalid plan. Use "weekly", "monthly" or "yearly"' });
+    }
 
-    const requiredCoins = PRICING[plan];
+    const requiredCoins = planConfig.coins;
     if (!requiredCoins) {
       return res.status(400).json({ message: 'Invalid plan. Use "weekly", "monthly" or "yearly"' });
     }
@@ -422,13 +426,7 @@ const upgradePremium = async (req, res) => {
 
     // Calculate expiry date based on plan
     const expiryDate = new Date();
-    if (plan === 'weekly') {
-      expiryDate.setDate(expiryDate.getDate() + 7);
-    } else if (plan === 'monthly') {
-      expiryDate.setMonth(expiryDate.getMonth() + 1);
-    } else if (plan === 'yearly') {
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-    }
+    expiryDate.setDate(expiryDate.getDate() + planConfig.days);
 
     // Deduct coins and upgrade to premium
     user.coin -= requiredCoins;

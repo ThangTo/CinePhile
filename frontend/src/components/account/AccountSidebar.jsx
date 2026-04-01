@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 import { handleAvatarError } from "utils/avatarUtils";
+import PremiumAvatar from "components/common/PremiumAvatar";
 
 const DEFAULT_TAB = "profile";
 
@@ -85,15 +86,23 @@ const AccountSidebar = ({ user, onLogout }) => {
 
       <div className="mt-auto border-t border-account-border pt-5">
         <div className="md:flex items-center mb-4 hidden">
-          <img
+          <PremiumAvatar
             src={user.avatar}
             alt={user.username}
-            className="w-10 h-10 rounded-full mr-3 object-cover"
-            onError={handleAvatarError}
+            size="w-10 h-10"
+            isPremium={isPremiumActive(user)}
+            className="mr-3"
           />
           <div className="overflow-hidden">
-            <div className="font-semibold text-account-text-primary whitespace-nowrap overflow-hidden text-ellipsis">
-              {user.username}
+            <div className="flex items-center gap-2">
+              <span className={`font-semibold whitespace-nowrap overflow-hidden text-ellipsis ${
+                isPremiumActive(user) ? "text-primaryColor" : "text-account-text-primary"
+              }`}>
+                {user.username}
+              </span>
+              {isPremiumActive(user) && (
+                <i className="fa-solid fa-crown text-primaryColor text-xs" style={{filter:"drop-shadow(0 0 3px rgba(255,216,117,0.6))"}} />
+              )}
             </div>
             <div className="text-xs text-account-text-secondary whitespace-nowrap overflow-hidden text-ellipsis">
               {user.email.length > 15 ? user.email.substring(0, 15) + "..." : user.email}

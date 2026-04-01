@@ -53,6 +53,10 @@ module.exports = {
         slideDown: "slideDown 0.3s ease-out",
         ripple: "ripple 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards",
         "fade-in-up": "fadeInUp 0.25s ease-out forwards",
+        "premium-glow": "premiumGlow 2.5s ease-in-out infinite",
+        "premium-shimmer": "premiumShimmer 3s ease-in-out infinite",
+        "crown-float": "crownFloat 3s ease-in-out infinite",
+        "premium-pulse": "premiumPulse 2s ease-in-out infinite",
       },
       keyframes: {
         spin: {
@@ -109,6 +113,22 @@ module.exports = {
         fadeInUp: {
           "0%": { transform: "translateY(8px) scale(0.95)", opacity: "0" },
           "100%": { transform: "translateY(0) scale(1)", opacity: "1" },
+        },
+        premiumGlow: {
+          "0%, 100%": { boxShadow: "0 0 8px 2px rgba(255, 216, 117, 0.4)" },
+          "50%": { boxShadow: "0 0 20px 6px rgba(255, 216, 117, 0.7)" },
+        },
+        premiumShimmer: {
+          "0%": { backgroundPosition: "-200% center" },
+          "100%": { backgroundPosition: "200% center" },
+        },
+        crownFloat: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-3px)" },
+        },
+        premiumPulse: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.6" },
         },
       },
       screens: {

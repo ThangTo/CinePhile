@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ConfirmDialog from "components/common/ConfirmDialog";
+import PremiumAvatar from "components/common/PremiumAvatar";
 import useToast from "hooks/useToast";
 
 const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, currentUserId }) => {
@@ -21,22 +22,30 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
     }
   };
   return (
-    <div className="bg-bgColor sm:p-2 py-2 rounded-lg hover:border-white/10 transition-colors">
+    <div className={`sm:p-2 py-2 rounded-lg transition-all ${
+        comment.isPremium
+          ? "bg-gradient-to-br from-primaryColor/8 to-hoverPrimaryColor/5 border border-primaryColor/20"
+          : "bg-bgColor hover:border-white/10"
+      }`}>
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <img
+        <PremiumAvatar
           src={comment.avatar}
           alt={comment.user}
-          className="w-12 h-12 rounded-full flex-shrink-0 ring-2 ring-white/10"
+          size="w-12 h-12"
+          isPremium={comment.isPremium}
         />
 
         <div className="flex-1 min-w-0">
           {/* User info & badges */}
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="font-semibold text-sm text-white">{comment.user}</span>
-            {comment.badge === "vip" && (
-              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded text-xs font-bold">
-                <i className="fa-solid fa-infinity text-xs" />
+            <span className={`font-semibold text-sm ${comment.isPremium ? "text-primaryColor" : "text-white"}`}>
+              {comment.user}
+            </span>
+            {comment.isPremium && (
+              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded-full text-xs font-bold shadow-sm">
+                <i className="fa-solid fa-crown text-[9px]" />
+                <span>Premium</span>
               </span>
             )}
             <span className="text-gray-400 text-xs">{comment.time}</span>
@@ -56,7 +65,9 @@ const CommentItem = ({ comment, onLike, onDislike, onReply, onMore, onDelete, cu
           )}
 
           {/* Comment content */}
-          <p className="text-gray-300 text-sm mb-3 leading-relaxed break-words whitespace-pre-wrap">
+          <p className={`text-sm mb-3 leading-relaxed break-words whitespace-pre-wrap ${
+            comment.isPremium ? "text-gray-200" : "text-gray-300"
+          }`}>
             {comment.content}
           </p>
 

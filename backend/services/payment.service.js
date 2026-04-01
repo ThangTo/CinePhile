@@ -21,10 +21,12 @@ const createPaymentLink = async (userId, amount, bonus = 0) => {
   // Khắc phục OrderCode: PayOS CHỈ chấp nhận số (Integer), KHÔNG chấp nhận chữ cái hay ký tự đặc biệt.
   // Ta dùng Timestamp (13 số) + Random (2 số) = 15 số (an toàn nằm dưới giới hạn Number.MAX_SAFE_INTEGER của JavaScript)
   const timestamp = Date.now().toString(); // 13 digits
-  const randomSuffix = Math.floor(Math.random() * 100).toString().padStart(2, '0'); // 2 digits
+  const randomSuffix = Math.floor(Math.random() * 100)
+    .toString()
+    .padStart(2, '0'); // 2 digits
   const orderCode = Number(timestamp + randomSuffix);
 
-  const money = parseInt(amount) * 10; // TODO money
+  const money = parseInt(amount);
 
   const body = {
     orderCode: orderCode,
@@ -42,7 +44,7 @@ const createPaymentLink = async (userId, amount, bonus = 0) => {
   // 1. Store request in MongoDB DB instead of memory
   const parsedAmount = parseInt(amount);
   const parsedBonus = parseInt(bonus) || 0;
-  
+
   await Transaction.create({
     user: userId,
     orderCode: orderCode.toString(),
@@ -50,7 +52,7 @@ const createPaymentLink = async (userId, amount, bonus = 0) => {
     coinAmount: parsedAmount,
     bonusCoin: parsedBonus,
     provider: 'PAYOS',
-    status: 'PENDING'
+    status: 'PENDING',
   });
 
   // 2. Create PayOS Payment Link
@@ -70,7 +72,10 @@ const handleWebhook = async (webhookData) => {
     const { orderCode } = webhookData.data;
 
     // 3. Find pending request in Database
-    const transaction = await Transaction.findOne({ orderCode: orderCode.toString(), status: 'PENDING' });
+    const transaction = await Transaction.findOne({
+      orderCode: orderCode.toString(),
+      status: 'PENDING',
+    });
 
     if (transaction) {
       console.log(`[Webhook] Processing success payment for Order ${orderCode}`);

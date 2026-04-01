@@ -977,4 +977,91 @@ export const settingsAPI = {
     });
     return response.data || response;
   },
+
+  // ─── Coin Packages ─────────────────────────────────────────────────────────
+
+  /**
+   * Get all coin packages — public endpoint, no auth required
+   */
+  getCoinPackages: async () => {
+    const response = await apiRequest("/settings/coin-packages", {
+      requiresAuth: false,
+    });
+    return response.data || response || [];
+  },
+
+  /**
+   * Add or update a coin package
+   * @param {Object} pkg - { id?, amount, bonus, label, sortOrder? }
+   */
+  upsertCoinPackage: async (pkg) => {
+    const response = await apiRequest("/admin/pricing/coin-packages", {
+      method: "POST",
+      data: pkg,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Delete a coin package
+   * @param {string} id - Package id
+   */
+  deleteCoinPackage: async (id) => {
+    const response = await apiRequest(`/admin/pricing/coin-packages/${id}`, {
+      method: "DELETE",
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Reorder coin packages
+   * @param {string[]} orderedIds - IDs in new display order
+   */
+  reorderCoinPackages: async (orderedIds) => {
+    const response = await apiRequest("/admin/pricing/coin-packages/reorder", {
+      method: "PUT",
+      data: { orderedIds },
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  // ─── Premium Plans ─────────────────────────────────────────────────────────
+
+  /**
+   * Get all premium plans — public endpoint, no auth required
+   */
+  getPremiumPlans: async () => {
+    const response = await apiRequest("/settings/premium-plans", {
+      requiresAuth: false,
+    });
+    return response.data || response || [];
+  },
+
+  /**
+   * Add or update a premium plan
+   * @param {Object} plan - { id?, planKey, label, days, coins, sortOrder? }
+   */
+  upsertPremiumPlan: async (plan) => {
+    const response = await apiRequest("/admin/pricing/premium-plans", {
+      method: "POST",
+      data: plan,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Delete a premium plan
+   * @param {string} id - Plan id
+   */
+  deletePremiumPlan: async (id) => {
+    const response = await apiRequest(`/admin/pricing/premium-plans/${id}`, {
+      method: "DELETE",
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };

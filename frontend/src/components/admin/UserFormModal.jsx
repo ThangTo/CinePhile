@@ -82,6 +82,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
     password: "",
     confirmPassword: "",
     avatar: "",
+    premiumExpiresAt: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -101,6 +102,9 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         password: "",
         confirmPassword: "",
         avatar: user.avatar || "",
+        premiumExpiresAt: user.premiumExpiresAt
+          ? new Date(user.premiumExpiresAt).toISOString().slice(0, 16)
+          : "",
       });
     } else {
       setFormData({
@@ -111,6 +115,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         password: "",
         confirmPassword: "",
         avatar: "",
+        premiumExpiresAt: "",
       });
     }
     setErrors({});
@@ -188,6 +193,11 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         email: formData.email,
         role: formData.role,
         avatar: formData.avatar || "",
+        premiumExpiresAt: formData.role === 'premium'
+          ? formData.premiumExpiresAt
+            ? new Date(formData.premiumExpiresAt).toISOString()
+            : new Date('2099-12-31T23:59:59.999Z').toISOString() // vĩnh viễn
+          : null, // user/admin: xóa expiry
       };
 
       // Chỉ gửi password nếu có thay đổi
@@ -345,6 +355,23 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
                           { value: "admin", label: "Admin" },
                         ]}
                       />
+                      {formData.role === "premium" && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider flex items-center gap-1.5">
+                            <FiClock className="text-primaryColor" /> Ngày Hết Hạn Premium
+                          </label>
+                          <input
+                            type="datetime-local"
+                            name="premiumExpiresAt"
+                            value={formData.premiumExpiresAt}
+                            onChange={handleChange}
+                            className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primaryColor transition-all"
+                          />
+                          <p className="text-xs text-gray-500">
+                            Để trống = vĩnh viễn (không hết hạn)
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -8,6 +8,7 @@ import AdminOverviewTab from "components/admin/AdminOverviewTab";
 import AdminNotificationTab from "components/admin/AdminNotificationTab";
 import AdminSettingsTab from "components/admin/AdminSettingsTab";
 import AdminViralClipsTab from "components/admin/AdminViralClipsTab";
+import SettingsPricingTab from "components/admin/SettingsPricingTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminDashboard = () => {
@@ -82,6 +83,8 @@ const AdminDashboard = () => {
         return <AdminNotificationTab />;
       case ADMIN_TABS.SETTINGS:
         return <AdminSettingsTab />;
+      case ADMIN_TABS.PRICING:
+        return <SettingsPricingTab />;
       default:
         return null;
     }

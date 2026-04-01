@@ -583,6 +583,148 @@ const setTheme = async (req, res) => {
   }
 };
 
+// ─── Pricing Controllers ────────────────────────────────────────────────────────
+
+/**
+ * GET /admin/pricing/coin-packages
+ * Get all coin packages
+ */
+const getCoinPackages = async (req, res) => {
+  try {
+    const packages = await adminService.getCoinPackages();
+    res.json({ data: packages });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/pricing/coin-packages
+ * Add or update a coin package
+ */
+const upsertCoinPackage = async (req, res) => {
+  try {
+    const { id, amount, bonus, label, price, sortOrder } = req.body;
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ message: 'Số coin phải lớn hơn 0' });
+    }
+    if (!price || Number(price) <= 0) {
+      return res.status(400).json({ message: 'Giá tiền phải lớn hơn 0' });
+    }
+    const pkg = {
+      id,
+      amount: Number(amount),
+      bonus: Number(bonus) || 0,
+      label: label || `${Number(amount) + (Number(bonus) || 0)} coin`,
+      price: Number(price),
+      sortOrder: Number(sortOrder) || 99,
+    };
+    const packages = await adminService.upsertCoinPackage(pkg);
+    res.json({ success: true, data: packages });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * DELETE /admin/pricing/coin-packages/:id
+ * Delete a coin package
+ */
+const deleteCoinPackage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const packages = await adminService.deleteCoinPackage(id);
+    res.json({ success: true, data: packages });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * PUT /admin/pricing/coin-packages/reorder
+ * Reorder coin packages
+ */
+const reorderCoinPackages = async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ message: 'orderedIds phải là một mảng' });
+    }
+    const packages = await adminService.reorderCoinPackages(orderedIds);
+    res.json({ success: true, data: packages });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /admin/pricing/premium-plans
+ * Get all premium plans
+ */
+const getPremiumPlans = async (req, res) => {
+  try {
+    const plans = await adminService.getPremiumPlans();
+    res.json({ data: plans });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/pricing/premium-plans
+ * Add or update a premium plan
+ */
+const upsertPremiumPlan = async (req, res) => {
+  try {
+    const { id, planKey, label, days, coins, sortOrder } = req.body;
+    if (!planKey || !label || !days || !coins) {
+      return res.status(400).json({ message: 'planKey, label, days, coins là bắt buộc' });
+    }
+    if (Number(coins) <= 0 || Number(days) <= 0) {
+      return res.status(400).json({ message: 'days và coins phải lớn hơn 0' });
+    }
+    const plan = {
+      id,
+      planKey: planKey.trim().toLowerCase().replace(/\s+/g, '_'),
+      label: label.trim(),
+      days: Number(days),
+      coins: Number(coins),
+      sortOrder: Number(sortOrder) || 99,
+    };
+    const plans = await adminService.upsertPremiumPlan(plan);
+    res.json({ success: true, data: plans });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * DELETE /admin/pricing/premium-plans/:id
+ * Delete a premium plan
+ */
+const deletePremiumPlan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const plans = await adminService.deletePremiumPlan(id);
+    res.json({ success: true, data: plans });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /admin/pricing/seed
+ * Seed default pricing (safe to call multiple times)
+ */
+const seedPricingSettings = async (req, res) => {
+  try {
+    await adminService.seedPricingSettings();
+    res.json({ success: true, message: 'Đã seed pricing mặc định' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 /**
  * GET /admin/movies/updating
  * Get movies for update modal (episodes, quality, or thumbnails tab)
@@ -830,4 +972,14 @@ module.exports = {
   // Settings
   getTheme,
   setTheme,
+
+  // Pricing
+  getCoinPackages,
+  upsertCoinPackage,
+  deleteCoinPackage,
+  reorderCoinPackages,
+  getPremiumPlans,
+  upsertPremiumPlan,
+  deletePremiumPlan,
+  seedPricingSettings,
 };

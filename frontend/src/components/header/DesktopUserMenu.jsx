@@ -5,6 +5,7 @@ import { useNotifications } from "contexts/NotificationContext";
 import NotificationPanel from "components/notifications/NotificationPanel";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 import { handleAvatarError } from "utils/avatarUtils";
+import PremiumAvatar from "components/common/PremiumAvatar";
 
 const PremiumBanner = ({ username, user }) => {
   const isPremium = isPremiumActive(user);
@@ -100,11 +101,11 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
           onClick={onToggle}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
-          <img
+          <PremiumAvatar
             src={user.avatar}
             alt={user.username}
-            className="w-10 h-10 rounded-full object-cover border-2 border-white/20"
-            onError={handleAvatarError}
+            size="w-10 h-10"
+            isPremium={isPremiumActive(user)}
           />
           <i
             className={`fa-solid fa-chevron-down text-gray-300 text-sm transition-transform ${
@@ -119,14 +120,16 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
             {/* User Info Header */}
             <div className="p-4 border-b border-white/10 bg-gradient-to-br from-[#2d3b52] to-[#1e293b]">
               <div className="flex items-center gap-3 mb-3">
-                <img
+                <PremiumAvatar
                   src={user.avatar}
                   alt={user.username}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-cyan-400/50"
-                  onError={handleAvatarError}
+                  size="w-12 h-12"
+                  isPremium={isPremiumActive(user)}
                 />
                 <div>
-                  <div className="text-white font-semibold">{user.username}</div>
+                  <div className={`font-semibold ${isPremiumActive(user) ? "text-primaryColor" : "text-white"}`}>
+                    {user.username}
+                  </div>
                   <div className="text-gray-400 text-xs">{user.email}</div>
                 </div>
               </div>

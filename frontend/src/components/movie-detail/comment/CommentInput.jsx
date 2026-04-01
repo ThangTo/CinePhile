@@ -1,6 +1,8 @@
 import React from "react";
 import useAuth from "hooks/useAuth";
+import { isPremiumActive } from "utils/premiumUtils";
 import { handleAvatarError } from "utils/avatarUtils";
+import PremiumAvatar from "components/common/PremiumAvatar";
 
 const CommentInput = ({
   commentText,
@@ -35,18 +37,21 @@ const CommentInput = ({
         {/* User Identity Header */}
         {isAuthenticated && user && (
           <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/10">
-            <img
+            <PremiumAvatar
               src={user.avatar}
               alt={user.username || "User"}
-              className="w-10 h-10 rounded-full ring-2 ring-white/20"
-              onError={handleAvatarError}
+              size="w-10 h-10"
+              isPremium={isPremiumActive(user)}
             />
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-white">{user.username || "Người dùng"}</span>
-                {user.isPremium && (
-                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded text-xs font-bold">
-                    <i className="fa-solid fa-infinity text-xs" />
+                <span className={`font-semibold ${isPremiumActive(user) ? "text-primaryColor" : "text-white"}`}>
+                  {user.username || "Người dùng"}
+                </span>
+                {isPremiumActive(user) && (
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded-full text-xs font-bold shadow-sm">
+                    <i className="fa-solid fa-crown text-[9px]" />
+                    <span>Premium</span>
                   </span>
                 )}
               </div>

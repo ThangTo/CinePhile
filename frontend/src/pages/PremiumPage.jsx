@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
+import { settingsAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
 import { isPremiumActive, getRemainingDays } from "utils/premiumUtils";
 
@@ -28,6 +29,8 @@ const PremiumPage = () => {
   const [loadingPlanId, setLoadingPlanId] = useState(null); // Track which plan is being processed
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
 
   // Redirect nếu chưa đăng nhập
   useEffect(() => {
@@ -36,60 +39,31 @@ const PremiumPage = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Định nghĩa các gói dịch vụ
-  const plans = [
-    {
-      id: "weekly",
-      name: "Premium Tuần",
-      duration: "1 tuần",
-      price: 30,
-      priceLabel: "30 Coin",
-      features: [
-        "Xem phim không giới hạn",
-        "Chất lượng HD/4K",
-        "Không quảng cáo",
-        "Tải xuống để xem offline",
-        "Hỗ trợ khách hàng cơ bản",
-      ],
-      popular: false,
-    },
-    {
-      id: "monthly",
-      name: "Premium Tháng",
-      duration: "1 tháng",
-      price: 100,
-      priceLabel: "100 Coin",
-      originalPrice: 120,
-      discount: "Tiết kiệm 20 coin",
-      features: [
-        "Tất cả tính năng Premium Tuần",
-        "Xem phim không giới hạn",
-        "Chất lượng HD/4K",
-        "Không quảng cáo",
-        "Tải xuống để xem offline",
-        "Ưu tiên hỗ trợ khách hàng",
-      ],
-      popular: true,
-    },
-    {
-      id: "yearly",
-      name: "Premium Năm",
-      duration: "12 tháng",
-      price: 1000,
-      priceLabel: "1000 Coin",
-      originalPrice: 1200,
-      discount: "Tiết kiệm 200 coin",
-      features: [
-        "Tất cả tính năng Premium Tháng",
-        "Tiết kiệm 200 coin/năm",
-        "Ưu tiên truy cập phim mới",
-        "Quà tặng đặc biệt dịp lễ",
-        "Hỗ trợ VIP 24/7",
-        "Huy hiệu thành viên độc quyền",
-      ],
-      popular: false,
-    },
-  ];
+  // Load premium plans from Settings
+  useEffect(() => {
+    settingsAPI.getPremiumPlans()
+      .then((fetchedPlans) => {
+        const sorted = [...(fetchedPlans || [])].sort((a, b) => (a.sortOrder || 99) - (b.sortOrder || 99));
+        // Merge with display metadata (features, popular, etc.)
+        const DEFAULT_FEATURES = {
+          weekly: ["Xem phim không giới hạn", "Chất lượng HD/4K", "Không quảng cáo", "Tải xuống để xem offline"],
+          monthly: ["Tất cả tính năng Premium Tuần", "Xem phim không giới hạn", "Chất lượng HD/4K", "Không quảng cáo", "Tải xuống để xem offline", "Ưu tiên hỗ trợ khách hàng"],
+          yearly: ["Tất cả tính năng Premium Tháng", "Ưu tiên truy cập phim mới", "Không quảng cáo", "Huy hiệu thành viên độc quyền", "Hỗ trợ VIP 24/7", "Quà tặng dịp lễ"],
+        };
+        const mapped = sorted.map((p, idx) => ({
+          id: p.planKey,
+          name: `Premium ${p.label}`,
+          duration: `${p.days} ngày`,
+          price: p.coins,
+          priceLabel: `${p.coins} Coin`,
+          features: DEFAULT_FEATURES[p.planKey] || [`Premium ${p.label}`, `${p.days} ngày`, "Tất cả tính năng premium"],
+          popular: idx === 1, // Middle plan is popular by default
+        }));
+        setPlans(mapped);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPlans(false));
+  }, []);
 
   const handleUpgrade = async (planId) => {
     if (!user) {
@@ -209,7 +183,16 @@ const PremiumPage = () => {
 
         {/* --- Pricing Cards Grid --- */}
         <div className="container mx-auto px-0 md:px-4 pb-20 max-w-6xl">
-          {/* items-stretch: Quan trọng để các thẻ cao bằng nhau */}
+          {loadingPlans ? (
+            <div className="flex items-center justify-center py-20">
+              <BarSpinner />
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="text-center py-20 text-gray-500">
+              Chưa có gói Premium nào được cấu hình.
+            </div>
+          ) : (
+          /* items-stretch: Quan trọng để các thẻ cao bằng nhau */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
             {plans.map((plan) => {
               const canAfford = userCoins >= plan.price;
@@ -353,6 +336,7 @@ const PremiumPage = () => {
               );
             })}
           </div>
+          )}
         </div>
 
         {/* --- Benefits Section --- */}

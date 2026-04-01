@@ -3,6 +3,8 @@ import useToast from "hooks/useToast";
 import ToastContainer from "components/common/ToastContainer";
 import { cardStyles, buttonStyles } from "./shared-styles";
 import { handleAvatarError } from "utils/avatarUtils";
+import { isPremiumActive } from "utils/premiumUtils";
+import PremiumAvatar from "components/common/PremiumAvatar";
 
 const MAX_AVATAR_SIZE_MB = 5;
 
@@ -63,11 +65,12 @@ const ProfileCard = ({ user, onUpdate }) => {
       <div className={cardStyles.body}>
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-6 text-center md:text-left">
           <div className="text-center">
-            <img
+            <PremiumAvatar
               src={user.avatar}
               alt="Ảnh đại diện"
-              className="w-[100px] h-[100px] rounded-full border-[3px] border-account-border mb-3 object-cover"
-              onError={handleAvatarError}
+              size="w-[100px] h-[100px]"
+              isPremium={isPremiumActive(user)}
+              className={`mb-3 ${isPremiumActive(user) ? "scale-105" : ""}`}
             />
             <div className="flex gap-2.5 justify-center">
               <button
@@ -80,7 +83,17 @@ const ProfileCard = ({ user, onUpdate }) => {
             </div>
           </div>
           <div className="pb-6">
-            <h3 className="text-[22px] font-semibold m-0 mb-2">{user.username}</h3>
+            <h3 className={`text-[22px] font-semibold m-0 mb-2 flex items-center justify-center md:justify-start gap-2 ${
+              isPremiumActive(user) ? "text-primaryColor" : "text-white"
+            }`}>
+              {user.username}
+              {isPremiumActive(user) && (
+                <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded-full text-xs font-bold shadow-sm">
+                  <i className="fa-solid fa-crown text-[9px]" />
+                  <span>Premium</span>
+                </span>
+              )}
+            </h3>
             <p className="text-base text-account-text-secondary m-0">{user.email}</p>
           </div>
         </div>

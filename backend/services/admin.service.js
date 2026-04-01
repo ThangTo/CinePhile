@@ -897,6 +897,126 @@ const setTheme = async (themeName) => {
   return await setSetting('theme', themeName, 'Global theme for the website');
 };
 
+// ─── Pricing Service ──────────────────────────────────────────────────────────
+
+const DEFAULT_COIN_PACKAGES = [
+  { id: 'pkg_1', amount: 10,  bonus: 0,   label: '10 coin',    price: 10000,  sortOrder: 1 },
+  { id: 'pkg_2', amount: 50,  bonus: 5,   label: '55 coin',    price: 50000,  sortOrder: 2 },
+  { id: 'pkg_3', amount: 100, bonus: 15,  label: '115 coin',   price: 100000, sortOrder: 3 },
+  { id: 'pkg_4', amount: 200, bonus: 40,  label: '240 coin',   price: 200000, sortOrder: 4 },
+  { id: 'pkg_5', amount: 500, bonus: 150,  label: '650 coin',   price: 500000, sortOrder: 5 },
+];
+
+const DEFAULT_PREMIUM_PLANS = [
+  { id: 'plan_weekly',  planKey: 'weekly',  label: 'Tuần',     days: 7,   coins: 30,   sortOrder: 1 },
+  { id: 'plan_monthly', planKey: 'monthly', label: 'Tháng',   days: 30,  coins: 100,  sortOrder: 2 },
+  { id: 'plan_yearly',  planKey: 'yearly',  label: 'Năm',     days: 365, coins: 1000, sortOrder: 3 },
+];
+
+/**
+ * Ensure default pricing is seeded in the database.
+ * Safe to call on startup — only upserts if missing.
+ */
+const seedPricingSettings = async () => {
+  const existingCoin = await SettingsModel.findOne({ key: 'coin_packages' });
+  if (!existingCoin) {
+    await SettingsModel.create({ key: 'coin_packages', value: DEFAULT_COIN_PACKAGES, description: 'Danh sách gói coin' });
+  }
+  const existingPremium = await SettingsModel.findOne({ key: 'premium_plans' });
+  if (!existingPremium) {
+    await SettingsModel.create({ key: 'premium_plans', value: DEFAULT_PREMIUM_PLANS, description: 'Danh sách gói premium' });
+  }
+};
+
+/**
+ * Get coin packages from DB (with defaults as fallback).
+ */
+const getCoinPackages = async () => {
+  const value = await getSetting('coin_packages');
+  return value && Array.isArray(value) ? value : DEFAULT_COIN_PACKAGES;
+};
+
+/**
+ * Upsert a single coin package by id. Adds if missing.
+ */
+const upsertCoinPackage = async (pkg) => {
+  const packages = await getCoinPackages();
+  const idx = packages.findIndex((p) => p.id === pkg.id);
+  if (idx >= 0) {
+    packages[idx] = { ...packages[idx], ...pkg };
+  } else {
+    packages.push({ ...pkg, id: pkg.id || `pkg_${Date.now()}` });
+  }
+  await setSetting('coin_packages', packages, 'Danh sách gói coin');
+  return packages;
+};
+
+/**
+ * Remove a coin package by id.
+ */
+const deleteCoinPackage = async (id) => {
+  const packages = await getCoinPackages().then((p) => p.filter((x) => x.id !== id));
+  await setSetting('coin_packages', packages, 'Danh sách gói coin');
+  return packages;
+};
+
+/**
+ * Reorder coin packages.
+ * @param {string[]} orderedIds - IDs in desired display order
+ */
+const reorderCoinPackages = async (orderedIds) => {
+  const packages = await getCoinPackages();
+  const reordered = orderedIds
+    .map((id, idx) => {
+      const pkg = packages.find((p) => p.id === id);
+      return pkg ? { ...pkg, sortOrder: idx + 1 } : null;
+    })
+    .filter(Boolean);
+  await setSetting('coin_packages', reordered, 'Danh sách gói coin');
+  return reordered;
+};
+
+/**
+ * Get premium plans from DB (with defaults as fallback).
+ */
+const getPremiumPlans = async () => {
+  const value = await getSetting('premium_plans');
+  return value && Array.isArray(value) ? value : DEFAULT_PREMIUM_PLANS;
+};
+
+/**
+ * Upsert a premium plan by id.
+ */
+const upsertPremiumPlan = async (plan) => {
+  const plans = await getPremiumPlans();
+  const idx = plans.findIndex((p) => p.id === plan.id);
+  if (idx >= 0) {
+    plans[idx] = { ...plans[idx], ...plan };
+  } else {
+    plans.push({ ...plan, id: plan.id || `plan_${Date.now()}` });
+  }
+  await setSetting('premium_plans', plans, 'Danh sách gói premium');
+  return plans;
+};
+
+/**
+ * Remove a premium plan by id.
+ */
+const deletePremiumPlan = async (id) => {
+  const plans = await getPremiumPlans().then((p) => p.filter((x) => x.id !== id));
+  await setSetting('premium_plans', plans, 'Danh sách gói premium');
+  return plans;
+};
+
+/**
+ * Get active premium plan price for a given planKey (used by upgradePremium controller).
+ */
+const getPremiumPlanPrice = async (planKey) => {
+  const plans = await getPremiumPlans();
+  const plan = plans.find((p) => p.planKey === planKey);
+  return plan ? { coins: plan.coins, days: plan.days } : null;
+};
+
 /**
  * Episodes Update Service
  */
@@ -1627,4 +1747,14 @@ module.exports = {
   setTheme,
   getSetting,
   setSetting,
+  // Pricing
+  seedPricingSettings,
+  getCoinPackages,
+  upsertCoinPackage,
+  deleteCoinPackage,
+  reorderCoinPackages,
+  getPremiumPlans,
+  upsertPremiumPlan,
+  deletePremiumPlan,
+  getPremiumPlanPrice,
 };

@@ -1,4 +1,5 @@
 import React from "react";
+import PremiumAvatar from "components/common/PremiumAvatar";
 import { RATING_OPTIONS } from "components/watch-page/RatingModal";
 
 // Helper function để tính thời gian đã trôi qua
@@ -36,19 +37,32 @@ const RatingItem = ({ rating }) => {
   const timeAgo = rating.createdAt ? getTimeAgo(new Date(rating.createdAt)) : "Vừa xong";
 
   return (
-    <div className="bg-bgColor sm:p-2 py-2 rounded-lg hover:border-white/10 transition-colors">
+    <div className={`sm:p-2 py-2 rounded-lg transition-all ${
+        rating.isPremium
+          ? "bg-gradient-to-br from-primaryColor/8 to-hoverPrimaryColor/5 border border-primaryColor/20"
+          : "bg-bgColor hover:border-white/10"
+      }`}>
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <img
+        <PremiumAvatar
           src={rating.avatar}
           alt={rating.user}
-          className="w-12 h-12 rounded-full flex-shrink-0 ring-2 ring-white/10"
+          size="w-12 h-12"
+          isPremium={rating.isPremium}
         />
 
         <div className="flex-1 min-w-0">
           {/* User info */}
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="font-semibold text-sm text-white">{rating.user}</span>
+            <span className={`font-semibold text-sm ${rating.isPremium ? "text-primaryColor" : "text-white"}`}>
+              {rating.user}
+            </span>
+            {rating.isPremium && (
+              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded-full text-xs font-bold shadow-sm">
+                <i className="fa-solid fa-crown text-[9px]" />
+                <span>Premium</span>
+              </span>
+            )}
             <span className="text-gray-400 text-xs">{timeAgo}</span>
           </div>
 
@@ -68,7 +82,9 @@ const RatingItem = ({ rating }) => {
                 <i
                   key={i}
                   className={`fa-solid fa-star text-xs ${
-                    i < Math.floor(rating.rating / 2) ? "text-primaryColor" : "text-gray-600"
+                    i < Math.floor(rating.rating / 2)
+                      ? rating.isPremium ? "text-yellow-300 drop-shadow-[0_0_4px_rgba(253,230,138,0.6)]" : "text-primaryColor"
+                      : rating.isPremium ? "text-yellow-700/60" : "text-gray-600"
                   }`}
                 />
               ))}

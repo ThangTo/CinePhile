@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
 import { BarSpinner } from "components/common/LoadingState";
+import { settingsAPI } from "services/admin.service";
 import http from "lib/axios";
 
 // Import React Icons
@@ -17,6 +18,8 @@ const RechargeCoinPage = () => {
   const [selectedAmount, setSelectedAmount] = useState(null);
   const [customAmount, setCustomAmount] = useState("");
   const [isCreatingLink, setIsCreatingLink] = useState(false);
+  const [coinPackages, setCoinPackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
 
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -25,27 +28,28 @@ const RechargeCoinPage = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Load coin packages from Settings
+  useEffect(() => {
+    settingsAPI.getCoinPackages()
+      .then((pkgs) => {
+        // Sort by sortOrder
+        const sorted = [...(pkgs || [])].sort((a, b) => (a.sortOrder || 99) - (b.sortOrder || 99));
+        setCoinPackages(sorted);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPackages(false));
+  }, []);
+
   // Check URL params for payment status (Redirect Mode)
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     if (query.get("success")) {
       setSuccess("Thanh toán thành công. Coin đã được cộng vào tài khoản!");
-      // Optionally fetch latest coin balance here if not pushed via socket/api
     }
     if (query.get("canceled")) {
       setError("Thanh toán thất bại hoặc đã bị hủy.");
     }
   }, []);
-
-  // Predefined coin packages
-  const coinPackages = [
-    { amount: 100, bonus: 0, label: "100 Coin", popular: false },
-    { amount: 500, bonus: 50, label: "500 Coin", popular: false },
-    { amount: 1000, bonus: 150, label: "1000 Coin", popular: true },
-    { amount: 2000, bonus: 400, label: "2000 Coin", popular: false },
-    { amount: 5000, bonus: 1500, label: "5000 Coin", popular: false },
-    { amount: 10000, bonus: 4000, label: "10000 Coin", popular: false },
-  ];
 
   const handleSelectPackage = (amount) => {
     setSelectedAmount(amount);
@@ -94,9 +98,10 @@ const RechargeCoinPage = () => {
       const bonus = selectedPackage?.bonus || 0;
 
       // Call Backend to Create Payment Link using secure axios instance
+      // amount = giá VNĐ từ package, bonus = coin thưởng
       const response = await http.post("/payment/create-payment-link", {
         userId: user._id,
-        amount: amount,
+        amount: selectedPackage?.price ?? amount,
         bonus: bonus,
       });
 
@@ -177,61 +182,71 @@ const RechargeCoinPage = () => {
               Bước 1: <span className="text-white text-lg md:text-2xl">Chọn gói nạp nhanh</span>
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {coinPackages.map((pkg) => {
-                const isSelected = selectedAmount === pkg.amount;
-                return (
-                  <button
-                    key={pkg.amount}
-                    onClick={() => handleSelectPackage(pkg.amount)}
-                    className={`
-                      relative p-5 rounded-2xl border transition-all duration-300 group overflow-hidden
-                      ${
-                        isSelected
-                          ? "bg-primaryColor/10 border-primaryColor shadow-lg shadow-primaryColor/20 scale-[1.02]"
-                          : "bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20"
-                      }
-                    `}
-                  >
-                    {/* Popular Badge */}
-                    {pkg.popular && (
-                      <div className="absolute top-0 right-0 bg-primaryColor text-black text-[10px] font-bold px-2 py-1 rounded-bl-lg shadow-sm">
-                        HOT
-                      </div>
-                    )}
-                    {isSelected && (
-                      <div className="absolute top-3 right-3 shadow-sm rounded-full">
-                        <div className="w-6 h-6 bg-primaryColor rounded-full flex items-center justify-center">
-                          <FiCheck className="text-black w-4 h-4 stroke-[3px]" />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col items-center text-center relative z-10">
-                      <span
-                        className={`text-xl font-bold mb-1 ${
+              {loadingPackages ? (
+                <div className="col-span-full flex items-center justify-center py-8">
+                  <BarSpinner />
+                </div>
+              ) : coinPackages.length === 0 ? (
+                <div className="col-span-full text-center py-8 text-gray-500">
+                  Chưa có gói coin nào được cấu hình.
+                </div>
+              ) : (
+                coinPackages.map((pkg) => {
+                  const isSelected = selectedAmount === pkg.amount;
+                  return (
+                    <button
+                      key={pkg.id || pkg.amount}
+                      onClick={() => handleSelectPackage(pkg.amount)}
+                      className={`
+                        relative p-5 rounded-2xl border transition-all duration-300 group overflow-hidden
+                        ${
                           isSelected
-                            ? "text-primaryColor"
-                            : "text-white group-hover:text-primaryColor transition-colors"
-                        }`}
-                      >
-                        {pkg.label}
-                      </span>
-                      <span className="text-sm text-gray-400 font-medium tracking-wider">
-                        {(pkg.amount * 10).toLocaleString()} VNĐ
-                      </span>
-
-                      {/* Bonus Display */}
-                      {pkg.bonus > 0 ? (
-                        <div className="mt-3 py-1 px-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold flex items-center gap-1">
-                          <FiTrendingUp /> +{pkg.bonus.toLocaleString()}
+                            ? "bg-primaryColor/10 border-primaryColor shadow-lg shadow-primaryColor/20 scale-[1.02]"
+                            : "bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20"
+                        }
+                      `}
+                    >
+                      {/* Popular Badge */}
+                      {pkg.popular && (
+                        <div className="absolute top-0 right-0 bg-primaryColor text-black text-[10px] font-bold px-2 py-1 rounded-bl-lg shadow-sm">
+                          HOT
                         </div>
-                      ) : (
-                        <div className="mt-3 h-6 opacity-0">spacer</div>
                       )}
-                    </div>
-                  </button>
-                );
-              })}
+                      {isSelected && (
+                        <div className="absolute top-3 right-3 shadow-sm rounded-full">
+                          <div className="w-6 h-6 bg-primaryColor rounded-full flex items-center justify-center">
+                            <FiCheck className="text-black w-4 h-4 stroke-[3px]" />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col items-center text-center relative z-10">
+                        <span
+                          className={`text-xl font-bold mb-1 ${
+                            isSelected
+                              ? "text-primaryColor"
+                              : "text-white group-hover:text-primaryColor transition-colors"
+                          }`}
+                        >
+                          {pkg.label}
+                        </span>
+                        <span className="text-sm text-gray-400 font-medium tracking-wider">
+                          {pkg.price ? Number(pkg.price).toLocaleString('vi-VN') + ' VNĐ' : (pkg.amount * 10).toLocaleString() + ' VNĐ'}
+                        </span>
+
+                        {/* Bonus Display */}
+                        {pkg.bonus > 0 ? (
+                          <div className="mt-3 py-1 px-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold flex items-center gap-1">
+                            <FiTrendingUp /> +{pkg.bonus.toLocaleString()}
+                          </div>
+                        ) : (
+                          <div className="mt-3 h-6 opacity-0">spacer</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
 
             {/* Custom Amount Input Helper */}
@@ -327,7 +342,9 @@ const RechargeCoinPage = () => {
                   <p className="text-gray-400">
                     Tổng thanh toán:{" "}
                     <strong className="text-primaryColor text-2xl">
-                      {((finalAmount > 0 ? finalAmount : 0) * 10).toLocaleString()} VNĐ
+                      {selectedPackage?.price
+                        ? Number(selectedPackage.price).toLocaleString("vi-VN")
+                        : (finalAmount * 10).toLocaleString("vi-VN")} VNĐ
                     </strong>
                   </p>
                 </div>

@@ -50,18 +50,72 @@ export const getRandomAvatarUrl = () => {
 };
 
 /**
+ * Check if a URL is reachable via a HEAD request (max 3s timeout).
+ * Returns true if the resource exists (2xx/3xx), false otherwise.
+ * Falls back to false for CORS-blocked responses (which still means the URL works).
+ * Base64 data URLs skip the fetch check and always return true.
+ * @param {string} src - Image src URL
+ * @returns {Promise<boolean>}
+ */
+const isUrlReachable = (src) =>
+  new Promise((resolve) => {
+    // Base64 data URLs: can't validate via fetch, assume valid unless clearly broken
+    if (src.startsWith('data:image')) {
+      // Basic sanity: must start with "data:image/" and have a comma
+      resolve(src.startsWith('data:image/') && src.includes(','));
+      return;
+    }
+
+    // Protocol-relative or relative URL: skip fetch (only works same-origin)
+    if (!src.startsWith('http://') && !src.startsWith('https://')) {
+      resolve(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+
+    fetch(src, { method: 'HEAD', signal: controller.signal })
+      .then((res) => {
+        clearTimeout(timeout);
+        // 2xx/3xx = valid; 0 with ok=false still means CORS/network issue but URL exists
+        resolve(res.ok || res.status < 400);
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        resolve(false);
+      });
+  });
+
+/**
  * onError handler for avatar <img> tags.
- * Reads the `alt` attribute (which is typically the username) to produce
- * a DETERMINISTIC fallback — so the same user always gets the same avatar
- * no matter which component renders it.
+ *
+ * Attempts to verify the original URL before falling back:
+ * - For http(s) URLs: makes a HEAD request (3s timeout) to confirm the resource is
+ *   truly unreachable (not just a transient network blip).
+ * - For data URLs: basic format validation only.
+ *
+ * If the URL is confirmed unreachable, replaces `src` with a deterministic default
+ * avatar (based on the `alt` attribute / username) and marks the element so the
+ * fallback is never applied twice.
  *
  * Usage: <img src={user.avatar} alt={user.username} onError={handleAvatarError} />
  */
-export const handleAvatarError = (e) => {
+export const handleAvatarError = async (e) => {
   const img = e.target;
-  // Prevent infinite loop if fallback also fails
+
+  // Already applied fallback → skip (prevents infinite loop)
   if (img.dataset.fallbackApplied) return;
+
+  const originalSrc = img.src;
+
+  // Attempt to revalidate the original URL before falling back
+  const reachable = await isUrlReachable(originalSrc);
+
+  // If the URL is reachable now, the previous error was transient — do nothing
+  if (reachable) return;
+
+  // Confirmed unreachable: apply deterministic fallback
   img.dataset.fallbackApplied = 'true';
-  // Use alt text (username) for deterministic selection
   img.src = getAvatarUrlByKey(img.alt || 'default');
 };

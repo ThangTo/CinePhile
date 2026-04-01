@@ -133,6 +133,28 @@ router.get('/settings/theme', adminController.getTheme);
 // PUT /api/v1/admin/settings/theme - Update theme
 router.put('/settings/theme', adminController.setTheme);
 
+// ===== ADMIN PRICING =====
+// Note: GET routes are public (in app.js) — anyone can read coin packages & premium plans.
+// Only write operations (POST/PUT/DELETE) require admin role.
+
+// POST /api/v1/admin/pricing/coin-packages  (upsert)
+router.post('/pricing/coin-packages', adminController.upsertCoinPackage);
+
+// PUT /api/v1/admin/pricing/coin-packages/reorder
+router.put('/pricing/coin-packages/reorder', adminController.reorderCoinPackages);
+
+// DELETE /api/v1/admin/pricing/coin-packages/:id
+router.delete('/pricing/coin-packages/:id', adminController.deleteCoinPackage);
+
+// POST /api/v1/admin/pricing/premium-plans  (upsert)
+router.post('/pricing/premium-plans', adminController.upsertPremiumPlan);
+
+// DELETE /api/v1/admin/pricing/premium-plans/:id
+router.delete('/pricing/premium-plans/:id', adminController.deletePremiumPlan);
+
+// POST /api/v1/admin/pricing/seed - Seed default pricing
+router.post('/pricing/seed', adminController.seedPricingSettings);
+
 // function isAdmin(req, res, next) {
 //   if (req.isAuthenticated() && (req.user.role === 'admin')) {
 //     return next();

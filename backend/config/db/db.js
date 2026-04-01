@@ -77,6 +77,18 @@ mongoose.connection.on('reconnected', () => {
   console.log('MongoDB reconnected');
 });
 
+mongoose.connection.on('connected', () => {
+  // Seed default pricing settings if not already present
+  try {
+    const adminService = require('../../services/admin.service');
+    adminService.seedPricingSettings().catch((err) => {
+      console.warn('Pricing seed skipped:', err.message);
+    });
+  } catch (err) {
+    // adminService may not be loaded yet; skip silently
+  }
+});
+
 module.exports = {
   connectDB,
 };
