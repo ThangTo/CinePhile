@@ -532,8 +532,19 @@ const getAllUsers = async (options = {}) => {
     UserModel.countDocuments(query),
   ]);
 
+  // Attach streak info to each user (already in User document)
+  const usersWithStreak = users.map(u => {
+    const obj = u.toObject ? u.toObject() : u;
+    return {
+      ...obj,
+      watchStreak: obj.watchStreak || 0,
+      longestStreak: obj.longestStreak || 0,
+      lastWatchDate: obj.lastWatchDate || null,
+    };
+  });
+
   return {
-    data: users,
+    data: usersWithStreak,
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -1808,9 +1819,6 @@ const getUserAnalytics = async (userId) => {
       $sort: { watchMinutes: -1 }
     }
   ]);
-
-  // TEMP DEBUG
-  console.log('[DEBUG getUserAnalytics] userId:', userId, '| aggregation count:', aggregation?.length || 0);
 
   if (!aggregation || aggregation.length === 0) {
     return { summary: { totalWatchMinutes: 0, moviesCount: 0 }, movies: [] };

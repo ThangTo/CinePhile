@@ -720,6 +720,18 @@ export const userAPI = {
   },
 
   /**
+   * Get specific user's watch streak
+   * @param {string} id - User ID
+   * @returns {Promise<Object>} Streak data
+   */
+  getUserStreak: async (id) => {
+    const response = await apiRequest(`/admin/users/${id}/streak`, {
+      requiresAuth: true,
+    });
+    return response;
+  },
+
+  /**
    * Create new user
    * @param {Object} userData - User data
    * @returns {Promise<Object>} Created user object

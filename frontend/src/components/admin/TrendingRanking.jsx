@@ -42,7 +42,7 @@ const AUDIO_LABELS = {
 
 const getAudioLabel = (audioType) => {
   if (!audioType) return "—";
-  const key = audioType.toLowerCase().replace(/[_-]/g, '');
+  const key = audioType.toLowerCase().replace(/[_-]/g, "");
   return AUDIO_LABELS[key] || audioType;
 };
 
@@ -68,9 +68,9 @@ const Chip = ({ icon: Icon, value, label, color }) => (
 /* ─── User Popup (mini table) ────────────────────────────────────── */
 const UserViewerPopup = ({ viewers, episodeLabel, audioLabel, onClose }) => (
   <motion.div
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{ opacity: 1, scale: 1 }}
-    exit={{ opacity: 0, scale: 0.95 }}
+    initial={{ opacity: 0, scale: 0.95, y: 4 }}
+    animate={{ opacity: 1, scale: 1, y: 0 }}
+    exit={{ opacity: 0, scale: 0.95, y: 4 }}
     transition={{ duration: 0.15 }}
     className="absolute bottom-full mb-2 right-0 w-64 bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden"
   >
@@ -85,7 +85,9 @@ const UserViewerPopup = ({ viewers, episodeLabel, audioLabel, onClose }) => (
     {/* List */}
     <div className="max-h-48 overflow-y-auto custom-scrollbar">
       {viewers.length === 0 ? (
-        <div className="px-3 py-4 text-center text-gray-600 text-xs italic">Chưa có user đăng nhập</div>
+        <div className="px-3 py-4 text-center text-gray-600 text-xs italic">
+          Chưa có user đăng nhập
+        </div>
       ) : (
         viewers.map((v, i) => (
           <div
@@ -94,7 +96,12 @@ const UserViewerPopup = ({ viewers, episodeLabel, audioLabel, onClose }) => (
           >
             <div className="w-7 h-7 rounded-full overflow-hidden border border-white/10 flex-shrink-0">
               {v.avatar ? (
-                <img src={v.avatar} alt={v.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img
+                  src={v.avatar}
+                  alt={v.name}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold">
                   {(v.name || "?").charAt(0).toUpperCase()}
@@ -104,7 +111,9 @@ const UserViewerPopup = ({ viewers, episodeLabel, audioLabel, onClose }) => (
             <div className="flex-1 min-w-0">
               <div className="text-xs font-semibold text-white truncate">{v.name}</div>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] text-amber-400 font-medium">{fmtTime(v.watchMinutes)}</span>
+                <span className="text-[10px] text-amber-400 font-medium">
+                  {fmtTime(v.watchMinutes)}
+                </span>
                 <span className="text-[10px] text-gray-600">·</span>
                 <span className="text-[10px] text-blue-400">{v.viewCount || 1}x</span>
               </div>
@@ -121,9 +130,9 @@ const ViewerButton = ({ viewers, episodeLabel, audioLabel }) => {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative flex-shrink-0">
+    <div className="relative isolate flex-shrink-0">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
         className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
           viewers.length > 0
             ? "bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20 cursor-pointer"
@@ -146,12 +155,7 @@ const ViewerButton = ({ viewers, episodeLabel, audioLabel }) => {
       </AnimatePresence>
 
       {/* Backdrop to close */}
-      {open && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setOpen(false)}
-        />
-      )}
+      {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
     </div>
   );
 };
@@ -159,25 +163,29 @@ const ViewerButton = ({ viewers, episodeLabel, audioLabel }) => {
 /* ─── Episode Row ─────────────────────────────────────────────────── */
 const EpisodeRow = ({ ep, audioFilter, episodeLabel }) => {
   // Show the primary variant (based on filter) or the first one
-  const variant = audioFilter === 'all'
-    ? ep.variants?.[0]
-    : (ep.variants?.find(v => v.audioType === audioFilter) || ep.variants?.[0]);
+  const variant =
+    audioFilter === "all"
+      ? ep.variants?.[0]
+      : ep.variants?.find((v) => v.audioType === audioFilter) || ep.variants?.[0];
 
   const label = episodeLabel || ep.episodeNum;
   const audioLabel = variant ? getAudioLabel(variant.audioType) : null;
 
   // For "all" filter, aggregate top viewers across variants
-  const allViewers = audioFilter === 'all'
-    ? (ep.variants || []).flatMap(v => v.topViewers || []).slice(0, 3)
-    : (variant?.topViewers || []);
+  const allViewers =
+    audioFilter === "all"
+      ? (ep.variants || []).flatMap((v) => v.topViewers || []).slice(0, 3)
+      : variant?.topViewers || [];
 
   return (
     <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-center bg-white/[0.025] hover:bg-white/[0.05] border border-white/[0.04] rounded-xl px-3 py-2.5 transition-colors">
       {/* Episode number */}
       <div className="flex-shrink-0 text-center min-w-[44px]">
-        <div className="text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-0.5">Tập</div>
+        <div className="text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-0.5">
+          Tập
+        </div>
         <div className="text-white font-black text-base leading-none mt-1">{ep.episodeNum}</div>
-        {audioFilter !== 'all' && audioLabel && (
+        {audioFilter !== "all" && audioLabel && (
           <div className="text-[9px] text-gray-500 mt-0.5 leading-tight">{audioLabel}</div>
         )}
       </div>
@@ -202,9 +210,9 @@ const EpisodeRow = ({ ep, audioFilter, episodeLabel }) => {
       {/* Audio variants + viewers */}
       <div className="flex items-center gap-2 flex-shrink-0">
         {/* Show audio variant badges if multiple */}
-        {ep.variants && ep.variants.length > 1 && audioFilter === 'all' && (
+        {ep.variants && ep.variants.length > 1 && audioFilter === "all" && (
           <div className="flex gap-1">
-            {ep.variants.map(v => (
+            {ep.variants.map((v) => (
               <span
                 key={v.audioType}
                 className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-white/5 text-gray-400 border-white/10"
@@ -219,7 +227,7 @@ const EpisodeRow = ({ ep, audioFilter, episodeLabel }) => {
         <ViewerButton
           viewers={allViewers}
           episodeLabel={label}
-          audioLabel={audioFilter !== 'all' ? audioLabel : null}
+          audioLabel={audioFilter !== "all" ? audioLabel : null}
         />
       </div>
     </div>
@@ -233,13 +241,12 @@ const EpisodeDrawer = ({ movie }) => {
   const topEp = movie.topEpisode;
   const hasEps = episodes.length > 0;
 
-  const [audioFilter, setAudioFilter] = useState('all');
+  const [audioFilter, setAudioFilter] = useState("all");
 
-  const filteredEps = audioFilter === 'all'
-    ? episodes
-    : episodes.filter(ep =>
-        ep.variants?.some(v => v.audioType === audioFilter)
-      );
+  const filteredEps =
+    audioFilter === "all"
+      ? episodes
+      : episodes.filter((ep) => ep.variants?.some((v) => v.audioType === audioFilter));
 
   return (
     <motion.div
@@ -247,7 +254,7 @@ const EpisodeDrawer = ({ movie }) => {
       animate={{ opacity: 1, height: "auto" }}
       exit={{ opacity: 0, height: 0 }}
       transition={{ duration: 0.3 }}
-      className="mt-3 mx-1 rounded-xl border border-white/5 bg-black/20 backdrop-blur-sm overflow-hidden"
+      className="mt-3 mx-1 rounded-xl border border-white/5 bg-black/20 backdrop-blur-sm overflow-visible"
     >
       <div className="px-4 py-3 space-y-3">
         {/* ── Header: top stats summary ───────────────────────────── */}
@@ -269,16 +276,12 @@ const EpisodeDrawer = ({ movie }) => {
               <div className="flex flex-col gap-0.5 col-span-2 sm:col-span-1">
                 <span className="text-[10px] text-gray-500">Tập hot nhất</span>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-sm font-bold text-purple-300">
-                    Tập {topEp.episodeNum}
-                  </span>
-                  <span className="text-[10px] text-gray-500">
-                    {fmtNum(topEp.views)} lượt
-                  </span>
+                  <span className="text-sm font-bold text-purple-300">Tập {topEp.episodeNum}</span>
+                  <span className="text-[10px] text-gray-500">{fmtNum(topEp.views)} lượt</span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[10px] text-purple-400 font-medium">
-                    {getAudioLabel(topEp.audioType) || '—'}
+                    {getAudioLabel(topEp.audioType) || "—"}
                   </span>
                   {topEp.serverName && (
                     <span className="text-[10px] text-gray-600 truncate max-w-[80px]">
@@ -309,19 +312,21 @@ const EpisodeDrawer = ({ movie }) => {
             {/* Audio filter pills */}
             {audioTypes.length > 1 && (
               <div className="flex items-center justify-between">
-                <p className="text-[10px] uppercase tracking-widest text-gray-600 font-bold">Chi tiết từng tập</p>
+                <p className="text-[10px] uppercase tracking-widest text-gray-600 font-bold">
+                  Chi tiết từng tập
+                </p>
                 <div className="flex gap-1.5">
                   <button
-                    onClick={() => setAudioFilter('all')}
+                    onClick={() => setAudioFilter("all")}
                     className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
-                      audioFilter === 'all'
+                      audioFilter === "all"
                         ? "bg-white/10 text-white border-white/20"
                         : "bg-transparent text-gray-500 border-white/5 hover:border-white/10 hover:text-gray-300"
                     }`}
                   >
                     Tất cả
                   </button>
-                  {audioTypes.map(at => (
+                  {audioTypes.map((at) => (
                     <button
                       key={at}
                       onClick={() => setAudioFilter(at)}
@@ -339,17 +344,19 @@ const EpisodeDrawer = ({ movie }) => {
             )}
 
             {audioTypes.length <= 1 && (
-              <p className="text-[10px] uppercase tracking-widest text-gray-600 font-bold">Chi tiết từng tập</p>
+              <p className="text-[10px] uppercase tracking-widest text-gray-600 font-bold">
+                Chi tiết từng tập
+              </p>
             )}
 
-            {/* Episode rows */}
-            <div className="flex flex-col gap-1.5 max-h-[380px] overflow-y-auto pr-0.5 custom-scrollbar">
+            {/* Episode rows — whole drawer scrolls, no inner overflow clip */}
+            <div className="flex flex-col gap-1.5">
               {filteredEps.length === 0 ? (
                 <div className="py-3 text-center text-gray-600 italic text-xs">
                   Không có tập nào cho loại audio này.
                 </div>
               ) : (
-                filteredEps.map(ep => (
+                filteredEps.map((ep) => (
                   <EpisodeRow
                     key={`${ep.episodeNum}-${audioFilter}`}
                     ep={ep}
@@ -369,9 +376,9 @@ const EpisodeDrawer = ({ movie }) => {
 const MovieRow = ({ movie, index }) => {
   const [expanded, setExpanded] = useState(false);
   const isSeries =
-    movie.type === 'series' ||
-    movie.type === 'tvshows' ||
-    movie.type === 'hoathinh' ||
+    movie.type === "series" ||
+    movie.type === "tvshows" ||
+    movie.type === "hoathinh" ||
     (movie.totalEpisodes || 0) > 1;
 
   return (
@@ -387,12 +394,14 @@ const MovieRow = ({ movie, index }) => {
         rounded-2xl transition-all duration-300
         shadow-sm hover:shadow-[0_6px_30px_rgba(0,0,0,0.35)] overflow-hidden`}
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-rose-500/0 via-rose-500/[0.025] to-transparent
-        opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div
+        className="absolute inset-0 bg-gradient-to-r from-rose-500/0 via-rose-500/[0.025] to-transparent
+        opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+      />
 
       <div
         className="flex items-center gap-3 p-3.5 cursor-pointer"
-        onClick={() => isSeries && setExpanded(v => !v)}
+        onClick={() => isSeries && setExpanded((v) => !v)}
       >
         <div className="flex-shrink-0 w-9 text-center">
           <span className={`font-black ${getRankStyle(index + 1)}`}>#{index + 1}</span>
@@ -419,14 +428,18 @@ const MovieRow = ({ movie, index }) => {
               {movie.name}
             </h4>
             {isSeries && (
-              <span className="hidden sm:inline text-[9px] uppercase tracking-wider px-1.5 py-0.5
-                bg-purple-500/15 text-purple-400 border border-purple-500/20 rounded-md font-bold flex-shrink-0">
+              <span
+                className="hidden sm:inline text-[9px] uppercase tracking-wider px-1.5 py-0.5
+                bg-purple-500/15 text-purple-400 border border-purple-500/20 rounded-md font-bold flex-shrink-0"
+              >
                 Series
               </span>
             )}
             {movie.isTrending && (
-              <span className="hidden md:flex items-center gap-1 text-[9px] uppercase tracking-wider px-1.5 py-0.5
-                bg-rose-500/15 text-rose-400 border border-rose-500/25 rounded-md font-black flex-shrink-0 animate-pulse">
+              <span
+                className="hidden md:flex items-center gap-1 text-[9px] uppercase tracking-wider px-1.5 py-0.5
+                bg-rose-500/15 text-rose-400 border border-rose-500/25 rounded-md font-black flex-shrink-0 animate-pulse"
+              >
                 <FiZap size={9} /> Hot
               </span>
             )}
@@ -434,7 +447,12 @@ const MovieRow = ({ movie, index }) => {
 
           <div className="flex flex-wrap gap-1.5 items-center">
             <Chip icon={FiEye} value={fmtNum(movie.views)} label="views" color="blue" />
-            <Chip icon={FiUsers} value={fmtNum(movie.uniqueViewers)} label="khán giả" color="emerald" />
+            <Chip
+              icon={FiUsers}
+              value={fmtNum(movie.uniqueViewers)}
+              label="khán giả"
+              color="emerald"
+            />
             <Chip icon={FiClock} value={fmtTime(movie.watchMinutes)} color="amber" />
             {movie.velocity > 0 && (
               <Chip icon={FiArrowUpRight} value={`${movie.velocity}/h`} color="rose" />
@@ -455,9 +473,7 @@ const MovieRow = ({ movie, index }) => {
         )}
       </div>
 
-      <AnimatePresence>
-        {expanded && <EpisodeDrawer movie={movie} />}
-      </AnimatePresence>
+      <AnimatePresence>{expanded && <EpisodeDrawer movie={movie} />}</AnimatePresence>
     </motion.div>
   );
 };
@@ -498,8 +514,10 @@ const TrendingRanking = () => {
       <div className="relative z-10 p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-7">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-rose-500/20 to-rose-500/5 rounded-xl
-              shadow-[0_0_24px_rgba(244,63,94,0.25)] border border-rose-500/20">
+            <div
+              className="p-2.5 bg-gradient-to-br from-rose-500/20 to-rose-500/5 rounded-xl
+              shadow-[0_0_24px_rgba(244,63,94,0.25)] border border-rose-500/20"
+            >
               <FiActivity size={22} className="text-rose-400 animate-pulse" />
             </div>
             <div>

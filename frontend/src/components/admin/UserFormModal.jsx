@@ -90,6 +90,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
 
   // Analytics State
   const [analytics, setAnalytics] = useState(null);
+  const [streak, setStreak] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   useEffect(() => {
@@ -126,10 +127,12 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
       if (user && user._id && isOpen) {
         setLoadingAnalytics(true);
         try {
-          const data = await userAPI.getUserAnalytics(user._id);
-          // TEMP DEBUG
-          console.log('[DEBUG UserFormModal] user._id:', user._id, '| analytics:', JSON.stringify(data));
-          setAnalytics(data);
+          const [analyticsData, streakData] = await Promise.all([
+            userAPI.getUserAnalytics(user._id),
+            userAPI.getUserStreak(user._id),
+          ]);
+          setAnalytics(analyticsData);
+          setStreak(streakData);
         } catch (error) {
           console.error("Failed to fetch user analytics:", error);
         } finally {
@@ -137,6 +140,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         }
       } else {
         setAnalytics(null);
+        setStreak(null);
       }
     };
     fetchAnalytics();
@@ -401,7 +405,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
                     ) : (
                       <div className="flex flex-col h-full z-10">
                         {/* Summary Cards */}
-                        <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                             <div className="bg-black/30 border border-white/5 rounded-2xl p-4 hover:border-primaryColor/30 transition-colors">
                               <p className="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wider flex items-center gap-1.5"><FiClock className="text-primaryColor" /> Tổng Thời Lúc Xem</p>
                               <div className="flex items-end gap-2 text-primaryColor">
@@ -416,6 +420,43 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
                               </div>
                             </div>
                         </div>
+
+                        {/* Streak Summary */}
+                        {streak && (
+                          <div className="grid grid-cols-4 gap-2 mb-4">
+                            <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl p-3 text-center">
+                              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-1">🔥 Hiện Tại</p>
+                              <span className="text-xl font-black text-orange-400">{streak.watchStreak}</span>
+                              <p className="text-[9px] text-gray-500 mt-0.5">ngày</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-xl p-3 text-center">
+                              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-1">🏆 Dài Nhất</p>
+                              <span className="text-xl font-black text-amber-400">{streak.longestStreak}</span>
+                              <p className="text-[9px] text-gray-500 mt-0.5">ngày</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-primaryColor/10 to-blue-500/10 border border-primaryColor/20 rounded-xl p-3 text-center">
+                              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-1">📅 Hôm Nay</p>
+                              {streak.todayProgress !== undefined && streak.todayProgress !== null ? (
+                                <>
+                                  <span className="text-xl font-black text-blue-400">{streak.todayProgress}</span>
+                                  <p className="text-[9px] text-gray-500 mt-0.5">/ 10 phút</p>
+                                </>
+                              ) : (
+                                <span className="text-sm font-medium text-gray-500">—</span>
+                              )}
+                            </div>
+                            <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-3 text-center">
+                              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-1">🕐 Lần Cuối</p>
+                              {streak.lastWatchDate ? (
+                                <span className="text-sm font-bold text-purple-400">
+                                  {new Date(streak.lastWatchDate).toLocaleDateString('vi-VN', { month: '2-digit', day: '2-digit' })}
+                                </span>
+                              ) : (
+                                <span className="text-sm font-medium text-gray-500">—</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Movies List */}
                         <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3 pb-2 max-h-[500px]">

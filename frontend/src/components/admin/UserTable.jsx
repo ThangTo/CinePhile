@@ -204,6 +204,7 @@ const UserTable = () => {
                 <th className="px-6 py-4">Tên</th>
                 <th className="px-6 py-4">Email</th>
                 <th className="px-6 py-4 text-center">Vai trò</th>
+                <th className="px-6 py-4 text-center">Streak</th>
                 {/* <th className="px-6 py-4 text-center">Trạng thái</th> */}
                 <th className="px-6 py-4 text-right">Ngày tham gia</th>
                 <th className="px-6 py-4 text-center">Hành động</th>
@@ -248,6 +249,19 @@ const UserTable = () => {
                             <span className="text-white font-bold text-base truncate pr-4 group-hover:text-primaryColor transition-colors">
                               {user.name || user.username || "N/A"}
                             </span>
+                            {/* Streak badge inline */}
+                            {user.watchStreak > 0 ? (
+                              <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-primaryColor bg-primaryColor/10 border border-primaryColor/20 px-1.5 py-0.5 rounded-md w-fit">
+                                <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+                                  <path d="M12 2c0 0-5 6.5-5 11a5 5 0 0 0 10 0c0-4.5-5-11-5-11z"/>
+                                </svg>
+                                {user.watchStreak} ngày
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] text-gray-600 px-1.5 py-0.5 rounded-md w-fit">
+                                Chưa xem
+                              </span>
+                            )}
                           </div>
                         </td>
 
@@ -277,6 +291,20 @@ const UserTable = () => {
                               ? "Premium"
                               : "User"}
                           </span>
+                        </td>
+
+                        {/* Streak */}
+                        <td className="px-6 py-4 text-center">
+                          {user.watchStreak > 0 ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="text-primaryColor font-black text-base leading-none">
+                                {user.watchStreak}
+                              </span>
+                              <span className="text-[9px] text-gray-500 font-medium">ngày</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-600 text-xs italic">—</span>
+                          )}
                         </td>
 
                         {/* Status */}

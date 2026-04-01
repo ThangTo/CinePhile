@@ -359,24 +359,16 @@ const incrementView = async (req, res) => {
 
     // Lấy userId nếu có token (optional auth)
     let userId = null;
-    let tokenUsed = false;
     try {
       const jwt = require('jsonwebtoken');
       const token = req.headers.authorization?.replace('Bearer ', '')
         || req.cookies?.accessToken;
       if (token) {
-        tokenUsed = true;
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.userId || decoded.id || decoded._id || null;
-        // TEMP DEBUG: log full decoded payload
-        console.log('[DEBUG incrementView] decoded keys:', Object.keys(decoded), '| userId result:', userId);
       }
     } catch (e) {
-      console.log('[DEBUG incrementView] JWT verify failed:', e.message);
-    }
-
-    if (!tokenUsed) {
-      console.log('[DEBUG incrementView] No token found in request');
+      // invalid/expired token — userId stays null, view still counted as anonymous
     }
 
     const userAgent = req.headers['user-agent'] || 'Unknown';

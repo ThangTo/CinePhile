@@ -69,6 +69,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Accumulated seconds watched today (persisted for accurate todayProgress in getStreak)
+    todayWatchSeconds: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    todayWatchDate: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

@@ -38,6 +38,10 @@ const WatchStreak = ({ compact = false }) => {
       if (res.ok) {
         const data = await res.json();
         setStreak(data);
+        // Sync today's seconds from API into local state so progress bar is accurate
+        if (data.todayProgress !== undefined && data.todayProgress !== null) {
+          setTodaySeconds((data.todayProgress || 0) * 60);
+        }
       }
     } catch {}
   };
@@ -411,7 +415,9 @@ const StreakCard = ({
             <span
               className={`text-xs font-bold ${isActiveToday ? "text-primaryColor" : "text-gray-400"}`}
             >
-              {isActiveToday ? "✓ Hoàn thành!" : `${progressMinutes}/${MINUTES_THRESHOLD} phút`}
+              {isActiveToday
+                ? `✓ Hoàn thành (${progressMinutes}/${MINUTES_THRESHOLD} phút)`
+                : `${progressMinutes}/${MINUTES_THRESHOLD} phút`}
             </span>
           </div>
 

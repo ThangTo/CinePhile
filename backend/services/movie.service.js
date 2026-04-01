@@ -1491,8 +1491,6 @@ const incrementView = async (
   { episodeId = null, userId = null, ipAddress = '0.0.0.0', userAgent = 'Unknown' } = {},
 ) => {
   const ViewHistory = require('../models/view_history.model');
-  // TEMP DEBUG: confirm userId reaches service
-  console.log('[DEBUG movieService.incrementView] userId:', userId, '| ip:', ipAddress);
   const movieDoc = await findMovie(identifier);
   if (!movieDoc) {
     throw new Error('Movie not found');

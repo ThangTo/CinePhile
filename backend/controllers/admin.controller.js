@@ -926,9 +926,26 @@ const getUniqueAnalyticsSummary = async (req, res) => {
   }
 };
 
+/**
+ * GET /admin/users/:id/streak
+ * Get specific user's watch streak (admin only)
+ */
+const getUserStreak = async (req, res) => {
+  try {
+    const watchStreakService = require('../services/watchStreak.service');
+    const streak = await watchStreakService.getStreak(req.params.id);
+    if (!streak) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(streak);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
-  // Movies
-  getAllMovies,
+// Movies
+getAllMovies,
   getMovieById,
   createMovie,
   updateMovie,
@@ -982,4 +999,7 @@ module.exports = {
   upsertPremiumPlan,
   deletePremiumPlan,
   seedPricingSettings,
+
+  // User Streak
+  getUserStreak,
 };
