@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import http from "../lib/axios";
-import { io } from "socket.io-client";
 
 // ====================================================================
 // HEY TIMI - VOICE ASSISTANT CONTEXT (v7 - WebSocket + Deepgram Streaming)
@@ -30,7 +29,6 @@ export const VoiceProvider = ({ children }) => {
   const [lastTranscript, setLastTranscript] = useState("");
   const [voiceError, setVoiceError] = useState(null);
   const [isThinking, setIsThinking] = useState(false);
-  const [socketConnection, setSocketConnection] = useState(null);
 
   // Refs
   const recognizerRef = useRef(null);
@@ -39,7 +37,6 @@ export const VoiceProvider = ({ children }) => {
   const cooldownRef = useRef(false);
   const speechFailCountRef = useRef(0);
   const handleWakeWordRef = useRef(null);
-  const currentAudioRef = useRef(null);
 
   // Conversation Memory: lưu tối đa 6 tin nhắn gần nhất (3 cặp user+assistant)
   const conversationHistoryRef = useRef([]);
@@ -71,7 +68,7 @@ export const VoiceProvider = ({ children }) => {
         }
       } catch {}
     }
-  }, [isEnabled]);
+  }, [isEnabled, ttsAudioPlayer]);
 
   const dismissOnboarding = useCallback(() => {
     setShowOnboarding(false);
@@ -144,7 +141,7 @@ export const VoiceProvider = ({ children }) => {
     } catch (e) {
       console.warn("[Timi] TTS error:", e.message);
     }
-  }, []);
+  }, [ttsAudioPlayer]);
 
   // ============ EXECUTE COMMANDS (SHARED LOGIC) ============
   const executeCommands = useCallback((data) => {
@@ -477,7 +474,7 @@ export const VoiceProvider = ({ children }) => {
 
     const initModel = async () => {
       try {
-        const tf = await import("@tensorflow/tfjs");
+        await import("@tensorflow/tfjs");
         const speechCommands = await import("@tensorflow-models/speech-commands");
 
         console.log("[Timi] Đang tải model...");

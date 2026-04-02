@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
@@ -15,14 +15,12 @@ import favoritesCache from "utils/favoritesCache";
 export const useBannerConfig = (movieData, successToast, warningToast) => {
   const navigate = useNavigate();
   const { isAuthenticated, openAuthModal, user } = useAuth();
-  const [favoritesList, setFavoritesList] = useState([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const hasFetchedRef = useRef(false);
 
   // Fetch favorites list when authenticated (with cache)
   useEffect(() => {
     if (!isAuthenticated || !user?.id || !movieData?.id) {
-      setFavoritesList([]);
       setIsFavorite(false);
       return;
     }
@@ -38,11 +36,9 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
           );
         });
 
-        setFavoritesList(favoriteIds);
         setIsFavorite(favoriteIds.includes(movieData.id));
       } catch (error) {
         console.error("Error fetching favorites:", error);
-        setFavoritesList([]);
         setIsFavorite(false);
       }
     };
@@ -55,7 +51,6 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
       // If already fetched, check cache
       const cached = favoritesCache.get();
       if (cached) {
-        setFavoritesList(cached);
         setIsFavorite(cached.includes(movieData.id));
       }
     }
@@ -82,7 +77,7 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
   );
 
   // Handle add/remove from favorites
-  const handleToggleFavorite = async () => {
+  const handleToggleFavorite = useCallback(async () => {
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
@@ -91,14 +86,12 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
       if (isFavorite) {
         await userService.removeFromFavorites(movieData.id);
         setIsFavorite(false);
-        setFavoritesList((prev) => prev.filter((id) => id !== movieData.id));
         // Clear cache to force refresh on next fetch
         favoritesCache.clear();
         if (successToast) successToast("Đã xóa khỏi danh sách yêu thích!");
       } else {
         await userService.addToFavorites(movieData.id);
         setIsFavorite(true);
-        setFavoritesList((prev) => [...prev, movieData.id]);
         // Clear cache to force refresh on next fetch
         favoritesCache.clear();
         if (successToast) successToast("Đã thêm vào danh sách yêu thích!");
@@ -109,7 +102,14 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
       }
       console.error("Error toggling favorite:", error);
     }
-  };
+  }, [
+    isAuthenticated,
+    isFavorite,
+    movieData.id,
+    openAuthModal,
+    successToast,
+    warningToast,
+  ]);
 
   // Action buttons configuration
   const actionButtons = useMemo(
@@ -145,11 +145,9 @@ export const useBannerConfig = (movieData, successToast, warningToast) => {
       movieData.id,
       movieData.isHidden,
       movieData.currentEpisode,
-      movieData.trailer_url,
+      handleToggleFavorite,
       navigate,
-      isAuthenticated,
       isFavorite,
-      warningToast,
     ]
   );
 

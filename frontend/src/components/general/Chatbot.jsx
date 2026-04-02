@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSystemInstruction } from "constants/chatbotKnowledge";
 
@@ -11,6 +11,7 @@ const Chatbot = () => {
   const chatbotTogglerRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const chatFormRef = useRef(null);
+  const handleOutgoingMessageRef = useRef(null);
 
   const [showChatbot, setShowChatbot] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -193,7 +194,9 @@ const Chatbot = () => {
     }
   };
 
-  const resetFileInput = () => {
+  handleOutgoingMessageRef.current = handleOutgoingMessage;
+
+  const resetFileInput = useCallback(() => {
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (fileUploadWrapperRef.current) {
       fileUploadWrapperRef.current.classList.remove("file-uploaded");
@@ -201,42 +204,41 @@ const Chatbot = () => {
       if (img) img.src = "";
     }
     userDataRef.current.file = { data: null, mime_type: null };
-  };
+  }, []);
 
   // --- EVENT LISTENERS (Inputs & Files) ---
   useEffect(() => {
-    if (!messageInputRef.current) return;
+    const textarea = messageInputRef.current;
+    if (!textarea) return;
     const handleKeyDown = (e) => {
       const userMessage = e.target.value.trim();
       const hasFile = userDataRef.current.file.data !== null;
       if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 768 && !isSending) {
         if (userMessage || hasFile) {
-          handleOutgoingMessage(e);
+          handleOutgoingMessageRef.current?.(e);
         } else {
           e.preventDefault();
         }
       }
     };
     const handleInput = () => {
-      const textarea = messageInputRef.current;
       textarea.style.height = "auto";
       textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     };
 
-    messageInputRef.current.addEventListener("keydown", handleKeyDown);
-    messageInputRef.current.addEventListener("input", handleInput);
+    textarea.addEventListener("keydown", handleKeyDown);
+    textarea.addEventListener("input", handleInput);
 
     return () => {
-      if (messageInputRef.current) {
-        messageInputRef.current.removeEventListener("keydown", handleKeyDown);
-        messageInputRef.current.removeEventListener("input", handleInput);
-      }
+      textarea.removeEventListener("keydown", handleKeyDown);
+      textarea.removeEventListener("input", handleInput);
     };
   }, [isSending]);
 
   // Handle File change
   useEffect(() => {
-    if (!fileInputRef.current) return;
+    const fileInput = fileInputRef.current;
+    if (!fileInput) return;
     const handleFileChange = (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -259,11 +261,11 @@ const Chatbot = () => {
       };
       reader.readAsDataURL(file);
     };
-    fileInputRef.current.addEventListener("change", handleFileChange);
+    fileInput.addEventListener("change", handleFileChange);
     return () => {
-      if (fileInputRef.current) fileInputRef.current.removeEventListener("change", handleFileChange);
+      fileInput.removeEventListener("change", handleFileChange);
     };
-  }, []);
+  }, [resetFileInput]);
 
   // Emoji Picker logic (Giữ nguyên)
   useEffect(() => {

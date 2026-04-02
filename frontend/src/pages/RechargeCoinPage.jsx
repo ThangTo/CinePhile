@@ -12,7 +12,7 @@ import { FaCoins } from "react-icons/fa";
 const RechargeCoinPage = () => {
   const navigate = useNavigate();
   const { user, updateUser, isAuthenticated } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [selectedAmount, setSelectedAmount] = useState(null);
@@ -54,14 +54,6 @@ const RechargeCoinPage = () => {
   const handleSelectPackage = (amount) => {
     setSelectedAmount(amount);
     setCustomAmount("");
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleCustomAmount = (e) => {
-    const value = e.target.value.replace(/\D/g, ""); // Only numbers
-    setCustomAmount(value);
-    setSelectedAmount(null);
     setError(null);
     setSuccess(null);
   };
@@ -137,8 +129,6 @@ const RechargeCoinPage = () => {
   const userCoins = user.coin || 0;
   const finalAmount = selectedAmount || parseInt(customAmount) || 0;
   const selectedPackage = coinPackages.find((pkg) => pkg.amount === selectedAmount);
-  const totalAfterRecharge = userCoins + finalAmount + (selectedPackage?.bonus || 0);
-
   return (
     <div className="min-h-screen pt-12 md:pt-0 bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
       {/* --- Background Effects --- */}

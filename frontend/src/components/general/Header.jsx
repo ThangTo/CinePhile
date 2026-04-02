@@ -22,8 +22,7 @@ const Header = () => {
   const menuRef = useRef(null);
   const mobileBellButtonRef = useRef(null);
   const navigate = useNavigate();
-  const { user, isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, logout } =
-    useAuth();
+  const { user, isAuthenticated, openAuthModal, logout } = useAuth();
   const { unreadCount } = useNotifications();
 
   useEffect(() => {

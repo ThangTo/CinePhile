@@ -292,7 +292,7 @@ const ProgressBar = ({
 
       window.removeEventListener("touchend", handleDragEnd);
     };
-  }, [isDragging, calculateProgress, onSeek]);
+  }, [isDragging, calculateProgress, onDragStateChange, onSeek]);
 
   // Hover Handler
 

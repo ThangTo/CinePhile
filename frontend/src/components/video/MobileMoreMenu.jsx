@@ -1,8 +1,5 @@
 import React from "react";
 import Tooltip from "../watch-page/Tooltip";
-import AudioMenu from "./AudioMenu";
-import SpeedMenu from "./SpeedMenu";
-import QualityMenu from "./QualityMenu";
 
 const MobileMoreMenu = ({
   audioOptions,

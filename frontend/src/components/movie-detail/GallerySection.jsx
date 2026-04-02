@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import OptimizedImage from "components/common/OptimizedImage";
-import { FiX } from "react-icons/fi";
 
 const GallerySection = ({ movie }) => {
   const [selectedImage, setSelectedImage] = useState(null);

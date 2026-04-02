@@ -58,16 +58,6 @@ export const NotificationProvider = ({ children }) => {
   };
 
   // Load unread count from API
-  const loadUnreadCount = async () => {
-    if (!isAuthenticated) return 0;
-    try {
-      const response = await notificationService.getUnreadCount();
-      return response.count || 0;
-    } catch (error) {
-      console.error("Error loading unread count:", error);
-      return 0;
-    }
-  };
 
   // Mark notifications panel as viewed (số biến mất khi click bell)
   const markPanelAsViewed = () => {

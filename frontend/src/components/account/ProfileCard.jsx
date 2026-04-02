@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import useToast from "hooks/useToast";
 import ToastContainer from "components/common/ToastContainer";
 import { cardStyles, buttonStyles } from "./shared-styles";
-import { handleAvatarError } from "utils/avatarUtils";
 import { isPremiumActive } from "utils/premiumUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
 
@@ -10,7 +9,7 @@ const MAX_AVATAR_SIZE_MB = 5;
 
 const ProfileCard = ({ user, onUpdate }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const { toasts, removeToast, success, info, error } = useToast();
+  const { toasts, removeToast, success, error } = useToast();
 
   const handleChangeAvatar = () => {
     const input = document.createElement("input");

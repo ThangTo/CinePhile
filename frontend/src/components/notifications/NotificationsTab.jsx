@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationItem from "./NotificationItem";
 import PaginationV2 from "components/common/PaginationV2";
-import { FiFilter, FiCheck, FiRotateCw, FiBellOff, FiLayers } from "react-icons/fi";
+import { FiCheck, FiRotateCw, FiBellOff, FiLayers } from "react-icons/fi";
 
 const FILTERS = {
   all: "Tất cả",

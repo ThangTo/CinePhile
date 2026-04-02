@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   FiX,
   FiFilm,
@@ -71,26 +71,7 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
     }
   }, [isOpen]);
 
-  // Load movies when modal opens or search term changes or tab changes or quality changes
-  useEffect(() => {
-    if (!isOpen) return;
-
-    // Load immediately when modal first opens
-    if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      loadMovies(1, "");
-      return;
-    }
-
-    // Debounce search term changes
-    const timeoutId = setTimeout(() => {
-      loadMovies(1, searchTerm);
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [isOpen, searchTerm, activeTab, selectedQuality]);
-
-  const loadMovies = async (page = 1, search = "") => {
+  const loadMovies = useCallback(async (page = 1, search = "") => {
     setIsLoading(true);
     setError(null);
     try {
@@ -126,7 +107,24 @@ const UpdateEpisodesModal = ({ isOpen, onClose, onUpdateSuccess }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeTab, selectedQuality]);
+
+  // Load movies when modal opens or search term changes or tab changes or quality changes
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      loadMovies(1, "");
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      loadMovies(1, searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [isOpen, loadMovies, searchTerm]);
 
   const handlePageChange = (newPage) => {
     loadMovies(newPage, searchTerm);

@@ -1,7 +1,6 @@
 import React from "react";
 import useAuth from "hooks/useAuth";
 import { isPremiumActive } from "utils/premiumUtils";
-import { handleAvatarError } from "utils/avatarUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
 
 const CommentInput = ({

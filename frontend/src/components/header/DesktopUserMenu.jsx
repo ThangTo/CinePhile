@@ -4,7 +4,6 @@ import { DESKTOP_MENU_ITEMS, DESKTOP_MENU_ITEM_CLASS } from "./constants";
 import { useNotifications } from "contexts/NotificationContext";
 import NotificationPanel from "components/notifications/NotificationPanel";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
-import { handleAvatarError } from "utils/avatarUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
 
 const PremiumBanner = ({ username, user }) => {

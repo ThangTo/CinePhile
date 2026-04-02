@@ -16,12 +16,10 @@ import {
   FiTrendingUp,
   FiPieChart,
   FiBarChart2,
-  FiArrowDown,
   FiGlobe,
   FiMonitor,
   FiClock,
   FiSmartphone,
-  FiPercent,
   FiTarget
 } from "react-icons/fi";
 

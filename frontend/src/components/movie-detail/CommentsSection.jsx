@@ -98,19 +98,16 @@ const CommentsSection = ({ movie, className = "" }) => {
   const [showAllComments, setShowAllComments] = useState(false);
   const [comments, setComments] = useState(movie?.comments || []);
   const [ratings, setRatings] = useState([]);
-  const [loading, setLoading] = useState(!movie?.comments);
   const [loadingRatings, setLoadingRatings] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const { toasts, removeToast, success, warning } = useToast();
-  const { isAuthenticated, showAuthModal, authMode, openAuthModal, closeAuthModal, user } =
-    useAuth();
+  const { isAuthenticated, openAuthModal, user } = useAuth();
 
   // Fetch comments if not provided in movie prop
   useEffect(() => {
     const fetchComments = async () => {
       if (!movie?.id || movie.comments) return;
       try {
-        setLoading(true);
         const response = await movieService.getComments(movie.id);
         const commentsData = response.data || [];
         // Format comments để match với frontend format (load từ localStorage theo userId)
@@ -121,7 +118,6 @@ const CommentsSection = ({ movie, className = "" }) => {
         console.error("Error fetching comments:", error);
         setComments([]);
       } finally {
-        setLoading(false);
       }
     };
     fetchComments();
@@ -144,7 +140,7 @@ const CommentsSection = ({ movie, className = "" }) => {
       }
     };
     fetchRatings();
-  }, [movie?.id, activeView]);
+  }, [movie?.id, activeView, ratings.length]);
 
   const handleSubmitComment = async () => {
     // Prevent spam: disable if already submitting

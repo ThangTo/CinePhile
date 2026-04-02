@@ -213,7 +213,6 @@ const AdminViralClipsTab = () => {
 
   // Pipeline state
   const [isGenerating, setIsGenerating] = useState(false);
-  const [pipelineStep, setPipelineStep] = useState(-1);
   const [pipelineError, setPipelineError] = useState(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
 
@@ -311,7 +310,6 @@ const AdminViralClipsTab = () => {
       } else {
         setPipelineError(res.error || "Không thể tạo clip");
         setIsGenerating(false);
-        setPipelineStep(-1);
       }
     } catch (err) {
       const msg =
@@ -320,7 +318,6 @@ const AdminViralClipsTab = () => {
         err.message;
       setPipelineError(msg);
       setIsGenerating(false);
-      setPipelineStep(-1);
     }
   };
 
@@ -345,7 +342,6 @@ const AdminViralClipsTab = () => {
                  startPolling(res.job.result.map((j) => j.jobId));
               } else {
                  setIsPolling(false);
-                 setPipelineStep(-1);
                  setIsGenerating(false);
                  setPipelineError("Không tìm thấy cảnh nào phù hợp.");
               }
@@ -354,7 +350,6 @@ const AdminViralClipsTab = () => {
               pollIntervalRef.current = null;
               setIsPolling(false);
               setPipelineError(res.job.error || "Lỗi khi phân tích dữ liệu AI");
-              setPipelineStep(-1);
               setIsGenerating(false);
             }
           }

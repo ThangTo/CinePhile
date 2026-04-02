@@ -1,5 +1,6 @@
 const MovieModel = require('../models/movie.model');
 const UserModel = require('../models/user.model');
+const watchStreakService = require('./watchStreak.service');
 const EpisodeModel = require('../models/episode.model');
 const UserHistoryModel = require('../models/user_history.model');
 const UserFavoriteModel = require('../models/user_favorite.model');
@@ -537,7 +538,7 @@ const getAllUsers = async (options = {}) => {
     const obj = u.toObject ? u.toObject() : u;
     return {
       ...obj,
-      watchStreak: obj.watchStreak || 0,
+      watchStreak: watchStreakService.getCurrentStreakValue(obj),
       longestStreak: obj.longestStreak || 0,
       lastWatchDate: obj.lastWatchDate || null,
     };

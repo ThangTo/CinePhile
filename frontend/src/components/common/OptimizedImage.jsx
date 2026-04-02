@@ -149,7 +149,7 @@ const OptimizedImage = ({
       }
     };
     img.src = imageSrc;
-  }, [imageSrc, onLoad, onError, priority]);
+  }, [allSrcs.length, currentSrcIndex, imageSrc, onLoad, onError, priority]);
 
   // If lazy is false or priority is true, or section is visible, load immediately when src changes
   useEffect(() => {
@@ -212,7 +212,7 @@ const OptimizedImage = ({
         imageCache.markAsLoaded(imageSrc);
       }
     });
-  }, [imageSrc, hasError]);
+  }, [allSrcs.length, currentSrcIndex, imageSrc, hasError]);
 
   // Separate container props from image props
   const { containerClassName, ...restProps } = props;

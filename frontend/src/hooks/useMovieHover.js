@@ -41,13 +41,14 @@ export const useMovieHover = (showDelay = 0, hideDelay = 0) => {
   }, []);
 
   useEffect(() => {
+    const currentInstance = instanceRef.current;
     // Cleanup timeouts on unmount
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
 
       // Clear active reference if this was the active one
-      if (activeHoverCardRef === instanceRef.current) {
+      if (activeHoverCardRef === currentInstance) {
         activeHoverCardRef = null;
       }
     };

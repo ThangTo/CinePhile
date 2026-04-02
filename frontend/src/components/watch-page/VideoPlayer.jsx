@@ -129,7 +129,6 @@ const VideoPlayer = ({
   const lastTapRef = useRef({ time: 0 });
   const singleTapTimeoutRef = useRef(null);
   const doubleTapDismissRef = useRef(null);
-  const streakSessionRef = useRef(0); // cumulative seconds in session
 
   const hlsRef = useRef(null);
   const blobUrlRef = useRef(null);
@@ -405,14 +404,40 @@ const VideoPlayer = ({
     resetNetworkRecoveryState();
     clearPendingBuffering();
     lastPlaybackProgressRef.current = 0;
-    streakSessionRef.current = 0;
   }, [hlsSource, resetNetworkRecoveryState, clearPendingBuffering]);
 
   // === HEARTBEAT: Gửi Watch Time mỗi 60 giây khi video đang phát ===
   useEffect(() => {
-    if (!isPlaying || !movie) return;
+    if (!isPlaying || !movie || !hasNativePlayer) return;
 
     let isBufferingNow = false;
+    let pendingSeconds = 0;
+
+    const flushPlaybackHeartbeat = (seconds) => {
+      const safeSeconds = Math.max(0, Math.floor(seconds));
+      if (!safeSeconds) return;
+
+      const movieId = movie.id || movie._id || movie.slug;
+      const vhId = viewHistoryIdRef?.current;
+
+      if (movieId) {
+        movieService.recordWatchTime(movieId, vhId, safeSeconds).catch(() => {});
+      }
+
+      userService
+        .recordStreak(safeSeconds)
+        .then((streakData) => {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("watch-streak-updated", {
+                detail: streakData,
+              })
+            );
+          }
+        })
+        .catch(() => {});
+    };
+
     const handleWaiting = () => {
       isBufferingNow = true;
     };
@@ -423,35 +448,49 @@ const VideoPlayer = ({
     const video = videoRef.current;
     if (video) {
       video.addEventListener("waiting", handleWaiting);
+      video.addEventListener("stalled", handleWaiting);
+      video.addEventListener("seeking", handleWaiting);
       video.addEventListener("canplay", handleCanPlay);
+      video.addEventListener("playing", handleCanPlay);
+      video.addEventListener("seeked", handleCanPlay);
     }
 
     const heartbeatInterval = setInterval(() => {
-      if (isBufferingNow) return;
+      if (!video || video.paused || video.ended || isBufferingNow) return;
 
-      const movieId = movie.id || movie._id || movie.slug;
-      const vhId = viewHistoryIdRef?.current;
-      if (movieId) {
-        movieService.recordWatchTime(movieId, vhId, 60).catch(() => {});
+      pendingSeconds += 1;
+
+      if (pendingSeconds >= 60) {
+        flushPlaybackHeartbeat(pendingSeconds);
+        pendingSeconds = 0;
       }
-
-      // Update watch streak every 60s
-      streakSessionRef.current += 60;
-      userService.recordStreak(streakSessionRef.current).catch(() => {});
-    }, 60000);
+    }, 1000);
 
     return () => {
       clearInterval(heartbeatInterval);
       if (video) {
         video.removeEventListener("waiting", handleWaiting);
+        video.removeEventListener("stalled", handleWaiting);
+        video.removeEventListener("seeking", handleWaiting);
         video.removeEventListener("canplay", handleCanPlay);
+        video.removeEventListener("playing", handleCanPlay);
+        video.removeEventListener("seeked", handleCanPlay);
       }
-      // Flush final streak on unmount
-      if (streakSessionRef.current > 0) {
-        userService.recordStreak(streakSessionRef.current).catch(() => {});
+
+      if (pendingSeconds > 0) {
+        flushPlaybackHeartbeat(pendingSeconds);
       }
     };
-  }, [isPlaying, movie, viewHistoryIdRef]);
+  }, [
+    episode?._id,
+    episode?.id,
+    fileSource,
+    hasNativePlayer,
+    hlsSource,
+    isPlaying,
+    movie,
+    viewHistoryIdRef,
+  ]);
 
   // Reset auto-play/seek state
   useEffect(() => {
@@ -959,7 +998,18 @@ const VideoPlayer = ({
         saveProgressIntervalRef.current = null;
       }
     };
-  }, [hlsSource, fileSource]);
+  }, [
+    episode?._id,
+    episode?.id,
+    fileSource,
+    hlsSource,
+    movie?._id,
+    movie?.id,
+    resetNetworkRecoveryState,
+    resumeTime,
+    shouldEscalateToProxyMode,
+    user,
+  ]);
 
   // --- Các helper function xử lý giao diện (Controls, Menu...) giữ nguyên ---
 
@@ -1290,22 +1340,6 @@ const VideoPlayer = ({
     }
     return minDiff > 100 ? -1 : bestMatch;
   };
-
-  const getMaxAllowedQuality = useCallback(() => {
-    if (!availableLevels || availableLevels.length === 0) return null;
-    const heightsFromLevels = [...availableLevels]
-      .map((l) => l?.height)
-      .filter(Boolean)
-      .sort((a, b) => b - a);
-    const sortedLevels = heightsFromLevels.length > 0 ? heightsFromLevels : [1080, 720, 480, 360];
-    if (sortedLevels.length === 0) return null;
-    if (isPremium || isAdmin) return sortedLevels[0];
-    if (isRegularUser && sortedLevels.length > 1) {
-      const maxRegularQuality = sortedLevels.find((h) => h <= 720) || sortedLevels[1];
-      return maxRegularQuality;
-    }
-    return sortedLevels[0];
-  }, [availableLevels, isPremium, isAdmin, isRegularUser]);
 
   const isQualityPremium = useCallback(
     (qualityStr) => {

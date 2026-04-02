@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  FiSettings, FiPlus, FiTrash2, FiEdit2, FiSave, FiX,
+  FiPlus, FiTrash2, FiEdit2, FiSave, FiX,
   FiDollarSign, FiStar, FiCheck, FiAlertCircle, FiLoader,
   FiChevronUp, FiChevronDown, FiRefreshCw,
 } from "react-icons/fi";
 import { settingsAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
-import ConfirmDialog from "components/common/ConfirmDialog";
 
 // ─── Shared Toast ───────────────────────────────────────────────────────────
 const Toast = ({ message, type, onClose }) => {

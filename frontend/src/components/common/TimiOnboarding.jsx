@@ -54,6 +54,7 @@ const TimiOnboarding = () => {
     }
 
     const currentText = STEPS[step].description;
+    const audioElement = audioRef.current;
     let isActive = true; // Chống race condition khi bấm chuyển bước liên tục
 
     // Gọi API TTS (Tự động Cache trên R2 nhờ Backend)
@@ -66,15 +67,17 @@ const TimiOnboarding = () => {
       .then(data => {
         if (!isActive) return;
         if (data.success && data.audioUrl && showOnboarding && !isMuted) {
-          audioRef.current.src = data.audioUrl;
-          audioRef.current.play().catch(e => console.log('Autoplay chặn:', e));
+          audioElement.src = data.audioUrl;
+          audioElement.play().catch(e => console.log('Autoplay chặn:', e));
         }
       })
       .catch(err => console.error('TTS Error:', err));
 
     return () => {
       isActive = false;
-      audioRef.current.pause();
+      if (audioElement) {
+        audioElement.pause();
+      }
     };
   }, [step, showOnboarding, isMuted]);
 

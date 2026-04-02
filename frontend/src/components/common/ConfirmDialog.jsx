@@ -25,9 +25,6 @@ const ConfirmDialog = ({
   if (!isOpen) return null;
 
   // Xử lý màu sắc dựa trên mức độ nguy hiểm (Danger Mode)
-  const themeColor = isDanger ? "red-600" : "primaryColor"; // Tailwind class
-  const themeColorHover = isDanger ? "red-700" : "hoverPrimaryColor";
-  const themeShadow = isDanger ? "shadow-red-900/20" : "shadow-primaryColor/20";
 
   // Icon hiển thị tùy ngữ cảnh
   const Icon = isDanger ? (

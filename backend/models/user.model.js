@@ -65,6 +65,10 @@ const userSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    lastQualifiedWatchDate: {
+      type: Date,
+      default: null,
+    },
     lastWatchDate: {
       type: Date,
       default: null,

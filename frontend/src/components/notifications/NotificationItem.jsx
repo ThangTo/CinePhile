@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { formatTimeAgo } from "utils/dateUtils";
 import { useNotifications } from "contexts/NotificationContext";
-import { FiTrash2, FiClock, FiBell, FiCircle } from "react-icons/fi"; // Sử dụng React Icons
+import { FiTrash2, FiClock, FiBell } from "react-icons/fi";
 
 const NotificationItem = ({ notification, isActive = false, onDelete }) => {
   const navigate = useNavigate();
@@ -26,7 +26,6 @@ const NotificationItem = ({ notification, isActive = false, onDelete }) => {
     onDelete(notification.id);
   };
 
-  // Xác định style dựa trên trạng thái
   const isRead = notification.isRead;
 
   return (
@@ -37,12 +36,11 @@ const NotificationItem = ({ notification, isActive = false, onDelete }) => {
         border-b border-white/5
         ${
           isActive
-            ? "bg-primaryColor/[0.08] border-l-4 border-l-primaryColor" // Active: Nền sáng nhẹ + dải màu trái
-            : "border-l-4 border-l-transparent hover:bg-white/[0.03]" // Normal: Hover sáng nhẹ
+            ? "bg-primaryColor/[0.08] border-l-4 border-l-primaryColor"
+            : "border-l-4 border-l-transparent hover:bg-white/[0.03]"
         }
       `}
     >
-      {/* 1. Icon Section */}
       <div className="flex-shrink-0 relative">
         <div
           className={`
@@ -56,22 +54,19 @@ const NotificationItem = ({ notification, isActive = false, onDelete }) => {
         >
           <FiBell className={`${!isRead ? "animate-swing" : ""} text-lg`} />
         </div>
-        
-        {/* Unread Indicator Dot (Glow effect) */}
+
         {!isRead && (
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-[#1a1a1a]"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-[#1a1a1a]" />
           </span>
         )}
       </div>
 
-      {/* 2. Content Section */}
-      <div className="flex-1 min-w-0 pr-6"> {/* pr-6 để tránh nút xóa đè lên chữ */}
+      <div className="flex-1 min-w-0 pr-6">
         <div className="flex flex-col gap-1">
-          {/* Title Header */}
           <div className="flex items-center justify-between">
-            <h3 
+            <h3
               className={`text-sm font-semibold truncate pr-2 ${
                 !isRead ? "text-white" : "text-gray-400"
               }`}
@@ -80,31 +75,29 @@ const NotificationItem = ({ notification, isActive = false, onDelete }) => {
             </h3>
           </div>
 
-          {/* Message Body */}
-          <p className={`text-sm leading-relaxed ${
-             !isRead ? "text-gray-300" : "text-gray-500"
-          }`}>
+          <p
+            className={`text-sm leading-relaxed ${
+              !isRead ? "text-gray-300" : "text-gray-500"
+            }`}
+          >
             {notification.message}
           </p>
 
-          {/* Metadata Footer */}
           <div className="flex items-center gap-3 mt-2">
             <span className="flex items-center gap-1 text-[11px] text-gray-500 font-medium">
               <FiClock className="w-3 h-3" />
               {formatTimeAgo(notification.createdAt)}
             </span>
-            
-            {/* Tag "Mới" - chỉ hiện khi chưa đọc và là tin mới */}
+
             {notification.isNew && !isRead && (
               <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold tracking-wider uppercase">
-                Mới
+                Má»›i
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* 3. Action Button (Hiện khi Hover) */}
       <button
         onClick={handleDelete}
         className="
@@ -114,12 +107,11 @@ const NotificationItem = ({ notification, isActive = false, onDelete }) => {
           hover:bg-red-500/10 hover:text-red-500
           transition-all duration-200 ease-out
         "
-        title="Xóa thông báo"
+        title="XÃ³a thÃ´ng bÃ¡o"
       >
         <FiTrash2 className="w-4 h-4" />
       </button>
 
-      {/* Active Indicator (Glow nền nếu đang active) */}
       {isActive && (
         <div className="absolute inset-0 bg-primaryColor/[0.02] pointer-events-none" />
       )}

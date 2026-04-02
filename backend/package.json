@@ -21,7 +21,8 @@
     "pm2:status": "pm2 status",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:chatbot": "node scripts/testChatbotBackend.js",
-    "test:chatbot:win": "powershell -ExecutionPolicy Bypass -File scripts/testChatbotBackend.ps1"
+    "test:chatbot:win": "powershell -ExecutionPolicy Bypass -File scripts/testChatbotBackend.ps1",
+    "test:watch-streak": "node scripts/testWatchStreakLogic.js"
   },
   "keywords": [],
   "author": "",

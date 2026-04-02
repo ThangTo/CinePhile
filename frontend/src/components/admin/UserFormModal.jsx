@@ -426,7 +426,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
                           <div className="grid grid-cols-4 gap-2 mb-4">
                             <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl p-3 text-center">
                               <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-1">🔥 Hiện Tại</p>
-                              <span className="text-xl font-black text-orange-400">{streak.watchStreak}</span>
+                              <span className="text-xl font-black text-orange-400">{streak.currentStreak ?? streak.watchStreak}</span>
                               <p className="text-[9px] text-gray-500 mt-0.5">ngày</p>
                             </div>
                             <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-xl p-3 text-center">

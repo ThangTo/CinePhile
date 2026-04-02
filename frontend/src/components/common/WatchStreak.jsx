@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
 
-const FIRE_URL = "https://cdn.jsdelivr.net/gh/PKEfg/emoji-dataset-fire@main/fire.svg";
 const MINUTES_THRESHOLD = 10;
 const DAYS_TO_MILESTONE = [7, 30, 100, 365];
 
@@ -23,31 +22,55 @@ const MILESTONE_ICONS = {
 
 const WatchStreak = ({ compact = false }) => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [streak, setStreak] = useState(null);
   const [todaySeconds, setTodaySeconds] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [showCard, setShowCard] = useState(false);
-  // Fetch streak on mount
-  const fetchStreak = async () => {
+  useEffect(() => {
     if (!isAuthenticated) return;
-    try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/users/streak`, {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStreak(data);
-        // Sync today's seconds from API into local state so progress bar is accurate
-        if (data.todayProgress !== undefined && data.todayProgress !== null) {
-          setTodaySeconds((data.todayProgress || 0) * 60);
+
+    const fetchStreak = async () => {
+      try {
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/users/streak`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setStreak(data);
+          // Sync today's seconds from API into local state so progress bar is accurate
+          if (data.todayProgress !== undefined && data.todayProgress !== null) {
+            setTodaySeconds((data.todayProgress || 0) * 60);
+          }
         }
-      }
-    } catch {}
-  };
+      } catch {}
+    };
+
+    fetchStreak();
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    fetchStreak();
+    if (!isAuthenticated) return undefined;
+
+    const handleStreakUpdated = (event) => {
+      const data = event?.detail;
+      if (!data) return;
+
+      setStreak(data);
+
+      if (data.todayProgress !== undefined && data.todayProgress !== null) {
+        setTodaySeconds((data.todayProgress || 0) * 60);
+        return;
+      }
+
+      if (data.minutesWatchedToday !== undefined && data.minutesWatchedToday !== null) {
+        setTodaySeconds((data.minutesWatchedToday || 0) * 60);
+      }
+    };
+
+    window.addEventListener("watch-streak-updated", handleStreakUpdated);
+    return () => {
+      window.removeEventListener("watch-streak-updated", handleStreakUpdated);
+    };
   }, [isAuthenticated]);
 
   // Close card on outside click (when card is visible)
@@ -97,8 +120,10 @@ const WatchStreak = ({ compact = false }) => {
     weekDays.push({ date: d, dayName: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"][i + dayOfWeek] });
   }
 
-  const lastWatchDate = streak?.lastWatchDate ? new Date(streak.lastWatchDate) : null;
-  if (lastWatchDate) lastWatchDate.setHours(0, 0, 0, 0);
+  const lastQualifiedDate = streak?.lastQualifiedWatchDate
+    ? new Date(streak.lastQualifiedWatchDate)
+    : null;
+  if (lastQualifiedDate) lastQualifiedDate.setHours(0, 0, 0, 0);
 
   // Compact version — used in header
   if (compact) {
@@ -158,7 +183,7 @@ const WatchStreak = ({ compact = false }) => {
               nextMilestone={nextMilestone}
               daysToNext={daysToNext}
               weekDays={weekDays}
-              lastWatchDate={lastWatchDate}
+              lastQualifiedDate={lastQualifiedDate}
               today={today}
               onClose={() => setShowCard(false)}
               onNavigate={() => {
@@ -185,7 +210,7 @@ const WatchStreak = ({ compact = false }) => {
       nextMilestone={nextMilestone}
       daysToNext={daysToNext}
       weekDays={weekDays}
-      lastWatchDate={lastWatchDate}
+      lastQualifiedDate={lastQualifiedDate}
       today={today}
       onClose={() => {}}
       onNavigate={() => {}}
@@ -205,7 +230,7 @@ const StreakCard = ({
   nextMilestone,
   daysToNext,
   weekDays,
-  lastWatchDate,
+  lastQualifiedDate,
   today,
   onClose,
   onNavigate,
@@ -333,7 +358,8 @@ const StreakCard = ({
             {weekDays.map((day, i) => {
               const isToday = day.date.getTime() === today.getTime();
               const isPast = day.date < today;
-              const isWatched = lastWatchDate && day.date.getTime() === lastWatchDate.getTime();
+              const isWatched =
+                lastQualifiedDate && day.date.getTime() === lastQualifiedDate.getTime();
 
               return (
                 <div key={i} className="flex flex-col items-center gap-1">
@@ -397,7 +423,10 @@ const StreakCard = ({
                 Mốc tiếp
               </span>
             </div>
-            <div className="text-xl font-black text-primaryColor leading-none">
+            <div
+              className="text-xl font-black text-primaryColor leading-none"
+              title={MILESTONE_LABELS[nextMilestone] || undefined}
+            >
               {nextMilestone.toLocaleString()}
             </div>
             <div className="text-[10px] text-gray-500 mt-0.5">

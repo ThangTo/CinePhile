@@ -48,7 +48,9 @@ export const restoreConsole = () => {
   console.error = originalConsole.error;
 };
 
-export default {
+const consoleUtils = {
   initConsole,
   restoreConsole,
 };
+
+export default consoleUtils;

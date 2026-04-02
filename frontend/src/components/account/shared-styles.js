@@ -40,9 +40,11 @@ export const modalStyles = {
   footer: "px-6 py-5 bg-account-bg-tertiary border-t border-account-border flex justify-end gap-3",
 };
 
-export default {
+const sharedStyles = {
   cardStyles,
   buttonStyles,
   formStyles,
   modalStyles,
 };
+
+export default sharedStyles;

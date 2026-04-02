@@ -12,7 +12,6 @@ import {
   FiMessageSquare,
   FiUser,
   FiClock,
-  FiFilter,
 } from "react-icons/fi";
 
 const CommentTable = () => {

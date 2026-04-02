@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { movieAPI } from "services/admin.service";
 import MovieFormModal from "./MovieFormModal";
 import MovieCrawlModal from "./MovieCrawlModal";
@@ -15,7 +15,6 @@ import {
   FiTrash2,
   FiEye,
   FiEyeOff,
-  FiStar,
   FiFilm,
   FiCalendar,
   FiDownload,
@@ -45,7 +44,7 @@ const MovieTable = () => {
     limit: 20,
   });
 
-  const loadMovies = async (page = 1, search = "", filterParams = {}) => {
+  const loadMovies = useCallback(async (page = 1, search = "", filterParams = {}) => {
     setIsLoading(true);
     try {
       // Build params object with filters
@@ -87,19 +86,18 @@ const MovieTable = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showFeaturedOnly, showHiddenOnly]);
 
   useEffect(() => {
-    loadMovies(1, "", filters);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    loadMovies(1, "", {});
+  }, [loadMovies]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       loadMovies(1, searchTerm, filters);
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, filters, showHiddenOnly, showFeaturedOnly]);
+  }, [filters, loadMovies, searchTerm]);
 
   const handleDelete = async (id) => {
     setIsDeleteModalOpen(false);

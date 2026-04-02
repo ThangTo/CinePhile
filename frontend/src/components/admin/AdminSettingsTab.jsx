@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { settingsAPI } from "services/admin.service";
 import { useTheme } from "contexts/ThemeContext";
-import { FiCheck, FiLoader, FiSettings, FiMonitor, FiLayout } from "react-icons/fi";
+import { FiCheck, FiLoader, FiSettings, FiLayout } from "react-icons/fi";
 
 const AdminSettingsTab = () => {
   // --- GIỮ NGUYÊN LOGIC CŨ ---

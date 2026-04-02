@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { USER_MENU_ITEMS, MOBILE_MENU_ITEM_CLASS } from "./constants";
-import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
+import { isPremiumActive } from "utils/premiumUtils";
 import { handleAvatarError } from "utils/avatarUtils";
 
 const UserInfoCard = ({ user }) => {

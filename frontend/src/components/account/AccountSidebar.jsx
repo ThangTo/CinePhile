@@ -1,9 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
-import { handleAvatarError } from "utils/avatarUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
-import WatchStreak from "components/common/WatchStreak";
 
 const DEFAULT_TAB = "profile";
 
