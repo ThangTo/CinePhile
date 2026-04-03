@@ -5,7 +5,7 @@
  * Con trỏ vẽ ra các nét cát màu vàng/lửa lấp lánh.
  * Nét vẽ biến mất từ đầu → cuối sau ~1 giây (kiểu "đốt dây pháo").
  *
- * Màu chủ đạo Tết: vàng #ffd875, cam #f59e0b, đỏ #dc2626, trắng #ffffff
+ * Màu chủ đạo Tết: vàng #ffd875, cam #f59e0b, trắng #ffffff
  */
 
 import { useEffect, useRef, useCallback } from "react";
@@ -17,8 +17,8 @@ import { isPremiumActive } from "utils/premiumUtils";
 /** Thời gian (ms) để nét vẽ biến mất hoàn toàn kể từ lúc được tạo */
 const TRAIL_LIFETIME_MS = 1000;
 
-/** Số hạt kim tuyến được tạo trên mỗi batch khi di chuyển */
-const PARTICLES_PER_BATCH = 4;
+/** Số hạt kim tuyến được tạo mỗi lần emit */
+const PARTICLES_PER_BATCH = 3;
 
 /** Xác suất (0–1) mỗi batch có màu "đỏ may mắn" Tết */
 const LUCKY_RED_CHANCE = 0; // Đỏ đã ẩn
@@ -57,10 +57,10 @@ class GlitterParticle {
     this.flickerPhase = Math.random() * Math.PI * 2;
     this.flickerSpeed = Math.random() * 0.08 + 0.04;
 
-    // Màu sắc: ưu tiên vàng/cam, nhưng có thể trúng đỏ may mắn
+    // Màu sắc: ưu tiên vàng/cam
     this.color =
       Math.random() < LUCKY_RED_CHANCE
-        ? GLITTER_PALETTE[GLITTER_PALETTE.length - 3] // đỏ
+        ? GLITTER_PALETTE[GLITTER_PALETTE.length - 3] // đỏ (không bao giờ chọn vì LUCKY_RED_CHANCE = 0)
         : GLITTER_PALETTE[Math.floor(Math.random() * 4)]; // vàng/cam/trắng
   }
 
@@ -80,9 +80,7 @@ class GlitterParticle {
     return now - this.birthTime < this.maxLife;
   }
 
-  update(now) {
-    const age = now - this.birthTime;
-    // Tốc độ giảm dần theo thời gian (ma sát nhẹ)
+  update() {
     this.x += this.vx;
     this.y += this.vy;
     this.vx *= 0.96;
@@ -129,9 +127,11 @@ const PremiumParticleTrail = () => {
   const canvasRef = useRef(null);
   const particlesRef = useRef([]);
   const rafRef = useRef(null);
+
+  // mouseRef: lưu vị trí frame trước — chỉ được ghi bởi mousemove, đọc bởi RAF
   const mouseRef = useRef({ x: 0, y: 0, px: 0, py: 0 });
-  const batchTimerRef = useRef(null);
-  const isActiveRef = useRef(false); // bật tắt hiệu ứng khi tab ẩn
+  // needsEmit: cờ — mousemove bật, RAF tắt và emit
+  const needsEmitRef = useRef(false);
 
   // ── Canvas setup ────────────────────────────────────────────────────────────
 
@@ -142,7 +142,7 @@ const PremiumParticleTrail = () => {
     canvas.height = window.innerHeight;
   }, []);
 
-  // ── Animation loop ──────────────────────────────────────────────────────────
+  // ── Render loop — emit + draw gộp vào đây, chạy đúng 60fps ──────────────
 
   const animate = useCallback(() => {
     const canvas = canvasRef.current;
@@ -150,53 +150,50 @@ const PremiumParticleTrail = () => {
     const ctx = canvas.getContext("2d");
     const now = performance.now();
 
-    // Xóa mờ để tạo vệt kéo dài (thay vì clear hoàn toàn)
+    // Nếu có di chuyển → emit particles từ vị trí cũ → mới
+    if (needsEmitRef.current) {
+      needsEmitRef.current = false;
+
+      const { x, y, px, py } = mouseRef.current;
+      const dx = x - px;
+      const dy = y - py;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist >= 3) {
+        // Chỉ emit tối đa 5 batches bất kể tốc độ di chuột
+        const batches = 5;
+        for (let i = 1; i <= batches; i++) {
+          const t = i / (batches + 1);
+          const bx = px + dx * t;
+          const by = py + dy * t;
+          for (let j = 0; j < PARTICLES_PER_BATCH; j++) {
+            particlesRef.current.push(new GlitterParticle(bx, by));
+          }
+        }
+      }
+
+      // Cập nhật vị trí "cũ" sau khi emit
+      mouseRef.current.px = mouseRef.current.x;
+      mouseRef.current.py = mouseRef.current.y;
+
+      // Giới hạn tổng hạt
+      if (particlesRef.current.length > 1500) {
+        particlesRef.current = particlesRef.current.slice(-1200);
+      }
+    }
+
+    // Fade overlay — giữ vệt visible khoảng 1s
     ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Cập nhật và vẽ từng hạt
     particlesRef.current = particlesRef.current.filter((p) => p.isAlive(now));
     for (const p of particlesRef.current) {
-      p.update(now);
+      p.update();
       p.draw(ctx, now);
     }
 
     rafRef.current = requestAnimationFrame(animate);
-  }, []);
-
-  // ── Emit particles along the cursor path ──────────────────────────────────
-
-  const emitAlongPath = useCallback(() => {
-    const { x, y, px, py } = mouseRef.current;
-    if (x === px && y === py) return;
-
-    const dx = x - px;
-    const dy = y - py;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const step = 8; // khoảng cách giữa các batch
-
-    if (dist < step) return;
-
-    const nx = dx / dist;
-    const ny = dy / dist;
-    const steps = Math.floor(dist / step);
-
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      const bx = px + dx * t;
-      const by = py + dy * t;
-      for (let j = 0; j < PARTICLES_PER_BATCH; j++) {
-        particlesRef.current.push(new GlitterParticle(bx, by));
-      }
-    }
-
-    // Giới hạn tổng hạt để tránh quá tải
-    if (particlesRef.current.length > 2000) {
-      particlesRef.current = particlesRef.current.slice(-1500);
-    }
-
-    mouseRef.current.px = x;
-    mouseRef.current.py = y;
   }, []);
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
@@ -210,55 +207,33 @@ const PremiumParticleTrail = () => {
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
 
-    // Bắt đầu animation
     rafRef.current = requestAnimationFrame(animate);
 
-    // Lắng nghe mouse move — emit particles
+    // mousemove CHỈ bật cờ — không làm gì khác
     const onMouseMove = (e) => {
       mouseRef.current.x = e.clientX;
       mouseRef.current.y = e.clientY;
-
-      if (!batchTimerRef.current) {
-        batchTimerRef.current = requestAnimationFrame(() => {
-          emitAlongPath();
-          batchTimerRef.current = null;
-        });
-      }
+      needsEmitRef.current = true;
     };
 
-    // Touch support
     const onTouchMove = (e) => {
-      const touch = e.touches[0];
-      mouseRef.current.x = touch.clientX;
-      mouseRef.current.y = touch.clientY;
-
-      if (!batchTimerRef.current) {
-        batchTimerRef.current = requestAnimationFrame(() => {
-          emitAlongPath();
-          batchTimerRef.current = null;
-        });
-      }
-    };
-
-    // Tạm dừng khi tab ẩn để tiết kiệm CPU
-    const onVisibility = () => {
-      isActiveRef.current = document.visibilityState === "visible";
+      const t = e.touches[0];
+      mouseRef.current.x = t.clientX;
+      mouseRef.current.y = t.clientY;
+      needsEmitRef.current = true;
     };
 
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("touchmove", onTouchMove, { passive: true });
-    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       window.removeEventListener("resize", resizeCanvas);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("touchmove", onTouchMove);
-      document.removeEventListener("visibilitychange", onVisibility);
 
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (batchTimerRef.current) cancelAnimationFrame(batchTimerRef.current);
     };
-  }, [user, resizeCanvas, animate, emitAlongPath]);
+  }, [user, resizeCanvas, animate]);
 
   if (!user || !isPremiumActive(user)) return null;
 
