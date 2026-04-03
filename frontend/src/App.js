@@ -7,6 +7,7 @@ import { VoiceProvider } from "contexts/VoiceContext";
 import ErrorBoundary from "components/common/ErrorBoundary";
 import VoiceIndicator from "components/common/VoiceIndicator";
 import TimiOnboarding from "components/common/TimiOnboarding";
+import PremiumParticleTrail from "components/common/PremiumParticleTrail";
 import { initUserInteractionListener } from "utils/userInteraction";
 import "styles/themes.css";
 import HomePage from "./pages/HomePage";
@@ -80,6 +81,7 @@ function App() {
               </Router>
               <VoiceIndicator />
               <TimiOnboarding />
+              <PremiumParticleTrail />
             </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>

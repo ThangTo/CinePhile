@@ -71,7 +71,7 @@ const MailboxFAB = () => {
             <button
               onClick={handleOpen}
               aria-label="Mở hộp thư CinePhine"
-              className="group relative flex h-[62px] w-[62px] items-center justify-center overflow-visible rounded-[24px] border transition-all duration-300 hover:-translate-y-1 active:scale-95 md:h-[68px] md:w-[68px]"
+              className="group relative flex h-[60px] w-[60px] items-center justify-center overflow-visible rounded-[24px] border transition-all duration-300 hover:-translate-y-1 active:scale-95 md:h-[60px] md:w-[60px]"
               style={{
                 background: `
                   linear-gradient(145deg, ${hexToRgba("#fff7dc", 0.42)} 0%, ${hexToRgba(primaryColor, 0.24)} 30%, ${hexToRgba(surfaceColor, 0.8)} 100%)

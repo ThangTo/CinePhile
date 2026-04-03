@@ -1,10 +1,103 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import ScrollContainer from "components/common/ScrollContainer";
 import { BarSpinner } from "components/common/LoadingState";
 import EmptyState from "components/common/EmptyState";
 import leaderboardService from "services/leaderboard.service";
 import formatWatchDuration from "utils/formatWatchDuration";
 import { getAvatarUrlByKey, handleAvatarError } from "utils/avatarUtils";
+
+// --- COMPONENT HIỆU ỨNG PHÉP THUẬT DÒNG CHẢY KIM TUYẾN ---
+const MagicFlowBackground = () => {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    let animationFrameId;
+    let particles = [];
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    window.addEventListener("resize", resize);
+    resize();
+
+    class Particle {
+      constructor() {
+        this.reset();
+        this.y = Math.random() * canvas.height; // Khởi tạo ngẫu nhiên toàn màn hình ban đầu
+      }
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = canvas.height + 10;
+        this.size = Math.random() * 1.5 + 0.5; // Kích thước kim tuyến
+        this.speedX = Math.random() * 0.5 - 0.25;
+        this.speedY = Math.random() * -1 - 0.5; // Tốc độ trôi lên
+        this.life = Math.random() * Math.PI * 2; // Chu kỳ lấp lánh
+
+        // Lấy dải màu primary của giao diện bạn đang dùng
+        const colors = ["#ffd875", "#ffe39f", "#22d3ee", "#ffffff"];
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+      }
+      update() {
+        // Trôi lượn sóng nhẹ nhàng như dòng cát/phép thuật
+        this.x += this.speedX + Math.sin(this.y * 0.01 + this.life) * 0.3;
+        this.y += this.speedY;
+        this.life += 0.05;
+
+        // Hiệu ứng nhấp nháy lấp lánh
+        this.opacity = ((Math.sin(this.life) + 1) / 2) * 0.8 + 0.1;
+
+        // Reset hạt khi bay khỏi màn hình
+        if (this.y < -10) {
+          this.reset();
+        }
+      }
+      draw() {
+        ctx.globalAlpha = this.opacity;
+        ctx.shadowBlur = 8; // Tạo hiệu ứng phát sáng mờ (glow)
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const init = () => {
+      particles = [];
+      // Số lượng hạt kim tuyến (bạn có thể tăng giảm tùy ý)
+      for (let i = 0; i < 80; i++) {
+        particles.push(new Particle());
+      }
+    };
+    init();
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach((p) => {
+        p.update();
+        p.draw();
+      });
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    animate();
+
+    return () => {
+      window.removeEventListener("resize", resize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none absolute inset-0 z-0 h-full w-full mix-blend-screen opacity-70"
+    />
+  );
+};
+// --------------------------------------------------------
 
 const PODIUM_STYLES = {
   1: {
@@ -268,8 +361,11 @@ const LeaderboardShell = ({ users, children, compact = false }) => (
       <div className="absolute left-[-80px] top-[-80px] h-56 w-56 rounded-full bg-[#ffd875]/10 blur-3xl" />
       <div className="absolute bottom-[-120px] right-[-80px] h-72 w-72 rounded-full bg-[#38bdf8]/10 blur-3xl" />
 
+      {/* HIỆU ỨNG CANVAS ĐƯỢC CHÈN Ở ĐÂY VỚI Z-INDEX THẤP NHẤT */}
+      <MagicFlowBackground />
+
       <div
-        className={`relative ${compact ? "px-3.5 py-4 sm:px-6 sm:py-6 lg:px-8" : "px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10"}`}
+        className={`relative z-10 ${compact ? "px-3.5 py-4 sm:px-6 sm:py-6 lg:px-8" : "px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10"}`}
       >
         <SectionHeader users={users} compact={compact} />
         <div className={compact ? "mt-6" : "mt-8"}>{children}</div>
@@ -288,7 +384,7 @@ const PodiumCard = ({ user, rank }) => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_52%)] opacity-60" />
       <div className="absolute -right-10 top-8 h-28 w-28 rounded-full bg-white/10 blur-3xl" />
 
-      <div className="relative">
+      <div className="relative z-10">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div
@@ -349,7 +445,7 @@ const LeaderboardRow = ({ user, rank, maxScore }) => {
   const progressWidth = maxScore > 0 ? Math.max(12, Math.round((score / maxScore) * 100)) : 12;
 
   return (
-    <article className="group rounded-[26px] border border-white/10 bg-white/[0.04] p-4 transition-all duration-300 hover:border-[#ffd875]/30 hover:bg-white/[0.06]">
+    <article className="group relative z-10 rounded-[26px] border border-white/10 bg-white/[0.04] p-4 transition-all duration-300 hover:border-[#ffd875]/30 hover:bg-white/[0.06] backdrop-blur-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#131927] text-lg font-black text-white ring-1 ring-white/10">
@@ -360,7 +456,9 @@ const LeaderboardRow = ({ user, rank, maxScore }) => {
 
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-white">{user.username}</h3>
-            <p className="mt-1 text-sm text-gray-400">Đã xem {formatWatchDuration(user.totalWatchTime)}</p>
+            <p className="mt-1 text-sm text-gray-400">
+              Đã xem {formatWatchDuration(user.totalWatchTime)}
+            </p>
           </div>
         </div>
 
@@ -405,7 +503,7 @@ const HorizontalHeroCard = ({ user }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <article className="relative overflow-hidden rounded-[28px] border border-[#ffd875]/30 bg-gradient-to-br from-[#2f260d] via-[#171d2a] to-[#10141d] p-4 shadow-[0_24px_80px_rgba(255,216,117,0.16)] sm:p-5">
+    <article className="relative z-10 overflow-hidden rounded-[28px] border border-[#ffd875]/30 bg-gradient-to-br from-[#2f260d] via-[#171d2a] to-[#10141d] p-4 shadow-[0_24px_80px_rgba(255,216,117,0.16)] sm:p-5">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_55%)] opacity-70" />
       <div className="absolute -right-10 top-6 h-28 w-28 rounded-full bg-[#ffd875]/15 blur-3xl" />
 
@@ -432,7 +530,9 @@ const HorizontalHeroCard = ({ user }) => {
           />
           <div className="min-w-0">
             <h3 className="truncate text-xl font-black text-white sm:text-2xl">{user.username}</h3>
-            <p className="mt-1 text-sm text-gray-300">Đã xem {formatWatchDuration(user.totalWatchTime)}</p>
+            <p className="mt-1 text-sm text-gray-300">
+              Đã xem {formatWatchDuration(user.totalWatchTime)}
+            </p>
           </div>
         </div>
 
@@ -477,7 +577,7 @@ const HorizontalRankCard = ({ user, rank, maxScore }) => {
   const progressWidth = maxScore > 0 ? Math.max(12, Math.round((score / maxScore) * 100)) : 12;
 
   return (
-    <article className="w-[74vw] max-w-[220px] shrink-0 snap-start rounded-[24px] border border-white/10 bg-white/[0.04] p-3.5 transition-all duration-300 hover:-translate-y-1 hover:border-[#ffd875]/30 hover:bg-white/[0.06] sm:w-[250px] sm:max-w-none sm:p-4 lg:w-[280px]">
+    <article className="relative z-10 w-[74vw] max-w-[220px] shrink-0 snap-start rounded-[24px] border border-white/10 bg-white/[0.04] p-3.5 transition-all duration-300 hover:-translate-y-1 hover:border-[#ffd875]/30 hover:bg-white/[0.06] sm:w-[250px] sm:max-w-none sm:p-4 lg:w-[280px] backdrop-blur-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
@@ -571,7 +671,7 @@ const VerticalLeaderboardContent = ({ users }) => {
       </div>
 
       {remainingEntries.length > 0 && (
-        <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-6">
+        <div className="relative z-10 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-6 backdrop-blur-sm">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
@@ -613,7 +713,7 @@ const HorizontalLeaderboardContent = ({ users }) => {
       </div>
 
       {remainingEntries.length > 0 && (
-        <div className="min-w-0 rounded-[28px] border border-white/10 bg-white/[0.03] p-3.5 sm:p-5">
+        <div className="relative z-10 min-w-0 rounded-[28px] border border-white/10 bg-white/[0.03] p-3.5 sm:p-5 backdrop-blur-sm">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
