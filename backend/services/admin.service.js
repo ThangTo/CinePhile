@@ -1524,14 +1524,14 @@ const getUpdatingMovies = async (options = {}) => {
  * @param {string} timeframe - 'today', 'week', 'month'
  * @returns {Promise<Array>} List of trending movies with per-episode breakdown
  */
-const getTrendingMovies = async (timeframe = 'today') => {
+const getTrendingMovies = async (timeframe = 'today', page = 1, limit = 10) => {
   const ViewHistoryModel = require('../models/view_history.model');
   const MovieModel = require('../models/movie.model');
   const EpisodeModel = require('../models/episode.model');
   const UserModel = require('../models/user.model');
 
   const now = new Date();
-  const startDate = new Date();
+  const startDate = new Date(now.getTime()); // clone — mutations below must NOT affect `now`
   if (timeframe === 'today') {
     startDate.setHours(0, 0, 0, 0);
   } else if (timeframe === 'week') {
@@ -1543,8 +1543,12 @@ const getTrendingMovies = async (timeframe = 'today') => {
   }
   const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
 
-  // 1. Movie-level trending aggregation
-  const aggregation = await ViewHistoryModel.aggregate([
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+  const skip = (pageNum - 1) * limitNum;
+
+  // 1. Movie-level trending aggregation with $facet for total count + paginated results
+  const aggregationRaw = await ViewHistoryModel.aggregate([
     { $match: { createdAt: { $gte: startDate } } },
     {
       $group: {
@@ -1566,8 +1570,17 @@ const getTrendingMovies = async (timeframe = 'today') => {
       }
     },
     { $sort: { totalWatchTime: -1, views: -1 } },
-    { $limit: 10 },
+    {
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [{ $skip: skip }, { $limit: limitNum }],
+      }
+    },
   ]);
+
+  const facetData = aggregationRaw[0] || {};
+  const total = facetData.metadata?.[0]?.total || 0;
+  const aggregation = facetData.data || [];
 
   const movieIds = aggregation.map(item => item._id);
   const movies = await MovieModel.find({ _id: { $in: movieIds } })
@@ -1774,7 +1787,13 @@ const getTrendingMovies = async (timeframe = 'today') => {
     };
   });
 
-  return result;
+  return {
+    data: result,
+    total,
+    page: pageNum,
+    limit: limitNum,
+    totalPages: Math.ceil(total / limitNum),
+  };
 };
 
 /**

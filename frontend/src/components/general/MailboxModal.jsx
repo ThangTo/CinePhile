@@ -339,7 +339,7 @@ const MailboxModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   /* ─── Sidebar content (reused for desktop sidebar + mobile drawer) ─── */
-  const SidebarContent = () => (
+  const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
       <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest px-2 mb-2 hidden md:block">
         Chọn chủ đề
@@ -401,7 +401,7 @@ const MailboxModal = ({ isOpen, onClose }) => {
   );
 
   /* ─── Chat area content ─── */
-  const ChatArea = () => (
+  const renderChatArea = () => (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Error */}
       {error && (
@@ -819,10 +819,10 @@ const MailboxModal = ({ isOpen, onClose }) => {
             className="w-52 shrink-0 overflow-y-auto py-4 px-3"
             style={{ borderRight: "1px solid rgba(255,255,255,0.06)" }}
           >
-            <SidebarContent />
+            {renderSidebarContent()}
           </div>
           {/* Chat */}
-          <ChatArea />
+          {renderChatArea()}
         </div>
       </div>
 
@@ -951,7 +951,7 @@ const MailboxModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Mobile Chat — full width */}
-        <ChatArea />
+        {renderChatArea()}
 
         {/* Mobile Sidebar Drawer */}
         {mobileShowSidebar && (

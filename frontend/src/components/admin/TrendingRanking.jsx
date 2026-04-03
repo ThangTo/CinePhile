@@ -9,6 +9,8 @@ import {
   FiFilm,
   FiZap,
   FiStar,
+  FiChevronDown,
+  FiChevronUp,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { BarSpinner } from "components/common/LoadingState";
@@ -483,13 +485,30 @@ const TrendingRanking = () => {
   const [timeframe, setTimeframe] = useState("today");
   const [movies, setMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
+  // Reset everything when timeframe changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setMovies([]);
+  }, [timeframe]);
+
+  // Fetch current page
   useEffect(() => {
     const fetchTrending = async () => {
       setIsLoading(true);
       try {
-        const data = await statsAPI.getTrendingMovies(timeframe);
-        setMovies(Array.isArray(data) ? data : []);
+        const result = await statsAPI.getTrendingMovies(timeframe, 1);
+        if (result && Array.isArray(result.data)) {
+          setMovies(result.data);
+          setTotalPages(result.totalPages || 1);
+        } else if (Array.isArray(result)) {
+          // fallback: old API format (full list)
+          setMovies(result);
+          setTotalPages(1);
+        }
       } catch (error) {
         console.error("Failed to fetch trending movies:", error);
         setMovies([]);
@@ -499,6 +518,41 @@ const TrendingRanking = () => {
     };
     fetchTrending();
   }, [timeframe]);
+
+  const loadMore = async () => {
+    if (isLoadingMore || currentPage >= totalPages) return;
+    setIsLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const result = await statsAPI.getTrendingMovies(timeframe, nextPage);
+      if (result && Array.isArray(result.data)) {
+        setMovies((prev) => [...prev, ...result.data]);
+        setCurrentPage(nextPage);
+        setTotalPages(result.totalPages || 1);
+      }
+    } catch (error) {
+      console.error("Failed to load more trending movies:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  const collapse = () => {
+    setCurrentPage(1);
+    // Re-fetch page 1 to reset
+    statsAPI.getTrendingMovies(timeframe, 1).then((result) => {
+      if (result && Array.isArray(result.data)) {
+        setMovies(result.data);
+      } else if (Array.isArray(result)) {
+        setMovies(result);
+      }
+      setTotalPages(1);
+    });
+  };
+
+  const hasMore = currentPage < totalPages;
+  // Show load-more/collapse controls when total pages > 1
+  const isExpanded = totalPages > 1;
 
   const tabs = [
     { id: "today", label: "Hôm Nay" },
@@ -570,6 +624,42 @@ const TrendingRanking = () => {
                   <MovieRow key={movie.movieId?.toString()} movie={movie} index={index} />
                 ))}
               </AnimatePresence>
+
+              {/* Load more / collapse controls */}
+              {isExpanded && (
+                <div className="flex justify-center mt-2">
+                  <div className="flex gap-3">
+                    {hasMore && (
+                      <button
+                        onClick={loadMore}
+                        disabled={isLoadingMore}
+                        className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold
+                          bg-white/5 border border-white/10 text-gray-400
+                          hover:bg-white/10 hover:text-white hover:border-white/20
+                          disabled:opacity-40 disabled:cursor-not-allowed
+                          transition-all duration-200"
+                      >
+                        {isLoadingMore ? (
+                          <BarSpinner size={14} />
+                        ) : (
+                          <FiChevronDown size={14} />
+                        )}
+                        Xem thêm
+                      </button>
+                    )}
+                    <button
+                      onClick={collapse}
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold
+                        bg-white/5 border border-white/10 text-gray-400
+                        hover:bg-white/10 hover:text-white hover:border-white/20
+                        transition-all duration-200"
+                    >
+                      <FiChevronUp size={14} />
+                      Thu gọn
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

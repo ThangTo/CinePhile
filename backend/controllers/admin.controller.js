@@ -850,8 +850,8 @@ const getUserAnalytics = async (req, res) => {
  */
 const getTrendingMovies = async (req, res) => {
   try {
-    const { timeframe } = req.query;
-    const trending = await adminService.getTrendingMovies(timeframe);
+    const { timeframe, page = 1, limit = 10 } = req.query;
+    const trending = await adminService.getTrendingMovies(timeframe, page, limit);
     res.json(trending);
   } catch (error) {
     res.status(500).json({ message: error.message });

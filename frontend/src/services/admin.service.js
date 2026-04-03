@@ -864,16 +864,19 @@ export const statsAPI = {
   },
 
   /**
-   * Get top trending movies by timeframe
+   * Get top trending movies by timeframe with pagination
    * @param {string} timeframe - 'today', 'week', 'month'
-   * @returns {Promise<Array>} Array of trending movies
+   * @param {number} page - Page number (1-indexed)
+   * @param {number} limit - Items per page
+   * @returns {Promise<{data: Array, total: number, page: number, limit: number, totalPages: number}>}
    */
-  getTrendingMovies: async (timeframe = "today") => {
+  getTrendingMovies: async (timeframe = "today", page = 1, limit = 10) => {
     const response = await apiRequest("/admin/analytics/trending", {
-      params: { timeframe },
+      params: { timeframe, page, limit },
       requiresAuth: true,
     });
-    return response.data || response;
+    // response is already the unwrapped body: { data, total, page, limit, totalPages }
+    return response;
   },
 
 
