@@ -205,6 +205,7 @@ const paymentRoutes = require('./routes/payment.routes');
 const viralClipRoutes = require('./routes/viralClip.routes');
 const aiRoutes = require('./routes/ai.routes');
 const mailboxRoutes = require('./routes/mailbox.routes');
+const leaderboardRoutes = require('./routes/leaderboard.routes');
 const adminController = require('./controllers/admin.controller');
 
 // API endpoints with caching
@@ -217,6 +218,7 @@ app.use('/api/v1/movies/meta/theme', cacheMiddleware(1800));
 app.use('/api/v1/movies', movieRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/users/leaderboard', leaderboardRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
 // ===== PUBLIC PRICING ROUTES (no auth required) =====

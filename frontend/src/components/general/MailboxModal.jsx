@@ -639,17 +639,19 @@ const MailboxModal = ({ isOpen, onClose }) => {
             style={{
               background: activeInputText.trim()
                 ? isPremiumUser
-                  ? "linear-gradient(135deg, #f6d365 0%, #f59e0b 100%)"
+                  ? `linear-gradient(135deg, rgba(255,255,255,0.16) 0%, ${activeCategoryConfig.color} 44%, ${activeCategoryConfig.color}d9 100%)`
                   : `linear-gradient(135deg, ${activeCategoryConfig.color}, ${activeCategoryConfig.color}cc)`
                 : isPremiumUser
-                  ? "rgba(246,211,101,0.12)"
+                  ? `linear-gradient(135deg, rgba(255,255,255,0.08) 0%, ${activeCategoryConfig.color}1f 100%)`
                   : "rgba(255,255,255,0.08)",
               boxShadow: activeInputText.trim()
                 ? isPremiumUser
-                  ? `0 8px 24px ${PREMIUM_THEME.glowSoft}`
+                  ? `0 8px 24px ${activeCategoryConfig.color}40, 0 0 0 1px rgba(255,255,255,0.12) inset`
                   : `0 4px 20px ${activeCategoryConfig.color}40`
                 : "none",
-              border: isPremiumUser ? `1px solid ${PREMIUM_THEME.border}` : "none",
+              border: isPremiumUser
+                ? `1px solid ${activeInputText.trim() ? `${activeCategoryConfig.color}66` : `${activeCategoryConfig.color}2e`}`
+                : "none",
             }}
           >
             {isSending ? (

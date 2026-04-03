@@ -65,6 +65,7 @@ const RechargeCoinPage = () => {
     }
 
     const amount = selectedAmount || parseInt(customAmount);
+    const selectedPackage = coinPackages.find((pkg) => pkg.amount === selectedAmount);
 
     if (!amount || amount <= 0) {
       setError("Vui lòng chọn gói coin hoặc nhập số coin muốn nạp");
@@ -81,20 +82,19 @@ const RechargeCoinPage = () => {
       return;
     }
 
+    if (!selectedPackage?.id) {
+      setError("Please select a valid coin package.");
+      return;
+    }
+
     try {
       setIsCreatingLink(true);
       setError(null);
 
-      // Get bonus from selected package
-      const selectedPackage = coinPackages.find((pkg) => pkg.amount === selectedAmount);
-      const bonus = selectedPackage?.bonus || 0;
-
       // Call Backend to Create Payment Link using secure axios instance
-      // amount = giá VNĐ từ package, bonus = coin thưởng
       const response = await http.post("/payment/create-payment-link", {
         userId: user._id,
-        amount: selectedPackage?.price ?? amount,
-        bonus: bonus,
+        packageId: selectedPackage.id,
       });
 
       const result = response.data;

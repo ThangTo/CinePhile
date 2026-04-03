@@ -1,6 +1,7 @@
 const { PayOS } = require('@payos/node');
 const User = require('../models/user.model');
 const Transaction = require('../models/transaction.model');
+const adminService = require('./admin.service');
 
 const payOS = new PayOS({
   clientId: process.env.PAYOS_CLIENT_ID,
@@ -8,29 +9,109 @@ const payOS = new PayOS({
   checksumKey: process.env.PAYOS_CHECKSUM_KEY,
 });
 
-const createPaymentLink = async (userId, amount, bonus = 0) => {
+const parsePositiveInteger = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const parseNonNegativeInteger = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+};
+
+const normalizeCoinPackage = (pkg) => ({
+  packageId: pkg.id || null,
+  amount: parsePositiveInteger(pkg.price),
+  coinAmount: parsePositiveInteger(pkg.amount),
+  bonusCoin: parseNonNegativeInteger(pkg.bonus),
+  label: pkg.label || 'Coin package',
+});
+
+const findPackageByPrice = (packages, money, bonusCoin = 0) => {
+  const samePricePackages = packages.filter(
+    (pkg) => parsePositiveInteger(pkg.price) === money,
+  );
+
+  if (samePricePackages.length === 1) {
+    return samePricePackages[0];
+  }
+
+  return samePricePackages.find(
+    (pkg) => parseNonNegativeInteger(pkg.bonus) === bonusCoin,
+  );
+};
+
+const resolveCoinPackageSelection = async ({ packageId, amount, bonus = 0 }) => {
+  const packages = await adminService.getCoinPackages();
+  const parsedMoney = parsePositiveInteger(amount);
+  const parsedBonus = parseNonNegativeInteger(bonus);
+
+  if (packageId) {
+    const selectedPackage = packages.find((pkg) => pkg.id === packageId);
+    if (!selectedPackage) {
+      throw new Error('Coin package not found');
+    }
+
+    return normalizeCoinPackage(selectedPackage);
+  }
+
+  if (!parsedMoney) {
+    throw new Error('Missing payment amount');
+  }
+
+  const matchedPackage = findPackageByPrice(packages, parsedMoney, parsedBonus);
+  if (!matchedPackage) {
+    throw new Error('Coin package not found');
+  }
+
+  return normalizeCoinPackage(matchedPackage);
+};
+
+const resolveTransactionAward = async (transaction) => {
+  const packages = await adminService.getCoinPackages();
+
+  if (transaction.packageId) {
+    const packageById = packages.find((pkg) => pkg.id === transaction.packageId);
+    if (packageById) {
+      return normalizeCoinPackage(packageById);
+    }
+  }
+
+  const matchedPackage = findPackageByPrice(
+    packages,
+    parsePositiveInteger(transaction.amount),
+    parseNonNegativeInteger(transaction.bonusCoin),
+  );
+
+  if (matchedPackage) {
+    return normalizeCoinPackage(matchedPackage);
+  }
+
+  throw new Error('Unable to resolve coin package for transaction');
+};
+
+const createPaymentLink = async ({ userId, packageId, amount, bonus = 0 }) => {
   const YOUR_DOMAIN =
     process.env.CLIENT_URL_LOCAL ||
     process.env.CLIENT_URL ||
     'https://decent-normally-bedbug.ngrok-free.app';
 
-  if (!userId || !amount) {
-    throw new Error('Missing userId or amount');
+  if (!userId || (!packageId && !amount)) {
+    throw new Error('Missing userId or payment package');
   }
 
-  // Khắc phục OrderCode: PayOS CHỈ chấp nhận số (Integer), KHÔNG chấp nhận chữ cái hay ký tự đặc biệt.
-  // Ta dùng Timestamp (13 số) + Random (2 số) = 15 số (an toàn nằm dưới giới hạn Number.MAX_SAFE_INTEGER của JavaScript)
-  const timestamp = Date.now().toString(); // 13 digits
+  const selectedPackage = await resolveCoinPackageSelection({ packageId, amount, bonus });
+
+  // PayOS only accepts a numeric orderCode.
+  const timestamp = Date.now().toString();
   const randomSuffix = Math.floor(Math.random() * 100)
     .toString()
-    .padStart(2, '0'); // 2 digits
+    .padStart(2, '0');
   const orderCode = Number(timestamp + randomSuffix);
 
-  const money = parseInt(amount);
-
   const body = {
-    orderCode: orderCode,
-    amount: money,
+    orderCode,
+    amount: selectedPackage.amount,
     description: 'Thanh toan don hang',
     returnUrl: `${YOUR_DOMAIN}/account?tabs=coin&success=true`,
     cancelUrl: `${YOUR_DOMAIN}/account?tabs=coin&canceled=true`,
@@ -41,21 +122,17 @@ const createPaymentLink = async (userId, amount, bonus = 0) => {
     throw new Error('User not found');
   }
 
-  // 1. Store request in MongoDB DB instead of memory
-  const parsedAmount = parseInt(amount);
-  const parsedBonus = parseInt(bonus) || 0;
-
   await Transaction.create({
     user: userId,
     orderCode: orderCode.toString(),
-    amount: money,
-    coinAmount: parsedAmount,
-    bonusCoin: parsedBonus,
+    amount: selectedPackage.amount,
+    coinAmount: selectedPackage.coinAmount,
+    bonusCoin: selectedPackage.bonusCoin,
+    packageId: selectedPackage.packageId,
     provider: 'PAYOS',
     status: 'PENDING',
   });
 
-  // 2. Create PayOS Payment Link
   const paymentLinkResponse = await payOS.paymentRequests.create(body);
 
   return {
@@ -64,14 +141,11 @@ const createPaymentLink = async (userId, amount, bonus = 0) => {
 };
 
 const handleWebhook = async (webhookData) => {
-  // console.log("[Webhook] Received webhook data");
   console.log('webhookData', webhookData);
 
-  // 2. Check if succeed
   if (webhookData.code === '00' && webhookData.success === true) {
     const { orderCode } = webhookData.data;
 
-    // 3. Find pending request in Database
     const transaction = await Transaction.findOne({
       orderCode: orderCode.toString(),
       status: 'PENDING',
@@ -80,15 +154,24 @@ const handleWebhook = async (webhookData) => {
     if (transaction) {
       console.log(`[Webhook] Processing success payment for Order ${orderCode}`);
 
-      // 4. Update User Coin
+      const resolvedAward = await resolveTransactionAward(transaction);
+      if (!resolvedAward.amount || !resolvedAward.coinAmount) {
+        throw new Error(`Invalid coin package resolution for order ${orderCode}`);
+      }
+
       const user = await User.findById(transaction.user);
       if (user) {
-        const totalCoins = transaction.coinAmount + transaction.bonusCoin;
+        const totalCoins =
+          parseNonNegativeInteger(resolvedAward.coinAmount) +
+          parseNonNegativeInteger(resolvedAward.bonusCoin);
+
         user.coin = (user.coin || 0) + totalCoins;
         await user.save();
       }
 
-      // 5. Cleanup Status
+      transaction.coinAmount = parseNonNegativeInteger(resolvedAward.coinAmount);
+      transaction.bonusCoin = parseNonNegativeInteger(resolvedAward.bonusCoin);
+      transaction.packageId = resolvedAward.packageId || transaction.packageId || null;
       transaction.status = 'SUCCESS';
       transaction.webhookData = webhookData;
       await transaction.save();

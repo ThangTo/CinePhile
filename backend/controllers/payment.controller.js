@@ -2,12 +2,23 @@ const paymentService = require("../services/payment.service");
 
 const createPaymentLink = async (req, res) => {
   try {
-    const { userId, amount, bonus = 0 } = req.body;
-    const result = await paymentService.createPaymentLink(userId, amount, bonus);
+    const { userId, packageId, amount, bonus = 0 } = req.body;
+    const result = await paymentService.createPaymentLink({
+      userId,
+      packageId,
+      amount,
+      bonus,
+    });
     res.json(result);
   } catch (error) {
     console.error("Error creating payment link:", error);
-    if (error.message === "Missing userId or amount") {
+    if (error.message === "Missing userId or payment package") {
+      return res.status(400).json({ message: error.message });
+    }
+    if (error.message === "Missing payment amount") {
+      return res.status(400).json({ message: error.message });
+    }
+    if (error.message === "Coin package not found") {
       return res.status(400).json({ message: error.message });
     }
     if (error.message === "User not found") {

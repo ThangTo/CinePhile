@@ -1,0 +1,20 @@
+/**
+ * Leaderboard Service
+ * Fetches top users ranked by watch-time × streak score.
+ */
+
+import apiRequest from './utils/apiRequest';
+
+const leaderboardService = {
+  /**
+   * Get top users leaderboard (public endpoint, no auth required)
+   * @returns {Promise<Array>} Array of { id, username, avatar, totalWatchTime, currentStreak, maxStreak, score }
+   */
+  getTopUsersLeaderboard: () =>
+    apiRequest('/users/leaderboard').then((res) => {
+      // API returns { success: true, data: [...] }
+      return res?.success ? res.data : [];
+    }),
+};
+
+export default leaderboardService;

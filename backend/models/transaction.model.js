@@ -15,6 +15,10 @@ const transactionSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  packageId: {
+    type: String,
+    default: null
+  },
   coinAmount: {
     type: Number,
     required: true

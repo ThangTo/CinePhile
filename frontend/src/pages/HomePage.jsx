@@ -5,6 +5,7 @@ import SectionRow from "components/home-page/SectionRow";
 import Top10Movie from "components/home-page/Top10Movie";
 import ContinueWatching from "components/home-page/ContinueWatching";
 import TrendingCarousel from "components/home-page/TrendingCarousel";
+import TopUsersSection from "components/home-page/TopUsersSection";
 import LazySection from "components/common/LazySection";
 // import QuickAdminLogin from "components/general/QuickAdminLogin";
 
@@ -22,6 +23,11 @@ const HomePage = () => {
         {/* Continue Watching Section - Only shows when user is authenticated */}
         <LazySection rootMargin="150px">
           <ContinueWatching />
+        </LazySection>
+
+        {/* Top Users Leaderboard */}
+        <LazySection rootMargin="200px">
+          <TopUsersSection />
         </LazySection>
 
         {/* AI Trending Social - TMDB + Google Trends + LLM curated */}
