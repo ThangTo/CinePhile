@@ -209,6 +209,7 @@ const movieService = {
     apiRequest(`/movies/${id}/view`, {
       method: "POST",
       data: { episodeId },
+      requiresAuth: true,
     }),
 
   /**
@@ -216,12 +217,14 @@ const movieService = {
    * @param {string} id - Movie ID hoặc slug
    * @param {string} viewHistoryId - ID của bản ghi ViewHistory
    * @param {number} seconds - Số giây đã xem (mặc định 30)
-   * @returns {Promise<Object>} { success: true }
+   * @param {string|null} episodeId - Episode ID hiện tại để gắn heartbeat đúng tập
+   * @returns {Promise<Object>} { success: true, viewHistoryId, streak? }
    */
-  recordWatchTime: (id, viewHistoryId, seconds = 30) =>
+  recordWatchTime: (id, viewHistoryId, seconds = 30, episodeId = null) =>
     apiRequest(`/movies/${id}/watch-time`, {
       method: "POST",
-      data: { viewHistoryId, seconds },
+      data: { viewHistoryId, seconds, episodeId },
+      requiresAuth: true,
     }),
 
   /**

@@ -1,4 +1,5 @@
 const movieService = require('../services/movie.service');
+const playbackHeartbeatService = require('../services/playbackHeartbeat.service');
 const trendingService = require('../services/trending.service');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
@@ -22,6 +23,26 @@ const DOWNLOAD_M3U8_TIMEOUT_MS = Math.max(
 const parseArrayParam = (param) => {
   if (!param) return undefined;
   return Array.isArray(param) ? param : param.split(',').filter(Boolean);
+};
+
+const getRequestIpAddress = (req) =>
+  req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+  || req.socket?.remoteAddress
+  || '0.0.0.0';
+
+const getOptionalUserId = (req) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const token = req.headers.authorization?.replace('Bearer ', '')
+      || req.cookies?.accessToken;
+
+    if (!token) return null;
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return decoded.userId || decoded.id || decoded._id || null;
+  } catch (_error) {
+    return null;
+  }
 };
 
 /**
@@ -352,25 +373,8 @@ const postComment = async (req, res) => {
  */
 const incrementView = async (req, res) => {
   try {
-    // Lấy IP thực của người dùng (hỗ trợ proxy/nginx)
-    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-      || req.socket?.remoteAddress
-      || '0.0.0.0';
-
-    // Lấy userId nếu có token (optional auth)
-    let userId = null;
-    try {
-      const jwt = require('jsonwebtoken');
-      const token = req.headers.authorization?.replace('Bearer ', '')
-        || req.cookies?.accessToken;
-      if (token) {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        userId = decoded.userId || decoded.id || decoded._id || null;
-      }
-    } catch (e) {
-      // invalid/expired token — userId stays null, view still counted as anonymous
-    }
-
+    const ipAddress = getRequestIpAddress(req);
+    const userId = getOptionalUserId(req);
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const { episodeId } = req.body || {};
 
@@ -395,8 +399,15 @@ const incrementView = async (req, res) => {
  */
 const recordWatchTime = async (req, res) => {
   try {
-    const { viewHistoryId, seconds = 30 } = req.body;
-    const result = await movieService.recordWatchTime(req.params.id, { viewHistoryId, seconds });
+    const { viewHistoryId, episodeId = null, seconds = 30 } = req.body || {};
+    const result = await playbackHeartbeatService.recordPlaybackHeartbeat(req.params.id, {
+      viewHistoryId,
+      episodeId,
+      seconds,
+      userId: getOptionalUserId(req),
+      ipAddress: getRequestIpAddress(req),
+      userAgent: req.headers['user-agent'] || 'Unknown',
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ message: error.message });

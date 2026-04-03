@@ -419,23 +419,28 @@ const VideoPlayer = ({
 
       const movieId = movie.id || movie._id || movie.slug;
       const vhId = viewHistoryIdRef?.current;
+      const episodeId = episode?._id || episode?.id || null;
 
       if (movieId) {
-        movieService.recordWatchTime(movieId, vhId, safeSeconds).catch(() => {});
-      }
+        movieService
+          .recordWatchTime(movieId, vhId, safeSeconds, episodeId)
+          .then((heartbeatData) => {
+            if (heartbeatData?.viewHistoryId && viewHistoryIdRef) {
+              viewHistoryIdRef.current = heartbeatData.viewHistoryId;
+            }
 
-      userService
-        .recordStreak(safeSeconds)
-        .then((streakData) => {
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("watch-streak-updated", {
-                detail: streakData,
-              })
-            );
-          }
-        })
-        .catch(() => {});
+            if (heartbeatData?.streak && typeof window !== "undefined") {
+              const streakData = heartbeatData.streak;
+
+              window.dispatchEvent(
+                new CustomEvent("watch-streak-updated", {
+                  detail: streakData,
+                })
+              );
+            }
+          })
+          .catch(() => {});
+      }
     };
 
     const handleWaiting = () => {
