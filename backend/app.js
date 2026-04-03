@@ -204,6 +204,7 @@ const castRoutes = require('./routes/cast.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const viralClipRoutes = require('./routes/viralClip.routes');
 const aiRoutes = require('./routes/ai.routes');
+const mailboxRoutes = require('./routes/mailbox.routes');
 const adminController = require('./controllers/admin.controller');
 
 // API endpoints with caching
@@ -238,6 +239,7 @@ app.use('/api/v1/comments', (req, res, next) => {
 app.use('/api/v1/comments', commentRoutes);
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/ai', aiRoutes);
+app.use('/api/v1/mailbox', mailboxRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

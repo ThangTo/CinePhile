@@ -12,6 +12,7 @@ export const ADMIN_TABS = {
   NOTIFICATIONS: "notifications",
   SETTINGS: "settings",
   PRICING: "pricing",
+  MAILBOX: "mailbox",
 };
 
 // Sidebar Menu Items
@@ -22,6 +23,7 @@ export const ADMIN_MENU_ITEMS = [
   { id: ADMIN_TABS.COMMENTS, label: "Bình Luận", icon: "fa-comments" },
   { id: ADMIN_TABS.VIRAL_CLIPS, label: "Viral Clips", icon: "fa-bolt" },
   { id: ADMIN_TABS.NOTIFICATIONS, label: "Thông Báo", icon: "fa-bell" },
+  { id: ADMIN_TABS.MAILBOX, label: "Hộp Thư", icon: "fa-envelope" },
   { id: ADMIN_TABS.SETTINGS, label: "Cài Đặt", icon: "fa-cog" },
   { id: ADMIN_TABS.PRICING, label: "Quản Lý Giá", icon: "fa-dollar-sign" },
 ];

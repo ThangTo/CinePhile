@@ -22,7 +22,7 @@ const Header = () => {
   const menuRef = useRef(null);
   const mobileBellButtonRef = useRef(null);
   const navigate = useNavigate();
-  const { user, isAuthenticated, openAuthModal, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, openAuthModal, logout } = useAuth();
   const { unreadCount } = useNotifications();
 
   useEffect(() => {
@@ -103,7 +103,7 @@ const Header = () => {
             <div className="hidden lg:block">
               <ThemeSelector />
             </div>
-            {user ? (
+            {!isLoading && isAuthenticated ? (
               <div className="lg:hidden relative">
                 <button
                   ref={mobileBellButtonRef}
@@ -158,13 +158,13 @@ const Header = () => {
             <SearchBar className="hidden lg:block laptop-sm:w-60 laptop-xs:w-44 xl:w-80" />
             {isAuthenticated ? (
               <DesktopUserMenu
-                user={user}
+                user={isAuthenticated ? user : null}
                 showUserMenu={showUserMenu}
                 onToggle={() => setShowUserMenu(!showUserMenu)}
                 onLogout={handleLogout}
                 menuRef={menuRef}
               />
-            ) : (
+            ) : !isLoading ? (
               <button
                 onClick={() => openAuthModal("login")}
                 className="hidden sm:hidden md:hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor hover:from-hoverPrimaryColor hover:to-primaryColor text-primaryColorButtonText font-semibold px-5 laptop-xs:px-4 py-2 text-sm transition-all shadow-lg shadow-primaryColor/30"
@@ -172,7 +172,7 @@ const Header = () => {
                 <i className="fa-solid fa-user" />
                 <span>Đăng nhập</span>
               </button>
-            )}
+            ) : null}
           </div>
         </nav>
       </header>
@@ -194,7 +194,7 @@ const Header = () => {
           <div className="fixed top-[62px] left-0 min-w-[360px] z-40 lg:hidden bg-[rgba(59,73,135,1)] rounded-2xl mx-2 md:mx-4">
             <div className="w-full bg-transparent px-4 py-4">
               <MobileUserMenu
-                user={user}
+                user={isAuthenticated ? user : null}
                 onLogout={handleLogout}
                 onOpenAuth={openAuthModal}
                 onClose={() => setShowMobileMenu(false)}

@@ -8,6 +8,7 @@ import AdminOverviewTab from "components/admin/AdminOverviewTab";
 import AdminNotificationTab from "components/admin/AdminNotificationTab";
 import AdminSettingsTab from "components/admin/AdminSettingsTab";
 import AdminViralClipsTab from "components/admin/AdminViralClipsTab";
+import AdminMailboxTab from "components/admin/AdminMailboxTab";
 import SettingsPricingTab from "components/admin/SettingsPricingTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
@@ -81,6 +82,13 @@ const AdminDashboard = () => {
         );
       case ADMIN_TABS.NOTIFICATIONS:
         return <AdminNotificationTab />;
+      case ADMIN_TABS.MAILBOX:
+        return (
+          <div className="animate-fade-in">
+            <h1 className="text-2xl font-bold text-white mb-4">Hộp Thư</h1>
+            <AdminMailboxTab />
+          </div>
+        );
       case ADMIN_TABS.SETTINGS:
         return <AdminSettingsTab />;
       case ADMIN_TABS.PRICING:

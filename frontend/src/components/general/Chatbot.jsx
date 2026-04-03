@@ -172,9 +172,7 @@ const Chatbot = () => {
       // Cập nhật lại UI tin nhắn của bot
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === newBotMessageId
-            ? { ...msg, content: answerHTML, isThinking: false }
-            : msg
+          msg.id === newBotMessageId ? { ...msg, content: answerHTML, isThinking: false } : msg
         )
       );
     } catch (error) {
@@ -341,17 +339,36 @@ const Chatbot = () => {
         id="chatbot-toggler"
         ref={chatbotTogglerRef}
         onClick={() => setShowChatbot(!showChatbot)}
-        className={`fixed bottom-[30px] right-[35px] h-14 w-14 flex items-center justify-center rounded-full shadow-[0_0_20px_rgba(var(--primary-color-rgb),0.4)] transition-all duration-300 z-[100005] hover:-translate-y-1 hover:shadow-[0_10px_25px_rgba(var(--primary-color-rgb),0.5)] ${
+        className={`fixed bottom-4 md:bottom-6 right-5 md:right-8 h-14 w-14 flex items-center justify-center rounded-full shadow-[0_0_20px_rgba(var(--primary-color-rgb),0.4)] transition-all duration-300 z-[100005] hover:-translate-y-1 hover:shadow-[0_10px_25px_rgba(var(--primary-color-rgb),0.5)] ${
           showChatbot ? "rotate-90 bg-bgColor2/90 border border-white/10" : "bg-primaryColor"
         }`}
       >
-        <span className={`absolute transition-all duration-300 ${showChatbot ? "opacity-0 scale-0 rotate-180" : "opacity-100 scale-100 rotate-0"}`}>
-          <svg className="w-7 h-7 fill-gray-900 drop-shadow-md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+        <span
+          className={`absolute transition-all duration-300 ${showChatbot ? "opacity-0 scale-0 rotate-180" : "opacity-100 scale-100 rotate-0"}`}
+        >
+          <svg
+            className="w-7 h-7 fill-gray-900 drop-shadow-md"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 1024 1024"
+          >
             <path d="M738.3 287.6H285.7c-59 0-106.8 47.8-106.8 106.8v303.1c0 59 47.8 106.8 106.8 106.8h81.5v111.1c0 .7.8 1.1 1.4.7l166.9-110.6 41.8-.8h117.4l43.6-.4c59 0 106.8-47.8 106.8-106.8V394.5c0-59-47.8-106.9-106.8-106.9zM351.7 448.2c0-29.5 23.9-53.5 53.5-53.5s53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5-53.5-23.9-53.5-53.5zm157.9 267.1c-67.8 0-123.8-47.5-132.3-109h264.6c-8.6 61.5-64.5 109-132.3 109zm110-213.7c-29.5 0-53.5-23.9-53.5-53.5s23.9-53.5 53.5-53.5 53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5zM867.2 644.5V453.1h26.5c19.4 0 35.1 15.7 35.1 35.1v121.1c0 19.4-15.7 35.1-35.1 35.1h-26.5zM95.2 609.4V488.2c0-19.4 15.7-35.1 35.1-35.1h26.5v191.3h-26.5c-19.4 0-35.1-15.7-35.1-35.1zM561.5 149.6c0 23.4-15.6 43.3-36.9 49.7v44.9h-30v-44.9c-21.4-6.5-36.9-26.3-36.9-49.7 0-28.6 23.3-51.9 51.9-51.9s51.9 23.3 51.9 51.9z" />
           </svg>
         </span>
-        <span className={`absolute transition-all duration-300 ${showChatbot ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-0 -rotate-180"}`}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
+        <span
+          className={`absolute transition-all duration-300 ${showChatbot ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-0 -rotate-180"}`}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-gray-300"
+          >
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -372,7 +389,11 @@ const Chatbot = () => {
 
           <div className="relative flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primaryColor/20 border border-primaryColor/30 flex items-center justify-center p-2 shadow-inner">
-              <svg className="w-full h-full fill-primaryColor drop-shadow-md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+              <svg
+                className="w-full h-full fill-primaryColor drop-shadow-md"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 1024 1024"
+              >
                 <path d="M738.3 287.6H285.7c-59 0-106.8 47.8-106.8 106.8v303.1c0 59 47.8 106.8 106.8 106.8h81.5v111.1c0 .7.8 1.1 1.4.7l166.9-110.6 41.8-.8h117.4l43.6-.4c59 0 106.8-47.8 106.8-106.8V394.5c0-59-47.8-106.9-106.8-106.9zM351.7 448.2c0-29.5 23.9-53.5 53.5-53.5s53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5-53.5-23.9-53.5-53.5zm157.9 267.1c-67.8 0-123.8-47.5-132.3-109h264.6c-8.6 61.5-64.5 109-132.3 109zm110-213.7c-29.5 0-53.5-23.9-53.5-53.5s23.9-53.5 53.5-53.5 53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5zM867.2 644.5V453.1h26.5c19.4 0 35.1 15.7 35.1 35.1v121.1c0 19.4-15.7 35.1-35.1 35.1h-26.5zM95.2 609.4V488.2c0-19.4 15.7-35.1 35.1-35.1h26.5v191.3h-26.5c-19.4 0-35.1-15.7-35.1-35.1zM561.5 149.6c0 23.4-15.6 43.3-36.9 49.7v44.9h-30v-44.9c-21.4-6.5-36.9-26.3-36.9-49.7 0-28.6 23.3-51.9 51.9-51.9s51.9 23.3 51.9 51.9z" />
               </svg>
             </div>
@@ -390,7 +411,17 @@ const Chatbot = () => {
             onClick={() => setShowChatbot(false)}
             className="relative text-gray-400 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors z-10 border border-transparent hover:border-white/5"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </button>
@@ -410,7 +441,11 @@ const Chatbot = () => {
             >
               {msg.role === "model" && (
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primaryColor/15 border border-primaryColor/30 flex items-center justify-center text-primaryColor p-1.5 shadow-sm">
-                  <svg className="w-full h-full fill-current drop-shadow-md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+                  <svg
+                    className="w-full h-full fill-current drop-shadow-md"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 1024 1024"
+                  >
                     <path d="M738.3 287.6H285.7c-59 0-106.8 47.8-106.8 106.8v303.1c0 59 47.8 106.8 106.8 106.8h81.5v111.1c0 .7.8 1.1 1.4.7l166.9-110.6 41.8-.8h117.4l43.6-.4c59 0 106.8-47.8 106.8-106.8V394.5c0-59-47.8-106.9-106.8-106.9zM351.7 448.2c0-29.5 23.9-53.5 53.5-53.5s53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5-53.5-23.9-53.5-53.5zm157.9 267.1c-67.8 0-123.8-47.5-132.3-109h264.6c-8.6 61.5-64.5 109-132.3 109zm110-213.7c-29.5 0-53.5-23.9-53.5-53.5s23.9-53.5 53.5-53.5 53.5 23.9 53.5 53.5-23.9 53.5-53.5 53.5zM867.2 644.5V453.1h26.5c19.4 0 35.1 15.7 35.1 35.1v121.1c0 19.4-15.7 35.1-35.1 35.1h-26.5zM95.2 609.4V488.2c0-19.4 15.7-35.1 35.1-35.1h26.5v191.3h-26.5c-19.4 0-35.1-15.7-35.1-35.1zM561.5 149.6c0 23.4-15.6 43.3-36.9 49.7v44.9h-30v-44.9c-21.4-6.5-36.9-26.3-36.9-49.7 0-28.6 23.3-51.9 51.9-51.9s51.9 23.3 51.9 51.9z" />
                   </svg>
                 </div>
@@ -425,8 +460,14 @@ const Chatbot = () => {
               >
                 {msg.isThinking ? (
                   <div className="flex gap-1.5 py-1">
-                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "-0.32s" }}></div>
-                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "-0.16s" }}></div>
+                    <div
+                      className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "-0.32s" }}
+                    ></div>
+                    <div
+                      className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "-0.16s" }}
+                    ></div>
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                   </div>
                 ) : (
@@ -435,7 +476,11 @@ const Chatbot = () => {
 
                 {msg.file && (
                   <div className="mt-2 w-full max-w-[200px] rounded-xl overflow-hidden border border-white/20 shadow-lg">
-                    <img src={`data:${msg.file.mime_type};base64,${msg.file.data}`} className="w-full block object-cover" alt="attachment" />
+                    <img
+                      src={`data:${msg.file.mime_type};base64,${msg.file.data}`}
+                      className="w-full block object-cover"
+                      alt="attachment"
+                    />
                   </div>
                 )}
               </div>
@@ -446,7 +491,10 @@ const Chatbot = () => {
         {/* Chat Footer */}
         <div className="p-4 bg-bgColor2/80 backdrop-blur-xl border-t border-white/10 relative shrink-0">
           {/* File Upload Preview */}
-          <div ref={fileUploadWrapperRef} className="hidden [&.file-uploaded]:block pb-3 transition-all duration-300">
+          <div
+            ref={fileUploadWrapperRef}
+            className="hidden [&.file-uploaded]:block pb-3 transition-all duration-300"
+          >
             <div className="relative w-16 h-16 rounded-xl border border-primaryColor/30 overflow-hidden bg-black shadow-lg">
               <img alt="preview" className="w-full h-full object-cover" />
               <button
@@ -457,7 +505,17 @@ const Chatbot = () => {
                 }}
                 className="absolute top-1 right-1 bg-black/70 text-white border-none rounded-full w-5 h-5 flex items-center justify-center cursor-pointer hover:bg-red-500 hover:scale-110 transition-all"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
@@ -483,7 +541,17 @@ const Chatbot = () => {
                 title="Emoji"
                 className="p-1.5 text-gray-400 hover:text-primaryColor hover:bg-primaryColor/10 rounded-full transition-colors flex"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <circle cx="12" cy="12" r="10"></circle>
                   <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
                   <line x1="9" y1="9" x2="9.01" y2="9"></line>
@@ -500,14 +568,29 @@ const Chatbot = () => {
                 title="Gửi ảnh"
                 className="p-1.5 text-gray-400 hover:text-primaryColor hover:bg-primaryColor/10 rounded-full transition-colors flex"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                   <circle cx="8.5" cy="8.5" r="1.5"></circle>
                   <polyline points="21 15 16 10 5 21"></polyline>
                 </svg>
               </button>
 
-              <input type="file" hidden ref={fileInputRef} accept="image/jpeg,image/png,image/gif,image/webp" />
+              <input
+                type="file"
+                hidden
+                ref={fileInputRef}
+                accept="image/jpeg,image/png,image/gif,image/webp"
+              />
             </div>
 
             <textarea
@@ -526,7 +609,18 @@ const Chatbot = () => {
               {isSending ? (
                 <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-[-2px]">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="ml-[-2px]"
+                >
                   <line x1="22" y1="2" x2="11" y2="13"></line>
                   <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                 </svg>

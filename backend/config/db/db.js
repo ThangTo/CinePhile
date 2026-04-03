@@ -87,6 +87,15 @@ mongoose.connection.on('connected', () => {
   } catch (err) {
     // adminService may not be loaded yet; skip silently
   }
+
+  try {
+    const Mailbox = require('../../models/mailbox.model');
+    Mailbox.syncIndexes().catch((err) => {
+      console.warn('Mailbox index sync skipped:', err.message);
+    });
+  } catch (err) {
+    console.warn('Mailbox index sync setup skipped:', err.message);
+  }
 });
 
 module.exports = {

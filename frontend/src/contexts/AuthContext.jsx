@@ -3,72 +3,46 @@ import authService from "services/auth.service";
 import AuthModal from "components/auth/AuthModal";
 import { saveReturnLocation } from "lib/auth-storage";
 
-/**
- * AuthContext - Provides authentication state and methods throughout the app
- */
 const AuthContext = createContext(null);
 
-/**
- * AuthProvider - Wraps the app and provides auth context
- */
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState("login"); // "login" or "register"
+  const [authMode, setAuthMode] = useState("login");
 
-  // Load user on mount
   useEffect(() => {
     const loadUser = async () => {
       setIsLoading(true);
+
       try {
-        //  Load cached user data trước để hiển thị ngay (không phải "Khách")
-        const cachedUserData = authService.getCurrentUserLocal();
-        if (cachedUserData) {
-          setUser(cachedUserData);
+        const currentUser = await authService.getCurrentUser();
+        const userDataFromAPI = currentUser?.data || currentUser;
+
+        if (userDataFromAPI) {
+          setUser(userDataFromAPI);
+          authService.setAuthData(null, userDataFromAPI);
+        } else {
+          authService.clearAuthData();
+          setUser(null);
+        }
+      } catch (apiError) {
+        const status = apiError?.status;
+
+        if (status === 401) {
+          console.warn("Auth expired (401 from server), clearing auth data");
+          authService.clearAuthData();
+        } else {
+          console.warn(
+            "Auth check failed, hiding authenticated UI until the next successful verification (status:",
+            status,
+            "):",
+            apiError?.message
+          );
         }
 
-        //  Gọi API để lấy user mới nhất (có thể mất thời gian)
-        // Nhưng vẫn giữ isLoading = true để không render UI "Khách"
-        try {
-          const currentUser = await authService.getCurrentUser();
-          const userDataFromAPI = currentUser?.data || currentUser;
-
-          if (userDataFromAPI) {
-            setUser(userDataFromAPI);
-            authService.setAuthData(null, userDataFromAPI);
-          } else {
-            //  Chỉ clear nếu thực sự không có user (401 hoặc không có data)
-            // Không clear nếu chỉ là network error tạm thời
-            authService.clearAuthData();
-            setUser(null);
-          }
-        } catch (apiError) {
-          // Xác định loại lỗi:
-          // - status 401: Token hết hạn và refresh cũng thất bại (server xác nhận)
-          // - status 0 hoặc undefined: Có thể là cookie bị chặn (mobile) hoặc mạng lỗi
-          //   → Giữ cached user để tránh logout oan trên mobile
-          // - Các status khác (500, 503...): Lỗi server tạm thời → giữ cached user
-          const status = apiError?.status;
-          const isServerConfirmedExpired = status === 401;
-
-          if (isServerConfirmedExpired) {
-            console.warn("⚠️ Auth expired (401 from server), clearing auth data");
-            authService.clearAuthData();
-            setUser(null);
-          } else {
-            // Lỗi mạng/cookie bị chặn/server tạm thời → giữ lại cached user
-            console.warn("⚠️ Non-401 error, keeping cached user (status:", status, "):", apiError?.message);
-          }
-        }
-      } catch (error) {
-        // Lỗi nghiêm trọng, clear tất cả
-        console.error("❌ Critical error in loadUser:", error);
-        authService.clearAuthData();
         setUser(null);
       } finally {
-        //  Chỉ set isLoading = false sau khi đã xử lý xong
-        // Đảm bảo UI không hiển thị "Khách" trước khi load xong
         setIsLoading(false);
       }
     };
@@ -76,8 +50,6 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  // Fix 4: Kiểm tra lại auth state khi user quay lại tab/app
-  // Giải quyết trường hợp token hết hạn khi app ở background
   useEffect(() => {
     let isChecking = false;
 
@@ -88,16 +60,19 @@ export const AuthProvider = ({ children }) => {
       try {
         const currentUser = await authService.getCurrentUser();
         const userData = currentUser?.data || currentUser;
+
         if (userData) {
           setUser(userData);
           authService.setAuthData(null, userData);
+        } else {
+          authService.clearAuthData();
+          setUser(null);
         }
       } catch (error) {
-        // Auth đã hết hạn khi tab/app ở background
         const status = error?.status;
-        // Chỉ logout khi server xác nhân 401 rõ ràng
+
         if (status === 401) {
-          console.warn("⚠️ Auth expired while inactive, logging out");
+          console.warn("Auth expired while inactive, logging out");
           authService.clearAuthData();
           setUser(null);
         }
@@ -110,49 +85,34 @@ export const AuthProvider = ({ children }) => {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [user]);
 
-  /**
-   * Open authentication modal
-   * Lưu location hiện tại để redirect về sau khi đăng nhập (chủ yếu cho Google OAuth)
-   * @param {string} mode - "login" or "register"
-   */
   const openAuthModal = (mode = "login") => {
-    // Lưu location hiện tại (trừ khi đang ở trang đăng nhập hoặc callback)
-    // Sử dụng window.location vì AuthProvider có thể được render ngoài Router
     const currentPath = window.location.pathname;
     const currentSearch = window.location.search;
-    const isAuthPage = currentPath === "/auth/google/callback" || currentPath.startsWith("/auth/");
+    const isAuthPage =
+      currentPath === "/auth/google/callback" || currentPath.startsWith("/auth/");
 
     if (!isAuthPage) {
-      // Lưu location hiện tại để redirect về sau khi đăng nhập (chủ yếu cho Google OAuth)
-      saveReturnLocation(
-        currentPath,
-        currentSearch,
-        null // Không thể lấy state từ window.location, nhưng không sao vì state thường không quan trọng
-      );
+      saveReturnLocation(currentPath, currentSearch, null);
     }
 
     setAuthMode(mode);
     setShowAuthModal(true);
   };
 
-  /**
-   * Close authentication modal
-   */
   const closeAuthModal = () => {
     setShowAuthModal(false);
   };
 
-  /**
-   * Handle login
-   */
   const login = async (credentials) => {
     try {
       const data = await authService.login(credentials);
       const userData = data?.user || data;
+
       if (userData) {
         setUser(userData);
         closeAuthModal();
       }
+
       return data;
     } catch (error) {
       console.error("Login error:", error);
@@ -160,17 +120,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  /**
-   * Handle register
-   */
   const register = async (userData) => {
     try {
       const data = await authService.register(userData);
       const userDataFromResponse = data?.user || data;
+
       if (userDataFromResponse) {
         setUser(userDataFromResponse);
         closeAuthModal();
       }
+
       return data;
     } catch (error) {
       console.error("Register error:", error);
@@ -178,9 +137,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  /**
-   * Handle logout
-   */
   const logout = async () => {
     try {
       await authService.logout();
@@ -192,31 +148,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  /**
-   * Update user data
-   */
   const updateUser = (userData) => {
     setUser(userData);
     authService.setAuthData(null, userData);
   };
 
-  /**
-   * Force refresh user from API
-   */
   const refetchCurrentUser = useCallback(async () => {
     const data = await authService.getCurrentUser();
     const userData = data?.data || data;
+
     if (userData) {
       setUser(userData);
       authService.setAuthData(null, userData);
       return userData;
     }
+
     throw new Error("Unable to fetch user");
   }, []);
 
-  /**
-   * Check if user is authenticated
-   */
   const isAuthenticated = !!user;
 
   const value = {
@@ -243,10 +192,6 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-/**
- * useAuth hook - Access auth context
- * @returns {Object} Auth context value
- */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
