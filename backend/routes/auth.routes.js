@@ -3,6 +3,7 @@ const router = express.Router();
 const passport = require('passport');
 const authController = require('../controllers/auth.controller');
 const authMiddleware = require('../middleware/auth.middleware');
+const avatarUploadMiddleware = require('../middleware/avatarUpload.middleware');
 
 // GET /api/v1/auth/google - Start Google OAuth
 router.get(
@@ -39,7 +40,7 @@ router.post('/refresh-token', authController.refreshToken);
 router.get('/me', authMiddleware, authController.getCurrentUser);
 
 // PUT /api/v1/auth/profile - Update profile
-router.put('/profile', authMiddleware, authController.updateProfile);
+router.put('/profile', authMiddleware, avatarUploadMiddleware, authController.updateProfile);
 
 // PUT /api/v1/auth/change-password - Change password
 router.put('/change-password', authMiddleware, authController.changePassword);

@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { BarSpinner } from "components/common/LoadingState";
 import { getOptimizedImageUrl } from "constants/imageSizes";
+import { handleAvatarError } from "utils/avatarUtils";
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const fmtNum = (n = 0) => Number(n).toLocaleString("vi-VN");
@@ -103,6 +104,7 @@ const UserViewerPopup = ({ viewers, episodeLabel, audioLabel, onClose }) => (
                   alt={v.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
+                  onError={handleAvatarError}
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold">

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 // 1. Import thư viện này (QUAN TRỌNG)
 const passportLocalMongoose = require('passport-local-mongoose');
+const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
 
 const userSchema = new mongoose.Schema(
   {
@@ -24,6 +25,10 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
       default: '',
+    },
+    avatarStorageKey: {
+      type: String,
+      default: null,
     },
     gender: {
       type: String,
@@ -88,6 +93,23 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+const transformAvatarForOutput = (_doc, ret) => {
+  ret.avatar = normalizeAvatarForOutput(
+    ret.avatar,
+    ret.username || ret.email || ret._id?.toString(),
+  );
+  delete ret.avatarStorageKey;
+  return ret;
+};
+
+userSchema.set('toJSON', {
+  transform: transformAvatarForOutput,
+});
+
+userSchema.set('toObject', {
+  transform: transformAvatarForOutput,
+});
 
 
 // 2. Kích hoạt Plugin (QUAN TRỌNG)

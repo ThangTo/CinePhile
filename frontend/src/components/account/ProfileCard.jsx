@@ -4,6 +4,7 @@ import ToastContainer from "components/common/ToastContainer";
 import { cardStyles, buttonStyles } from "./shared-styles";
 import { isPremiumActive } from "utils/premiumUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
+import { normalizeAvatarFile } from "utils/avatarUtils";
 
 const MAX_AVATAR_SIZE_MB = 5;
 
@@ -16,8 +17,8 @@ const ProfileCard = ({ user, onUpdate }) => {
     input.type = "file";
     input.accept = "image/*";
 
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
+    input.onchange = async (event) => {
+      const file = event.target.files?.[0];
       if (!file) return;
 
       if (file.size > MAX_AVATAR_SIZE_MB * 1024 * 1024) {
@@ -28,27 +29,16 @@ const ProfileCard = ({ user, onUpdate }) => {
       setIsUploading(true);
 
       try {
-        const reader = new FileReader();
+        const normalizedAvatarFile = await normalizeAvatarFile(file);
+        const formData = new FormData();
+        formData.append("avatar", normalizedAvatarFile);
 
-        reader.onloadend = async () => {
-          try {
-            const avatarDataUrl = reader.result;
-
-            // Gửi lên server thông qua onUpdate
-            await onUpdate({ avatar: avatarDataUrl });
-            success("Cập nhật ảnh đại diện thành công!");
-          } catch (err) {
-            console.error("Error updating avatar:", err);
-            error("Không thể cập nhật ảnh đại diện. Vui lòng thử lại!");
-          } finally {
-            setIsUploading(false);
-          }
-        };
-
-        reader.readAsDataURL(file);
-      } catch (err) {
-        console.error("Error reading avatar file:", err);
-        error("Không thể đọc file ảnh. Vui lòng thử lại!");
+        await onUpdate(formData);
+        success("Cập nhật ảnh đại diện thành công!");
+      } catch (uploadError) {
+        console.error("Error updating avatar:", uploadError);
+        error("Không thể cập nhật ảnh đại diện. Vui lòng thử lại!");
+      } finally {
         setIsUploading(false);
       }
     };
@@ -62,16 +52,16 @@ const ProfileCard = ({ user, onUpdate }) => {
         <h2 className={cardStyles.headerTitle}>Hồ sơ của tôi</h2>
       </div>
       <div className={cardStyles.body}>
-        <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-6 text-center md:text-left">
+        <div className="flex flex-col items-center justify-center gap-6 text-center md:flex-row md:justify-start md:text-left">
           <div className="text-center">
             <PremiumAvatar
               src={user.avatar}
-              alt="Ảnh đại diện"
+              alt={user.username || "Ảnh đại diện"}
               size="w-[100px] h-[100px]"
               isPremium={isPremiumActive(user)}
               className={`mb-3 ${isPremiumActive(user) ? "scale-105" : ""}`}
             />
-            <div className="flex gap-2.5 justify-center">
+            <div className="flex justify-center gap-2.5">
               <button
                 className={`${buttonStyles.base} ${buttonStyles.secondary}`}
                 onClick={handleChangeAvatar}
@@ -82,18 +72,20 @@ const ProfileCard = ({ user, onUpdate }) => {
             </div>
           </div>
           <div className="pb-6">
-            <h3 className={`text-[22px] font-semibold m-0 mb-2 flex items-center justify-center md:justify-start gap-2 ${
-              isPremiumActive(user) ? "text-primaryColor" : "text-white"
-            }`}>
+            <h3
+              className={`m-0 mb-2 flex items-center justify-center gap-2 text-[22px] font-semibold md:justify-start ${
+                isPremiumActive(user) ? "text-primaryColor" : "text-white"
+              }`}
+            >
               {user.username}
               {isPremiumActive(user) && (
-                <span className="inline-flex items-center gap-1 bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-primaryColorButtonText px-2 py-0.5 rounded-full text-xs font-bold shadow-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-primaryColor to-hoverPrimaryColor px-2 py-0.5 text-xs font-bold text-primaryColorButtonText shadow-sm">
                   <i className="fa-solid fa-crown text-[9px]" />
                   <span>Premium</span>
                 </span>
               )}
             </h3>
-            <p className="text-base text-account-text-secondary m-0">{user.email}</p>
+            <p className="m-0 text-base text-account-text-secondary">{user.email}</p>
           </div>
         </div>
       </div>

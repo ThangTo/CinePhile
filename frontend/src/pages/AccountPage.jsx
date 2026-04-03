@@ -62,15 +62,18 @@ const AccountPage = () => {
 
   const handleUpdateProfile = async (updatedData) => {
     try {
-      console.log("updatedData", updatedData);
       const updatedUser = await userService.updateProfile(updatedData);
-      console.log("updatedUser", updatedUser);
       updateUser(updatedUser);
+      return updatedUser;
     } catch (error) {
       console.error("Error updating profile:", error);
-      // Fallback: update local state only
-      const updatedUser = { ...user, ...updatedData };
-      updateUser(updatedUser);
+      if (!(updatedData instanceof FormData)) {
+        const updatedUser = { ...user, ...updatedData };
+        updateUser(updatedUser);
+        return updatedUser;
+      }
+
+      throw error;
     }
   };
 

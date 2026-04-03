@@ -3,12 +3,13 @@ const router = express.Router();
 const userController = require('../controllers/user.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 const watchStreakController = require('../controllers/watchStreak.controller');
+const avatarUploadMiddleware = require('../middleware/avatarUpload.middleware');
 
 // GET /api/v1/users/:id - Get user profile
 router.get('/', authMiddleware, userController.getProfile);
 
 // PUT /api/v1/users/:id - Update user profile
-router.put('/', authMiddleware, userController.updateProfile);
+router.put('/', authMiddleware, avatarUploadMiddleware, userController.updateProfile);
 
 // POST /api/v1/users/favorites - Add to favorites
 router.post('/favorites', authMiddleware, userController.addToFavorites);

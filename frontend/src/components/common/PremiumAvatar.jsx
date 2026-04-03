@@ -1,5 +1,5 @@
 import React from "react";
-import { handleAvatarError } from "utils/avatarUtils";
+import { getAvatarUrlByKey, handleAvatarError } from "utils/avatarUtils";
 
 /**
  * PremiumAvatar — wraps any avatar image with premium visual enhancements.
@@ -20,6 +20,8 @@ const PremiumAvatar = ({
   className = "",
   imgClass = "",
 }) => {
+  const resolvedSrc = src || getAvatarUrlByKey(alt);
+
   if (isPremium) {
     return (
       <div className={`relative inline-flex shrink-0 ${className}`}>
@@ -39,7 +41,7 @@ const PremiumAvatar = ({
           style={{ background: "#111" }}
         >
           <img
-            src={src}
+            src={resolvedSrc}
             alt={alt}
             className={`w-full h-full object-cover ${imgClass}`}
             onError={handleAvatarError}
@@ -70,7 +72,7 @@ const PremiumAvatar = ({
   return (
     <div className={`relative inline-flex shrink-0 ${className}`}>
       <img
-        src={src}
+        src={resolvedSrc}
         alt={alt}
         className={`${size} rounded-full object-cover ring-2 ring-white/10 ${imgClass}`}
         onError={handleAvatarError}

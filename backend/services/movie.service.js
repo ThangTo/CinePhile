@@ -13,6 +13,7 @@ const {
   transformPaginatedResult,
 } = require('../utils/movieTransformer');
 const { isLatinName } = require('../utils/castUtils');
+const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
 
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value) && /^[0-9a-fA-F]{24}$/.test(value);
 const LOGO_FETCH_CONCURRENCY = Math.max(1, Number(process.env.TMDB_LOGO_FETCH_CONCURRENCY || 3));
@@ -255,7 +256,7 @@ const mapComment = (comment) => {
     id: comment._id?.toString() || comment.id,
     userId: user?._id?.toString() || user?.toString() || comment.userId,
     user: user?.username || 'Ẩn danh',
-    avatar: user?.avatar || 'https://i.pravatar.cc/150?img=5',
+    avatar: normalizeAvatarForOutput(user?.avatar, user?.username || comment.userId),
     content: comment.content,
     episode: comment.episodeId,
     likes: comment.likes || 0,
@@ -1695,7 +1696,7 @@ const getRatings = async (identifier, filters = {}) => {
       id: rating._id.toString(),
       userId: user?._id?.toString() || user?.toString() || rating.userId,
       user: user?.username || 'Ẩn danh',
-      avatar: user?.avatar || 'https://i.pravatar.cc/150?img=5',
+      avatar: normalizeAvatarForOutput(user?.avatar, user?.username || rating.userId),
       rating: rating.rating,
       createdAt: rating.createdAt,
       isPremium,

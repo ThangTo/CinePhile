@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const { getRandomAvatar } = require('../utils/avatarUtils');
 const redisService = require('./redis.service');
+const avatarService = require('./avatar.service');
 
 // Helper to generate tokens
 const generateTokens = (userId) => {
@@ -108,6 +109,7 @@ const login = async (credentials) => {
       }
 
       try {
+        await avatarService.migrateStoredAvatarToR2(user);
         // Generate tokens and return auth payload
         const authPayload = generateAuthPayload(user);
         resolve(authPayload);
@@ -187,6 +189,7 @@ const getCurrentUser = async (token) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId);
     if (!user) throw new Error('User not found');
+    await avatarService.migrateStoredAvatarToR2(user);
     return user;
   } catch (error) {
     throw new Error('Invalid token');
@@ -237,6 +240,7 @@ const loginWithGoogleProfile = async (profile) => {
   }
 
   await user.save();
+  await avatarService.migrateStoredAvatarToR2(user);
   // Ensure avatar is included in the returned user object
   const userObj = user.toObject ? user.toObject() : user;
   return generateAuthPayload(userObj);
@@ -248,9 +252,10 @@ const loginWithGoogleProfile = async (profile) => {
  * @param {Object} updates - { fullName?, avatar?, bio?, ... }
  * @returns {Promise<Object>} Updated user object
  */
-const updateProfile = async (userId, updates) => {
+const updateProfile = async (userId, updates = {}, avatarFile = null) => {
   const allowedUpdates = ['username', 'email', 'avatar', 'gender'];
   const actualUpdates = {};
+  const hasAvatarField = Object.prototype.hasOwnProperty.call(updates, 'avatar');
 
   Object.keys(updates).forEach((key) => {
     if (allowedUpdates.includes(key)) {
@@ -258,14 +263,34 @@ const updateProfile = async (userId, updates) => {
     }
   });
 
-  const user = await User.findByIdAndUpdate(userId, actualUpdates, {
-    new: true,
-    runValidators: true,
-  });
-
+  const user = await User.findById(userId);
   if (!user) {
     throw new Error('User not found');
   }
+
+  if (Object.prototype.hasOwnProperty.call(actualUpdates, 'username')) {
+    user.username = actualUpdates.username;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(actualUpdates, 'email')) {
+    user.email = actualUpdates.email;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(actualUpdates, 'gender')) {
+    user.gender = actualUpdates.gender;
+  }
+
+  if (avatarFile) {
+    await avatarService.updateUserAvatarFromFile(user, avatarFile);
+    return user;
+  }
+
+  if (hasAvatarField) {
+    await avatarService.updateUserAvatarFromValue(user, actualUpdates.avatar);
+    return user;
+  }
+
+  await user.save();
 
   return user;
 };

@@ -4,6 +4,7 @@ const UserWatchlist = require('../models/user_watchlist.model');
 const UserHistory = require('../models/user_history.model');
 
 const userService = require('../services/user.service');
+const authService = require('../services/auth.service');
 const adminService = require('../services/admin.service');
 const { PLANS } = require('../config/premium.config');
 // Helper to get user ID from authenticated request (via auth middleware)
@@ -47,14 +48,10 @@ const updateProfile = async (req, res) => {
     // Only allow updating specific fields
     if (req.body.username) updates.username = req.body.username;
     if (req.body.email) updates.email = req.body.email;
-    if (req.body.avatar) updates.avatar = req.body.avatar;
+    if (Object.prototype.hasOwnProperty.call(req.body, 'avatar')) updates.avatar = req.body.avatar;
     if (req.body.gender) updates.gender = req.body.gender;
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { $set: updates },
-      { new: true, runValidators: true },
-    );
+    const user = await authService.updateProfile(userId, updates, req.file);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

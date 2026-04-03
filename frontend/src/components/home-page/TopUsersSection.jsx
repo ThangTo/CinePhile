@@ -4,8 +4,7 @@ import { BarSpinner } from "components/common/LoadingState";
 import EmptyState from "components/common/EmptyState";
 import leaderboardService from "services/leaderboard.service";
 import formatWatchDuration from "utils/formatWatchDuration";
-
-const DEFAULT_AVATAR = "/default-avatar.png";
+import { getAvatarUrlByKey, handleAvatarError } from "utils/avatarUtils";
 
 const PODIUM_STYLES = {
   1: {
@@ -61,12 +60,10 @@ const UserAvatar = ({ src, username, className = "h-14 w-14" }) => (
     className={`relative overflow-hidden rounded-2xl ring-1 ring-white/10 bg-white/5 ${className}`}
   >
     <img
-      src={src || DEFAULT_AVATAR}
+      src={src || getAvatarUrlByKey(username)}
       alt={username}
       className="h-full w-full object-cover"
-      onError={(event) => {
-        event.currentTarget.src = DEFAULT_AVATAR;
-      }}
+      onError={handleAvatarError}
     />
   </div>
 );

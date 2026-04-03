@@ -13,9 +13,9 @@ const CATEGORY_ORDER = MAILBOX_CATEGORIES.reduce((accumulator, category, index) 
   return accumulator;
 }, {});
 
-const USER_POPULATE_FIELDS = 'username avatarUrl';
-const ADMIN_USER_POPULATE_FIELDS = 'username email avatarUrl role createdAt';
-const ADMIN_MESSAGE_POPULATE_FIELDS = 'username avatarUrl role';
+const USER_POPULATE_FIELDS = 'username avatar';
+const ADMIN_USER_POPULATE_FIELDS = 'username email avatar role createdAt';
+const ADMIN_MESSAGE_POPULATE_FIELDS = 'username avatar role';
 
 function normalizeCategory(category, { allowEmpty = false } = {}) {
   if (category === undefined || category === null || category === '') {

@@ -1,10 +1,27 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const authService = require('../services/auth.service');
+const avatarService = require('../services/avatar.service');
 const { attachAuthCookies } = require('../utils/authUtils');
 const redisService = require('../services/redis.service');
 
 const isProduction = process.env.NODE_ENV === 'production';
+
+const ensureUserAvatarReady = async (user) => {
+  if (!user) {
+    return user;
+  }
+
+  try {
+    await avatarService.migrateStoredAvatarToR2(user);
+  } catch (error) {
+    if (!isProduction) {
+      console.warn('Avatar migration skipped:', error.message);
+    }
+  }
+
+  return user;
+};
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -28,7 +45,7 @@ const authMiddleware = async (req, res, next) => {
           attachAuthCookies(res, newTokens);
           // Verify new token and get user
           const decoded = jwt.verify(newTokens.token, process.env.JWT_SECRET);
-          const user = await User.findById(decoded.userId);
+          const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
           if (user) {
             // Check if premium subscription has expired and downgrade if needed
             if (user.role === 'premium' && user.premiumExpiresAt) {
@@ -66,7 +83,7 @@ const authMiddleware = async (req, res, next) => {
       }
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId);
+      const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
 
       if (!user) {
         return res.status(401).json({ message: 'Unauthorized' });
@@ -96,7 +113,7 @@ const authMiddleware = async (req, res, next) => {
             attachAuthCookies(res, newTokens);
             // Verify new token and get user
             const decoded = jwt.verify(newTokens.token, process.env.JWT_SECRET);
-            const user = await User.findById(decoded.userId);
+            const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
             if (user) {
               // Check if premium subscription has expired and downgrade if needed
               if (user.role === 'premium' && user.premiumExpiresAt) {
@@ -162,7 +179,7 @@ const optionalAuth = async (req, res, next) => {
       }
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId);
+      const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
 
       if (user) {
         // Check if premium subscription has expired and downgrade if needed

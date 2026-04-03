@@ -8,6 +8,7 @@
 
 const mongoose = require('mongoose');
 const redisService = require('./redis.service');
+const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
 
 const CACHE_KEY = 'leaderboard:topUsers:v2';
 const CACHE_TTL = 300; // 5 minutes
@@ -120,7 +121,10 @@ const getTopUsersLeaderboard = async () => {
     // Ignore Redis errors and fall back to the DB query below.
   }
 
-  const result = await getTopUsers();
+  const result = (await getTopUsers()).map((entry) => ({
+    ...entry,
+    avatar: normalizeAvatarForOutput(entry.avatar, entry.username || entry.id),
+  }));
 
   try {
     await redisService.set(CACHE_KEY, result, CACHE_TTL);

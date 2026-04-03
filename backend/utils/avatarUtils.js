@@ -1,47 +1,101 @@
-/**
- * Default avatars for new users.
- *
- * The actual images should now be stored on an external object storage / CDN
- * (e.g. Cloudflare R2). We keep only the filenames here and build full URLs
- * using an environment-configured base URL.
- */
-const DEFAULT_AVATARS = [
-  'avt1.jpg',
-  'avt2.webp',
-  'avt3.jpg',
-  'avt4.jpg',
-  'avt5.jpg',
-];
+const DEFAULT_AVATARS = ['avt1.jpg', 'avt2.webp', 'avt3.jpg', 'avt4.jpg', 'avt5.jpg'];
 
-// Base URL for avatars hosted on R2 / CDN, e.g.:
-// https://your-bucket.r2.dev/avatars
-const R2_AVATAR_BASE_URL =
-  process.env.PUBLIC_DOMAIN + '/avatars' || null;
+const FALLBACK_R2_AVATAR_BASE_URL =
+  'https://pub-e00827b92ed84d85a314a9c12ba6f2e7.r2.dev/avatars';
 
-/**
- * Get a random default avatar URL.
- * Priority:
- * 1. R2 / CDN base URL if configured (recommended)
- * 2. Legacy local /api/v1/avatars path as a fallback (for dev)
- *
- * @returns {string} Random avatar URL
- */
-const getRandomAvatar = () => {
-  const randomIndex = Math.floor(Math.random() * DEFAULT_AVATARS.length);
-  const avatarFilename = DEFAULT_AVATARS[randomIndex];
+const AVATAR_FOLDER = process.env.R2_AVATAR_FOLDER || 'avatars';
 
-  // Preferred: build URL from R2/CDN base if provided
-  if (R2_AVATAR_BASE_URL) {
-    const base = R2_AVATAR_BASE_URL.replace(/\/$/, '');
-    return `${base}/${avatarFilename}`;
+const trimTrailingSlash = (value = '') => value.replace(/\/+$/, '');
+
+const getAvatarBaseUrl = () => {
+  if (process.env.R2_AVATAR_BASE_URL) {
+    return trimTrailingSlash(process.env.R2_AVATAR_BASE_URL);
   }
 
-  // Fallback: old behaviour using local static folder (useful for local dev)
-  const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
-  return `${apiBaseUrl}/api/v1/avatars/${avatarFilename}`;
+  if (process.env.PUBLIC_DOMAIN) {
+    return `${trimTrailingSlash(process.env.PUBLIC_DOMAIN)}/${AVATAR_FOLDER}`;
+  }
+
+  return trimTrailingSlash(FALLBACK_R2_AVATAR_BASE_URL);
+};
+
+const hashString = (value = '') => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = value.charCodeAt(index) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash);
+};
+
+const buildDefaultAvatarUrl = (filename) => `${getAvatarBaseUrl()}/${filename}`;
+
+const extractDefaultAvatarFilename = (value = '') => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const matchedFilename = DEFAULT_AVATARS.find((filename) => {
+    const escaped = filename.replace('.', '\\.');
+    return new RegExp(`(?:^|/)${escaped}(?:$|[?#])`, 'i').test(trimmed);
+  });
+
+  return matchedFilename || null;
+};
+
+const getDefaultAvatarUrlByKey = (key) => {
+  const index = hashString(key || 'default') % DEFAULT_AVATARS.length;
+  return buildDefaultAvatarUrl(DEFAULT_AVATARS[index]);
+};
+
+const getRandomAvatar = () => {
+  const randomIndex = Math.floor(Math.random() * DEFAULT_AVATARS.length);
+  return buildDefaultAvatarUrl(DEFAULT_AVATARS[randomIndex]);
+};
+
+const normalizeAvatarForOutput = (avatar, key) => {
+  const trimmed = String(avatar || '').trim();
+  if (!trimmed) {
+    return getDefaultAvatarUrlByKey(key);
+  }
+
+  if (trimmed.startsWith('data:image/')) {
+    return trimmed;
+  }
+
+  const defaultAvatarFilename = extractDefaultAvatarFilename(trimmed);
+  if (defaultAvatarFilename) {
+    return buildDefaultAvatarUrl(defaultAvatarFilename);
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith(`${AVATAR_FOLDER}/`)) {
+    return `${getAvatarBaseUrl()}/${trimmed.slice(AVATAR_FOLDER.length + 1)}`;
+  }
+
+  if (trimmed.startsWith('users/')) {
+    return `${getAvatarBaseUrl()}/${trimmed}`;
+  }
+
+  if (trimmed.startsWith('/api/v1/avatars/')) {
+    const filename = trimmed.split('/').pop();
+    return filename ? buildDefaultAvatarUrl(filename) : getDefaultAvatarUrlByKey(key);
+  }
+
+  return getDefaultAvatarUrlByKey(key);
 };
 
 module.exports = {
+  AVATAR_FOLDER,
   DEFAULT_AVATARS,
+  FALLBACK_R2_AVATAR_BASE_URL,
+  buildDefaultAvatarUrl,
+  extractDefaultAvatarFilename,
+  getAvatarBaseUrl,
+  getDefaultAvatarUrlByKey,
   getRandomAvatar,
+  normalizeAvatarForOutput,
 };

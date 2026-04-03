@@ -157,7 +157,7 @@ const getCurrentUser = async (req, res) => {
  */
 const updateProfile = async (req, res) => {
   try {
-    const result = await authService.updateProfile(req.user._id, req.body);
+    const result = await authService.updateProfile(req.user._id, req.body, req.file);
     res.json(result);
   } catch (error) {
     res.status(400).json({ message: error.message });

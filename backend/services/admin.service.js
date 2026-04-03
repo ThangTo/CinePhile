@@ -16,6 +16,7 @@ const analyticsService = require('./analytics.service');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
 const { parseEpisodeNumber } = require('../utils/movieTransformer');
 const { crawlMovieBySlug } = require('./crawler.service');
+const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
 
 /**
  * Admin Service
@@ -1723,7 +1724,7 @@ const getTrendingMovies = async (timeframe = 'today', page = 1, limit = 10) => {
             return {
               userId: vd.userId,
               name: u ? (u.name || u.username) : 'Ẩn danh',
-              avatar: u ? u.avatar : null,
+              avatar: normalizeAvatarForOutput(u ? u.avatar : null, u ? (u.name || u.username) : vd.userId),
               watchMinutes: Math.round(vd.watchMinutes),
             };
           });
