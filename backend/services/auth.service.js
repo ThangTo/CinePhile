@@ -4,6 +4,7 @@ const { getRandomAvatar } = require('../utils/avatarUtils');
 const redisService = require('./redis.service');
 const avatarService = require('./avatar.service');
 const { isPremiumActive } = require('../utils/premiumUtils');
+const cursorEffectService = require('./cursorEffect.service');
 
 // Helper to generate tokens
 const generateTokens = (userId) => {
@@ -197,6 +198,8 @@ const getCurrentUser = async (token) => {
       user.cursorEffectId = 'glitter';
       await user.save(); // Lưu vào DB để không phải gán lại mỗi lần login
     }
+
+    await cursorEffectService.syncUserCursorEffectAccess(user);
 
     return user;
   } catch (error) {

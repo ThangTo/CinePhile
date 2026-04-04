@@ -2,6 +2,12 @@ const CursorEffect = require('../models/cursorEffect.model');
 const User = require('../models/user.model');
 const { isPremiumActive } = require('../utils/premiumUtils');
 
+const createCursorEffectError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
 /**
  * Lấy danh sách tất cả hiệu ứng (public — không cần auth)
  * @returns {Promise<Array>}
@@ -18,14 +24,16 @@ const getAllEffects = async () => {
 const getEffectsWithOwnership = async (userId) => {
   const [effects, user] = await Promise.all([
     CursorEffect.find({ isActive: true }).sort({ sortOrder: 1 }).lean(),
-    userId ? User.findById(userId).lean() : null,
+    userId ? User.findById(userId) : null,
   ]);
+
+  await syncUserCursorEffectAccess(user, { effects });
 
   const isPremium = user ? isPremiumActive(user) : false;
 
   return effects.map((effect) => {
     const isOwned = checkOwnership(effect, user, isPremium);
-    const isEquipped = user && user.cursorEffectId === effect.effectId;
+    const isEquipped = Boolean(user && isOwned && user.cursorEffectId === effect.effectId);
 
     return {
       ...effect,
@@ -41,10 +49,9 @@ const getEffectsWithOwnership = async (userId) => {
  * Kiểm tra user có sở hữu effect không
  */
 const checkOwnership = (effect, user, isPremium) => {
-  if (!user) return false;
-
   // Base: không hiệu ứng luôn owned
   if (effect.effectId === 'none') return true;
+  if (!user) return false;
 
   // Premium users sở hữu mặc định các effect premium
   if (effect.unlockType === 'premium' && isPremium) return true;
@@ -69,6 +76,40 @@ const canBuy = (effect, user, isPremium) => {
 };
 
 /**
+ * Đảm bảo effect đang trang bị vẫn hợp lệ với quyền hiện tại của user.
+ * Premium hết hạn hoặc effect bị vô hiệu hóa thì trả về "none".
+ * @param {Object|null} user
+ * @param {Object} [options]
+ * @param {Array<Object>} [options.effects]
+ * @returns {Promise<Object|null>}
+ */
+const syncUserCursorEffectAccess = async (user, options = {}) => {
+  if (!user) return null;
+
+  const currentEffectId = user.cursorEffectId || 'none';
+  if (currentEffectId === 'none') return user;
+
+  const effect =
+    options.effects?.find((item) => item.effectId === currentEffectId) ||
+    (await CursorEffect.findOne({ effectId: currentEffectId, isActive: true }).lean());
+
+  const isPremium = isPremiumActive(user);
+  if (effect && checkOwnership(effect, user, isPremium)) {
+    return user;
+  }
+
+  user.cursorEffectId = 'none';
+
+  if (typeof user.save === 'function') {
+    await user.save();
+  } else if (user._id) {
+    await User.updateOne({ _id: user._id }, { $set: { cursorEffectId: 'none' } });
+  }
+
+  return user;
+};
+
+/**
  * Mua hiệu ứng bằng coin
  * @param {string} userId
  * @param {string} effectId
@@ -77,31 +118,37 @@ const canBuy = (effect, user, isPremium) => {
 const purchaseEffect = async (userId, effectId) => {
   const effect = await CursorEffect.findOne({ effectId, isActive: true }).lean();
   if (!effect) {
-    throw new Error('Hiệu ứng không tồn tại');
+    throw createCursorEffectError('Hiệu ứng không tồn tại', 404);
   }
 
   const user = await User.findById(userId);
   if (!user) {
-    throw new Error('User not found');
+    throw createCursorEffectError('User not found', 404);
   }
 
   const isPremium = isPremiumActive(user);
 
   if (!canBuy(effect, user, isPremium)) {
     if (effect.unlockType === 'event') {
-      throw new Error('Hiệu ứng này không thể mua. Hãy hoàn thành điều kiện sự kiện để mở khóa.');
+      throw createCursorEffectError(
+        'Hiệu ứng này không thể mua. Hãy hoàn thành điều kiện sự kiện để mở khóa.',
+        400
+      );
     }
-    throw new Error('Bạn không thể mua hiệu ứng này');
+    throw createCursorEffectError('Bạn không thể mua hiệu ứng này', 400);
   }
 
   // Kiểm tra đã sở hữu chưa
   if (checkOwnership(effect, user, isPremium)) {
-    throw new Error('Bạn đã sở hữu hiệu ứng này');
+    throw createCursorEffectError('Bạn đã sở hữu hiệu ứng này', 409);
   }
 
   // Kiểm tra coin
   if (user.coin < effect.price) {
-    throw new Error(`Không đủ coin. Cần ${effect.price} coin, bạn có ${user.coin} coin`);
+    throw createCursorEffectError(
+      `Không đủ coin. Cần ${effect.price} coin, bạn có ${user.coin} coin`,
+      400
+    );
   }
 
   // Trừ coin và thêm vào owned
@@ -126,18 +173,18 @@ const purchaseEffect = async (userId, effectId) => {
 const equipEffect = async (userId, effectId) => {
   const effect = await CursorEffect.findOne({ effectId, isActive: true }).lean();
   if (!effect) {
-    throw new Error('Hiệu ứng không tồn tại');
+    throw createCursorEffectError('Hiệu ứng không tồn tại', 404);
   }
 
   const user = await User.findById(userId);
   if (!user) {
-    throw new Error('User not found');
+    throw createCursorEffectError('User not found', 404);
   }
 
   const isPremium = isPremiumActive(user);
 
   if (!checkOwnership(effect, user, isPremium)) {
-    throw new Error('Bạn chưa sở hữu hiệu ứng này');
+    throw createCursorEffectError('Bạn chưa sở hữu hiệu ứng này', 400);
   }
 
   user.cursorEffectId = effectId;
@@ -238,4 +285,5 @@ module.exports = {
   equipEffect,
   seedEffects,
   checkOwnership,
+  syncUserCursorEffectAccess,
 };

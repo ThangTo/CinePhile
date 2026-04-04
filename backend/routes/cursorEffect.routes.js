@@ -15,7 +15,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const effects = await cursorEffectService.getEffectsWithOwnership(userId);
     res.status(200).json({ data: effects });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message });
   }
 });
 
@@ -29,8 +29,7 @@ router.post('/purchase', authMiddleware, async (req, res) => {
     const result = await cursorEffectService.purchaseEffect(userId, effectId);
     res.status(200).json({ success: true, ...result });
   } catch (error) {
-    const status = error.message.includes('không thể mua') || error.message.includes('chưa sở hữu') ? 400 : 500;
-    res.status(status).json({ message: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message });
   }
 });
 
@@ -44,7 +43,7 @@ router.post('/equip', authMiddleware, async (req, res) => {
     const result = await cursorEffectService.equipEffect(userId, effectId);
     res.status(200).json({ success: true, ...result });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message });
   }
 });
 

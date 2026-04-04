@@ -4,6 +4,7 @@ export const USER_MENU_ITEMS = [
   { icon: "fa-plus", label: "Danh sách", href: "watchlist" },
   { icon: "fa-clock", label: "Xem tiếp", href: "continue-watching" },
   { icon: "fa-user", label: "Tài khoản", href: "profile" },
+  { icon: "fa-wand-magic-sparkles", label: "Hiệu ứng", href: "effects" },
 ];
 
 // Desktop menu items (slightly different icons)
@@ -12,6 +13,7 @@ export const DESKTOP_MENU_ITEMS = [
   { icon: "fa-list", label: "Danh sách", href: "watchlist" },
   { icon: "fa-history", label: "Xem tiếp", href: "continue-watching" },
   { icon: "fa-user", label: "Tài khoản", href: "profile" },
+  { icon: "fa-wand-magic-sparkles", label: "Hiệu ứng", href: "effects" },
 ];
 
 // Genre categories (Thể loại)
