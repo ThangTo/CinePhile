@@ -6,6 +6,7 @@ const UserHistory = require('../models/user_history.model');
 const userService = require('../services/user.service');
 const authService = require('../services/auth.service');
 const adminService = require('../services/admin.service');
+const cursorEffectService = require('../services/cursorEffect.service');
 const { PLANS } = require('../config/premium.config');
 // Helper to get user ID from authenticated request (via auth middleware)
 const getUserId = (req) => {
@@ -430,6 +431,11 @@ const upgradePremium = async (req, res) => {
     user.role = 'premium';
     user.premiumPlan = plan;
     user.premiumExpiresAt = expiryDate;
+    // Premium: mặc định bật glitter nếu chưa có effect
+    if (!user.cursorEffectId || user.cursorEffectId === 'none') {
+      user.cursorEffectId = 'glitter';
+    }
+
     await user.save();
 
     res.status(200).json({

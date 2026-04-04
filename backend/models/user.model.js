@@ -88,6 +88,15 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Cursor effect
+    cursorEffectId: {
+      type: String,
+      default: 'none',
+    },
+    ownedCursorEffects: {
+      type: [String],
+      default: ['none'],
+    },
   },
   {
     timestamps: true,

@@ -3,6 +3,7 @@ const User = require('../models/user.model');
 const { getRandomAvatar } = require('../utils/avatarUtils');
 const redisService = require('./redis.service');
 const avatarService = require('./avatar.service');
+const { isPremiumActive } = require('../utils/premiumUtils');
 
 // Helper to generate tokens
 const generateTokens = (userId) => {
@@ -190,6 +191,13 @@ const getCurrentUser = async (token) => {
     const user = await User.findById(decoded.userId);
     if (!user) throw new Error('User not found');
     await avatarService.migrateStoredAvatarToR2(user);
+
+    // Premium: mặc định bật glitter nếu chưa có effect
+    if (isPremiumActive(user) && (!user.cursorEffectId || user.cursorEffectId === 'none')) {
+      user.cursorEffectId = 'glitter';
+      await user.save(); // Lưu vào DB để không phải gán lại mỗi lần login
+    }
+
     return user;
   } catch (error) {
     throw new Error('Invalid token');

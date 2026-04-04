@@ -89,6 +89,15 @@ mongoose.connection.on('connected', () => {
   }
 
   try {
+    const cursorEffectService = require('../../services/cursorEffect.service');
+    cursorEffectService.seedEffects().catch((err) => {
+      console.warn('CursorEffect seed skipped:', err.message);
+    });
+  } catch (err) {
+    // cursorEffectService may not be loaded yet; skip silently
+  }
+
+  try {
     const Mailbox = require('../../models/mailbox.model');
     Mailbox.syncIndexes().catch((err) => {
       console.warn('Mailbox index sync skipped:', err.message);

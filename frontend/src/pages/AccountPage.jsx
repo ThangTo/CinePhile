@@ -13,6 +13,7 @@ import ContinueWatchingSection from "components/account/ContinueWatchingSection"
 import FavoritesSection from "components/account/FavoritesSection";
 import WatchlistSection from "components/account/WatchlistSection";
 import WatchStreak from "components/common/WatchStreak";
+import CursorEffectShop from "components/account/CursorEffectShop";
 
 const DEFAULT_TAB = "profile";
 
@@ -23,6 +24,7 @@ const TAB_TITLES = {
   notifications: "Thông báo",
   "continue-watching": "Xem tiếp của bạn",
   streak: "Chuỗi xem",
+  effects: "Hiệu ứng",
 };
 
 const AccountPage = () => {
@@ -108,6 +110,10 @@ const AccountPage = () => {
 
     if (activeTab === "streak") {
       return <WatchStreak />;
+    }
+
+    if (activeTab === "effects") {
+      return <CursorEffectShop />;
     }
 
     return (

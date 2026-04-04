@@ -36,6 +36,11 @@ const navItems = [
     icon: "fa-fire",
     label: "Chuỗi xem",
   },
+  {
+    tab: "effects",
+    icon: "fa-wand-magic-sparkles",
+    label: "Hiệu ứng",
+  },
 ];
 
 const AccountSidebar = ({ user, onLogout }) => {
@@ -99,13 +104,18 @@ const AccountSidebar = ({ user, onLogout }) => {
           />
           <div className="overflow-hidden">
             <div className="flex items-center gap-2">
-              <span className={`font-semibold whitespace-nowrap overflow-hidden text-ellipsis ${
-                isPremiumActive(user) ? "text-primaryColor" : "text-account-text-primary"
-              }`}>
+              <span
+                className={`font-semibold whitespace-nowrap overflow-hidden text-ellipsis ${
+                  isPremiumActive(user) ? "text-primaryColor" : "text-account-text-primary"
+                }`}
+              >
                 {user.username}
               </span>
               {isPremiumActive(user) && (
-                <i className="fa-solid fa-crown text-primaryColor text-xs" style={{filter:"drop-shadow(0 0 3px rgba(255,216,117,0.6))"}} />
+                <i
+                  className="fa-solid fa-crown text-primaryColor text-xs"
+                  style={{ filter: "drop-shadow(0 0 3px rgba(255,216,117,0.6))" }}
+                />
               )}
             </div>
             <div className="text-xs text-account-text-secondary whitespace-nowrap overflow-hidden text-ellipsis">
