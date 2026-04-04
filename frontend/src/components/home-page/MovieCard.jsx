@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import WithHoverCard from "components/common/WithHoverCard";
+import MovieViewsTag from "components/common/MovieViewsTag";
 import OptimizedImage from "components/common/OptimizedImage";
 import { preloadImage } from "utils/imagePreloader";
 import { getOptimizedImageUrl } from "constants/imageSizes";
@@ -105,7 +106,7 @@ const MovieCard = ({
             priority={false}
             sizeKey={compact ? "THUMBNAIL" : "CARD"}
           />
-          <div className="absolute left-2 md:top-1 top-0 z-10 flex gap-1">
+          <div className="absolute left-2 md:top-1 top-0 z-10 flex max-w-[calc(100%-12px)] flex-wrap items-center gap-1 pr-2">
             <span className="rounded bg-cyan-500 md:px-2 md:py-0.5 px-1 py-0.5 md:text-[10px] text-[8px] font-bold text-white shadow">
               {movie.quality || "HD"}
             </span>
@@ -134,6 +135,7 @@ const MovieCard = ({
               }
               return null;
             })()}
+            <MovieViewsTag movie={movie} compact className="pointer-events-none" />
           </div>
         </div>
 

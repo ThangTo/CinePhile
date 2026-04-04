@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import RankBadge from "./RankBadge";
 import ClippedPoster from "./ClippedPoster";
+import MovieViewsTag from "components/common/MovieViewsTag";
 import WithHoverCard from "components/common/WithHoverCard";
 
 /**
@@ -26,60 +27,62 @@ const Top10Card = ({ movie, rank }) => {
       className="relative flex-shrink-0 w-[50%] sm:w-[30%] md:w-[20%] lg:w-[16.5%] min-w-[100px] select-none cursor-pointer"
       onClick={handleClick}
     >
-      <ClippedPoster 
-        src={movie.poster} 
-        fallbackSrcs={[movie.backgroundImage, movie.thumb_url, movie.poster_url]} 
-        alt={movie.title} 
-        isOdd={isOdd} 
+      <ClippedPoster
+        src={movie.poster}
+        fallbackSrcs={[movie.backgroundImage, movie.thumb_url, movie.poster_url]}
+        alt={movie.title}
+        isOdd={isOdd}
       />
 
-      {/* Movie Info */}
-      <div className="flex items-start gap-2 mt-1">
+      <div className="mt-1 flex items-start gap-2">
         <RankBadge rank={rank} />
 
-        <div className="flex flex-col flex-1 min-w-0 pt-2 sm:pt-1">
-          {/* Vietnamese Title */}
-          <div className="text-white text-sm sm:text-base font-semibold line-clamp-1 leading-tight">
+        <div className="flex min-w-0 flex-1 flex-col pt-2 sm:pt-1">
+          <div className="line-clamp-1 text-sm font-semibold leading-tight text-white sm:text-base">
             {movie.title}
           </div>
 
-          {/* English Title */}
-          <div className="mt-0.5 text-gray-400 text-xs line-clamp-1">{movie.englishTitle}</div>
+          <div className="mt-0.5 line-clamp-1 text-xs text-gray-400">{movie.englishTitle}</div>
 
-          {/* Episode Info */}
-          {movie.episode && (
-            <div className="hidden sm:block mt-1 text-gray-500 text-[10px] text-xs line-clamp-1">
-              {movie.episode}
+          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+            <MovieViewsTag movie={movie} compact variant="soft" />
+
+            {movie.episode && (
+              <div className="hidden line-clamp-1 text-[10px] text-gray-500 sm:block">
+                {movie.episode}
+              </div>
+            )}
+
+            <div className="hidden items-center gap-1.5 flex-wrap sm:flex">
+              {movie.rating > 0 && (
+                <span className="inline-flex items-center gap-0.5 rounded bg-primaryColor/20 px-1.5 py-0.5 text-[10px] font-semibold text-primaryColor">
+                  <i className="fa-solid fa-star text-[8px]" />
+                  {movie.rating.toFixed(1)}
+                </span>
+              )}
+              {movie.quality && (
+                <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-400">
+                  {movie.quality}
+                </span>
+              )}
+              {movie.totalEpisodes === 1 &&
+              (movie.currentEpisode === 1 ||
+                movie.currentEpisode === "1" ||
+                movie.currentEpisode === "Full") ? (
+                <span className="rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-orange-400">
+                  Full
+                </span>
+              ) : movie.totalEpisodes > 1 && movie.currentEpisode ? (
+                <span className="rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-orange-400">
+                  Tập {movie.currentEpisode}
+                </span>
+              ) : null}
+              {movie.ageRating && (
+                <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-red-400">
+                  {movie.ageRating}
+                </span>
+              )}
             </div>
-          )}
-
-          {/* Rating & Quality Badges */}
-          <div className="hidden sm:flex mt-1.5 items-center gap-1.5 flex-wrap">
-            {movie.rating > 0 && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-primaryColor/20 text-primaryColor rounded text-[10px] font-semibold">
-                <i className="fa-solid fa-star text-[8px]" />
-                {movie.rating.toFixed(1)}
-              </span>
-            )}
-            {movie.quality && (
-              <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-[10px] font-semibold">
-                {movie.quality}
-              </span>
-            )}
-            {movie.totalEpisodes === 1 && (movie.currentEpisode === 1 || movie.currentEpisode === "1" || movie.currentEpisode === "Full") ? (
-              <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded text-[10px] font-semibold">
-                Full
-              </span>
-            ) : movie.totalEpisodes > 1 && movie.currentEpisode ? (
-              <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded text-[10px] font-semibold">
-                Tập {movie.currentEpisode}
-              </span>
-            ) : null}
-            {movie.ageRating && (
-              <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded text-[10px] font-semibold">
-                {movie.ageRating}
-              </span>
-            )}
           </div>
         </div>
       </div>

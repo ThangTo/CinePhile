@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import SectionHeader from "components/common/SectionHeader";
 import ScrollContainer from "components/common/ScrollContainer";
+import MovieViewsTag from "components/common/MovieViewsTag";
 import OptimizedImage from "components/common/OptimizedImage";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
@@ -202,10 +203,11 @@ const LandscapeCard = ({ movie, onClick }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
 
         {/* Quality badge */}
-        <div className="absolute top-2 left-2">
+        <div className="absolute top-2 left-2 flex items-center gap-1.5">
           <span className="px-1.5 py-0.5 text-[10px] font-bold bg-cyan-500 text-white rounded shadow-sm">
             {movie.quality || "HD"}
           </span>
+          <MovieViewsTag movie={movie} compact className="pointer-events-none" />
         </div>
 
         {/* Episode badge */}

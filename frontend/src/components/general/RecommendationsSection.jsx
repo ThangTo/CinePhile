@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import MovieViewsTag from "components/common/MovieViewsTag";
 import movieService from "services/movie.service";
 import OptimizedImage from "components/common/OptimizedImage";
 import { BarSpinner } from "components/common/LoadingState";
@@ -129,6 +130,9 @@ const RecommendationsSection = ({ movie }) => {
                       {recommendedMovie.englishTitle}
                     </p>
                   )}
+                  <div className="mt-1.5">
+                    <MovieViewsTag movie={recommendedMovie} compact variant="soft" />
+                  </div>
                   <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-400">
                     {recommendedMovie.ageRating && (
                       <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-white/10 text-[10px] font-semibold text-amber-300">
@@ -182,6 +186,9 @@ const RecommendationsSection = ({ movie }) => {
                       {recommendedMovie.englishTitle}
                     </p>
                   )}
+                  <div className="mt-1.5">
+                    <MovieViewsTag movie={recommendedMovie} compact variant="soft" />
+                  </div>
                   <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-400">
                     {recommendedMovie.ageRating && (
                       <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-white/10 text-[10px] font-semibold text-amber-300">
