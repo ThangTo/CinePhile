@@ -43,7 +43,7 @@ const MOBILE_ACCOUNT_NAV_ITEMS = [
   {
     tab: "coin-history",
     icon: "fa-receipt",
-    label: "Lá»‹ch sá»­ coin",
+    label: "Lịch sử coin",
     accent: "text-primaryColor",
   },
 ];
@@ -57,7 +57,7 @@ const TAB_TITLES = {
   streak: "Chuỗi xem",
   effects: "Hiệu ứng",
   quests: "Nhiệm vụ",
-  "coin-history": "Lich su coin",
+  "coin-history": "Lịch sử coin",
 };
 
 const AccountPage = () => {
@@ -123,8 +123,7 @@ const AccountPage = () => {
     MOBILE_ACCOUNT_NAV_ITEMS.find((item) => item.tab === activeTab) || MOBILE_ACCOUNT_NAV_ITEMS[0];
   const mobileStatusText = premiumActive ? getPremiumStatusText(user) : "Thành viên thường";
 
-  const getMobileTabLabel = (item) =>
-    item?.tab === "coin-history" ? "Lich su coin" : item?.label;
+  const getMobileTabLabel = (item) => (item?.tab === "coin-history" ? "Lịch sử coin" : item?.label);
 
   const renderMainContent = () => {
     if (activeTab === "continue-watching") {

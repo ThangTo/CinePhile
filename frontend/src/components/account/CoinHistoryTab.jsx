@@ -6,14 +6,14 @@ import { BarSpinner } from "components/common/LoadingState";
 const LIMIT = 20;
 
 const REASON_LABELS = {
-  quest_reward: "ThÆ°á»Ÿng nhiá»‡m vá»¥",
-  quest_reward_auto: "Tá»± nháº­n thÆ°á»Ÿng nhiá»‡m vá»¥",
-  quest_bonus: "Bonus hoÃ n thÃ nh nhiá»‡m vá»¥",
-  quest_bonus_auto: "Tá»± nháº­n bonus nhiá»‡m vá»¥",
-  payment_success: "Náº¡p coin thÃ nh cÃ´ng",
-  premium_upgrade: "NÃ¢ng cáº¥p Premium",
-  cursor_purchase: "Mua hiá»‡u á»©ng con trá»",
-  admin_add_coin: "Cá»™ng coin thá»§ cÃ´ng",
+  quest_reward: "Thưởng nhiệm vụ",
+  quest_reward_auto: "Tự nhận thưởng nhiệm vụ",
+  quest_bonus: "Bonus hoàn thành nhiệm vụ",
+  quest_bonus_auto: "Tự nhận bonus nhiệm vụ",
+  payment_success: "Nạp coin thành công",
+  premium_upgrade: "Nâng cấp Premium",
+  cursor_purchase: "Mua hiệu ứng con trỏ",
+  admin_add_coin: "Cộng coin thủ công",
 };
 
 const formatDelta = (value) => {
@@ -34,7 +34,7 @@ const formatDateTime = (value) => {
   });
 };
 
-const getReasonLabel = (reason) => REASON_LABELS[reason] || "Biáº¿n Ä‘á»™ng coin";
+const getReasonLabel = (reason) => REASON_LABELS[reason] || "Biến động coin";
 
 const CoinHistoryTab = () => {
   const { user } = useAuth();
@@ -54,13 +54,13 @@ const CoinHistoryTab = () => {
     if (search.get("success")) {
       return {
         type: "success",
-        message: "Thanh toÃ¡n thÃ nh cÃ´ng. Coin Ä‘Ã£ Ä‘Æ°á»£c cá»™ng vÃ o tÃ i khoáº£n.",
+        message: "Thanh toán thành công. Coin đã được cộng vào tài khoản.",
       };
     }
     if (search.get("canceled")) {
       return {
         type: "error",
-        message: "Thanh toÃ¡n chÆ°a hoÃ n táº¥t hoáº·c Ä‘Ã£ bá»‹ há»§y.",
+        message: "Thanh toán chưa hoàn tất hoặc đã bị hủy.",
       };
     }
     return null;
@@ -86,7 +86,7 @@ const CoinHistoryTab = () => {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err?.message || "KhÃ´ng thá»ƒ táº£i lá»‹ch sá»­ coin.");
+          setError(err?.message || "Không thể tải lịch sử coin.");
         }
       } finally {
         if (!cancelled) {
@@ -115,7 +115,7 @@ const CoinHistoryTab = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-account-border bg-account-bg-secondary p-5">
           <p className="text-xs uppercase tracking-[0.24em] text-account-text-secondary">
-            Sá»‘ dÆ° hiá»‡n táº¡i
+            Số dư hiện tại
           </p>
           <div className="mt-3 flex items-center gap-3">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primaryColor/15 text-primaryColor">
@@ -132,25 +132,25 @@ const CoinHistoryTab = () => {
 
         <div className="rounded-2xl border border-account-border bg-account-bg-secondary p-5">
           <p className="text-xs uppercase tracking-[0.24em] text-account-text-secondary">
-            Tá»•ng giao dá»‹ch
+            Tổng giao dịch
           </p>
           <p className="mt-4 text-3xl font-bold text-account-text-primary">
             {(history.total || 0).toLocaleString("vi-VN")}
           </p>
           <p className="mt-2 text-sm text-account-text-secondary">
-            Bao gá»“m má»i láº§n cá»™ng vÃ  trá»« coin
+            Bao gồm mọi lần cộng và trừ coin
           </p>
         </div>
 
         <div className="rounded-2xl border border-account-border bg-account-bg-secondary p-5">
           <p className="text-xs uppercase tracking-[0.24em] text-account-text-secondary">
-            Trang hiá»‡n táº¡i
+            Trang hiện tại
           </p>
           <p className="mt-4 text-3xl font-bold text-account-text-primary">
             {history.page}/{history.totalPages}
           </p>
           <p className="mt-2 text-sm text-account-text-secondary">
-            Má»—i trang hiá»ƒn thá»‹ tá»‘i Ä‘a {history.limit} giao dá»‹ch
+            Mỗi trang hiển thị tối đa {history.limit} giao dịch
           </p>
         </div>
       </div>
@@ -177,10 +177,10 @@ const CoinHistoryTab = () => {
         {history.entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center text-account-text-secondary">
             <i className="fa-solid fa-receipt mb-4 text-4xl opacity-40" />
-            <p className="text-lg font-semibold text-account-text-primary">ChÆ°a cÃ³ lá»‹ch sá»­ coin</p>
+            <p className="text-lg font-semibold text-account-text-primary">Chưa có lịch sử coin</p>
             <p className="mt-2 max-w-md text-sm">
-              Khi báº¡n nháº­n thÆ°á»Ÿng nhiá»‡m vá»¥, náº¡p coin, mua hiá»‡u á»©ng hoáº·c nÃ¢ng cáº¥p Premium,
-              má»i biáº¿n Ä‘á»™ng sáº½ xuáº¥t hiá»‡n á»Ÿ Ä‘Ã¢y.
+              Khi bạn nhận thưởng nhiệm vụ, nạp coin, mua hiệu ứng hoặc nâng cấp Premium, mọi biến
+              động sẽ xuất hiện ở đây.
             </p>
           </div>
         ) : (
@@ -209,7 +209,7 @@ const CoinHistoryTab = () => {
                       <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-account-text-secondary md:grid-cols-3">
                         <div className="rounded-2xl bg-account-bg-secondary px-3 py-2">
                           <p className="text-[11px] uppercase tracking-[0.18em] text-account-text-secondary/75">
-                            TrÆ°á»›c giao dá»‹ch
+                            Trước giao dịch
                           </p>
                           <p className="mt-1 font-semibold text-account-text-primary">
                             {(entry.balanceBefore || 0).toLocaleString("vi-VN")} coin
@@ -217,7 +217,7 @@ const CoinHistoryTab = () => {
                         </div>
                         <div className="rounded-2xl bg-account-bg-secondary px-3 py-2">
                           <p className="text-[11px] uppercase tracking-[0.18em] text-account-text-secondary/75">
-                            Biáº¿n Ä‘á»™ng
+                            Biến động
                           </p>
                           <p
                             className={`mt-1 font-semibold ${
@@ -229,7 +229,7 @@ const CoinHistoryTab = () => {
                         </div>
                         <div className="rounded-2xl bg-account-bg-secondary px-3 py-2">
                           <p className="text-[11px] uppercase tracking-[0.18em] text-account-text-secondary/75">
-                            Sau giao dá»‹ch
+                            Sau giao dịch
                           </p>
                           <p className="mt-1 font-semibold text-account-text-primary">
                             {(entry.balanceAfter || 0).toLocaleString("vi-VN")} coin
@@ -240,9 +240,7 @@ const CoinHistoryTab = () => {
 
                     <div
                       className={`inline-flex shrink-0 items-center justify-center rounded-2xl px-4 py-3 text-lg font-bold ${
-                        isPositive
-                          ? "bg-green-500/12 text-green-300"
-                          : "bg-red-500/12 text-red-300"
+                        isPositive ? "bg-green-500/12 text-green-300" : "bg-red-500/12 text-red-300"
                       }`}
                     >
                       {formatDelta(entry.delta)}
@@ -264,7 +262,7 @@ const CoinHistoryTab = () => {
             className="inline-flex items-center gap-2 rounded-xl border border-account-border bg-account-bg-secondary px-4 py-2 text-sm font-semibold text-account-text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             <i className="fa-solid fa-arrow-left" />
-            Trang trÆ°á»›c
+            Trang trước
           </button>
           <button
             type="button"

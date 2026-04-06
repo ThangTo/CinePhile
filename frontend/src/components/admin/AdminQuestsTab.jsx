@@ -14,17 +14,17 @@ import { questAdminAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
 
 const PERIOD_META = {
-  daily: { label: "Daily", nextLabel: "ngay tiep theo", color: "text-sky-300" },
-  weekly: { label: "Weekly", nextLabel: "tuan tiep theo", color: "text-amber-300" },
+  daily: { label: "Daily", nextLabel: "ngày tiếp theo", color: "text-sky-300" },
+  weekly: { label: "Weekly", nextLabel: "tuần tiếp theo", color: "text-amber-300" },
 };
 
 const METRIC_OPTIONS = [
-  { value: "watch_seconds", label: "Xem phim theo phut", unit: "phut" },
-  { value: "unique_movies", label: "Xem phim khac nhau", unit: "phim" },
-  { value: "comment_count", label: "Binh luan", unit: "lan" },
-  { value: "rating_count", label: "Danh gia", unit: "lan" },
-  { value: "favorite_count", label: "Them yeu thich", unit: "lan" },
-  { value: "watchlist_count", label: "Them watchlist", unit: "lan" },
+  { value: "watch_seconds", label: "Xem phim theo phút", unit: "phút" },
+  { value: "unique_movies", label: "Xem phim khác nhau", unit: "phim" },
+  { value: "comment_count", label: "Bình luận", unit: "lần" },
+  { value: "rating_count", label: "Đánh giá", unit: "lần" },
+  { value: "favorite_count", label: "Thêm yêu thích", unit: "lần" },
+  { value: "watchlist_count", label: "Thêm watchlist", unit: "lần" },
 ];
 
 const CATEGORY_OPTIONS = ["watch", "social", "engagement"];
@@ -69,7 +69,7 @@ const SnapshotCard = ({ title, subtitle, snapshot }) => (
     <h4 className="text-white font-semibold">{title}</h4>
     <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
     {!snapshot?.quests?.length ? (
-      <div className="text-sm text-gray-500 mt-4">Chua co du lieu.</div>
+      <div className="text-sm text-gray-500 mt-4">Chưa có dữ liệu.</div>
     ) : (
       <div className="space-y-2 mt-4">
         <div className="flex flex-wrap gap-2 text-xs text-gray-400">
@@ -140,8 +140,10 @@ const TemplateModal = ({ open, initialValue, onClose, onSave }) => {
       <div className="relative bg-[#161825] border border-white/10 rounded-2xl p-6 w-full max-w-lg">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h3 className="text-lg font-bold text-white">{form.id ? "Sua template" : "Them template"}</h3>
-            <p className="text-xs text-gray-400 mt-1">Template chi anh huong cac ky tuong lai.</p>
+            <h3 className="text-lg font-bold text-white">
+              {form.id ? "Sửa template" : "Thêm template"}
+            </h3>
+            <p className="text-xs text-gray-400 mt-1">Template chỉ ảnh hưởng các kỳ tương lai.</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white">
             <FiX size={20} />
@@ -160,11 +162,15 @@ const TemplateModal = ({ open, initialValue, onClose, onSave }) => {
             </select>
             <select
               value={form.category}
-              onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, category: event.target.value }))
+              }
               className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white"
             >
               {CATEGORY_OPTIONS.map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>
+                  {value}
+                </option>
               ))}
             </select>
           </div>
@@ -172,31 +178,39 @@ const TemplateModal = ({ open, initialValue, onClose, onSave }) => {
             value={form.title}
             onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
             className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white"
-            placeholder="Tieu de quest"
+            placeholder="Tiêu đề quest"
             required
           />
           <textarea
             rows={3}
             value={form.description}
-            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, description: event.target.value }))
+            }
             className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white resize-none"
-            placeholder="Mo ta"
+            placeholder="Mô tả"
           />
           <div className="grid grid-cols-3 gap-4">
             <select
               value={form.targetMetric}
-              onChange={(event) => setForm((current) => ({ ...current, targetMetric: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, targetMetric: event.target.value }))
+              }
               className="col-span-2 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white"
             >
               {METRIC_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
             </select>
             <input
               type="number"
               min="1"
               value={form.targetValue}
-              onChange={(event) => setForm((current) => ({ ...current, targetValue: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, targetValue: event.target.value }))
+              }
               className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white"
               required
             />
@@ -213,18 +227,28 @@ const TemplateModal = ({ open, initialValue, onClose, onSave }) => {
               min="10"
               step="10"
               value={form.rewardCoins}
-              onChange={(event) => setForm((current) => ({ ...current, rewardCoins: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, rewardCoins: event.target.value }))
+              }
               className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white"
               required
             />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-3 rounded-xl border border-white/10 text-gray-300">
-              Huy
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 rounded-xl border border-white/10 text-gray-300"
+            >
+              Hủy
             </button>
-            <button type="submit" disabled={saving} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primaryColor text-black font-semibold disabled:opacity-50">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primaryColor text-black font-semibold disabled:opacity-50"
+            >
               {saving ? <FiLoader className="animate-spin" /> : <FiSave />}
-              {saving ? "Dang luu..." : "Luu"}
+              {saving ? "Đang lưu..." : "Lưu"}
             </button>
           </div>
         </form>
@@ -254,7 +278,8 @@ const PeriodSection = ({
     .map((id) => templates.find((template) => template.id === id))
     .filter(Boolean);
 
-  const patchSelection = (nextIds, extra = {}) => onDraftChange(type, { [listKey]: nextIds, ...extra });
+  const patchSelection = (nextIds, extra = {}) =>
+    onDraftChange(type, { [listKey]: nextIds, ...extra });
 
   const handleMove = (index, delta) => {
     const nextIndex = index + delta;
@@ -288,7 +313,7 @@ const PeriodSection = ({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className={`text-2xl font-bold ${meta.color}`}>{meta.label}</h2>
-          <p className="text-sm text-gray-400 mt-1">Moi thay doi se ap dung tu {meta.nextLabel}.</p>
+          <p className="text-sm text-gray-400 mt-1">Mọi thay đổi sẽ áp dụng từ {meta.nextLabel}.</p>
         </div>
         <button
           onClick={() => onSave(type)}
@@ -296,18 +321,18 @@ const PeriodSection = ({
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primaryColor text-black font-semibold disabled:opacity-50"
         >
           {saving ? <FiLoader className="animate-spin" /> : <FiSave />}
-          {saving ? "Dang luu..." : dirty ? "Luu nhap" : "Da dong bo"}
+          {saving ? "Đang lưu..." : dirty ? "Lưu nháp" : "Đã đồng bộ"}
         </button>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <SnapshotCard
-          title="Dang chay hien tai"
-          subtitle="Snapshot nay khong bi doi khi admin sua draft."
+          title="Đang chạy hiện tại"
+          subtitle="Snapshot này không bị đổi khi admin sửa draft."
           snapshot={currentSnapshot}
         />
         <SnapshotCard
-          title="Preview ky sau"
+          title="Preview kỳ sau"
           subtitle={`Period key: ${nextPeriodKey || "-"}`}
           snapshot={nextPreview}
         />
@@ -319,7 +344,7 @@ const PeriodSection = ({
             onClick={() => onDraftChange(type, { selectionMode: "fixed" })}
             className={`px-4 py-2 rounded-xl border ${draft.selectionMode === "fixed" ? "bg-primaryColor text-black border-primaryColor" : "border-white/10 text-gray-300"}`}
           >
-            Co dinh
+            Cố định
           </button>
           <button
             onClick={() => onDraftChange(type, { selectionMode: "random" })}
@@ -332,42 +357,46 @@ const PeriodSection = ({
             className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 text-white hover:bg-white/5"
           >
             <FiPlus />
-            Them template
+            Thêm template
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Selection mode</p>
+            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Chế độ chọn</p>
             <p className="text-white font-semibold">{draft.selectionMode}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Completion bonus</p>
+            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Thưởng hoàn thành</p>
             <input
               type="number"
               min="0"
               step="10"
               value={draft.completionBonusCoins ?? 0}
-              onChange={(event) => onDraftChange(type, { completionBonusCoins: Number(event.target.value || 0) })}
+              onChange={(event) =>
+                onDraftChange(type, { completionBonusCoins: Number(event.target.value || 0) })
+              }
               className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2.5 text-white"
             />
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Trang thai draft</p>
+            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Trạng thái draft</p>
             <p className={`font-semibold ${dirty ? "text-amber-300" : "text-emerald-300"}`}>
-              {dirty ? "Co thay doi chua luu" : "Da dong bo"}
+              {dirty ? "Có thay đổi chưa lưu" : "Đã đồng bộ"}
             </p>
           </div>
         </div>
 
         {draft.selectionMode === "random" && (
           <div className="w-full md:w-48">
-            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Random count</p>
+            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Số lượng random</p>
             <input
               type="number"
               min="1"
               value={draft.randomCount ?? 1}
-              onChange={(event) => onDraftChange(type, { randomCount: Number(event.target.value || 0) })}
+              onChange={(event) =>
+                onDraftChange(type, { randomCount: Number(event.target.value || 0) })
+              }
               className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2.5 text-white"
             />
           </div>
@@ -376,32 +405,48 @@ const PeriodSection = ({
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <h4 className="text-white font-semibold">
-              {draft.selectionMode === "random" ? "Pool random ky sau" : "Danh sach co dinh ky sau"}
+              {draft.selectionMode === "random" ? "Pool random kỳ sau" : "Danh sách cố định kỳ sau"}
             </h4>
-            <p className="text-xs text-gray-400 mt-1">Sap xep thu tu va bo bot quest o day.</p>
+            <p className="text-xs text-gray-400 mt-1">Sắp xếp thứ tự và bỏ bớt quest ở đây.</p>
             <div className="space-y-2 mt-4">
               {!selectedTemplates.length && (
                 <div className="text-sm text-gray-500 border border-dashed border-white/10 rounded-xl p-4">
-                  Chua chon quest nao.
+                  Chưa chọn quest nào.
                 </div>
               )}
               {selectedTemplates.map((template, index) => (
-                <div key={template.id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-3">
+                <div
+                  key={template.id}
+                  className="flex items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-3"
+                >
                   <div className="w-8 h-8 rounded-lg bg-primaryColor/10 text-primaryColor text-xs font-bold flex items-center justify-center shrink-0">
                     {index + 1}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-white font-medium">{template.title}</p>
-                    <p className="text-xs text-gray-400 mt-1">{formatTarget(template)} • +{template.rewardCoins} coin</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {formatTarget(template)} • +{template.rewardCoins} coin
+                    </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => handleMove(index, -1)} disabled={index === 0} className="p-2 rounded-lg text-gray-500 hover:text-white disabled:opacity-25">
+                    <button
+                      onClick={() => handleMove(index, -1)}
+                      disabled={index === 0}
+                      className="p-2 rounded-lg text-gray-500 hover:text-white disabled:opacity-25"
+                    >
                       <FiChevronUp />
                     </button>
-                    <button onClick={() => handleMove(index, 1)} disabled={index === selectedTemplates.length - 1} className="p-2 rounded-lg text-gray-500 hover:text-white disabled:opacity-25">
+                    <button
+                      onClick={() => handleMove(index, 1)}
+                      disabled={index === selectedTemplates.length - 1}
+                      className="p-2 rounded-lg text-gray-500 hover:text-white disabled:opacity-25"
+                    >
                       <FiChevronDown />
                     </button>
-                    <button onClick={() => handleRemove(template.id)} className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                    <button
+                      onClick={() => handleRemove(template.id)}
+                      className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    >
                       <FiX />
                     </button>
                   </div>
@@ -411,22 +456,29 @@ const PeriodSection = ({
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <h4 className="text-white font-semibold">Template pool</h4>
-            <p className="text-xs text-gray-400 mt-1">Them vao draft, sua template, hoac archive cho ky sau.</p>
+            <h4 className="text-white font-semibold">Kho template</h4>
+            <p className="text-xs text-gray-400 mt-1">
+              Thêm vào draft, sửa template, hoặc archive cho kỳ sau.
+            </p>
             <div className="space-y-2 mt-4">
               {!templates.length && (
                 <div className="text-sm text-gray-500 border border-dashed border-white/10 rounded-xl p-4">
-                  Chua co template nao.
+                  Chưa có template nào.
                 </div>
               )}
               {templates.map((template) => (
-                <div key={template.id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-3">
+                <div
+                  key={template.id}
+                  className="flex items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-3"
+                >
                   <div className="w-10 h-10 rounded-xl bg-white/[0.05] flex items-center justify-center shrink-0">
                     <i className={`fas ${template.icon || "fa-solid fa-star"} text-primaryColor`} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-white font-medium">{template.title}</p>
-                    <p className="text-xs text-gray-400 mt-1">{formatTarget(template)} • +{template.rewardCoins} coin</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {formatTarget(template)} • +{template.rewardCoins} coin
+                    </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
@@ -434,12 +486,18 @@ const PeriodSection = ({
                       disabled={selectedIds.includes(template.id)}
                       className="px-3 py-2 rounded-lg bg-primaryColor text-black text-xs font-semibold disabled:opacity-40"
                     >
-                      {selectedIds.includes(template.id) ? "Da chon" : "Them"}
+                      {selectedIds.includes(template.id) ? "Đã chọn" : "Thêm"}
                     </button>
-                    <button onClick={() => onEditTemplate(type, template)} className="p-2 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10">
+                    <button
+                      onClick={() => onEditTemplate(type, template)}
+                      className="p-2 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                    >
                       <FiEdit2 />
                     </button>
-                    <button onClick={() => onArchiveTemplate(template)} className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                    <button
+                      onClick={() => onArchiveTemplate(template)}
+                      className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    >
                       <FiTrash2 />
                     </button>
                   </div>
@@ -459,7 +517,11 @@ const AdminQuestsTab = () => {
   const [savingType, setSavingType] = useState(null);
   const [data, setData] = useState(null);
   const [drafts, setDrafts] = useState({});
-  const [templateModal, setTemplateModal] = useState({ open: false, type: "daily", template: null });
+  const [templateModal, setTemplateModal] = useState({
+    open: false,
+    type: "daily",
+    template: null,
+  });
 
   const refreshData = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
@@ -469,7 +531,7 @@ const AdminQuestsTab = () => {
       setData(response);
       setDrafts(response?.draftConfig || {});
     } catch (error) {
-      showToast(error?.message || "Khong the tai cau hinh quest", "error");
+      showToast(error?.message || "Không thể tải cấu hình quest", "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -504,9 +566,9 @@ const AdminQuestsTab = () => {
     try {
       await questAdminAPI.updateConfig(type, drafts[type]);
       await refreshData(true);
-      showToast(`Da luu nhap ${type}`);
+      showToast(`Đã lưu nháp ${type}`);
     } catch (error) {
-      showToast(error?.message || "Khong the luu quest config", "error");
+      showToast(error?.message || "Không thể lưu quest config", "error");
     } finally {
       setSavingType(null);
     }
@@ -517,24 +579,24 @@ const AdminQuestsTab = () => {
       await questAdminAPI.upsertTemplate(payload);
       setTemplateModal({ open: false, type: "daily", template: null });
       await refreshData(true);
-      showToast(payload.id ? "Da cap nhat template" : "Da tao template");
+      showToast(payload.id ? "Đã cập nhật template" : "Đã tạo template");
     } catch (error) {
-      showToast(error?.message || "Khong the luu template", "error");
+      showToast(error?.message || "Không thể lưu template", "error");
       throw error;
     }
   };
 
   const handleArchiveTemplate = async (template) => {
     const confirmed = window.confirm(
-      `Archive quest "${template.title}"? Viec nay chi anh huong draft ky sau.`,
+      `Archive quest "${template.title}"? Việc này chỉ ảnh hưởng draft kỳ sau.`
     );
     if (!confirmed) return;
     try {
       await questAdminAPI.archiveTemplate(template.id);
       await refreshData(true);
-      showToast("Da archive template");
+      showToast("Đã archive template");
     } catch (error) {
-      showToast(error?.message || "Khong the archive template", "error");
+      showToast(error?.message || "Không thể archive template", "error");
     }
   };
 
@@ -542,7 +604,7 @@ const AdminQuestsTab = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <BarSpinner />
-        <p className="text-gray-400 text-sm animate-pulse">Dang tai quest admin...</p>
+        <p className="text-gray-400 text-sm animate-pulse">Đang tải quest admin...</p>
       </div>
     );
   }
@@ -551,9 +613,9 @@ const AdminQuestsTab = () => {
     <div className="w-full max-w-7xl mx-auto pb-12 space-y-8 animate-fade-in">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-white/5 pb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Quan ly nhiem vu</h1>
+          <h1 className="text-2xl font-bold text-white">Quản lý nhiệm vụ</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Quan ly pool quest, lineup ky sau va giu snapshot ky hien tai bat bien.
+            Quản lý pool quest, lineup kỳ sau và giữ snapshot kỳ hiện tại bất biến.
           </p>
         </div>
         <button
@@ -562,7 +624,7 @@ const AdminQuestsTab = () => {
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 disabled:opacity-50"
         >
           {refreshing ? <FiLoader className="animate-spin" /> : <FiRefreshCw />}
-          {refreshing ? "Dang tai..." : "Tai lai"}
+          {refreshing ? "Đang tải..." : "Tải lại"}
         </button>
       </div>
 
@@ -570,7 +632,9 @@ const AdminQuestsTab = () => {
         <PeriodSection
           key={type}
           type={type}
-          draft={drafts[type] || { selectionMode: "fixed", fixedQuestIds: [], randomPoolQuestIds: [] }}
+          draft={
+            drafts[type] || { selectionMode: "fixed", fixedQuestIds: [], randomPoolQuestIds: [] }
+          }
           templates={sortTemplates(data?.templates?.[type] || [])}
           currentSnapshot={data?.currentSnapshot?.[type]}
           nextPreview={data?.nextPreview?.[type]}
@@ -579,14 +643,18 @@ const AdminQuestsTab = () => {
           saving={savingType === type}
           onDraftChange={handleDraftChange}
           onSave={handleSaveConfig}
-          onEditTemplate={(periodType, template) => setTemplateModal({ open: true, type: periodType, template })}
+          onEditTemplate={(periodType, template) =>
+            setTemplateModal({ open: true, type: periodType, template })
+          }
           onArchiveTemplate={handleArchiveTemplate}
         />
       ))}
 
       <TemplateModal
         open={templateModal.open}
-        initialValue={templateModal.template || { ...DEFAULT_TEMPLATE_FORM, type: templateModal.type }}
+        initialValue={
+          templateModal.template || { ...DEFAULT_TEMPLATE_FORM, type: templateModal.type }
+        }
         onClose={() => setTemplateModal({ open: false, type: "daily", template: null })}
         onSave={handleSaveTemplate}
       />

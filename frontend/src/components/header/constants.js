@@ -6,7 +6,7 @@ export const USER_MENU_ITEMS = [
   { icon: "fa-user", label: "Tài khoản", href: "profile" },
   { icon: "fa-wand-magic-sparkles", label: "Hiệu ứng", href: "effects", highlight: true },
   { icon: "fa-trophy", label: "Nhiệm vụ", href: "quests", highlight: true },
-  { icon: "fa-receipt", label: "Lich su coin", href: "coin-history", highlight: true },
+  { icon: "fa-receipt", label: "Lịch sử coin", href: "coin-history", highlight: true },
 ];
 
 // Desktop menu items (slightly different icons)
@@ -17,7 +17,7 @@ export const DESKTOP_MENU_ITEMS = [
   { icon: "fa-user", label: "Tài khoản", href: "profile" },
   { icon: "fa-wand-magic-sparkles", label: "Hiệu ứng", href: "effects", highlight: true },
   { icon: "fa-trophy", label: "Nhiệm vụ", href: "quests", highlight: true },
-  { icon: "fa-receipt", label: "Lich su coin", href: "coin-history", highlight: true },
+  { icon: "fa-receipt", label: "Lịch sử coin", href: "coin-history", highlight: true },
 ];
 
 // Genre categories (Thể loại)

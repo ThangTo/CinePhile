@@ -49,7 +49,7 @@ const navItems = [
   {
     tab: "coin-history",
     icon: "fa-receipt",
-    label: "Lich su coin",
+    label: "Lịch sử coin",
   },
 ];
 

@@ -16,16 +16,16 @@ export const ADMIN_TABS = {
 };
 
 export const ADMIN_MENU_ITEMS = [
-  { id: ADMIN_TABS.OVERVIEW, label: "Tong quan", icon: "fa-chart-line" },
+  { id: ADMIN_TABS.OVERVIEW, label: "Tổng quan", icon: "fa-chart-line" },
   { id: ADMIN_TABS.MOVIES, label: "Phim", icon: "fa-film" },
-  { id: ADMIN_TABS.USERS, label: "Nguoi dung", icon: "fa-users" },
-  { id: ADMIN_TABS.COMMENTS, label: "Binh luan", icon: "fa-comments" },
+  { id: ADMIN_TABS.USERS, label: "Người dùng", icon: "fa-users" },
+  { id: ADMIN_TABS.COMMENTS, label: "Bình luận", icon: "fa-comments" },
   { id: ADMIN_TABS.VIRAL_CLIPS, label: "Viral Clips", icon: "fa-bolt" },
-  { id: ADMIN_TABS.NOTIFICATIONS, label: "Thong bao", icon: "fa-bell" },
-  { id: ADMIN_TABS.MAILBOX, label: "Hop thu", icon: "fa-envelope" },
-  { id: ADMIN_TABS.SETTINGS, label: "Cai dat", icon: "fa-cog" },
-  { id: ADMIN_TABS.PRICING, label: "Quan ly gia", icon: "fa-dollar-sign" },
-  { id: ADMIN_TABS.QUESTS, label: "Nhiem vu", icon: "fa-list-check" },
+  { id: ADMIN_TABS.NOTIFICATIONS, label: "Thông báo", icon: "fa-bell" },
+  { id: ADMIN_TABS.MAILBOX, label: "Hộp thư", icon: "fa-envelope" },
+  { id: ADMIN_TABS.SETTINGS, label: "Cài đặt", icon: "fa-cog" },
+  { id: ADMIN_TABS.PRICING, label: "Quản lý giá", icon: "fa-dollar-sign" },
+  { id: ADMIN_TABS.QUESTS, label: "Nhiệm vụ", icon: "fa-list-check" },
 ];
 
 export const STAT_COLORS = {
@@ -49,10 +49,10 @@ export const QUALITY_OPTIONS = [
 ];
 
 export const AGE_RATING_OPTIONS = [
-  { value: "P", label: "P - Moi lua tuoi" },
-  { value: "T13", label: "T13 - Tren 13 tuoi" },
-  { value: "T16", label: "T16 - Tren 16 tuoi" },
-  { value: "T18", label: "T18 - Tren 18 tuoi" },
+  { value: "P", label: "P - Mọi lứa tuổi" },
+  { value: "T13", label: "T13 - Trên 13 tuổi" },
+  { value: "T16", label: "T16 - Trên 16 tuổi" },
+  { value: "T18", label: "T18 - Trên 18 tuổi" },
 ];
 
 export const USER_STATUS = {
