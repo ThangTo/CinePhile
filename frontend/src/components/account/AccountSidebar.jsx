@@ -46,6 +46,11 @@ const navItems = [
     icon: "fa-trophy",
     label: "Nhiệm vụ",
   },
+  {
+    tab: "coin-history",
+    icon: "fa-receipt",
+    label: "Lich su coin",
+  },
 ];
 
 const AccountSidebar = ({ user, onLogout }) => {

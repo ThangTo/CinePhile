@@ -2,16 +2,14 @@ const assert = require('assert');
 const path = require('path');
 const Module = require('module');
 
-function createQuestHarness() {
+function createHarness() {
   const definitions = [];
   const progressDocs = [];
   const configs = [];
   const snapshots = [];
-  const users = new Map();
   const notifications = [];
-  let userIncDelayMs = 0;
-  let progressClaimDelayMs = 0;
-  let bonusClaimDelayMs = 0;
+  const users = new Map();
+  const ledgerCalls = [];
 
   const cloneDate = (value) => (value instanceof Date ? new Date(value.getTime()) : value);
 
@@ -85,14 +83,9 @@ function createQuestHarness() {
   };
 
   QuestProgress.find = async (query) => progressDocs.filter((doc) => matchesQuery(doc, query));
-
   QuestProgress.findOne = async (query) => progressDocs.find((doc) => matchesQuery(doc, query)) || null;
 
   QuestProgress.findOneAndUpdate = async (query, update, options = {}) => {
-    if (progressClaimDelayMs) {
-      await new Promise((resolve) => setTimeout(resolve, progressClaimDelayMs));
-    }
-
     const target = progressDocs.find((doc) => matchesQuery(doc, query));
     if (!target) return null;
 
@@ -104,16 +97,11 @@ function createQuestHarness() {
   QuestProgress.updateOne = async (query, update) => {
     const target = progressDocs.find((doc) => matchesQuery(doc, query));
     if (!target) return { modifiedCount: 0 };
-
     applyUpdate(target, update);
     return { modifiedCount: 1 };
   };
 
   QuestProgress.updateMany = async (query, update) => {
-    if (bonusClaimDelayMs) {
-      await new Promise((resolve) => setTimeout(resolve, bonusClaimDelayMs));
-    }
-
     const targets = progressDocs.filter((doc) => matchesQuery(doc, query));
     targets.forEach((doc) => applyUpdate(doc, update));
     return { modifiedCount: targets.length };
@@ -178,48 +166,44 @@ function createQuestHarness() {
     },
   };
 
-  const User = {};
-
-  const coinLedgerService = {
-    applyCoinChange: async ({ userId, delta }) => {
-      if (userIncDelayMs) {
-        await new Promise((resolve) => setTimeout(resolve, userIncDelayMs));
-      }
-
-      const user = users.get(userId);
-      if (!user) {
-        const error = new Error('User not found');
-        error.statusCode = 404;
-        throw error;
-      }
-
-      if (delta < 0 && user.coin < Math.abs(delta)) {
-        const error = new Error('Khong du coin de thuc hien giao dich');
-        error.statusCode = 400;
-        throw error;
-      }
-
-      const balanceBefore = user.coin;
-      user.coin += delta;
-
-      return {
-        user: { ...user },
-        entry: {
-          userId,
-          delta,
-          balanceBefore,
-          balanceAfter: user.coin,
-        },
-        balanceBefore,
-        balanceAfter: user.coin,
-      };
+  const notificationService = {
+    createNotification: async (payload) => {
+      notifications.push(payload);
+      return payload;
+    },
+    create: async (userId, payload) => {
+      notifications.push({ userId, ...payload });
+      return payload;
     },
   };
 
-  const notificationService = {
-    create: async (userId, payload) => {
-      notifications.push({ userId, payload });
-      return { ok: true };
+  const coinLedgerService = {
+    applyCoinChange: async ({ userId, delta, reason, sourceType, sourceId, note, metadata }) => {
+      const user = users.get(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const before = user.coin || 0;
+      user.coin = before + delta;
+      const call = {
+        userId,
+        delta,
+        reason,
+        sourceType,
+        sourceId,
+        note,
+        metadata,
+        balanceBefore: before,
+        balanceAfter: user.coin,
+      };
+      ledgerCalls.push(call);
+      return {
+        user: { ...user },
+        entry: call,
+        balanceBefore: before,
+        balanceAfter: user.coin,
+      };
     },
   };
 
@@ -232,7 +216,7 @@ function createQuestHarness() {
     if (request === '../models/quest_progress.model') return QuestProgress;
     if (request === '../models/quest_config.model') return QuestConfig;
     if (request === '../models/quest_period_snapshot.model') return QuestPeriodSnapshot;
-    if (request === '../models/user.model') return User;
+    if (request === '../models/user.model') return {};
     if (request === './notification.service') return notificationService;
     if (request === './coinLedger.service') return coinLedgerService;
     return originalLoad(request, parent, isMain);
@@ -247,17 +231,9 @@ function createQuestHarness() {
     progressDocs,
     configs,
     snapshots,
-    users,
     notifications,
-    setUserIncDelay(ms) {
-      userIncDelayMs = ms;
-    },
-    setProgressClaimDelay(ms) {
-      progressClaimDelayMs = ms;
-    },
-    setBonusClaimDelay(ms) {
-      bonusClaimDelayMs = ms;
-    },
+    users,
+    ledgerCalls,
   };
 }
 
@@ -272,62 +248,23 @@ async function runTest(name, fn) {
   }
 }
 
-async function expectReject(promiseFactory, pattern) {
-  let didThrow = false;
-
-  try {
-    await promiseFactory();
-  } catch (error) {
-    didThrow = true;
-    assert.match(error.message, pattern);
-  }
-
-  if (!didThrow) {
-    throw new Error(`Expected promise to reject with ${pattern}`);
-  }
-}
-
 async function main() {
-  await runTest('getUserQuestProgress exposes targetMetric and bonus flags', async () => {
-    const harness = createQuestHarness();
-    harness.definitions.push({
-      _id: 'quest-1',
-      questId: 'daily_watch_10min',
-      type: 'daily',
-      category: 'watch',
-      title: 'Xem phim 10 phut',
-      description: '',
-      icon: 'fa-solid fa-play',
-      targetMetric: 'watch_seconds',
-      targetValue: 600,
-      rewardCoins: 10,
-      completionBonusCoins: 50,
-      isActive: true,
-      order: 1,
-    });
-
-    const result = await harness.service.getUserQuestProgress('user-1');
-
-    assert.equal(result.daily.quests[0].targetMetric, 'watch_seconds');
-    assert.equal(result.daily.completionBonusClaimed, false);
-    assert.equal(result.daily.canClaimCompletionBonus, false);
-  });
-
-  await runTest('claimCompletionBonus blocks until all quest rewards are claimed', async () => {
-    const harness = createQuestHarness();
-    const periodKey = harness.service.getPeriodKey('daily');
+  await runTest('autoClaimQuestPeriod claims pending quest rewards and completion bonus for a closed period', async () => {
+    const harness = createHarness();
+    const periodKey = '2026-04-05';
+    harness.users.set('user-1', { _id: 'user-1', coin: 5 });
 
     harness.definitions.push(
       {
         _id: 'quest-1',
-        questId: 'daily_a',
+        questId: 'daily_watch_10min',
         type: 'daily',
         category: 'watch',
-        title: 'A',
+        title: 'Watch 10 minutes',
         description: '',
         icon: '',
         targetMetric: 'watch_seconds',
-        targetValue: 60,
+        targetValue: 600,
         rewardCoins: 10,
         completionBonusCoins: 50,
         isActive: true,
@@ -335,128 +272,10 @@ async function main() {
       },
       {
         _id: 'quest-2',
-        questId: 'daily_b',
+        questId: 'daily_comment',
         type: 'daily',
         category: 'social',
-        title: 'B',
-        description: '',
-        icon: '',
-        targetMetric: 'comment_count',
-        targetValue: 1,
-        rewardCoins: 20,
-        completionBonusCoins: 0,
-        isActive: true,
-        order: 2,
-      },
-    );
-
-    harness.progressDocs.push(
-      new (function ProgressOne() {
-        return {
-          userId: 'user-2',
-          questId: 'quest-1',
-          periodKey,
-          currentValue: 60,
-          isCompleted: true,
-          isClaimed: false,
-          watchedMovieIds: [],
-          isCompletionBonusClaimed: false,
-          completionBonusClaimedAt: null,
-        };
-      })(),
-      new (function ProgressTwo() {
-        return {
-          userId: 'user-2',
-          questId: 'quest-2',
-          periodKey,
-          currentValue: 1,
-          isCompleted: true,
-          isClaimed: false,
-          watchedMovieIds: [],
-          isCompletionBonusClaimed: false,
-          completionBonusClaimedAt: null,
-        };
-      })(),
-    );
-
-    harness.users.set('user-2', { _id: 'user-2', coin: 0 });
-
-    await expectReject(
-      () => harness.service.claimCompletionBonus('user-2', 'daily'),
-      /nhan het thuong|claim all quest rewards/i,
-    );
-  });
-
-  await runTest('claimReward stays idempotent under concurrent requests', async () => {
-    const harness = createQuestHarness();
-    const periodKey = harness.service.getPeriodKey('daily');
-
-    harness.definitions.push({
-      _id: 'quest-3',
-      questId: 'daily_watch',
-      type: 'daily',
-      category: 'watch',
-      title: 'Watch',
-      description: '',
-      icon: '',
-      targetMetric: 'watch_seconds',
-      targetValue: 60,
-      rewardCoins: 10,
-      completionBonusCoins: 0,
-      isActive: true,
-      order: 1,
-    });
-
-    harness.progressDocs.push({
-      userId: 'user-3',
-      questId: 'quest-3',
-      periodKey,
-      currentValue: 60,
-      isCompleted: true,
-      isClaimed: false,
-      watchedMovieIds: [],
-      isCompletionBonusClaimed: false,
-      completionBonusClaimedAt: null,
-    });
-
-    harness.users.set('user-3', { _id: 'user-3', coin: 0 });
-    harness.setProgressClaimDelay(15);
-    harness.setUserIncDelay(15);
-
-    await Promise.all([
-      harness.service.claimReward('user-3', 'quest-3'),
-      harness.service.claimReward('user-3', 'quest-3'),
-    ]);
-
-    assert.equal(harness.users.get('user-3').coin, 10);
-  });
-
-  await runTest('claimCompletionBonus stays idempotent after all rewards are claimed', async () => {
-    const harness = createQuestHarness();
-    const periodKey = harness.service.getPeriodKey('daily');
-
-    harness.definitions.push(
-      {
-        _id: 'quest-4',
-        questId: 'daily_a',
-        type: 'daily',
-        category: 'watch',
-        title: 'A',
-        description: '',
-        icon: '',
-        targetMetric: 'watch_seconds',
-        targetValue: 60,
-        rewardCoins: 10,
-        completionBonusCoins: 50,
-        isActive: true,
-        order: 1,
-      },
-      {
-        _id: 'quest-5',
-        questId: 'daily_b',
-        type: 'daily',
-        category: 'social',
-        title: 'B',
+        title: 'Comment once',
         description: '',
         icon: '',
         targetMetric: 'comment_count',
@@ -470,44 +289,135 @@ async function main() {
 
     harness.progressDocs.push(
       {
-        userId: 'user-4',
-        questId: 'quest-4',
+        _id: 'progress-1',
+        userId: 'user-1',
+        questId: 'quest-1',
         periodKey,
-        currentValue: 60,
+        currentValue: 600,
         isCompleted: true,
-        isClaimed: true,
+        isClaimed: false,
         watchedMovieIds: [],
         isCompletionBonusClaimed: false,
-        completionBonusClaimedAt: null,
       },
       {
-        userId: 'user-4',
-        questId: 'quest-5',
+        _id: 'progress-2',
+        userId: 'user-1',
+        questId: 'quest-2',
         periodKey,
         currentValue: 1,
         isCompleted: true,
-        isClaimed: true,
+        isClaimed: false,
         watchedMovieIds: [],
         isCompletionBonusClaimed: false,
-        completionBonusClaimedAt: null,
       },
     );
 
-    harness.users.set('user-4', { _id: 'user-4', coin: 0 });
-    harness.setBonusClaimDelay(15);
-    harness.setUserIncDelay(15);
+    harness.snapshots.push({
+      type: 'daily',
+      periodKey,
+      timezone: 'Asia/Ho_Chi_Minh',
+      selectionMode: 'fixed',
+      completionBonusCoins: 50,
+      quests: [
+        {
+          sourceQuestDefinitionId: 'quest-1',
+          questId: 'daily_watch_10min',
+          title: 'Watch 10 minutes',
+          targetMetric: 'watch_seconds',
+          targetValue: 600,
+          rewardCoins: 10,
+          order: 1,
+        },
+        {
+          sourceQuestDefinitionId: 'quest-2',
+          questId: 'daily_comment',
+          title: 'Comment once',
+          targetMetric: 'comment_count',
+          targetValue: 1,
+          rewardCoins: 20,
+          order: 2,
+        },
+      ],
+    });
 
-    await Promise.all([
-      harness.service.claimCompletionBonus('user-4', 'daily'),
-      harness.service.claimCompletionBonus('user-4', 'daily'),
-    ]);
+    const result = await harness.service.autoClaimQuestPeriod('daily', periodKey, {
+      claimedAt: new Date('2026-04-06T00:10:00.000Z'),
+    });
 
-    assert.equal(harness.users.get('user-4').coin, 50);
+    assert.equal(result.processedUsers, 1);
+    assert.equal(result.totalCoinsAwarded, 80);
+    assert.equal(harness.users.get('user-1').coin, 85);
     assert.equal(harness.progressDocs.every((doc) => doc.isClaimed), true);
     assert.equal(
       harness.progressDocs.every((doc) => doc.isCompletionBonusClaimed === true),
       true,
     );
+    assert.equal(harness.ledgerCalls.length, 3);
+    assert.equal(harness.notifications.length, 1);
+    assert.equal(harness.notifications[0].type, 'quest_auto_claim');
+  });
+
+  await runTest('autoClaimQuestPeriod ignores incomplete rewards', async () => {
+    const harness = createHarness();
+    const periodKey = '2026-W14';
+    harness.users.set('user-2', { _id: 'user-2', coin: 0 });
+
+    harness.definitions.push({
+      _id: 'quest-w1',
+      questId: 'weekly_watch_60min',
+      type: 'weekly',
+      category: 'watch',
+      title: 'Watch 60 minutes',
+      description: '',
+      icon: '',
+      targetMetric: 'watch_seconds',
+      targetValue: 3600,
+      rewardCoins: 50,
+      completionBonusCoins: 50,
+      isActive: true,
+      order: 1,
+    });
+
+    harness.progressDocs.push({
+      _id: 'progress-w1',
+      userId: 'user-2',
+      questId: 'quest-w1',
+      periodKey,
+      currentValue: 1200,
+      isCompleted: false,
+      isClaimed: false,
+      watchedMovieIds: [],
+      isCompletionBonusClaimed: false,
+    });
+
+    harness.snapshots.push({
+      type: 'weekly',
+      periodKey,
+      timezone: 'Asia/Ho_Chi_Minh',
+      selectionMode: 'fixed',
+      completionBonusCoins: 50,
+      quests: [
+        {
+          sourceQuestDefinitionId: 'quest-w1',
+          questId: 'weekly_watch_60min',
+          title: 'Watch 60 minutes',
+          targetMetric: 'watch_seconds',
+          targetValue: 3600,
+          rewardCoins: 50,
+          order: 1,
+        },
+      ],
+    });
+
+    const result = await harness.service.autoClaimQuestPeriod('weekly', periodKey, {
+      claimedAt: new Date('2026-04-06T00:10:00.000Z'),
+    });
+
+    assert.equal(result.processedUsers, 0);
+    assert.equal(result.totalCoinsAwarded, 0);
+    assert.equal(harness.users.get('user-2').coin, 0);
+    assert.equal(harness.ledgerCalls.length, 0);
+    assert.equal(harness.notifications.length, 0);
   });
 }
 

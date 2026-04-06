@@ -32,6 +32,9 @@ router.get('/watchlist', authMiddleware, userController.getWatchlist);
 // GET /api/v1/users/history - Get watch history
 router.get('/history', authMiddleware, userController.getHistory);
 
+// GET /api/v1/users/coin-history - Get coin ledger history
+router.get('/coin-history', authMiddleware, userController.getCoinHistory);
+
 // GET /api/v1/users/continue-watching - Get continue watching list
 router.get('/continue-watching', authMiddleware, userController.getContinueWatching);
 

@@ -4,6 +4,7 @@ const { updateEpisodesForMovies } = require('./admin.service');
 const { runPageRange } = require('./crawler.service');
 const { runPipeline: runTrendingPipeline } = require('./trending.service');
 const analyticsService = require('./analytics.service');
+const questService = require('./quest.service');
 
 /**
  * Cron Service
@@ -162,6 +163,33 @@ const scheduleDailyAnalyticsSnapshot = () => {
  * Backfill recent analytics data from Redis into MongoDB on startup.
  * Runs asynchronously without blocking server boot.
  */
+const scheduleQuestAutoClaim = () => {
+  cron.schedule(
+    '5 0 * * *',
+    async () => {
+      console.log('\nðŸª™ [CRON] Auto-claiming expired quest rewards...');
+      try {
+        const results = await questService.autoClaimExpiredQuestPeriods({ now: new Date() });
+        const summary = results
+          .map(
+            (result) =>
+              `${result.type}:${result.periodKey} users=${result.processedUsers} coins=${result.totalCoinsAwarded}`,
+          )
+          .join(' | ');
+        console.log(`âœ… [CRON] Quest auto-claim completed: ${summary || 'no rewards processed'}`);
+      } catch (error) {
+        console.error('âŒ [CRON] Quest auto-claim failed:', error.message);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: 'Asia/Ho_Chi_Minh',
+    },
+  );
+
+  console.log('âœ… Scheduled: Quest auto-claim every day at 00:05 (Vietnam Time)');
+};
+
 const runAnalyticsBackfill = () => {
   // Defer slightly to ensure DB connection is ready
   setTimeout(async () => {
@@ -189,6 +217,7 @@ const initCronJobs = () => {
   scheduleMovieCrawling();
   scheduleTrendingUpdate();
   scheduleDailyAnalyticsSnapshot();
+  scheduleQuestAutoClaim();
 
   // Run one-time backfill to seed MongoDB from existing Redis data
   runAnalyticsBackfill();
@@ -202,5 +231,6 @@ module.exports = {
   scheduleMovieCrawling,
   scheduleTrendingUpdate,
   scheduleDailyAnalyticsSnapshot,
+  scheduleQuestAutoClaim,
   runAnalyticsBackfill,
 };

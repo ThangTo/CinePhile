@@ -2,6 +2,7 @@ const { PayOS } = require('@payos/node');
 const User = require('../models/user.model');
 const Transaction = require('../models/transaction.model');
 const adminService = require('./admin.service');
+const coinLedgerService = require('./coinLedger.service');
 
 const payOS = new PayOS({
   clientId: process.env.PAYOS_CLIENT_ID,
@@ -113,8 +114,8 @@ const createPaymentLink = async ({ userId, packageId, amount, bonus = 0 }) => {
     orderCode,
     amount: selectedPackage.amount,
     description: 'Thanh toan don hang',
-    returnUrl: `${YOUR_DOMAIN}/account?tabs=coin&success=true`,
-    cancelUrl: `${YOUR_DOMAIN}/account?tabs=coin&canceled=true`,
+    returnUrl: `${YOUR_DOMAIN}/account?tabs=coin-history&success=true`,
+    cancelUrl: `${YOUR_DOMAIN}/account?tabs=coin-history&canceled=true`,
   };
 
   const user = await User.findById(userId);
@@ -159,15 +160,25 @@ const handleWebhook = async (webhookData) => {
         throw new Error(`Invalid coin package resolution for order ${orderCode}`);
       }
 
-      const user = await User.findById(transaction.user);
-      if (user) {
-        const totalCoins =
-          parseNonNegativeInteger(resolvedAward.coinAmount) +
-          parseNonNegativeInteger(resolvedAward.bonusCoin);
+      const totalCoins =
+        parseNonNegativeInteger(resolvedAward.coinAmount) +
+        parseNonNegativeInteger(resolvedAward.bonusCoin);
 
-        user.coin = (user.coin || 0) + totalCoins;
-        await user.save();
-      }
+      await coinLedgerService.applyCoinChange({
+        userId: transaction.user,
+        delta: totalCoins,
+        reason: 'payment_success',
+        sourceType: 'payment',
+        sourceId: transaction._id || transaction.orderCode,
+        note: `Nap coin thanh cong tu don hang ${transaction.orderCode}`,
+        metadata: {
+          orderCode: transaction.orderCode,
+          packageId: resolvedAward.packageId || transaction.packageId || null,
+          coinAmount: parseNonNegativeInteger(resolvedAward.coinAmount),
+          bonusCoin: parseNonNegativeInteger(resolvedAward.bonusCoin),
+          provider: transaction.provider,
+        },
+      });
 
       transaction.coinAmount = parseNonNegativeInteger(resolvedAward.coinAmount);
       transaction.bonusCoin = parseNonNegativeInteger(resolvedAward.bonusCoin);

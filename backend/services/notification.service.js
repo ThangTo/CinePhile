@@ -78,6 +78,7 @@ const createNotification = async (data) => {
       title: data.title,
       message: data.message,
       type: data.type,
+      data: data.data || null,
       movieId: data.movieId || null,
       userId: data.userId,
       targetUrl: data.targetUrl || null,
@@ -102,6 +103,7 @@ const createNotification = async (data) => {
       title: data.title,
       message: data.message,
       type: data.type,
+      data: data.data || null,
       movieId: data.movieId || null,
       userId: user._id,
       targetUrl: data.targetUrl || null,
@@ -123,6 +125,12 @@ const createNotification = async (data) => {
   }
 };
 
+const create = async (userId, payload = {}) =>
+  createNotification({
+    userId,
+    ...payload,
+  });
+
 module.exports = {
   getNotifications,
   getUnreadNotifications,
@@ -130,5 +138,6 @@ module.exports = {
   markAsReadById,
   markAllAsRead,
   deleteNotification,
+  create,
   createNotification,
 };

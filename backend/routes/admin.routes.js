@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
+const adminQuestController = require('../controllers/admin.quest.controller');
 const thumbnailController = require('../controllers/thumbnail.controller');
 
 const authMiddleware = require('../middleware/auth.middleware');
@@ -157,6 +158,19 @@ router.delete('/pricing/premium-plans/:id', adminController.deletePremiumPlan);
 
 // POST /api/v1/admin/pricing/seed - Seed default pricing
 router.post('/pricing/seed', adminController.seedPricingSettings);
+
+// ===== ADMIN QUESTS =====
+// GET /api/v1/admin/quests/config
+router.get('/quests/config', adminQuestController.getAdminQuestConfig);
+
+// PUT /api/v1/admin/quests/config/:type
+router.put('/quests/config/:type', adminQuestController.updateQuestConfig);
+
+// POST /api/v1/admin/quests/templates
+router.post('/quests/templates', adminQuestController.upsertQuestTemplate);
+
+// DELETE /api/v1/admin/quests/templates/:id
+router.delete('/quests/templates/:id', adminQuestController.archiveQuestTemplate);
 
 // function isAdmin(req, res, next) {
 //   if (req.isAuthenticated() && (req.user.role === 'admin')) {

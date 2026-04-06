@@ -8,6 +8,7 @@ const authService = require('../services/auth.service');
 const adminService = require('../services/admin.service');
 const cursorEffectService = require('../services/cursorEffect.service');
 const questService = require('../services/quest.service');
+const coinLedgerService = require('../services/coinLedger.service');
 const { PLANS } = require('../config/premium.config');
 // Helper to get user ID from authenticated request (via auth middleware)
 const getUserId = (req) => {
@@ -294,6 +295,19 @@ const getContinueWatching = async (req, res) => {
   }
 };
 
+const getCoinHistory = async (req, res) => {
+  try {
+    const userId = await getUserId(req);
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+
+    const result = await coinLedgerService.getCoinHistory(userId, { page, limit });
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message });
+  }
+};
+
 /**
  * GET /users/progress/:movieId
  * Get watch progress for a specific movie
@@ -433,8 +447,21 @@ const upgradePremium = async (req, res) => {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + planConfig.days);
 
+    const coinChange = await coinLedgerService.applyCoinChange({
+      userId,
+      delta: -requiredCoins,
+      reason: 'premium_upgrade',
+      sourceType: 'premium_plan',
+      sourceId: plan,
+      note: `Nang cap goi Premium ${plan}`,
+      metadata: {
+        plan,
+        days: planConfig.days,
+      },
+    });
+
     // Deduct coins and upgrade to premium
-    user.coin -= requiredCoins;
+    user.coin = coinChange.balanceAfter;
     user.role = 'premium';
     user.premiumPlan = plan;
     user.premiumExpiresAt = expiryDate;
@@ -448,10 +475,10 @@ const upgradePremium = async (req, res) => {
     res.status(200).json({
       message: `Nâng cấp Premium thành công! Đã trừ ${requiredCoins} coin`,
       user: user,
-      remainingCoins: user.coin,
+      remainingCoins: coinChange.balanceAfter,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message });
   }
 };
 
@@ -476,16 +503,26 @@ const addCoins = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.coin = (user.coin || 0) + amount;
+    const coinChange = await coinLedgerService.applyCoinChange({
+      userId,
+      delta: amount,
+      reason: 'admin_add_coin',
+      sourceType: 'manual_adjustment',
+      sourceId: `admin-add:${userId}:${Date.now()}`,
+      note: `Cong coin thu cong: ${amount}`,
+      metadata: { amount },
+    });
+
+    user.coin = coinChange.balanceAfter;
     await user.save();
 
     res.status(200).json({
       message: `Đã thêm ${amount} coin vào tài khoản`,
       user: user,
-      totalCoins: user.coin,
+      totalCoins: coinChange.balanceAfter,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message });
   }
 };
 
@@ -500,6 +537,7 @@ module.exports = {
   getWatchlist,
   getHistory,
   getContinueWatching,
+  getCoinHistory,
   getProgress,
   saveProgress,
   deleteProgress,

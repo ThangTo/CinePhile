@@ -13,12 +13,25 @@ const notificationSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ['new_episode', 'comment_reply', 'system', 'payment', 'movie_update'],
+      enum: [
+        'new_episode',
+        'comment_reply',
+        'system',
+        'payment',
+        'movie_update',
+        'quest_claimed',
+        'quest_bonus',
+        'quest_auto_claim',
+      ],
       required: true,
     },
 
     message: { type: String, required: true },
     title: { type: String },
+    data: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
 
     movieId: {
       type: mongoose.Schema.Types.ObjectId,

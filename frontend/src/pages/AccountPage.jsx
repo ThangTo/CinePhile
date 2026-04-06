@@ -15,6 +15,7 @@ import WatchlistSection from "components/account/WatchlistSection";
 import WatchStreak from "components/common/WatchStreak";
 import CursorEffectShop from "components/account/CursorEffectShop";
 import QuestPage from "components/account/QuestPage";
+import CoinHistoryTab from "components/account/CoinHistoryTab";
 import PremiumAvatar from "components/common/PremiumAvatar";
 import { getPremiumStatusText, isPremiumActive } from "utils/premiumUtils";
 
@@ -39,6 +40,12 @@ const MOBILE_ACCOUNT_NAV_ITEMS = [
     label: "Hiệu ứng",
     accent: "text-primaryColor",
   },
+  {
+    tab: "coin-history",
+    icon: "fa-receipt",
+    label: "Lá»‹ch sá»­ coin",
+    accent: "text-primaryColor",
+  },
 ];
 
 const TAB_TITLES = {
@@ -50,6 +57,7 @@ const TAB_TITLES = {
   streak: "Chuỗi xem",
   effects: "Hiệu ứng",
   quests: "Nhiệm vụ",
+  "coin-history": "Lich su coin",
 };
 
 const AccountPage = () => {
@@ -115,6 +123,9 @@ const AccountPage = () => {
     MOBILE_ACCOUNT_NAV_ITEMS.find((item) => item.tab === activeTab) || MOBILE_ACCOUNT_NAV_ITEMS[0];
   const mobileStatusText = premiumActive ? getPremiumStatusText(user) : "Thành viên thường";
 
+  const getMobileTabLabel = (item) =>
+    item?.tab === "coin-history" ? "Lich su coin" : item?.label;
+
   const renderMainContent = () => {
     if (activeTab === "continue-watching") {
       return <ContinueWatchingSection user={user} />;
@@ -138,6 +149,10 @@ const AccountPage = () => {
 
     if (activeTab === "effects") {
       return <CursorEffectShop />;
+    }
+
+    if (activeTab === "coin-history") {
+      return <CoinHistoryTab />;
     }
 
     if (activeTab === "quests") {
@@ -268,7 +283,7 @@ const AccountPage = () => {
                                 isActive ? "text-black" : item.accent
                               }`}
                             >
-                              {item.label}
+                              {getMobileTabLabel(item)}
                             </p>
                           </div>
                         </div>
@@ -291,7 +306,7 @@ const AccountPage = () => {
                   Account
                 </p>
                 <h2 className="mt-1 text-xl font-semibold text-account-text-primary">
-                  {activeMobileItem.label}
+                  {getMobileTabLabel(activeMobileItem)}
                 </h2>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-account-bg-primary/75 text-primaryColor ring-1 ring-account-border">

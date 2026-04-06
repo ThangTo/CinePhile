@@ -1080,3 +1080,41 @@ export const settingsAPI = {
     return response.data || response;
   },
 };
+
+/**
+ * Quest Admin API
+ */
+export const questAdminAPI = {
+  getConfig: async () => {
+    const response = await apiRequest("/admin/quests/config", {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  updateConfig: async (type, payload) => {
+    const response = await apiRequest(`/admin/quests/config/${type}`, {
+      method: "PUT",
+      data: payload,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  upsertTemplate: async (payload) => {
+    const response = await apiRequest("/admin/quests/templates", {
+      method: "POST",
+      data: payload,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  archiveTemplate: async (id) => {
+    const response = await apiRequest(`/admin/quests/templates/${id}`, {
+      method: "DELETE",
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+};

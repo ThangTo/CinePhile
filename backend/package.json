@@ -29,7 +29,10 @@
     "test:watch-streak": "node scripts/testWatchStreakLogic.js",
     "test:playback-heartbeat": "node scripts/testPlaybackHeartbeatService.js",
     "test:leaderboard": "node scripts/testLeaderboardService.js",
+    "test:coin-ledger": "node scripts/testCoinLedgerService.js",
     "test:quest": "node scripts/testQuestService.js",
+    "test:quest-auto-claim": "node scripts/testQuestAutoClaim.js",
+    "test:quest-admin": "node scripts/testQuestAdminConfig.js",
     "test:comment-quest": "node scripts/testCommentQuestModeration.js"
   },
   "keywords": [],

@@ -1,4 +1,9 @@
 const mongoose = require('mongoose');
+const {
+  QUEST_TYPES,
+  QUEST_CATEGORIES,
+  QUEST_TARGET_METRICS,
+} = require('../constants/quest.constants');
 
 const questDefinitionSchema = new mongoose.Schema(
   {
@@ -11,12 +16,12 @@ const questDefinitionSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['daily', 'weekly'],
+      enum: QUEST_TYPES,
     },
     category: {
       type: String,
       required: true,
-      enum: ['engagement', 'watch', 'social'],
+      enum: QUEST_CATEGORIES,
     },
     title: {
       type: String,
@@ -43,6 +48,7 @@ const questDefinitionSchema = new mongoose.Schema(
     targetMetric: {
       type: String,
       required: true,
+      enum: QUEST_TARGET_METRICS,
     },
     // Optional filter for target movies ('any' for now)
     targetMovieFilter: {

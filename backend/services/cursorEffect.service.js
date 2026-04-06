@@ -1,6 +1,7 @@
 const CursorEffect = require('../models/cursorEffect.model');
 const User = require('../models/user.model');
 const { isPremiumActive } = require('../utils/premiumUtils');
+const coinLedgerService = require('./coinLedger.service');
 
 const createCursorEffectError = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -152,14 +153,28 @@ const purchaseEffect = async (userId, effectId) => {
   }
 
   // Trừ coin và thêm vào owned
-  user.coin -= effect.price;
+  const coinChange = await coinLedgerService.applyCoinChange({
+    userId,
+    delta: -effect.price,
+    reason: 'cursor_purchase',
+    sourceType: 'cursor_effect',
+    sourceId: effect.effectId,
+    note: `Mua hieu ung con tro ${effect.nameVi || effect.name}`,
+    metadata: {
+      effectId: effect.effectId,
+      effectName: effect.nameVi || effect.name,
+      price: effect.price,
+    },
+  });
+
+  user.coin = coinChange.balanceAfter;
   user.ownedCursorEffects = user.ownedCursorEffects || [];
   user.ownedCursorEffects.push(effectId);
   await user.save();
 
   return {
     message: `Đã mua thành công hiệu ứng "${effect.nameVi}"`,
-    remainingCoins: user.coin,
+    remainingCoins: coinChange.balanceAfter,
     effectId,
   };
 };

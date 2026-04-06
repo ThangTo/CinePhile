@@ -10,6 +10,7 @@ import AdminSettingsTab from "components/admin/AdminSettingsTab";
 import AdminViralClipsTab from "components/admin/AdminViralClipsTab";
 import AdminMailboxTab from "components/admin/AdminMailboxTab";
 import SettingsPricingTab from "components/admin/SettingsPricingTab";
+import AdminQuestsTab from "components/admin/AdminQuestsTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminDashboard = () => {
@@ -93,6 +94,8 @@ const AdminDashboard = () => {
         return <AdminSettingsTab />;
       case ADMIN_TABS.PRICING:
         return <SettingsPricingTab />;
+      case ADMIN_TABS.QUESTS:
+        return <AdminQuestsTab />;
       default:
         return null;
     }

@@ -103,6 +103,17 @@ const userService = {
     }),
 
   /**
+   * Láº¥y lá»‹ch sá»­ biáº¿n Ä‘á»™ng coin cá»§a user hiá»‡n táº¡i
+   * @param {Object} params - { page?, limit? }
+   * @returns {Promise<Object>} { entries, total, totalPages, page, limit }
+   */
+  getCoinHistory: (params = {}) =>
+    apiRequest(`/users/coin-history`, {
+      params,
+      requiresAuth: true,
+    }),
+
+  /**
    * Lấy danh sách phim đang xem tiếp (continue watching) của user hiện tại
    * @param {Object} params - { page?, limit? }
    * @returns {Promise<Object>} { data: [], pagination: {} }
