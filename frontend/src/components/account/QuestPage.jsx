@@ -204,7 +204,7 @@ const QuestPage = ({ onCoinUpdate }) => {
     : canClaimCompletionBonus
       ? `Nhận thêm +${completionBonusCoins} coin bonus hoàn thành`
       : allCompleted && completionBonusCoins > 0
-        ? "Nhận hết thưởng từng nhiệm vụ để mở khóa bonus"
+        ? `Nhận hết thưởng từng nhiệm vụ để mở khóa +${completionBonusCoins} coin bonus`
         : allCompleted
           ? "Tất cả thưởng nhiệm vụ đã sẵn sàng hoặc đã nhận"
           : "Hoàn thành nhiệm vụ để nhận coin";

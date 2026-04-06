@@ -25,7 +25,7 @@ describe("QuestCard", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /di ngay/i }));
+    fireEvent.click(screen.getByRole("button", { name: /đi ngay/i }));
 
     expect(handleGoNow).toHaveBeenCalledTimes(1);
   });
@@ -51,7 +51,7 @@ describe("QuestCard", () => {
       />
     );
 
-    expect(screen.queryByRole("button", { name: /di ngay/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /đi ngay/i })).toBeNull();
   });
 
   it('does not render "Di ngay" when quest reward was already claimed', () => {
@@ -75,6 +75,6 @@ describe("QuestCard", () => {
       />
     );
 
-    expect(screen.queryByRole("button", { name: /di ngay/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /đi ngay/i })).toBeNull();
   });
 });

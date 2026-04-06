@@ -90,7 +90,7 @@ const AccountSidebar = ({ user, onLogout }) => {
             className={`fas ${isPremiumActive(user) ? "fa-crown" : "fa-star"} w-5 text-center`}
           ></i>
           <span className={`ml-1 ${isPremiumActive(user) ? "font-bold" : ""}`}>
-            {isPremiumActive(user) ? "Premium" : "Nâng Cấp Premium"}
+            {isPremiumActive(user) ? "Premium" : "Nâng cấp Premium"}
           </span>
         </div>
         {isPremiumActive(user) && (
