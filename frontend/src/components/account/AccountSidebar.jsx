@@ -41,6 +41,11 @@ const navItems = [
     icon: "fa-wand-magic-sparkles",
     label: "Hiệu ứng",
   },
+  {
+    tab: "quests",
+    icon: "fa-trophy",
+    label: "Nhiệm vụ",
+  },
 ];
 
 const AccountSidebar = ({ user, onLogout }) => {

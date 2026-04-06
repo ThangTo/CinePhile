@@ -339,7 +339,7 @@ const Chatbot = () => {
         id="chatbot-toggler"
         ref={chatbotTogglerRef}
         onClick={() => setShowChatbot(!showChatbot)}
-        className={`fixed bottom-4 md:bottom-6 right-5 md:right-8 h-14 w-14 flex items-center justify-center rounded-full shadow-[0_0_20px_rgba(var(--primary-color-rgb),0.4)] transition-all duration-300 z-[100005] hover:-translate-y-1 hover:shadow-[0_10px_25px_rgba(var(--primary-color-rgb),0.5)] ${
+        className={`hidden sm:fixed bottom-4 md:bottom-6 right-5 md:right-8 h-14 w-14 sm:flex items-center justify-center rounded-full shadow-[0_0_20px_rgba(var(--primary-color-rgb),0.4)] transition-all duration-300 z-[100005] hover:-translate-y-1 hover:shadow-[0_10px_25px_rgba(var(--primary-color-rgb),0.5)] ${
           showChatbot ? "rotate-90 bg-bgColor2/90 border border-white/10" : "bg-primaryColor"
         }`}
       >

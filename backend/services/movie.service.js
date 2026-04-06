@@ -1498,12 +1498,46 @@ const incrementView = async (
   }
 
   const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const claimedRecordIds = new Set();
+
+  const findViewRecordByIdentity = async (baseQuery) => {
+    if (userId) {
+      const userRecord = await ViewHistory.findOne({ ...baseQuery, userId }).lean();
+      if (userRecord) {
+        return userRecord;
+      }
+
+      if (ipAddress) {
+        return ViewHistory.findOne({ ...baseQuery, userId: null, ipAddress }).lean();
+      }
+
+      return null;
+    }
+
+    return ViewHistory.findOne({ ...baseQuery, ipAddress }).lean();
+  };
+
+  const claimAnonymousRecord = async (viewRecord) => {
+    if (!viewRecord || !userId || viewRecord.userId) {
+      return viewRecord;
+    }
+
+    const recordId = viewRecord._id?.toString?.() || String(viewRecord._id);
+    if (claimedRecordIds.has(recordId)) {
+      viewRecord.userId = userId;
+      return viewRecord;
+    }
+
+    await ViewHistory.findByIdAndUpdate(viewRecord._id, { $set: { userId } });
+    claimedRecordIds.add(recordId);
+    viewRecord.userId = userId;
+    return viewRecord;
+  };
 
   // 1. Anti-Spam cho MOVIE (Show Level)
   const movieSpamQuery = {
     movieId: movieDoc._id,
     createdAt: { $gte: TWO_HOURS_AGO },
-    ...(userId ? { userId } : { ipAddress }),
   };
 
   // 2. Anti-Spam cho EPISODE (Granular Level)
@@ -1511,14 +1545,15 @@ const incrementView = async (
     ? {
         episodeId,
         createdAt: { $gte: TWO_HOURS_AGO },
-        ...(userId ? { userId } : { ipAddress }),
       }
     : null;
 
-  const [recentMovieView, recentEpisodeView] = await Promise.all([
-    ViewHistory.findOne(movieSpamQuery).lean(),
-    episodeSpamQuery ? ViewHistory.findOne(episodeSpamQuery).lean() : Promise.resolve(null),
+  const [recentMovieViewRaw, recentEpisodeViewRaw] = await Promise.all([
+    findViewRecordByIdentity(movieSpamQuery),
+    episodeSpamQuery ? findViewRecordByIdentity(episodeSpamQuery) : Promise.resolve(null),
   ]);
+  const recentMovieView = await claimAnonymousRecord(recentMovieViewRaw);
+  const recentEpisodeView = await claimAnonymousRecord(recentEpisodeViewRaw);
 
   // Phân tích loại thiết bị
   let deviceType = 'Desktop';
@@ -1549,11 +1584,8 @@ const incrementView = async (
     results.episodeCounted = true;
 
     // KIỂM TRA UNIQUE VIEWERS (Đã từng xem tập này bao giờ chưa?) - Tính trọn đời
-    const everWatchedQuery = {
-      episodeId,
-      ...(userId ? { userId } : { ipAddress }),
-    };
-    const hasEverWatched = await ViewHistory.findOne(everWatchedQuery).lean();
+    const hasEverWatched = await findViewRecordByIdentity({ episodeId });
+    await claimAnonymousRecord(hasEverWatched);
     if (!hasEverWatched) {
       updates.push(Episode.findByIdAndUpdate(episodeId, { $inc: { uniqueViewers: 1 } }));
       results.isNewUniqueViewer = true;
@@ -1561,9 +1593,10 @@ const incrementView = async (
   }
 
   // Ghi log ViewHistory (Luôn ghi log phiên xem mới nếu không phải spam trong 2h cho chính tập đó)
-  let viewRecordId = recentEpisodeView?._id?.toString() || recentMovieView?._id?.toString();
+  const activeViewRecord = episodeId ? recentEpisodeView : recentMovieView;
+  let viewRecordId = activeViewRecord?._id?.toString() || recentMovieView?._id?.toString();
 
-  if (!recentEpisodeView) {
+  if (!activeViewRecord) {
     const newRecord = await ViewHistory.create({
       movieId: movieDoc._id,
       episodeId: episodeId || null,

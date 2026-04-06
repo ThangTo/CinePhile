@@ -4,6 +4,7 @@ const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
 const ViewHistory = require('../models/view_history.model');
 const watchStreakService = require('./watchStreak.service');
+const questService = require('./quest.service');
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
@@ -49,15 +50,44 @@ const matchesPlaybackTarget = (viewRecord, { movieId, episodeId }) => {
   return recordMovieId === targetMovieId && recordEpisodeId === targetEpisodeId;
 };
 
+const claimAnonymousViewRecord = async (viewRecord, userId) => {
+  if (!viewRecord || !userId || viewRecord.userId) {
+    return viewRecord;
+  }
+
+  await ViewHistory.findByIdAndUpdate(viewRecord._id, { $set: { userId } });
+  viewRecord.userId = userId;
+  return viewRecord;
+};
+
 const findRecentViewRecord = async ({ movieId, episodeId, userId, ipAddress }) => {
-  const query = {
+  const baseQuery = {
     movieId,
     createdAt: { $gte: new Date(Date.now() - TWO_HOURS_MS) },
     ...(episodeId ? { episodeId } : { episodeId: null }),
-    ...(userId ? { userId } : { ipAddress }),
   };
 
-  const queryResult = ViewHistory.findOne(query);
+  const runFindOne = async (query) => {
+    const queryResult = ViewHistory.findOne(query);
+    if (typeof queryResult.sort === 'function') {
+      return queryResult.sort({ createdAt: -1 }).lean();
+    }
+
+    return queryResult.lean();
+  };
+
+  if (userId) {
+    const userRecord = await runFindOne({ ...baseQuery, userId });
+    if (userRecord) {
+      return userRecord;
+    }
+
+    if (ipAddress) {
+      return runFindOne({ ...baseQuery, userId: null, ipAddress });
+    }
+  }
+
+  const queryResult = ViewHistory.findOne({ ...baseQuery, ipAddress });
   if (typeof queryResult.sort === 'function') {
     return queryResult.sort({ createdAt: -1 }).lean();
   }
@@ -75,7 +105,7 @@ const ensureViewHistoryRecord = async (
     const existingRecord = await ViewHistory.findById(viewHistoryId).lean();
     if (existingRecord) {
       if (!normalizedEpisodeId || normalizeEpisodeId(existingRecord.episodeId) === normalizedEpisodeId) {
-        return existingRecord;
+        return claimAnonymousViewRecord(existingRecord, userId);
       }
     }
   }
@@ -93,7 +123,7 @@ const ensureViewHistoryRecord = async (
   });
 
   if (matchesPlaybackTarget(recentRecord, { movieId: movieDoc._id, episodeId: normalizedEpisodeId })) {
-    return recentRecord;
+    return claimAnonymousViewRecord(recentRecord, userId);
   }
 
   return ViewHistory.create({
@@ -146,6 +176,12 @@ const recordPlaybackHeartbeat = async (
   let streak = null;
   if (userId) {
     streak = await watchStreakService.recordStreak(userId, safeSecs);
+    // Quest progress: watch event (fire-and-forget)
+    questService.checkAndUpdateProgress(userId, {
+      type: 'watch',
+      seconds: safeSecs,
+      movieId: viewRecord.movieId,
+    }).catch(() => {});
   }
 
   return {

@@ -14,6 +14,7 @@ import FavoritesSection from "components/account/FavoritesSection";
 import WatchlistSection from "components/account/WatchlistSection";
 import WatchStreak from "components/common/WatchStreak";
 import CursorEffectShop from "components/account/CursorEffectShop";
+import QuestPage from "components/account/QuestPage";
 
 const DEFAULT_TAB = "profile";
 
@@ -25,6 +26,7 @@ const TAB_TITLES = {
   "continue-watching": "Xem tiếp của bạn",
   streak: "Chuỗi xem",
   effects: "Hiệu ứng",
+  quests: "Nhiệm vụ",
 };
 
 const AccountPage = () => {
@@ -114,6 +116,14 @@ const AccountPage = () => {
 
     if (activeTab === "effects") {
       return <CursorEffectShop />;
+    }
+
+    if (activeTab === "quests") {
+      return (
+        <QuestPage
+          onCoinUpdate={(newBalance) => updateUser({ ...user, coin: newBalance })}
+        />
+      );
     }
 
     return (

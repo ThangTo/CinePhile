@@ -6,7 +6,7 @@ import { getAvatarUrlByKey, handleAvatarError } from "utils/avatarUtils";
 
 const UserInfoCard = ({ user }) => {
   const isPremium = isPremiumActive(user);
-  
+
   return (
     <div className="bg-gradient-to-br from-[#4a5a7f] to-[#3b4d6f] rounded-xl p-4 mb-4">
       <div className="flex items-center gap-3 mb-3">
@@ -91,14 +91,21 @@ const MobileUserMenu = ({ user, onLogout, onOpenAuth, onClose }) => {
               <Link
                 key={item.label}
                 to={`/account?tabs=${item.href}`}
-                className={MOBILE_MENU_ITEM_CLASS}
+                className={
+                  item.highlight
+                    ? "flex items-center border border-primaryColor/40 gap-3 px-3 py-2.5 text-primaryColor hover:bg-primaryColor/10 rounded-lg transition-colors"
+                    : MOBILE_MENU_ITEM_CLASS
+                }
                 onClick={onClose}
               >
                 <i className={`fa-solid ${item.icon} w-5 text-center`} />
                 <span>{item.label}</span>
               </Link>
             ))}
-            <button onClick={onLogout} className={MOBILE_MENU_ITEM_CLASS}>
+            <button
+              onClick={onLogout}
+              className="flex items-center !border-red-500/40 gap-3 px-3 py-2.5 text-red-400 hover:!bg-red-500/10 rounded-lg transition-colors"
+            >
               <i className="fa-solid fa-sign-out-alt w-5 text-center" />
               <span>Thoát</span>
             </button>

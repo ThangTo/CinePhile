@@ -7,6 +7,7 @@ const userService = require('../services/user.service');
 const authService = require('../services/auth.service');
 const adminService = require('../services/admin.service');
 const cursorEffectService = require('../services/cursorEffect.service');
+const questService = require('../services/quest.service');
 const { PLANS } = require('../config/premium.config');
 // Helper to get user ID from authenticated request (via auth middleware)
 const getUserId = (req) => {
@@ -82,6 +83,9 @@ const addToFavorites = async (req, res) => {
       userId: userId,
       movieId,
     });
+
+    // Quest progress: favorite event (fire-and-forget)
+    questService.checkAndUpdateProgress(userId, { type: 'favorite', movieId }).catch(() => {});
 
     res.status(201).json({ message: 'Added to favorites' });
   } catch (error) {
@@ -173,6 +177,9 @@ const addToWatchlist = async (req, res) => {
       userId: userId,
       movieId,
     });
+
+    // Quest progress: watchlist event (fire-and-forget)
+    questService.checkAndUpdateProgress(userId, { type: 'watchlist', movieId }).catch(() => {});
 
     res.status(201).json({ message: 'Added to watchlist' });
   } catch (error) {

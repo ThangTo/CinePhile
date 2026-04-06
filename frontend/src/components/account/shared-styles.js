@@ -1,10 +1,11 @@
 // Shared Tailwind class strings for Account components
 
 export const cardStyles = {
-  container: "bg-account-bg-secondary border border-account-border rounded-xl mb-8 overflow-hidden",
+  container:
+    "bg-account-bg-secondary border border-account-border rounded-xl mb-2 md:mb-8 overflow-hidden",
   header: "px-6 py-5 border-b border-account-border",
   headerTitle: "m-0 text-xl font-semibold",
-  body: "p-6",
+  body: "p-2 md:p-6",
   footer: "px-6 py-5 bg-account-bg-tertiary border-t border-account-border flex justify-end",
 };
 

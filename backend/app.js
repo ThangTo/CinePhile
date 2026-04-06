@@ -207,6 +207,7 @@ const aiRoutes = require('./routes/ai.routes');
 const mailboxRoutes = require('./routes/mailbox.routes');
 const leaderboardRoutes = require('./routes/leaderboard.routes');
 const cursorEffectRoutes = require('./routes/cursorEffect.routes');
+const questRoutes = require('./routes/quest.routes');
 const adminController = require('./controllers/admin.controller');
 
 // API endpoints with caching
@@ -244,6 +245,7 @@ app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/mailbox', mailboxRoutes);
 app.use('/api/v1/cursor-effects', cursorEffectRoutes);
+app.use('/api/v1/quests', questRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {

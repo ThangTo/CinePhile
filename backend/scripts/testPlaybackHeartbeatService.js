@@ -225,4 +225,32 @@ const run = async (name, fn) => {
     ]);
     assert.deepStrictEqual(state.streakCalls, [{ userId: 'user-3', secondsWatched: 15 }]);
   });
+
+  await run('claims an anonymous view record for the authenticated user before adding watch time', async () => {
+    const state = makeState();
+    state.viewRecordsById['vh-guest'] = {
+      _id: 'vh-guest',
+      movieId: 'movie-guest',
+      episodeId: 'episode-guest',
+      userId: null,
+      ipAddress: '5.5.5.5',
+    };
+
+    const service = installMocks(state);
+    const result = await service.recordPlaybackHeartbeat('movie-slug', {
+      viewHistoryId: 'vh-guest',
+      episodeId: 'episode-guest',
+      seconds: 20,
+      userId: 'user-guest',
+      ipAddress: '5.5.5.5',
+    });
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.viewHistoryId, 'vh-guest');
+    assert.deepStrictEqual(state.viewUpdates, [
+      { id: 'vh-guest', update: { $set: { userId: 'user-guest' } } },
+      { id: 'vh-guest', update: { $inc: { watchDuration: 20 } } },
+    ]);
+    assert.deepStrictEqual(state.streakCalls, [{ userId: 'user-guest', secondsWatched: 20 }]);
+  });
 })();

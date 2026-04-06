@@ -23,51 +23,69 @@ const ensureUserAvatarReady = async (user) => {
   return user;
 };
 
+const normalizeActiveUser = async (user) => {
+  if (!user) {
+    return null;
+  }
+
+  if (user.role === 'premium' && user.premiumExpiresAt) {
+    const now = new Date();
+    const expiresAt = new Date(user.premiumExpiresAt);
+    if (expiresAt <= now) {
+      user.role = 'user';
+      user.premiumPlan = null;
+      user.premiumExpiresAt = null;
+      await user.save();
+    }
+  }
+
+  return user;
+};
+
+const getAccessTokenFromRequest = (req) => {
+  const authHeader = req.headers.authorization;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+
+  return req.cookies?.accessToken || null;
+};
+
+const getUserFromAccessToken = async (token) => {
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
+  return normalizeActiveUser(user);
+};
+
+const tryRefreshUserFromCookie = async (req, res) => {
+  const refreshToken = req.cookies?.refreshToken;
+  if (!refreshToken) {
+    return null;
+  }
+
+  const newTokens = await authService.refreshToken(refreshToken);
+  attachAuthCookies(res, newTokens);
+  return getUserFromAccessToken(newTokens.token);
+};
+
 const authMiddleware = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    let token = null;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-    }
+    const token = getAccessTokenFromRequest(req);
 
     if (!token) {
-      token = req.cookies?.accessToken || null;
-    }
-
-    if (!token) {
-      // Try to refresh token if refresh token exists
-      const refreshToken = req.cookies?.refreshToken;
-      if (refreshToken) {
-        try {
-          const newTokens = await authService.refreshToken(refreshToken);
-          attachAuthCookies(res, newTokens);
-          // Verify new token and get user
-          const decoded = jwt.verify(newTokens.token, process.env.JWT_SECRET);
-          const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
-          if (user) {
-            // Check if premium subscription has expired and downgrade if needed
-            if (user.role === 'premium' && user.premiumExpiresAt) {
-              const now = new Date();
-              const expiresAt = new Date(user.premiumExpiresAt);
-              if (expiresAt <= now) {
-                user.role = 'user';
-                user.premiumPlan = null;
-                user.premiumExpiresAt = null;
-                await user.save();
-              }
-            }
-            req.user = user;
-            return next();
-          }
-        } catch (refreshError) {
-          // Refresh token is invalid, clear cookies and return unauthorized
-          res.clearCookie('accessToken');
-          res.clearCookie('refreshToken');
-          return res.status(401).json({ message: 'Unauthorized' });
+      try {
+        const refreshedUser = await tryRefreshUserFromCookie(req, res);
+        if (refreshedUser) {
+          req.user = refreshedUser;
+          return next();
         }
+      } catch (refreshError) {
+        res.clearCookie('accessToken');
+        res.clearCookie('refreshToken');
+        return res.status(401).json({ message: 'Unauthorized' });
       }
+
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -82,23 +100,10 @@ const authMiddleware = async (req, res, next) => {
         }
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
+      const user = await getUserFromAccessToken(token);
 
       if (!user) {
         return res.status(401).json({ message: 'Unauthorized' });
-      }
-
-      // Check if premium subscription has expired and downgrade if needed
-      if (user.role === 'premium' && user.premiumExpiresAt) {
-        const now = new Date();
-        const expiresAt = new Date(user.premiumExpiresAt);
-        if (expiresAt <= now) {
-          user.role = 'user';
-          user.premiumPlan = null;
-          user.premiumExpiresAt = null;
-          await user.save();
-        }
       }
 
       req.user = user;
@@ -106,35 +111,16 @@ const authMiddleware = async (req, res, next) => {
     } catch (tokenError) {
       // Token expired or invalid, try to refresh
       if (tokenError.name === 'TokenExpiredError' || tokenError.name === 'JsonWebTokenError') {
-        const refreshToken = req.cookies?.refreshToken;
-        if (refreshToken) {
-          try {
-            const newTokens = await authService.refreshToken(refreshToken);
-            attachAuthCookies(res, newTokens);
-            // Verify new token and get user
-            const decoded = jwt.verify(newTokens.token, process.env.JWT_SECRET);
-            const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
-            if (user) {
-              // Check if premium subscription has expired and downgrade if needed
-              if (user.role === 'premium' && user.premiumExpiresAt) {
-                const now = new Date();
-                const expiresAt = new Date(user.premiumExpiresAt);
-                if (expiresAt <= now) {
-                  user.role = 'user';
-                  user.premiumPlan = null;
-                  user.premiumExpiresAt = null;
-                  await user.save();
-                }
-              }
-              req.user = user;
-              return next();
-            }
-          } catch (refreshError) {
-            // Refresh token is invalid, clear cookies and return unauthorized
-            res.clearCookie('accessToken');
-            res.clearCookie('refreshToken');
-            return res.status(401).json({ message: 'Unauthorized' });
+        try {
+          const refreshedUser = await tryRefreshUserFromCookie(req, res);
+          if (refreshedUser) {
+            req.user = refreshedUser;
+            return next();
           }
+        } catch (refreshError) {
+          res.clearCookie('accessToken');
+          res.clearCookie('refreshToken');
+          return res.status(401).json({ message: 'Unauthorized' });
         }
       }
       throw tokenError;
@@ -150,21 +136,17 @@ const authMiddleware = async (req, res, next) => {
 // Optional authentication - doesn't block if no token, just attaches user if available
 const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    let token = null;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-    }
+    const token = getAccessTokenFromRequest(req);
 
     if (!token) {
-      token = req.cookies?.accessToken || null;
-    }
-
-    if (!token) {
-      // No token, continue without user
-      req.user = null;
-      return next();
+      try {
+        const refreshedUser = await tryRefreshUserFromCookie(req, res);
+        req.user = refreshedUser || null;
+        return next();
+      } catch (_refreshError) {
+        req.user = null;
+        return next();
+      }
     }
 
     try {
@@ -178,27 +160,25 @@ const optionalAuth = async (req, res, next) => {
         }
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
+      const user = await getUserFromAccessToken(token);
 
       if (user) {
-        // Check if premium subscription has expired and downgrade if needed
-        if (user.role === 'premium' && user.premiumExpiresAt) {
-          const now = new Date();
-          const expiresAt = new Date(user.premiumExpiresAt);
-          if (expiresAt <= now) {
-            user.role = 'user';
-            user.premiumPlan = null;
-            user.premiumExpiresAt = null;
-            await user.save();
-          }
-        }
         req.user = user;
       } else {
         req.user = null;
       }
     } catch (tokenError) {
-      // Token invalid, just set user to null
+      if (tokenError.name === 'TokenExpiredError' || tokenError.name === 'JsonWebTokenError') {
+        try {
+          const refreshedUser = await tryRefreshUserFromCookie(req, res);
+          req.user = refreshedUser || null;
+          return next();
+        } catch (_refreshError) {
+          req.user = null;
+          return next();
+        }
+      }
+
       req.user = null;
     }
 

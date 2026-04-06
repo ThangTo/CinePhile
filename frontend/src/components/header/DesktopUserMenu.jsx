@@ -8,7 +8,7 @@ import PremiumAvatar from "components/common/PremiumAvatar";
 
 const PremiumBanner = ({ username, user }) => {
   const isPremium = isPremiumActive(user);
-  
+
   if (isPremium) {
     const statusText = getPremiumStatusText(user);
     return (
@@ -19,9 +19,7 @@ const PremiumBanner = ({ username, user }) => {
             {username} - Premium
           </span>
         </div>
-        <p className="text-gray-300 text-xs">
-          {statusText}
-        </p>
+        <p className="text-gray-300 text-xs">{statusText}</p>
       </div>
     );
   }
@@ -126,7 +124,9 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
                   isPremium={isPremiumActive(user)}
                 />
                 <div>
-                  <div className={`font-semibold ${isPremiumActive(user) ? "text-primaryColor" : "text-white"}`}>
+                  <div
+                    className={`font-semibold ${isPremiumActive(user) ? "text-primaryColor" : "text-white"}`}
+                  >
                     {user.username}
                   </div>
                   <div className="text-gray-400 text-xs">{user.email}</div>
@@ -156,7 +156,11 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
                 <Link
                   key={item.label}
                   to={`/account?tabs=${item.href}`}
-                  className={DESKTOP_MENU_ITEM_CLASS}
+                  className={
+                    item.highlight
+                      ? "flex items-center gap-3 px-4 py-2.5 text-primaryColor hover:bg-primaryColor/10 transition-colors"
+                      : DESKTOP_MENU_ITEM_CLASS
+                  }
                   onClick={onToggle}
                 >
                   <i className={`fa-solid ${item.icon} w-5 text-center`} />
@@ -165,10 +169,10 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
               ))}
               <button
                 onClick={onLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:bg-red-500/10 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/10 transition-colors"
               >
-                <i className="fa-solid fa-sign-out-alt w-5 text-center" />
-                <span>Thoát</span>
+                <i className="fa-solid fa-sign-out-alt w-5 text-center text-red-400" />
+                <span className="text-red-400">Thoát</span>
               </button>
             </div>
           </div>

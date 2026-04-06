@@ -1,4 +1,5 @@
 const movieService = require('../services/movie.service');
+const questService = require('../services/quest.service');
 const playbackHeartbeatService = require('../services/playbackHeartbeat.service');
 const trendingService = require('../services/trending.service');
 const ffmpeg = require('fluent-ffmpeg');
@@ -31,6 +32,10 @@ const getRequestIpAddress = (req) =>
   || '0.0.0.0';
 
 const getOptionalUserId = (req) => {
+  if (req.user && req.user._id) {
+    return req.user._id;
+  }
+
   try {
     const jwt = require('jsonwebtoken');
     const token = req.headers.authorization?.replace('Bearer ', '')
@@ -361,6 +366,11 @@ const postComment = async (req, res) => {
       req.body,
     );
     res.status(201).json(newComment);
+
+    // Quest progress: comment event (fire-and-forget)
+    if (req.user?._id) {
+      questService.checkAndUpdateProgress(req.user._id, { type: 'comment', movieId: newComment.movieId }).catch(() => {});
+    }
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -428,6 +438,11 @@ const rateMovie = async (req, res) => {
       req.body.rating,
     );
     res.json(result);
+
+    // Quest progress: rating event (fire-and-forget)
+    if (req.user?._id) {
+      questService.checkAndUpdateProgress(req.user._id, { type: 'rating' }).catch(() => {});
+    }
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
