@@ -366,11 +366,6 @@ const postComment = async (req, res) => {
       req.body,
     );
     res.status(201).json(newComment);
-
-    // Quest progress: comment event (fire-and-forget)
-    if (req.user?._id) {
-      questService.checkAndUpdateProgress(req.user._id, { type: 'comment', movieId: newComment.movieId }).catch(() => {});
-    }
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

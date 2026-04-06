@@ -1,4 +1,5 @@
 const Comment = require('../models/comment.model');
+const commentQuestService = require('../services/commentQuest.service');
 
 /**
  * GET /admin/comments
@@ -108,6 +109,14 @@ const updateStatus = async (req, res) => {
 
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    if (status === 'allowed') {
+      try {
+        await commentQuestService.grantCommentQuestProgress(comment._id);
+      } catch (error) {
+        console.error('[admin comment] Failed to grant quest progress:', error.message);
+      }
     }
 
     res.json(comment);

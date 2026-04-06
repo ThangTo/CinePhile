@@ -6,6 +6,7 @@ const movieModelPath = path.resolve(__dirname, '../models/movie.model.js');
 const episodeModelPath = path.resolve(__dirname, '../models/episode.model.js');
 const viewHistoryPath = path.resolve(__dirname, '../models/view_history.model.js');
 const streakServicePath = path.resolve(__dirname, '../services/watchStreak.service.js');
+const leaderboardServicePath = path.resolve(__dirname, '../services/leaderboard.service.js');
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -19,6 +20,7 @@ const installMocks = (state) => {
   delete require.cache[episodeModelPath];
   delete require.cache[viewHistoryPath];
   delete require.cache[streakServicePath];
+  delete require.cache[leaderboardServicePath];
 
   require.cache[movieModelPath] = {
     id: movieModelPath,
@@ -107,6 +109,18 @@ const installMocks = (state) => {
     },
   };
 
+  require.cache[leaderboardServicePath] = {
+    id: leaderboardServicePath,
+    filename: leaderboardServicePath,
+    loaded: true,
+    exports: {
+      invalidateLeaderboardCache() {
+        state.leaderboardInvalidations += 1;
+        return Promise.resolve(true);
+      },
+    },
+  };
+
   return require(servicePath);
 };
 
@@ -120,6 +134,7 @@ const makeState = () => ({
   episodeUpdates: [],
   viewUpdates: [],
   streakCalls: [],
+  leaderboardInvalidations: 0,
 });
 
 const run = async (name, fn) => {
@@ -161,6 +176,7 @@ const run = async (name, fn) => {
     ]);
     assert.strictEqual(state.movieUpdates.length, 2);
     assert.strictEqual(state.episodeUpdates.length, 1);
+    assert.strictEqual(state.leaderboardInvalidations, 1);
   });
 
   await run('reuses a matching view history id without creating duplicates', async () => {
@@ -188,6 +204,7 @@ const run = async (name, fn) => {
     assert.deepStrictEqual(state.viewUpdates, [
       { id: 'vh-99', update: { $inc: { watchDuration: 60 } } },
     ]);
+    assert.strictEqual(state.leaderboardInvalidations, 0);
   });
 
   await run('falls back to a recent matching record when the supplied id points to another episode', async () => {
@@ -224,6 +241,7 @@ const run = async (name, fn) => {
       { id: 'vh-new', update: { $inc: { watchDuration: 15 } } },
     ]);
     assert.deepStrictEqual(state.streakCalls, [{ userId: 'user-3', secondsWatched: 15 }]);
+    assert.strictEqual(state.leaderboardInvalidations, 1);
   });
 
   await run('claims an anonymous view record for the authenticated user before adding watch time', async () => {
@@ -252,5 +270,6 @@ const run = async (name, fn) => {
       { id: 'vh-guest', update: { $inc: { watchDuration: 20 } } },
     ]);
     assert.deepStrictEqual(state.streakCalls, [{ userId: 'user-guest', secondsWatched: 20 }]);
+    assert.strictEqual(state.leaderboardInvalidations, 1);
   });
 })();

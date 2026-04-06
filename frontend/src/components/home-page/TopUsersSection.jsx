@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import ScrollContainer from "components/common/ScrollContainer";
 import { BarSpinner } from "components/common/LoadingState";
 import EmptyState from "components/common/EmptyState";
@@ -760,25 +760,53 @@ const TopUsersSectionBase = ({ variant = "horizontal" }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const isCompact = variant === "horizontal";
+  const isMountedRef = useRef(false);
 
-  const fetchLeaderboard = async () => {
-    setLoading(true);
-    setError(null);
+  const fetchLeaderboard = useCallback(async ({ silent = false } = {}) => {
+    if (!silent && isMountedRef.current) {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
       const data = await leaderboardService.getTopUsersLeaderboard();
+      if (!isMountedRef.current) return;
       setUsers(Array.isArray(data) ? data.slice(0, 10) : []);
+      setError(null);
     } catch (err) {
       console.error("[TopUsersSection]", err);
+      if (!isMountedRef.current || silent) return;
       setError("Không thể tải bảng xếp hạng lúc này.");
     } finally {
-      setLoading(false);
+      if (!silent && isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchLeaderboard();
-  }, []);
+
+    const refreshLeaderboard = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      fetchLeaderboard({ silent: true });
+    };
+
+    const intervalId = window.setInterval(refreshLeaderboard, 60000);
+    window.addEventListener("focus", refreshLeaderboard);
+    document.addEventListener("visibilitychange", refreshLeaderboard);
+
+    return () => {
+      isMountedRef.current = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshLeaderboard);
+      document.removeEventListener("visibilitychange", refreshLeaderboard);
+    };
+  }, [fetchLeaderboard]);
 
   if (loading) {
     return (

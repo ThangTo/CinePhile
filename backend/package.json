@@ -28,7 +28,9 @@
     "test:view-history-backfill": "node scripts/testViewHistoryBackfillService.js",
     "test:watch-streak": "node scripts/testWatchStreakLogic.js",
     "test:playback-heartbeat": "node scripts/testPlaybackHeartbeatService.js",
-    "test:quest": "node scripts/testQuestService.js"
+    "test:leaderboard": "node scripts/testLeaderboardService.js",
+    "test:quest": "node scripts/testQuestService.js",
+    "test:comment-quest": "node scripts/testCommentQuestModeration.js"
   },
   "keywords": [],
   "author": "",

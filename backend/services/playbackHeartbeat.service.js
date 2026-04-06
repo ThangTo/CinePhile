@@ -5,6 +5,7 @@ const Episode = require('../models/episode.model');
 const ViewHistory = require('../models/view_history.model');
 const watchStreakService = require('./watchStreak.service');
 const questService = require('./quest.service');
+const leaderboardService = require('./leaderboard.service');
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
@@ -176,6 +177,7 @@ const recordPlaybackHeartbeat = async (
   let streak = null;
   if (userId) {
     streak = await watchStreakService.recordStreak(userId, safeSecs);
+    leaderboardService.invalidateLeaderboardCache().catch(() => {});
     // Quest progress: watch event (fire-and-forget)
     questService.checkAndUpdateProgress(userId, {
       type: 'watch',

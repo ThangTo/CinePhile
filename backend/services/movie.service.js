@@ -7,6 +7,7 @@ const Cast = require('../models/cast.model');
 const Comment = require('../models/comment.model');
 const Rating = require('../models/rating.model');
 const redisService = require('./redis.service');
+const commentQuestService = require('./commentQuest.service');
 const {
   transformMovie,
   transformMovies,
@@ -262,6 +263,7 @@ const mapComment = (comment) => {
     likes: comment.likes || 0,
     dislikes: comment.dislikes || 0,
     createdAt: comment.createdAt,
+    status: comment.status || 'allowed',
     isPremium,
   };
 };
@@ -1441,9 +1443,15 @@ const postComment = async (identifier, userId, data = {}) => {
   });
   const populated = await comment.populate('userId', 'username avatar role premiumExpiresAt');
 
-  // Only map if allowed (technically frontend should handle hiding pending, but API usually returns created object)
-  // We return it, frontend will see status=pending and might show "Pending approval" message
-  return mapComment({ ...populated.toObject(), status });
+  if (status === 'allowed') {
+    try {
+      await commentQuestService.grantCommentQuestProgress(comment._id);
+    } catch (error) {
+      console.error('[comment quest] Failed to grant progress after comment create:', error.message);
+    }
+  }
+
+  return mapComment(populated.toObject());
 };
 
 /**

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "hooks/useAuth";
+import userService from "services/user.service";
 
 const MINUTES_THRESHOLD = 10;
 const DAYS_TO_MILESTONE = [7, 30, 100, 365];
@@ -29,15 +30,13 @@ const WatchStreak = ({ compact = false }) => {
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    let isMounted = true;
+
     const fetchStreak = async () => {
       try {
-        const res = await fetch(`${process.env.REACT_APP_API_URL}/users/streak`, {
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
+        const data = await userService.getStreak();
+        if (isMounted && data) {
           setStreak(data);
-          // Sync today's seconds from API into local state so progress bar is accurate
           if (data.todayProgress !== undefined && data.todayProgress !== null) {
             setTodaySeconds((data.todayProgress || 0) * 60);
           }
@@ -46,6 +45,10 @@ const WatchStreak = ({ compact = false }) => {
     };
 
     fetchStreak();
+
+    return () => {
+      isMounted = false;
+    };
   }, [isAuthenticated]);
 
   useEffect(() => {

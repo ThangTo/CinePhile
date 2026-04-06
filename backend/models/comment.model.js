@@ -43,6 +43,10 @@ const commentSchema = new mongoose.Schema({
     enum: ['pending', 'allowed', 'banned', 'dismissed'],
     default: 'allowed'
   },
+  questProgressGrantedAt: {
+    type: Date,
+    default: null
+  },
 }, { 
   timestamps: true // Tự động thêm createdAt và updatedAt
 });

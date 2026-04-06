@@ -50,7 +50,9 @@ const MovieViewsTag = ({
 }) => {
   const count = getMovieViewCount(movie, views);
   const displayValue = formatCompactViewCount(count);
-  const sizeClassName = compact ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-1.5 px-2 py-1 text-[11px]";
+  const sizeClassName = compact
+    ? "gap-0 md:gap-1 px-1 md:px-2 py-0.5 text-[10px]"
+    : "gap-0 md:gap-1.5 px-1 md:px-2 py-1 text-[11px]";
   const iconClassName = compact ? "h-4 min-w-4 text-[9px]" : "h-[18px] min-w-[18px] text-[10px]";
   const variantClassName = VARIANT_CLASS_NAMES[variant] || VARIANT_CLASS_NAMES.overlay;
   const iconWrapperClassName =
