@@ -87,6 +87,9 @@ router.get('/users/:id/analytics', adminController.getUserAnalytics);
 // GET /api/v1/admin/users/:id/streak - Get specific user's watch streak
 router.get('/users/:id/streak', adminController.getUserStreak);
 
+// GET /api/v1/admin/users/:id/quests - Get specific user's quest summary
+router.get('/users/:id/quests', adminController.getUserQuestSummary);
+
 // POST /api/v1/admin/users - Create user
 router.post('/users', adminController.createUser);
 

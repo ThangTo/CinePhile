@@ -732,6 +732,18 @@ export const userAPI = {
   },
 
   /**
+   * Get user quest summary (daily & weekly)
+   * @param {string} id - User ID
+   * @returns {Promise<Object>} Quest summary { daily, weekly }
+   */
+  getUserQuestSummary: async (id) => {
+    const response = await apiRequest(`/admin/users/${id}/quests`, {
+      requiresAuth: true,
+    });
+    return response;
+  },
+
+  /**
    * Create new user
    * @param {Object} userData - User data
    * @returns {Promise<Object>} Created user object
@@ -878,7 +890,6 @@ export const statsAPI = {
     // response is already the unwrapped body: { data, total, page, limit, totalPages }
     return response;
   },
-
 
   /**
    * Get real-time active users count

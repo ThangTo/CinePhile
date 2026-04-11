@@ -211,7 +211,7 @@ const QuestPage = ({ onCoinUpdate }) => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-account-bg-secondary border border-account-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
             <i className="fas fa-calendar-day text-primaryColor" />
@@ -278,6 +278,22 @@ const QuestPage = ({ onCoinUpdate }) => {
             {totalEarnedCoins.toLocaleString("vi-VN")}
           </div>
           <p className="text-xs text-account-text-secondary mt-2">{rewardStatusText}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <i className="fas fa-trophy text-yellow-400" />
+            <span className="text-sm font-semibold text-yellow-400">
+              Tổng nhiệm vụ đã hoàn thành
+            </span>
+          </div>
+          <div className="text-2xl font-bold text-yellow-400">
+            <i className="fas fa-check-circle mr-1.5 text-sm" />
+            {quests?.lifetime?.totalCompleted ?? 0}
+          </div>
+          <p className="text-xs text-yellow-400/70 mt-2">
+            +{quests?.lifetime?.claimedCoins?.toLocaleString("vi-VN") ?? 0} coin đã nhận
+          </p>
         </div>
       </div>
 

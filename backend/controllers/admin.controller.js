@@ -943,6 +943,20 @@ const getUserStreak = async (req, res) => {
   }
 };
 
+/**
+ * GET /admin/users/:id/quests
+ * Get specific user's quest summary (daily & weekly progress)
+ */
+const getUserQuestSummary = async (req, res) => {
+  try {
+    const questService = require('../services/quest.service');
+    const summary = await questService.getQuestSummary(req.params.id);
+    res.json(summary);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
 // Movies
 getAllMovies,
@@ -1002,4 +1016,5 @@ getAllMovies,
 
   // User Streak
   getUserStreak,
+  getUserQuestSummary,
 };

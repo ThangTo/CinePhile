@@ -13,7 +13,10 @@ import {
   FiClock,
   FiFilm,
   FiEye,
-  FiTarget
+  FiTarget,
+  FiDollarSign,
+  FiCheckCircle,
+  FiStar,
 } from "react-icons/fi";
 import { userAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
@@ -83,6 +86,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
     confirmPassword: "",
     avatar: "",
     premiumExpiresAt: "",
+    coin: 0,
   });
 
   const [errors, setErrors] = useState({});
@@ -91,6 +95,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
   // Analytics State
   const [analytics, setAnalytics] = useState(null);
   const [streak, setStreak] = useState(null);
+  const [questSummary, setQuestSummary] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   useEffect(() => {
@@ -106,6 +111,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         premiumExpiresAt: user.premiumExpiresAt
           ? new Date(user.premiumExpiresAt).toISOString().slice(0, 16)
           : "",
+        coin: user.coin ?? 0,
       });
     } else {
       setFormData({
@@ -117,6 +123,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         confirmPassword: "",
         avatar: "",
         premiumExpiresAt: "",
+        coin: 0,
       });
     }
     setErrors({});
@@ -127,12 +134,14 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
       if (user && user._id && isOpen) {
         setLoadingAnalytics(true);
         try {
-          const [analyticsData, streakData] = await Promise.all([
+          const [analyticsData, streakData, questData] = await Promise.all([
             userAPI.getUserAnalytics(user._id),
             userAPI.getUserStreak(user._id),
+            userAPI.getUserQuestSummary(user._id),
           ]);
           setAnalytics(analyticsData);
           setStreak(streakData);
+          setQuestSummary(questData);
         } catch (error) {
           console.error("Failed to fetch user analytics:", error);
         } finally {
@@ -141,6 +150,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
       } else {
         setAnalytics(null);
         setStreak(null);
+        setQuestSummary(null);
       }
     };
     fetchAnalytics();
@@ -199,6 +209,7 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         email: formData.email,
         role: formData.role,
         avatar: formData.avatar || "",
+        coin: Number(formData.coin) || 0,
         premiumExpiresAt: formData.role === 'premium'
           ? formData.premiumExpiresAt
             ? new Date(formData.premiumExpiresAt).toISOString()
@@ -311,6 +322,15 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
                       onChange={handleChange}
                       placeholder="https://..."
                     />
+                    <FormField
+                      label="Coin"
+                      name="coin"
+                      type="number"
+                      icon={FiDollarSign}
+                      value={formData.coin}
+                      onChange={handleChange}
+                      placeholder="0"
+                    />
                   </div>
                 </div>
 
@@ -420,6 +440,80 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
                               </div>
                             </div>
                         </div>
+
+                        {/* Quest Summary */}
+                        {questSummary && (
+                          <div className="mb-4">
+                            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-2 flex items-center gap-1">
+                              <FiStar className="text-yellow-400" /> Nhiệm Vụ Đã Hoàn Thành
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {/* Daily */}
+                              <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3">
+                                <p className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider mb-2">📅 Ngày</p>
+                                <div className="flex items-center justify-between">
+                                  <div className="text-center flex-1">
+                                    <span className="text-2xl font-black text-yellow-400">{questSummary.daily.completed ?? 0}</span>
+                                    <p className="text-[9px] text-gray-500">/ {questSummary.daily.total ?? 0} nhiệm vụ</p>
+                                  </div>
+                                  <div className="h-8 w-px bg-white/10" />
+                                  <div className="text-center flex-1">
+                                    <span className={`text-lg font-black ${questSummary.daily.claimed ? 'text-emerald-400' : 'text-orange-400'}`}>
+                                      {questSummary.daily.claimed ? (
+                                        <FiCheckCircle className="inline text-emerald-400" />
+                                      ) : (
+                                        <FiClock className="inline text-orange-400" />
+                                      )}
+                                    </span>
+                                    <p className="text-[9px] text-gray-500">
+                                      {questSummary.daily.claimed ? 'Đã nhận' : 'Chưa nhận'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Weekly */}
+                              <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-xl p-3">
+                                <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider mb-2">📆 Tuần</p>
+                                <div className="flex items-center justify-between">
+                                  <div className="text-center flex-1">
+                                    <span className="text-2xl font-black text-cyan-400">{questSummary.weekly.completed ?? 0}</span>
+                                    <p className="text-[9px] text-gray-500">/ {questSummary.weekly.total ?? 0} nhiệm vụ</p>
+                                  </div>
+                                  <div className="h-8 w-px bg-white/10" />
+                                  <div className="text-center flex-1">
+                                    <span className={`text-lg font-black ${questSummary.weekly.claimed ? 'text-emerald-400' : 'text-orange-400'}`}>
+                                      {questSummary.weekly.claimed ? (
+                                        <FiCheckCircle className="inline text-emerald-400" />
+                                      ) : (
+                                        <FiClock className="inline text-orange-400" />
+                                      )}
+                                    </span>
+                                    <p className="text-[9px] text-gray-500">
+                                      {questSummary.weekly.claimed ? 'Đã nhận' : 'Chưa nhận'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Lifetime Stats */}
+                            {questSummary.lifetime && (
+                              <div className="mt-2 bg-gradient-to-br from-yellow-500/20 to-amber-500/20 border border-yellow-500/40 rounded-xl p-3">
+                                <p className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider mb-2">🏆 Tổng quan lifetime</p>
+                                <div className="flex items-center justify-between">
+                                  <div className="text-center flex-1">
+                                    <span className="text-2xl font-black text-yellow-400">{questSummary.lifetime.totalCompleted ?? 0}</span>
+                                    <p className="text-[9px] text-gray-500">nhiệm vụ đã hoàn thành</p>
+                                  </div>
+                                  <div className="h-8 w-px bg-white/10" />
+                                  <div className="text-center flex-1">
+                                    <span className="text-xl font-black text-emerald-400">+{questSummary.lifetime.claimedCoins?.toLocaleString("vi-VN") ?? 0}</span>
+                                    <p className="text-[9px] text-gray-500">coin đã nhận</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Streak Summary */}
                         {streak && (

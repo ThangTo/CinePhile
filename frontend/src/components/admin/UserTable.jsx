@@ -6,7 +6,17 @@ import PaginationV2 from "components/common/PaginationV2";
 import ConfirmDialog from "components/common/ConfirmDialog";
 import { formatTimeAgo } from "utils/dateUtils";
 import { handleAvatarError } from "utils/avatarUtils";
-import { FiSearch, FiPlus, FiTrash2, FiUsers, FiMail, FiCalendar, FiUser, FiEdit2 } from "react-icons/fi";
+import {
+  FiSearch,
+  FiPlus,
+  FiTrash2,
+  FiUsers,
+  FiMail,
+  FiCalendar,
+  FiUser,
+  FiEdit2,
+  FiDollarSign,
+} from "react-icons/fi";
 
 const UserTable = () => {
   const [users, setUsers] = useState([]);
@@ -205,6 +215,7 @@ const UserTable = () => {
                 <th className="px-6 py-4">Email</th>
                 <th className="px-6 py-4 text-center">Vai trò</th>
                 <th className="px-6 py-4 text-center">Streak</th>
+                <th className="px-6 py-4 text-center">Coin</th>
                 {/* <th className="px-6 py-4 text-center">Trạng thái</th> */}
                 <th className="px-6 py-4 text-right">Ngày tham gia</th>
                 <th className="px-6 py-4 text-center">Hành động</th>
@@ -253,7 +264,7 @@ const UserTable = () => {
                             {user.watchStreak > 0 ? (
                               <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-primaryColor bg-primaryColor/10 border border-primaryColor/20 px-1.5 py-0.5 rounded-md w-fit">
                                 <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
-                                  <path d="M12 2c0 0-5 6.5-5 11a5 5 0 0 0 10 0c0-4.5-5-11-5-11z"/>
+                                  <path d="M12 2c0 0-5 6.5-5 11a5 5 0 0 0 10 0c0-4.5-5-11-5-11z" />
                                 </svg>
                                 {user.watchStreak} ngày
                               </span>
@@ -280,16 +291,16 @@ const UserTable = () => {
                               user.role === "admin"
                                 ? "bg-purple-500/20 text-purple-400"
                                 : user.role === "premium"
-                                ? "bg-yellow-500/20 text-yellow-400"
-                                : "bg-blue-500/20 text-blue-400"
+                                  ? "bg-yellow-500/20 text-yellow-400"
+                                  : "bg-blue-500/20 text-blue-400"
                             }`}
                           >
                             <FiUser size={12} />
                             {user.role === "admin"
                               ? "Admin"
                               : user.role === "premium"
-                              ? "Premium"
-                              : "User"}
+                                ? "Premium"
+                                : "User"}
                           </span>
                         </td>
 
@@ -305,6 +316,16 @@ const UserTable = () => {
                           ) : (
                             <span className="text-gray-600 text-xs italic">—</span>
                           )}
+                        </td>
+
+                        {/* Coin */}
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-yellow-400 font-black text-base leading-none">
+                              {user.coin ?? 0}
+                            </span>
+                            <span className="text-[9px] text-gray-500 font-medium">coin</span>
+                          </div>
                         </td>
 
                         {/* Status */}
@@ -373,7 +394,7 @@ const UserTable = () => {
                   })
                 : !isLoading && (
                     <tr>
-                      <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan="9" className="px-6 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-2">
                             <FiUsers className="text-gray-600 text-3xl" />

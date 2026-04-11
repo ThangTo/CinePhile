@@ -504,19 +504,58 @@ async function getUserQuestProgress(userId) {
     getQuestSnapshotForUser('weekly', now),
   ]);
 
-  const [dailyGroup, weeklyGroup] = await Promise.all([
+  const [dailyGroup, weeklyGroup, lifetime] = await Promise.all([
     buildQuestGroupForUser(userId, dailySnapshot),
     buildQuestGroupForUser(userId, weeklySnapshot),
+    getLifetimeQuestStats(userId),
   ]);
 
   return {
     daily: dailyGroup,
     weekly: weeklyGroup,
+    lifetime,
   };
+}
+
+async function getLifetimeQuestStats(userId) {
+  const claimedProgress = await QuestProgress.find({
+    userId,
+    isClaimed: true,
+  });
+
+  if (!claimedProgress.length) {
+    return { totalCompleted: 0, claimedCoins: 0 };
+  }
+
+  const definitionIds = claimedProgress.map((p) => p.questId);
+  const definitions = await QuestDefinition.find({ _id: { $in: definitionIds } });
+  const definitionMap = new Map(
+    definitions.map((d) => [asIdString(d._id), d.rewardCoins])
+  );
+
+  let totalCompleted = 0;
+  let claimedCoins = 0;
+  let completionBonusClaimed = 0;
+
+  for (const progress of claimedProgress) {
+    const defId = asIdString(progress.questId);
+    if (progress.isClaimed) {
+      totalCompleted++;
+      claimedCoins += definitionMap.get(defId) || 0;
+    }
+    if (progress.isCompletionBonusClaimed) {
+      completionBonusClaimed++;
+    }
+  }
+
+  claimedCoins += completionBonusClaimed * 50;
+
+  return { totalCompleted, claimedCoins };
 }
 
 async function getQuestSummary(userId) {
   const progress = await getUserQuestProgress(userId);
+  const lifetime = await getLifetimeQuestStats(userId);
 
   function sumCoins(quests, claimedOnly) {
     return quests
@@ -543,6 +582,7 @@ async function getQuestSummary(userId) {
       completionBonusClaimed: progress.weekly.completionBonusClaimed,
       canClaimCompletionBonus: progress.weekly.canClaimCompletionBonus,
     },
+    lifetime,
   };
 }
 
