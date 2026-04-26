@@ -137,6 +137,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const requestRegistrationOTP = async (userData) => {
+    return authService.requestRegistrationOTP(userData);
+  };
+
+  const forgotPassword = async (email) => {
+    return authService.forgotPassword(email);
+  };
+
+  const verifyPasswordResetOTP = async (data) => {
+    return authService.verifyPasswordResetOTP(data);
+  };
+
+  const resetPassword = async (resetData) => {
+    return authService.resetPassword(resetData);
+  };
+
   const logout = async () => {
     try {
       await authService.logout();
@@ -178,6 +194,10 @@ export const AuthProvider = ({ children }) => {
     closeAuthModal,
     login,
     register,
+    requestRegistrationOTP,
+    forgotPassword,
+    verifyPasswordResetOTP,
+    resetPassword,
     logout,
     updateUser,
     getCurrentUser: refetchCurrentUser,

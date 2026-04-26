@@ -5,6 +5,8 @@ const redisService = require('./redis.service');
 const avatarService = require('./avatar.service');
 const { isPremiumActive } = require('../utils/premiumUtils');
 const cursorEffectService = require('./cursorEffect.service');
+const emailService = require('./email.service');
+const otpService = require('./otp.service');
 
 // Helper to generate tokens
 const generateTokens = (userId) => {
@@ -29,53 +31,72 @@ const generateAuthPayload = (user) => {
 };
 
 /**
- * Register new user
- * @param {Object} userData - { username, email, password }
- * @returns {Promise<Object>} { user: Object, token: string, refreshToken: string }
+ * Request OTP for registration
+ * @param {Object} userData - { username, email }
  */
-const register = async (userData) => {
-  const { username, email, password } = userData;
+const requestRegistrationOTP = async (userData) => {
+  const { username, email } = userData;
 
-  if (!username || !email || !password) {
-    throw new Error('Username, email and password are required');
+  if (!username || !email) {
+    throw new Error('Username and email are required');
   }
 
-  // Check if user exists by email (email is unique)
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw new Error('User with this email already exists');
+  const existingEmail = await User.findOne({ email });
+  if (existingEmail) {
+    throw new Error('Email này đã được sử dụng');
   }
 
-  // Check if username already exists
   const existingUsername = await User.findOne({ username });
   if (existingUsername) {
-    throw new Error('Username already exists');
+    throw new Error('Tên người dùng này đã tồn tại');
   }
 
-  // Register user with passport-local-mongoose
-  // User.register takes a user instance and a password
-  // Assign random default avatar
+  // Generate OTP
+  const otp = await otpService.generateOTP(email, 'register');
+
+  // Send Email
+  await emailService.sendRegistrationOTP(email, otp);
+
+  return { message: 'Mã xác thực đã được gửi tới email của bạn' };
+};
+
+/**
+ * Register new user with OTP verification
+ * @param {Object} userData - { username, email, password, otp }
+ */
+const register = async (userData) => {
+  const { username, email, password, otp } = userData;
+
+  if (!username || !email || !password || !otp) {
+    throw new Error('Vui lòng điền đầy đủ thông tin và mã xác thực');
+  }
+
+  // Verify OTP
+  const isValidOTP = await otpService.verifyOTP(email, otp, 'register');
+  if (!isValidOTP) {
+    throw new Error('Mã xác thực không chính xác hoặc đã hết hạn');
+  }
+
+  // Double check existence (just in case)
+  const existingUser = await User.findOne({ email });
+  if (existingUser) throw new Error('Email này đã được sử dụng');
+
   const randomAvatar = getRandomAvatar();
   const user = new User({ username, email, avatar: randomAvatar });
 
   return new Promise((resolve, reject) => {
     User.register(user, password, async function (err, registeredUser) {
       if (err) {
-        // Handle different error types from passport-local-mongoose
-        if (err.name === 'UserExistsError') {
-          return reject(new Error('User already exists'));
-        }
-        return reject(new Error(err.message || 'Registration failed'));
+        if (err.name === 'UserExistsError') return reject(new Error('Tên người dùng đã tồn tại'));
+        return reject(new Error(err.message || 'Đăng ký thất bại'));
       }
 
       try {
-        // Ensure avatar is set (in case it wasn't saved)
         if (!registeredUser.avatar) {
           registeredUser.avatar = randomAvatar;
           await registeredUser.save();
         }
-        const authPayload = generateAuthPayload(registeredUser);
-        resolve(authPayload);
+        resolve(generateAuthPayload(registeredUser));
       } catch (error) {
         reject(error);
       }
@@ -338,52 +359,100 @@ const changePassword = async (userId, passwords) => {
 };
 
 /**
- * Send forgot password email
+ * Send forgot password OTP
  * @param {string} email - User email
  * @returns {Promise<Object>} { message: string }
  */
 const forgotPassword = async (email) => {
   const user = await User.findOne({ email });
   if (!user) {
-    throw new Error('User not found');
+    throw new Error('Không tìm thấy tài khoản với email này');
   }
 
-  // Generate reset token (short lived)
-  const resetToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  // Generate OTP
+  const otp = await otpService.generateOTP(email, 'forgot_password');
 
-  // In a real app, send email here
-  console.log(`Reset token for ${email}: ${resetToken}`);
+  // Send Email
+  await emailService.sendForgotPasswordOTP(email, otp);
 
-  return { message: 'Password reset email sent' };
+  return { message: 'Mã xác thực khôi phục mật khẩu đã được gửi tới email của bạn' };
+};
+
+/**
+ * Verify OTP for password reset
+ * @param {Object} data - { email, otp }
+ * @returns {Promise<Object>} { resetToken: string, message: string }
+ */
+const verifyPasswordResetOTP = async (data) => {
+  const { email, otp } = data;
+
+  if (!email || !otp) {
+    throw new Error('Vui lòng điền đầy đủ email và mã OTP');
+  }
+
+  // Verify OTP
+  const isValidOTP = await otpService.verifyOTP(email, otp, 'forgot_password');
+  if (!isValidOTP) {
+    throw new Error('Mã xác thực không chính xác hoặc đã hết hạn');
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new Error('Người dùng không tồn tại');
+  }
+
+  // Generate a temporary reset token valid for 15 minutes
+  const resetToken = jwt.sign(
+    { userId: user._id, purpose: 'reset_password' }, 
+    process.env.JWT_SECRET, 
+    { expiresIn: '15m' }
+  );
+
+  return { resetToken, message: 'Xác thực OTP thành công' };
 };
 
 /**
  * Reset password with token
- * @param {Object} resetData - { token, newPassword }
+ * @param {Object} resetData - { resetToken, newPassword }
  * @returns {Promise<Object>} { message: string }
  */
 const resetPassword = async (resetData) => {
-  const { token, newPassword } = resetData;
+  const { resetToken, newPassword } = resetData;
+
+  if (!resetToken || !newPassword) {
+    throw new Error('Vui lòng điền đầy đủ thông tin: token xác thực và mật khẩu mới');
+  }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
+    const decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+    if (decoded.purpose !== 'reset_password') {
+      throw new Error('Mã xác thực không hợp lệ');
+    }
 
+    const user = await User.findById(decoded.userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new Error('Người dùng không tồn tại');
     }
 
     // Use passport-local-mongoose setPassword method
-    await user.setPassword(newPassword);
-    await user.save();
-
-    return { message: 'Password reset successfully' };
+    return new Promise((resolve, reject) => {
+      user.setPassword(newPassword, async (err, updatedUser) => {
+        if (err) return reject(new Error('Không thể đặt lại mật khẩu'));
+        try {
+          await updatedUser.save();
+          resolve({ message: 'Mật khẩu đã được đặt lại thành công' });
+        } catch (saveErr) {
+          reject(new Error('Lỗi khi lưu mật khẩu mới'));
+        }
+      });
+    });
   } catch (error) {
-    throw new Error('Invalid or expired reset token');
+    throw new Error('Mã xác thực đã hết hạn hoặc không hợp lệ, vui lòng yêu cầu lại');
   }
 };
 
 module.exports = {
+  requestRegistrationOTP,
   register,
   login,
   logout,
@@ -393,5 +462,6 @@ module.exports = {
   updateProfile,
   changePassword,
   forgotPassword,
+  verifyPasswordResetOTP,
   resetPassword,
 };

@@ -457,10 +457,6 @@ class UpstashRestClient {
     return this._exec(['GET', key]);
   }
 
-  async set(key, value) {
-    return this._exec(['SET', key, value]);
-  }
-
   async setEx(key, seconds, value) {
     return this._exec(['SET', key, value, 'EX', seconds]);
   }

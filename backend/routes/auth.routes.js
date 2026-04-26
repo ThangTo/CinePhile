@@ -24,6 +24,9 @@ router.get(
   authController.googleCallback,
 );
 
+// POST /api/v1/auth/request-registration-otp - Request OTP for registration
+router.post('/request-registration-otp', authController.requestRegistrationOTP);
+
 // POST /api/v1/auth/register - Register new user
 router.post('/register', authController.register);
 
@@ -47,6 +50,9 @@ router.put('/change-password', authMiddleware, authController.changePassword);
 
 // POST /api/v1/auth/forgot-password - Send reset password email
 router.post('/forgot-password', authController.forgotPassword);
+
+// POST /api/v1/auth/verify-reset-otp - Verify OTP for password reset
+router.post('/verify-reset-otp', authController.verifyPasswordResetOTP);
 
 // POST /api/v1/auth/reset-password - Reset password with token
 router.post('/reset-password', authController.resetPassword);

@@ -5,10 +5,23 @@ const clientBaseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 const { successRedirect, failureRedirect } = getGoogleRedirects(clientBaseUrl);
 
 /**
+ * POST /auth/request-registration-otp
+ * Request OTP for registration
+ * @param {Object} req.body - { username, email }
+ */
+const requestRegistrationOTP = async (req, res) => {
+  try {
+    const result = await authService.requestRegistrationOTP(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+/**
  * POST /auth/register
- * Register new user
- * @param {Object} req.body - { username, email, password }
- * @returns {Object} { user: Object, token: string, refreshToken: string } (status: 201)
+ * Register new user with OTP
+ * @param {Object} req.body - { username, email, password, otp }
  */
 const register = async (req, res) => {
   try {
@@ -20,20 +33,7 @@ const register = async (req, res) => {
       refreshToken: result.refreshToken,
     });
   } catch (error) {
-    // Map error messages to Vietnamese
-    let message = error.message;
-    if (message.includes('already exists')) {
-      if (message.includes('email')) {
-        message = 'Email này đã được sử dụng';
-      } else if (message.includes('Username')) {
-        message = 'Tên người dùng này đã tồn tại';
-      } else {
-        message = 'Tài khoản đã tồn tại';
-      }
-    } else if (message.includes('required')) {
-      message = 'Vui lòng điền đầy đủ thông tin';
-    }
-    res.status(400).json({ message });
+    res.status(400).json({ message: error.message });
   }
 };
 
@@ -202,6 +202,20 @@ const forgotPassword = async (req, res) => {
 };
 
 /**
+ * POST /auth/verify-reset-otp
+ * Verify OTP for password reset
+ * @param {Object} req.body - { email, otp }
+ */
+const verifyPasswordResetOTP = async (req, res) => {
+  try {
+    const result = await authService.verifyPasswordResetOTP(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+/**
  * POST /auth/reset-password
  * Reset password with token
  * @param {Object} req.body - { token, newPassword }
@@ -260,6 +274,7 @@ const googleCallback = (req, res) => {
 };
 
 module.exports = {
+  requestRegistrationOTP,
   register,
   login,
   logout,
@@ -268,6 +283,7 @@ module.exports = {
   updateProfile,
   changePassword,
   forgotPassword,
+  verifyPasswordResetOTP,
   resetPassword,
   googleCallback,
   GOOGLE_FAILURE_REDIRECT: failureRedirect,

@@ -7,23 +7,21 @@ import { setAuthData, clearAuthData, getCurrentUserLocal, isAuthenticated, saveM
 
 const authService = {
   /**
-   * Đăng ký tài khoản mới
-   * Hỗ trợ 2 cách gọi:
-   * - register({ username, email, password })
-   * - register(username, email, password)
-   *
-   * @param {string|Object} usernameOrData - Username string hoặc userData object
-   * @param {string} email - Email (nếu usernameOrData là string)
-   * @param {string} password - Password (nếu usernameOrData là string)
-   * @returns {Promise<Object>} { user, token, refreshToken }
+   * Yêu cầu gửi mã OTP đăng ký
+   * @param {Object} userData - { username, email }
    */
-  register: async (usernameOrData, email, password) => {
-    // Normalize input - hỗ trợ cả hai cách gọi
-    const userData =
-      typeof usernameOrData === "string"
-        ? { username: usernameOrData, email, password }
-        : usernameOrData;
+  requestRegistrationOTP: async (userData) => {
+    return apiRequest("/auth/request-registration-otp", {
+      method: "POST",
+      data: userData,
+    });
+  },
 
+  /**
+   * Đăng ký tài khoản mới với OTP
+   * @param {Object} userData - { username, email, password, otp }
+   */
+  register: async (userData) => {
     try {
       const data = await apiRequest("/auth/register", {
         method: "POST",
@@ -40,8 +38,6 @@ const authService = {
       return data;
     } catch (error) {
       console.error("Register error:", error);
-      // Axios interceptor returns { status, message, raw, isAuthPath }
-      // Just re-throw it as-is
       throw error;
     }
   },
@@ -67,8 +63,6 @@ const authService = {
       return data;
     } catch (error) {
       console.error("Login error:", error);
-      // Axios interceptor returns { status, message, raw, isAuthPath }
-      // Just re-throw it as-is
       throw error;
     }
   },
@@ -170,8 +164,20 @@ const authService = {
   },
 
   /**
+   * Xác thực OTP reset mật khẩu
+   * @param {Object} data - { email, otp }
+   * @returns {Promise<Object>} { resetToken, message }
+   */
+  verifyPasswordResetOTP: async (data) => {
+    return apiRequest("/auth/verify-reset-otp", {
+      method: "POST",
+      data,
+    });
+  },
+
+  /**
    * Reset mật khẩu với token
-   * @param {Object} resetData - { token, newPassword }
+   * @param {Object} resetData - { resetToken, newPassword }
    * @returns {Promise<Object>} { message }
    */
   resetPassword: async (resetData) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "contexts/AuthContext";
 import bgFormLogin from "assets/images/bg-form-login.png";
 
@@ -6,35 +6,97 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api
 const GOOGLE_AUTH_URL = `${API_BASE_URL}/auth/google`;
 
 const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
-  const { login, register } = useAuth();
-  const [mode, setMode] = useState(initialMode); // "login" or "register"
+  const {
+    login,
+    register,
+    requestRegistrationOTP,
+    forgotPassword,
+    verifyPasswordResetOTP,
+    resetPassword,
+  } = useAuth();
+  // modes: "login", "register", "forgot-password", "verify-otp-register", "verify-otp-forgot-password", "reset-password"
+  const [mode, setMode] = useState(initialMode);
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
     confirmPassword: "",
+    otp: "",
   });
+  const [resetToken, setResetToken] = useState(null);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState({
     password: false,
     confirmPassword: false,
   });
+  const [resendTimer, setResendTimer] = useState(0);
+  const timerRef = useRef(null);
+  const otpRefs = useRef([]);
 
-  // Prevent body scroll when modal is open and scroll to top
+  const handleOtpChange = (index, value) => {
+    if (isNaN(value)) return;
+
+    let currentOtp = formData.otp.split("");
+    while (currentOtp.length < 6) currentOtp.push("");
+
+    currentOtp[index] = value.slice(-1); // Take last char if multiple
+    const newOtp = currentOtp.join("").substring(0, 6);
+
+    setFormData((prev) => ({ ...prev, otp: newOtp }));
+
+    if (value && index < 5 && otpRefs.current[index + 1]) {
+      otpRefs.current[index + 1].focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === "Backspace") {
+      if (!formData.otp[index] && index > 0 && otpRefs.current[index - 1]) {
+        otpRefs.current[index - 1].focus();
+      }
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pastedData) {
+      setFormData((prev) => ({ ...prev, otp: pastedData }));
+      const focusIndex = Math.min(pastedData.length, 5);
+      if (otpRefs.current[focusIndex]) {
+        otpRefs.current[focusIndex].focus();
+      }
+    }
+  };
+
+  // Sync mode with initialMode when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Save current scroll position
-      const scrollY = window.scrollY;
+      setMode(initialMode);
+      setErrors({});
+    }
+  }, [isOpen, initialMode]);
 
-      // Lock body scroll at current position
+  // Handle countdown timer for OTP resend
+  useEffect(() => {
+    if (resendTimer > 0) {
+      timerRef.current = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+    } else {
+      clearTimeout(timerRef.current);
+    }
+    return () => clearTimeout(timerRef.current);
+  }, [resendTimer]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const scrollY = window.scrollY;
       document.body.style.position = "fixed";
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = "100%";
       document.body.style.overflow = "hidden";
-
       return () => {
-        // Restore scroll position
         document.body.style.position = "";
         document.body.style.top = "";
         document.body.style.width = "";
@@ -47,219 +109,312 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-    // Clear error when user types
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      if (newErrors[name]) delete newErrors[name];
+      if (newErrors.general) delete newErrors.general;
+      return newErrors;
+    });
   };
 
-  const validateLogin = () => {
-    const newErrors = {};
-    if (!formData.email) newErrors.email = "Vui lòng nhập email";
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email không hợp lệ";
-    if (!formData.password) newErrors.password = "Vui lòng nhập mật khẩu";
-    return newErrors;
-  };
-
-  const validateRegister = () => {
-    const newErrors = {};
-    if (!formData.username) newErrors.username = "Vui lòng nhập tên hiển thị";
-    if (!formData.email) newErrors.email = "Vui lòng nhập email";
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email không hợp lệ";
-    if (!formData.password) newErrors.password = "Vui lòng nhập mật khẩu";
-    else if (formData.password.length < 6) newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
-    if (!formData.confirmPassword) newErrors.confirmPassword = "Vui lòng nhập lại mật khẩu";
-    else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Mật khẩu không khớp";
-    }
-    return newErrors;
-  };
+  const validateEmail = (email) => /\S+@\S+\.\S+/.test(email);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const newErrors = validateLogin();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    setErrors({});
+    if (!formData.email || !formData.password) {
+      setErrors({ general: "Vui lòng nhập đầy đủ email và mật khẩu" });
       return;
     }
-
     setIsLoading(true);
-    setErrors({}); // Clear previous errors
     try {
-      // Use email for login (backend expects email)
       await login({ email: formData.email, password: formData.password });
-      // Chỉ cần tắt modal - AuthContext đã set user state
-      // Các component sẽ tự động re-render khi auth state thay đổi
       onClose();
     } catch (error) {
-      console.error("Login error:", error);
-      // Axios interceptor returns { status, message, raw, isAuthPath }
-      const errorMessage = error?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
-      setErrors({
-        general: errorMessage,
-      });
+      setErrors({ general: error?.message || "Đăng nhập thất bại" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRegister = async (e) => {
+  const handleRequestRegistrationOTP = async (e) => {
     e.preventDefault();
-    const newErrors = validateRegister();
+    const newErrors = {};
+    if (!formData.username) newErrors.username = "Vui lòng nhập tên hiển thị";
+    if (!formData.email) newErrors.email = "Vui lòng nhập email";
+    else if (!validateEmail(formData.email)) newErrors.email = "Email không hợp lệ";
+    if (!formData.password) newErrors.password = "Vui lòng nhập mật khẩu";
+    else if (formData.password.length < 6) newErrors.password = "Mật khẩu phải ít nhất 6 ký tự";
+    if (formData.password !== formData.confirmPassword)
+      newErrors.confirmPassword = "Mật khẩu không khớp";
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
     setIsLoading(true);
-    setErrors({}); // Clear previous errors
+    try {
+      await requestRegistrationOTP({ username: formData.username, email: formData.email });
+      switchMode("verify-otp-register");
+      setResendTimer(60);
+    } catch (error) {
+      setErrors({ general: error?.message || "Không thể gửi mã OTP" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!formData.email || !validateEmail(formData.email)) {
+      setErrors({ email: "Vui lòng nhập email hợp lệ" });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await forgotPassword(formData.email);
+      switchMode("verify-otp-forgot-password");
+      setResendTimer(60);
+    } catch (error) {
+      setErrors({ general: error?.message || "Lỗi khi gửi yêu cầu" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyForgotOTP = async (e) => {
+    e.preventDefault();
+    if (formData.otp.length !== 6) {
+      setErrors({ otp: "Mã OTP phải có 6 chữ số" });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await verifyPasswordResetOTP({
+        email: formData.email,
+        otp: formData.otp,
+      });
+      setResetToken(result.resetToken);
+      switchMode("reset-password");
+    } catch (error) {
+      setErrors({ general: error?.message || "Mã xác thực không chính xác" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyRegisterOTP = async (e) => {
+    e.preventDefault();
+    if (formData.otp.length !== 6) {
+      setErrors({ otp: "Mã OTP phải có 6 chữ số" });
+      return;
+    }
+
+    setIsLoading(true);
     try {
       await register({
         username: formData.username,
         email: formData.email,
         password: formData.password,
+        otp: formData.otp,
       });
-      // Chỉ cần tắt modal - AuthContext đã set user state
-      // Các component sẽ tự động re-render khi auth state thay đổi
       onClose();
     } catch (error) {
-      console.error("Register error:", error);
-      // Axios interceptor returns { status, message, raw, isAuthPath }
-      const errorMessage = error?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
-      setErrors({
-        general: errorMessage,
+      setErrors({ general: error?.message || "Xác thực thất bại" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    const newErrors = {};
+    if (!formData.password) newErrors.password = "Vui lòng nhập mật khẩu mới";
+    else if (formData.password.length < 6) newErrors.password = "Mật khẩu phải ít nhất 6 ký tự";
+    if (formData.password !== formData.confirmPassword)
+      newErrors.confirmPassword = "Mật khẩu không khớp";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await resetPassword({
+        resetToken: resetToken,
+        newPassword: formData.password,
       });
+      setErrors({ general: "Đổi mật khẩu thành công! Vui lòng đăng nhập lại." });
+      setTimeout(() => switchMode("login"), 2000);
+    } catch (error) {
+      setErrors({ general: error?.message || "Đổi mật khẩu thất bại" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (resendTimer > 0) return;
+    setIsLoading(true);
+    try {
+      if (mode === "verify-otp-register") {
+        await requestRegistrationOTP({ username: formData.username, email: formData.email });
+      } else if (mode === "verify-otp-forgot-password") {
+        await forgotPassword(formData.email);
+      }
+      setResendTimer(60);
+      setErrors({ general: "Mã OTP mới đã được gửi thành công!" });
+    } catch (error) {
+      setErrors({ general: error?.message || "Không thể gửi lại mã" });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = () => {
-    // Location đã được lưu trong openAuthModal (AuthContext)
-    // Google OAuth sẽ redirect về GoogleAuthHandler, nơi sẽ xử lý redirect về return location
     window.location.href = GOOGLE_AUTH_URL;
   };
 
   const switchMode = (newMode) => {
     setMode(newMode);
-    setFormData({
-      username: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    });
+    if (!newMode.includes("otp") && newMode !== "reset-password") {
+      setFormData({ username: "", email: "", password: "", confirmPassword: "", otp: "" });
+    }
     setErrors({});
-    setShowPassword({
-      password: false,
-      confirmPassword: false,
-    });
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto p-4"
-      style={{ isolation: "isolate" }}
-    >
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[9999999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      {/* Animated Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-md transition-opacity"
+        onClick={onClose}
+      />
 
-      {/* Modal Content */}
-      <div className="relative z-10 w-full min-h-[500px] max-w-4xl mx-auto my-auto flex bg-bgColor2 rounded-2xl overflow-hidden shadow-2xl">
-        {/* Left Side - Branding */}
-        <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-bgColor2 to-bgColor2 p-12 flex-col justify-center items-center relative overflow-hidden">
-          {/* Background pattern */}
+      {/* Modal Container - Glassmorphism */}
+      <div className="relative z-10 w-full max-w-[900px] my-auto flex flex-col md:flex-row rounded-3xl overflow-hidden border border-white/10 bg-[#111111]/80 backdrop-blur-2xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.8)] animate-fade-in">
+        {/* Left Side (Hidden on Mobile) */}
+        <div className="hidden md:flex md:w-5/12 relative overflow-hidden">
           <img
             src={bgFormLogin}
             alt="Background"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay"
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+          <div className="relative z-10 p-10 flex flex-col justify-end items-start h-full text-white w-full">
+            <div className="w-16 h-1.5 bg-primaryColor rounded-full mb-6 shadow-[0_0_10px_rgba(255,216,117,0.6)]"></div>
+            <h1 className="text-4xl font-extrabold mb-4 tracking-wider drop-shadow-lg">
+              CINEPHINE
+            </h1>
+            <p className="text-gray-300 leading-relaxed font-light text-sm drop-shadow-md">
+              Thế giới điện ảnh thu nhỏ trong tầm tay bạn. Khám phá hàng ngàn bộ phim bom tấn với
+              chất lượng tuyệt đỉnh cùng cộng đồng đam mê điện ảnh.
+            </p>
+          </div>
         </div>
 
         {/* Right Side - Form */}
-        <div className="w-full md:w-1/2 bg-bgColor2 p-8 md:p-12 relative">
+        <div className="w-full md:w-7/12 p-8 sm:p-10 relative">
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+            className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all z-20 group"
           >
-            <i className="fa-solid fa-times text-2xl" />
+            <i className="fa-solid fa-times text-lg group-hover:rotate-90 transition-transform duration-300" />
           </button>
 
-          <div className="max-w-md mx-auto">
-            <h2 className="text-3xl font-bold text-white mb-2">
-              {mode === "login" ? "Đăng nhập" : "Tạo tài khoản mới"}
-            </h2>
-            <p className="text-gray-400 mb-6">
-              {mode === "login" ? (
-                <>
-                  Nếu bạn chưa có tài khoản,{" "}
-                  <button
-                    onClick={() => switchMode("register")}
-                    className="text-primaryColor hover:underline"
-                  >
-                    đăng ký ngay
-                  </button>
-                </>
-              ) : (
-                <>
-                  Nếu bạn đã có tài khoản,{" "}
-                  <button
-                    onClick={() => switchMode("login")}
-                    className="text-primaryColor hover:underline"
-                  >
-                    đăng nhập
-                  </button>
-                </>
-              )}
-            </p>
+          <div className="max-w-[380px] mx-auto w-full pt-2 sm:pt-4">
+            {/* Headers */}
+            <div className="mb-8">
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
+                {mode === "login" && "Đăng nhập"}
+                {mode === "register" && "Đăng ký"}
+                {mode === "forgot-password" && "Khôi phục mật khẩu"}
+                {mode === "verify-otp-register" && "Xác thực OTP"}
+                {mode === "reset-password" && "Đặt mật khẩu mới"}
+              </h2>
 
+              <p className="text-gray-400 text-sm sm:text-base">
+                {mode === "login" && (
+                  <>
+                    Chưa có tài khoản?{" "}
+                    <button
+                      type="button"
+                      onClick={() => switchMode("register")}
+                      className="text-primaryColor font-semibold hover:underline"
+                    >
+                      Đăng ký
+                    </button>
+                  </>
+                )}
+                {mode === "register" && (
+                  <>
+                    Đã có tài khoản?{" "}
+                    <button
+                      type="button"
+                      onClick={() => switchMode("login")}
+                      className="text-primaryColor font-semibold hover:underline"
+                    >
+                      Đăng nhập
+                    </button>
+                  </>
+                )}
+                {mode === "forgot-password" && (
+                  <>
+                    Nhớ mật khẩu?{" "}
+                    <button
+                      type="button"
+                      onClick={() => switchMode("login")}
+                      className="text-primaryColor font-semibold hover:underline"
+                    >
+                      Quay lại
+                    </button>
+                  </>
+                )}
+                {(mode === "verify-otp-register" || mode === "verify-otp-forgot-password") && (
+                  <>
+                    Mã OTP đã được gửi đến <br />
+                    <span className="text-white font-medium mt-1 inline-block">
+                      {formData.email}
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Error Message */}
             {errors.general && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500 rounded text-red-500 text-sm">
-                {errors.general}
+              <div
+                className={`mb-6 p-4 rounded-xl text-sm border flex items-start gap-3 animate-fade-in backdrop-blur-md ${errors.general.includes("thành công") ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-red-500/10 border-red-500/30 text-red-400"}`}
+              >
+                <i
+                  className={`fa-solid mt-0.5 ${errors.general.includes("thành công") ? "fa-circle-check" : "fa-circle-exclamation"}`}
+                ></i>
+                <p>{errors.general}</p>
               </div>
             )}
 
-            <form onSubmit={mode === "login" ? handleLogin : handleRegister} className="space-y-4">
-              <div>
-                <input
-                  required
-                  type={mode === "login" ? "email" : "text"}
-                  name={mode === "login" ? "email" : "username"}
-                  value={mode === "login" ? formData.email : formData.username}
-                  onChange={handleChange}
-                  placeholder={mode === "login" ? "Email" : "Tên hiển thị"}
-                  className="w-full px-4 py-3 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
-                />
-                {mode === "login" && errors.email && (
-                  <p className="mt-1 text-red-500 text-sm">{errors.email}</p>
-                )}
-                {mode === "register" && errors.username && (
-                  <p className="mt-1 text-red-500 text-sm">{errors.username}</p>
-                )}
-              </div>
-
-              {mode === "register" && (
-                <div>
+            {/* Login Form */}
+            {mode === "login" && (
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div className="space-y-1">
                   <input
                     required
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="Email"
-                    className="w-full px-4 py-3 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                    placeholder="Email của bạn"
+                    className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner"
                   />
-                  {errors.email && <p className="mt-1 text-red-500 text-sm">{errors.email}</p>}
                 </div>
-              )}
 
-              <div>
-                <div className="relative">
+                <div className="space-y-1 relative">
                   <input
                     required
                     type={showPassword.password ? "text" : "password"}
@@ -267,26 +422,83 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Mật khẩu"
-                    className="w-full px-4 py-3 pr-10 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                    className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner pr-12"
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                     onClick={() =>
-                      setShowPassword({
-                        ...showPassword,
-                        password: !showPassword.password,
-                      })
+                      setShowPassword({ ...showPassword, password: !showPassword.password })
                     }
                   >
                     <i className={`fas ${showPassword.password ? "fa-eye-slash" : "fa-eye"}`}></i>
                   </button>
                 </div>
-                {errors.password && <p className="mt-1 text-red-500 text-sm">{errors.password}</p>}
-              </div>
 
-              {mode === "register" && (
-                <div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("forgot-password")}
+                    className="text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Quên mật khẩu?
+                  </button>
+                </div>
+
+                <button
+                  disabled={isLoading}
+                  className="w-full py-4 bg-primaryColor hover:bg-hoverPrimaryColor text-black font-bold rounded-xl shadow-[0_0_20px_rgba(255,216,117,0.3)] hover:shadow-[0_0_25px_rgba(255,216,117,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2 active:scale-[0.98]"
+                >
+                  {isLoading ? <i className="fas fa-spinner fa-spin mr-2"></i> : "Đăng nhập"}
+                </button>
+              </form>
+            )}
+
+            {/* Register Form */}
+            {mode === "register" && (
+              <form onSubmit={handleRequestRegistrationOTP} className="space-y-4">
+                <input
+                  required
+                  type="text"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  placeholder="Tên hiển thị"
+                  className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner"
+                />
+
+                <input
+                  required
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="Email xác thực"
+                  className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner"
+                />
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="relative">
+                    <input
+                      required
+                      type={showPassword.password ? "text" : "password"}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="Mật khẩu (tối thiểu 6 ký tự)"
+                      className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner pr-12"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                      onClick={() =>
+                        setShowPassword({ ...showPassword, password: !showPassword.password })
+                      }
+                    >
+                      <i className={`fas ${showPassword.password ? "fa-eye-slash" : "fa-eye"}`}></i>
+                    </button>
+                  </div>
+
                   <div className="relative">
                     <input
                       required
@@ -294,12 +506,12 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleChange}
-                      placeholder="Nhập lại mật khẩu"
-                      className="w-full px-4 py-3 pr-10 bg-bgColor2 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primaryColor transition-colors"
+                      placeholder="Xác nhận mật khẩu"
+                      className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner pr-12"
                     />
                     <button
                       type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                       onClick={() =>
                         setShowPassword({
                           ...showPassword,
@@ -308,45 +520,254 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                       }
                     >
                       <i
-                        className={`fas ${
-                          showPassword.confirmPassword ? "fa-eye-slash" : "fa-eye"
-                        }`}
+                        className={`fas ${showPassword.confirmPassword ? "fa-eye-slash" : "fa-eye"}`}
+                      ></i>
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  disabled={isLoading}
+                  className="w-full py-4 bg-primaryColor hover:bg-hoverPrimaryColor text-black font-bold rounded-xl shadow-[0_0_20px_rgba(255,216,117,0.3)] hover:shadow-[0_0_25px_rgba(255,216,117,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4 active:scale-[0.98]"
+                >
+                  {isLoading ? <i className="fas fa-spinner fa-spin mr-2"></i> : "Tiếp tục"}
+                </button>
+              </form>
+            )}
+
+            {/* Forgot Password Form */}
+            {mode === "forgot-password" && (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <p className="text-sm text-gray-400">
+                  Nhập email của bạn, chúng tôi sẽ gửi mã OTP để đặt lại mật khẩu.
+                </p>
+                <input
+                  required
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="Email đã đăng ký"
+                  className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner"
+                />
+
+                <button
+                  disabled={isLoading}
+                  className="w-full py-4 bg-primaryColor hover:bg-hoverPrimaryColor text-black font-bold rounded-xl shadow-[0_0_20px_rgba(255,216,117,0.3)] hover:shadow-[0_0_25px_rgba(255,216,117,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4 active:scale-[0.98]"
+                >
+                  {isLoading ? <i className="fas fa-spinner fa-spin mr-2"></i> : "Gửi mã OTP"}
+                </button>
+              </form>
+            )}
+
+            {/* Reset Password Form */}
+            {mode === "reset-password" && (
+              <form onSubmit={handleResetPassword} className="space-y-6">
+                <div className="space-y-4">
+                  <div className="relative">
+                    <input
+                      required
+                      type={showPassword.password ? "text" : "password"}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="Mật khẩu mới"
+                      className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner pr-12"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                      onClick={() =>
+                        setShowPassword({ ...showPassword, password: !showPassword.password })
+                      }
+                    >
+                      <i className={`fas ${showPassword.password ? "fa-eye-slash" : "fa-eye"}`}></i>
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-red-400 text-sm">{errors.password}</p>}
+
+                  <div className="relative">
+                    <input
+                      required
+                      type={showPassword.confirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      placeholder="Xác nhận mật khẩu mới"
+                      className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner pr-12"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                      onClick={() =>
+                        setShowPassword({
+                          ...showPassword,
+                          confirmPassword: !showPassword.confirmPassword,
+                        })
+                      }
+                    >
+                      <i
+                        className={`fas ${showPassword.confirmPassword ? "fa-eye-slash" : "fa-eye"}`}
                       ></i>
                     </button>
                   </div>
                   {errors.confirmPassword && (
-                    <p className="mt-1 text-red-500 text-sm">{errors.confirmPassword}</p>
+                    <p className="text-red-400 text-sm">{errors.confirmPassword}</p>
                   )}
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 bg-primaryColor hover:bg-hoverPrimaryColor text-primaryColorButtonText font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? "Đang xử lý..." : mode === "login" ? "Đăng nhập" : "Đăng ký"}
-              </button>
-            </form>
-
-            {mode === "login" && (
-              <>
-                <div className="mt-4 text-center text-gray-400 text-sm">OR</div>
-
-                <div className="mt-4">
+                <div className="flex gap-3 pt-2">
                   <button
-                    onClick={handleGoogleLogin}
-                    className="w-full py-3 bg-white hover:bg-gray-100 text-gray-800 font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    type="button"
+                    onClick={() => switchMode("forgot-password")}
+                    className="w-1/3 py-4 bg-white/5 text-white font-semibold rounded-xl border border-white/10 hover:bg-white/10 transition-all backdrop-blur-sm active:scale-[0.98]"
                   >
-                    <img
-                      src="https://www.google.com/favicon.ico"
-                      alt="Google"
-                      className="w-5 h-5"
-                    />
-                    Đăng nhập bằng Google
+                    Hủy
+                  </button>
+                  <button
+                    disabled={isLoading}
+                    className="w-2/3 py-4 bg-primaryColor hover:bg-hoverPrimaryColor text-black font-bold rounded-xl shadow-[0_0_20px_rgba(255,216,117,0.3)] hover:shadow-[0_0_25px_rgba(255,216,117,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                  >
+                    {isLoading ? <i className="fas fa-spinner fa-spin"></i> : "Xác nhận"}
                   </button>
                 </div>
-              </>
+              </form>
+            )}
+
+            {/* OTP Verification Form for Register */}
+            {mode === "verify-otp-register" && (
+              <form onSubmit={handleVerifyRegisterOTP} className="space-y-8">
+                <div
+                  className="flex justify-center gap-1.5 sm:gap-3 w-full"
+                  onPaste={handleOtpPaste}
+                >
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <input
+                      key={index}
+                      ref={(el) => (otpRefs.current[index] = el)}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={formData.otp[index] || ""}
+                      onChange={(e) => handleOtpChange(index, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                      className="w-[45px] h-[55px] sm:w-14 sm:h-16 text-center text-xl sm:text-2xl font-bold bg-white/5 border border-white/10 rounded-xl text-white focus:bg-white/10 focus:border-primaryColor focus:shadow-[0_0_15px_rgba(255,216,117,0.2)] outline-none transition-all shadow-inner placeholder-white/20"
+                      placeholder="-"
+                      autoComplete="one-time-code"
+                    />
+                  ))}
+                </div>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    disabled={resendTimer > 0 || isLoading}
+                    onClick={handleResendOTP}
+                    className="text-sm text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:hover:text-gray-400 font-medium"
+                  >
+                    {resendTimer > 0
+                      ? `Gửi lại mã sau ${resendTimer}s`
+                      : "Chưa nhận được mã? Gửi lại ngay"}
+                  </button>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("register")}
+                    className="w-1/3 py-4 bg-white/5 text-white font-semibold rounded-xl border border-white/10 hover:bg-white/10 transition-all backdrop-blur-sm active:scale-[0.98]"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    disabled={isLoading || formData.otp.length < 6}
+                    className="w-2/3 py-4 bg-primaryColor hover:bg-hoverPrimaryColor text-black font-bold rounded-xl shadow-[0_0_20px_rgba(255,216,117,0.3)] hover:shadow-[0_0_25px_rgba(255,216,117,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                  >
+                    {isLoading ? <i className="fas fa-spinner fa-spin"></i> : "Xác nhận"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* OTP Verification Form for Forgot Password */}
+            {mode === "verify-otp-forgot-password" && (
+              <form onSubmit={handleVerifyForgotOTP} className="space-y-8">
+                <div
+                  className="flex justify-center gap-1.5 sm:gap-3 w-full"
+                  onPaste={handleOtpPaste}
+                >
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <input
+                      key={index}
+                      ref={(el) => (otpRefs.current[index] = el)}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={formData.otp[index] || ""}
+                      onChange={(e) => handleOtpChange(index, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                      className="w-[45px] h-[55px] sm:w-14 sm:h-16 text-center text-xl sm:text-2xl font-bold bg-white/5 border border-white/10 rounded-xl text-white focus:bg-white/10 focus:border-primaryColor focus:shadow-[0_0_15px_rgba(255,216,117,0.2)] outline-none transition-all shadow-inner placeholder-white/20"
+                      placeholder="-"
+                      autoComplete="one-time-code"
+                    />
+                  ))}
+                </div>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    disabled={resendTimer > 0 || isLoading}
+                    onClick={handleResendOTP}
+                    className="text-sm text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:hover:text-gray-400 font-medium"
+                  >
+                    {resendTimer > 0
+                      ? `Gửi lại mã sau ${resendTimer}s`
+                      : "Chưa nhận được mã? Gửi lại ngay"}
+                  </button>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("forgot-password")}
+                    className="w-1/3 py-4 bg-white/5 text-white font-semibold rounded-xl border border-white/10 hover:bg-white/10 transition-all backdrop-blur-sm active:scale-[0.98]"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    disabled={isLoading || formData.otp.length < 6}
+                    className="w-2/3 py-4 bg-primaryColor hover:bg-hoverPrimaryColor text-black font-bold rounded-xl shadow-[0_0_20px_rgba(255,216,117,0.3)] hover:shadow-[0_0_25px_rgba(255,216,117,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                  >
+                    {isLoading ? <i className="fas fa-spinner fa-spin"></i> : "Tiếp tục"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Social Login Separator */}
+            {mode === "login" && (
+              <div className="mt-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="flex-1 border-t border-white/10"></div>
+                  <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
+                    Hoặc đăng nhập với
+                  </span>
+                  <div className="flex-1 border-t border-white/10"></div>
+                </div>
+
+                <button
+                  onClick={handleGoogleLogin}
+                  type="button"
+                  className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-xl flex items-center justify-center gap-3 transition-all group backdrop-blur-sm active:scale-[0.98]"
+                >
+                  <img
+                    src="https://www.google.com/favicon.ico"
+                    alt="Google"
+                    className="w-5 h-5 group-hover:scale-110 transition-transform"
+                  />
+                  Tiếp tục với Google
+                </button>
+              </div>
             )}
           </div>
         </div>
