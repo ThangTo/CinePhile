@@ -350,6 +350,14 @@ const VideoControls = ({
               onToggleMoreMenu={onToggleMoreMenu}
               setShowMoreMenu={setShowMoreMenu}
               onDownload={onDownload}
+              // Subtitle
+              showSubtitleMenu={showSubtitleMenu}
+              onToggleSubtitleMenu={onToggleSubtitleMenu}
+              subtitleOptions={subtitleOptions}
+              currentSubtitle={currentSubtitle}
+              onSubtitleChange={onSubtitleChange}
+              isGeneratingSubtitle={isGeneratingSubtitle}
+              subtitleProgress={subtitleProgress}
             />
           </div>
         </div>

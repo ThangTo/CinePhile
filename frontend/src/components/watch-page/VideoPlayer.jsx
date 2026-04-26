@@ -130,6 +130,10 @@ const VideoPlayer = ({
   const apiBaseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
   const apiOrigin = apiBaseUrl.replace(/\/api\/v1\/?$/, "");
 
+  const isMobileDevice = useMemo(() => {
+    return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  }, []);
+
   useEffect(() => {
     // Fetch feature permissions on mount
     fetch(`${apiBaseUrl}/settings/features`)
@@ -169,9 +173,12 @@ const VideoPlayer = ({
   // Custom Subtitle Refs
   const subtitleOverlayRef = useRef(null);
   const subtitleContainerRef = useRef(null);
+  const subtitleTextRef = useRef(null);
   const parsedSubtitlesRef = useRef([]);
   const subPosRef = useRef({ x: 0, y: -40 });
+  const subScaleRef = useRef(1);
   const subDragRef = useRef({ isDragging: false, startX: 0, startY: 0, initX: 0, initY: 0 });
+  const subResizeRef = useRef({ isResizing: false, startX: 0, initScale: 1 });
 
   const subtitleMovieId = movie?._id || movie?.id || movie?.slug || null;
   const subtitleEpisodeId =
@@ -305,12 +312,12 @@ const VideoPlayer = ({
             break;
           }
         }
-        if (subtitleOverlayRef.current.innerHTML !== foundText) {
-          subtitleOverlayRef.current.innerHTML = foundText;
+        if (subtitleTextRef.current && subtitleTextRef.current.innerHTML !== foundText) {
+          subtitleTextRef.current.innerHTML = foundText;
           subtitleOverlayRef.current.style.opacity = foundText ? "1" : "0";
         }
       } else if (subtitleOverlayRef.current) {
-        subtitleOverlayRef.current.innerHTML = "";
+        if (subtitleTextRef.current) subtitleTextRef.current.innerHTML = "";
         subtitleOverlayRef.current.style.opacity = "0";
       }
     };
@@ -576,7 +583,7 @@ const VideoPlayer = ({
       setSubtitleError(null);
       parsedSubtitlesRef.current = [];
       if (subtitleOverlayRef.current) {
-        subtitleOverlayRef.current.innerHTML = "";
+        if (subtitleTextRef.current) subtitleTextRef.current.innerHTML = "";
         subtitleOverlayRef.current.style.opacity = "0";
       }
       setShowSubtitleMenu(false);
@@ -1407,7 +1414,7 @@ const VideoPlayer = ({
     if (!vttUrl) {
       parsedSubtitlesRef.current = [];
       if (subtitleOverlayRef.current) {
-        subtitleOverlayRef.current.innerHTML = "";
+        if (subtitleTextRef.current) subtitleTextRef.current.innerHTML = "";
         subtitleOverlayRef.current.style.opacity = "0";
       }
       return;
@@ -1468,7 +1475,7 @@ const VideoPlayer = ({
       console.error("Failed to load or parse custom VTT", e);
       parsedSubtitlesRef.current = [];
       if (subtitleOverlayRef.current) {
-        subtitleOverlayRef.current.innerHTML = "";
+        if (subtitleTextRef.current) subtitleTextRef.current.innerHTML = "";
         subtitleOverlayRef.current.style.opacity = "0";
       }
     }
@@ -2361,7 +2368,7 @@ const VideoPlayer = ({
         >
           <div
             ref={subtitleOverlayRef}
-            className="pointer-events-auto cursor-move select-none"
+            className="pointer-events-auto cursor-move select-none relative group"
             style={{
               color: "#fde047",
               backgroundColor: "rgba(0, 0, 0, 0.7)",
@@ -2369,15 +2376,16 @@ const VideoPlayer = ({
               fontFamily: "Inter, 'Malgun Gothic', sans-serif",
               textShadow: "1px 1px 3px rgba(0, 0, 0, 0.9)",
               borderRadius: "5px",
-              padding: "4px 8px",
+              padding: "6px 12px",
               textAlign: "center",
               maxWidth: "90%",
               whiteSpace: "pre-line",
               opacity: 0,
-              transform: `translate(${subPosRef.current.x}px, ${subPosRef.current.y}px)`,
+              transform: `translate(${subPosRef.current.x}px, ${subPosRef.current.y}px) scale(${subScaleRef.current})`,
             }}
             onPointerDown={(e) => {
               if (e.button !== 0 && e.type !== "touchstart") return;
+              if (e.target.closest(".resize-handle")) return;
               subDragRef.current.isDragging = true;
               subDragRef.current.startX = e.clientX || (e.touches && e.touches[0].clientX);
               subDragRef.current.startY = e.clientY || (e.touches && e.touches[0].clientY);
@@ -2394,7 +2402,7 @@ const VideoPlayer = ({
               subPosRef.current.x = subDragRef.current.initX + dx;
               subPosRef.current.y = subDragRef.current.initY + dy;
               if (subtitleOverlayRef.current) {
-                subtitleOverlayRef.current.style.transform = `translate(${subPosRef.current.x}px, ${subPosRef.current.y}px)`;
+                subtitleOverlayRef.current.style.transform = `translate(${subPosRef.current.x}px, ${subPosRef.current.y}px) scale(${subScaleRef.current})`;
               }
             }}
             onPointerUp={(e) => {
@@ -2404,7 +2412,43 @@ const VideoPlayer = ({
             onPointerCancel={(e) => {
               subDragRef.current.isDragging = false;
             }}
-          ></div>
+          >
+            <div ref={subtitleTextRef}></div>
+            
+            {/* Resize Handle */}
+            <div
+              className="resize-handle absolute -right-2 -bottom-2 w-6 h-6 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-nwse-resize z-10"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                subResizeRef.current.isResizing = true;
+                subResizeRef.current.startX = e.clientX || (e.touches && e.touches[0].clientX);
+                subResizeRef.current.initScale = subScaleRef.current;
+                e.currentTarget.setPointerCapture(e.pointerId);
+              }}
+              onPointerMove={(e) => {
+                if (!subResizeRef.current.isResizing) return;
+                e.stopPropagation();
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                const dx = clientX - subResizeRef.current.startX;
+                // Scale proportional to horizontal drag (150px drag = 1.0 scale change)
+                let newScale = subResizeRef.current.initScale + dx / 150;
+                newScale = Math.max(0.5, Math.min(newScale, 3));
+                subScaleRef.current = newScale;
+                if (subtitleOverlayRef.current) {
+                  subtitleOverlayRef.current.style.transform = `translate(${subPosRef.current.x}px, ${subPosRef.current.y}px) scale(${subScaleRef.current})`;
+                }
+              }}
+              onPointerUp={(e) => {
+                subResizeRef.current.isResizing = false;
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              }}
+              onPointerCancel={() => {
+                subResizeRef.current.isResizing = false;
+              }}
+            >
+              <i className="fa-solid fa-up-right-and-down-left-from-center text-[10px] text-white"></i>
+            </div>
+          </div>
         </div>
       )}
 
