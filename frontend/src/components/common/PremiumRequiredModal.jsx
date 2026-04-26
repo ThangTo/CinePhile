@@ -60,8 +60,8 @@ const PremiumRequiredModal = ({ isOpen, onClose }) => {
 
           <div className="text-gray-400 mb-8 space-y-1">
             <p className="text-sm">
-              Chất lượng này chỉ dành cho thành viên Premium. <br />
-              Vui lòng nâng cấp tài khoản để trải nghiệm chất lượng hình ảnh tốt nhất!
+              Tính năng này chỉ dành cho thành viên Premium. <br />
+              Vui lòng nâng cấp tài khoản để trải nghiệm nhiều tính năng hấp dẫn!
             </p>
           </div>
 

@@ -2,6 +2,8 @@ const adminService = require('../services/admin.service');
 const analyticsService = require('../services/analytics.service');
 const { transformMovieData, slugify } = require('../utils/movieAdminUtils');
 const { transformMovie } = require('../utils/movieTransformer');
+const Settings = require('../models/Settings');
+const Episode = require('../models/episode.model');
 
 /**
  * Helper: Parse array query parameters (genres, countries)
@@ -16,6 +18,117 @@ const parseArrayParam = (param) => {
 /**
  * Admin Movies Controllers
  */
+
+/**
+ * GET /admin/colab-url
+ * Get current Colab Whisper URL
+ */
+const getColabUrl = async (req, res) => {
+  try {
+    const setting = await Settings.findOne({ key: 'colab_whisper_url' });
+    res.json({ success: true, url: setting ? setting.value : '' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const DEFAULT_FEATURE_PERMISSIONS = {
+  download_movie: { requiresPremium: false },
+  korean_subtitles: { requiresPremium: false },
+};
+
+/**
+ * GET /api/v1/settings/features (Public) & /admin/settings/features
+ * Get feature permissions
+ */
+const getFeaturePermissions = async (req, res) => {
+  try {
+    const setting = await Settings.findOne({ key: 'feature_permissions' });
+    const value = setting ? setting.value : DEFAULT_FEATURE_PERMISSIONS;
+    res.json({ success: true, data: value });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * PUT /admin/settings/features
+ * Update feature permissions
+ */
+const updateFeaturePermissions = async (req, res) => {
+  try {
+    const { features } = req.body;
+    if (!features || typeof features !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid features data' });
+    }
+
+    const updatedSetting = await Settings.findOneAndUpdate(
+      { key: 'feature_permissions' },
+      { 
+        value: features,
+        description: 'Permissions for user features (e.g. requiresPremium)'
+      },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, data: updatedSetting.value, message: 'Feature permissions updated' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /admin/subtitles/requests
+ * Get episodes requiring subtitles sorted by request count
+ */
+const getSubtitleRequests = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const episodes = await Episode.find({ subtitleRequestCount: { $gt: 0 } })
+      .populate('movieId', 'title name slug thumb_url')
+      .sort({ subtitleRequestCount: -1, updatedAt: -1 })
+      .skip(Number(skip))
+      .limit(Number(limit))
+      .lean();
+
+    const total = await Episode.countDocuments({ subtitleRequestCount: { $gt: 0 } });
+
+    res.json({
+      success: true,
+      data: episodes,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /admin/colab-url
+ * Update Colab Whisper URL
+ */
+const updateColabUrl = async (req, res) => {
+  try {
+    const { url } = req.body;
+    await Settings.findOneAndUpdate(
+      { key: 'colab_whisper_url' },
+      { 
+        value: url,
+        description: 'Google Colab Ngrok URL for Whisper Large-v3'
+      },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, message: 'Updated Colab Whisper URL successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 /**
  * GET /admin/movies
@@ -1003,6 +1116,8 @@ getAllMovies,
   // Settings
   getTheme,
   setTheme,
+  getFeaturePermissions,
+  updateFeaturePermissions,
 
   // Pricing
   getCoinPackages,
@@ -1017,4 +1132,9 @@ getAllMovies,
   // User Streak
   getUserStreak,
   getUserQuestSummary,
+
+  // Remote Whisper
+  getColabUrl,
+  updateColabUrl,
+  getSubtitleRequests,
 };

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
+const fs = require('fs');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const RedisStore = require('rate-limit-redis');
@@ -159,6 +160,33 @@ app.use(passport.initialize());
 // Serve static avatar files
 app.use('/api/v1/avatars', express.static(path.join(__dirname, 'data/avatars')));
 
+// Serve Korean subtitle VTT files
+const vttCachePath = path.join(__dirname, 'temp_output', 'vtt_cache');
+if (!fs.existsSync(vttCachePath)) {
+  fs.mkdirSync(vttCachePath, { recursive: true });
+}
+app.use('/subtitles/ko', (req, res, next) => {
+  const filePath = path.join(vttCachePath, req.path);
+  if (req.path.endsWith('.vtt') && fs.existsSync(filePath)) {
+    let content = fs.readFileSync(filePath, 'utf-8');
+    
+    // Ensure it starts with WEBVTT followed by at least one blank line
+    if (!content.startsWith('WEBVTT')) {
+      content = 'WEBVTT\n\n' + content.trimStart();
+      fs.writeFileSync(filePath, content, 'utf-8');
+    } else if (!content.startsWith('WEBVTT\n\n') && !content.startsWith('WEBVTT\r\n\r\n')) {
+      // Fix cases where WEBVTT header exists but blank line is missing
+      content = content.replace(/^WEBVTT\s*/, 'WEBVTT\n\n');
+      fs.writeFileSync(filePath, content, 'utf-8');
+    }
+
+    res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Ensure CORS for tracks
+    return res.status(200).send(content);
+  }
+  next();
+});
+
 passport.use(new LocalStrategy({ usernameField: 'email' }, User.authenticate()));
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
@@ -229,6 +257,9 @@ app.get('/api/v1/settings/coin-packages', adminController.getCoinPackages);
 
 // GET /api/v1/settings/premium-plans — anyone can read premium plans
 app.get('/api/v1/settings/premium-plans', adminController.getPremiumPlans);
+
+// GET /api/v1/settings/features — anyone can read feature permissions
+app.get('/api/v1/settings/features', adminController.getFeaturePermissions);
 app.use('/api/v1/crawl', crawlerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/cast', castRoutes);

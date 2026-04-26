@@ -117,3 +117,21 @@
   80%  { opacity: 0.5; transform: translateX(4px); }
   100% { opacity: 0.2; transform: translateX(0); }
 }
+
+/* ====================================================================
+   SUBTITLE (WEBVTT) STYLING
+   ==================================================================== */
+::cue {
+  color: #fde047; /* Text color - Default is yellow, you can change to #ffffff for white */
+  background-color: rgba(0, 0, 0, 0.7); /* Background color and opacity */
+  font-size: 1.25rem; /* Font size */
+  font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif; /* Font family */
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9); /* Text shadow for better readability */
+  border-radius: 5px; /* Rounded corners */
+  padding: 4px 8px; /* Padding inside the background box */
+}
+
+/* For specific languages if you set data-subtitle-lang */
+video[data-subtitle-lang="ko"]::cue {
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+}

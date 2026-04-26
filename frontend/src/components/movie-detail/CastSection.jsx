@@ -31,12 +31,19 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
     fetchCast();
   }, [movie?.id]);
 
-  // Filter: chỉ lấy diễn viên có avatar
+  // Filter: ưu tiên diễn viên có avatar, fallback dùng placeholder
   const castWithAvatar = Array.isArray(cast)
-    ? cast.filter((actor) => actor?.avatar && actor.avatar.trim() !== "")
+    ? cast.map((actor) => {
+        const hasRealAvatar = actor?.avatar && actor.avatar.trim() !== "";
+        return {
+          ...actor,
+          avatar: hasRealAvatar ? actor.avatar : "/placeholder-actor.svg",
+          hasRealAvatar,
+        };
+      })
     : [];
 
-  const hasCastWithAvatar = castWithAvatar.length > 0;
+  const hasCast = castWithAvatar.length > 0;
 
   // Số lượng cast hiển thị khi collapsed (chỉ trên mobile)
   const MOBILE_COLLAPSED_COUNT = 6;
@@ -54,10 +61,10 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
     layout === "vertical"
       ? "grid-cols-3"
       : layout === "detail"
-      ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
-      : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7";
+        ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
+        : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7";
 
-  // Empty state component - hiển thị khi không có diễn viên có avatar
+  // Empty state component - hiển thị khi backend không trả về cast data
   const EmptyCastState = () => (
     <div className="flex flex-col items-center justify-center py-12 px-4">
       <div className="relative mb-4">
@@ -87,9 +94,9 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
           </div>
         )}
         {!loading && error && <div className="text-red-400 text-sm text-center py-4">{error}</div>}
-        {!loading && !error && !hasCastWithAvatar && <EmptyCastState />}
+        {!loading && !error && !hasCast && <EmptyCastState />}
 
-        {!loading && !error && hasCastWithAvatar && (
+        {!loading && !error && hasCast && (
           <div className={`grid ${gridClass} gap-4`}>
             {castWithAvatar.map((actor, index) => (
               <Link
@@ -99,13 +106,22 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
               >
                 {/* Actor Image */}
                 <div className="aspect-[3/4] overflow-hidden bg-bgColor relative group">
-                  <OptimizedImage
-                    src={actor.avatar}
-                    alt={actor.name || "Diễn viên"}
-                    className="w-full h-full object-cover group-hover:opacity-80 transition-transform duration-300"
-                    lazy={true}
-                    sizeKey="CARD"
-                  />
+                  {actor.hasRealAvatar ? (
+                    <OptimizedImage
+                      src={actor.avatar}
+                      alt={actor.name}
+                      className="w-full h-full object-cover"
+                      lazy={true}
+                      sizeKey="CARD"
+                    />
+                  ) : (
+                    <img
+                      src={actor.avatar}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      draggable="false"
+                    />
+                  )}
                   <div className="absolute inset-0 z-0 bg-gradient-to-t from-bgColor via-bgColor/10 to-transparent" />
                 </div>
 
@@ -152,9 +168,9 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
         </div>
       )}
       {!loading && error && <div className="text-red-400 text-sm text-center py-4">{error}</div>}
-      {!loading && !error && !hasCastWithAvatar && <EmptyCastState />}
+      {!loading && !error && !hasCast && <EmptyCastState />}
 
-      {!loading && !error && hasCastWithAvatar && (
+      {!loading && !error && hasCast && (
         <>
           {/* Mobile: Hiển thị với collapse */}
           <div className={`lg:hidden grid ${gridClass} gap-6 transition-all duration-300`}>
@@ -165,13 +181,22 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
                 className="text-center hover:opacity-80 transition-opacity group"
               >
                 <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-full ring-1 ring-white/10 bg-bgColor2">
-                  <OptimizedImage
-                    src={actor.avatar}
-                    alt={actor.name || "Diễn viên"}
-                    className="h-full w-full object-cover"
-                    lazy={true}
-                    sizeKey="CARD"
-                  />
+                  {actor.hasRealAvatar ? (
+                    <OptimizedImage
+                      src={actor.avatar}
+                      alt={actor.name}
+                      className="h-full w-full object-cover"
+                      lazy={true}
+                      sizeKey="CARD"
+                    />
+                  ) : (
+                    <img
+                      src={actor.avatar}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      draggable="false"
+                    />
+                  )}
                 </div>
                 <div className="text-sm font-semibold text-gray-200">
                   {actor.name || "Không rõ"}
@@ -188,13 +213,22 @@ const CastSection = ({ movie, layout = "default", title = true }) => {
                 className="text-center hover:opacity-80 transition-opacity group"
               >
                 <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-full ring-1 ring-white/10 bg-bgColor2">
-                  <OptimizedImage
-                    src={actor.avatar}
-                    alt={actor.name || "Diễn viên"}
-                    className="h-full w-full object-cover"
-                    lazy={true}
-                    sizeKey="CARD"
-                  />
+                  {actor.hasRealAvatar ? (
+                    <OptimizedImage
+                      src={actor.avatar}
+                      alt={actor.name}
+                      className="h-full w-full object-cover"
+                      lazy={true}
+                      sizeKey="CARD"
+                    />
+                  ) : (
+                    <img
+                      src={actor.avatar}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      draggable="false"
+                    />
+                  )}
                 </div>
                 <div className="text-sm font-semibold text-gray-200 transition-colors group-hover:text-primaryColor">
                   {actor.name || "Không rõ"}

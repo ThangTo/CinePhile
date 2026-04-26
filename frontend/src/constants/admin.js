@@ -10,19 +10,23 @@ export const ADMIN_TABS = {
   VIRAL_CLIPS: "viral-clips",
   NOTIFICATIONS: "notifications",
   SETTINGS: "settings",
+  SUBTITLES: "subtitles",
   PRICING: "pricing",
   MAILBOX: "mailbox",
   QUESTS: "quests",
+  CASTS: "casts",
 };
 
 export const ADMIN_MENU_ITEMS = [
   { id: ADMIN_TABS.OVERVIEW, label: "Tổng quan", icon: "fa-chart-line" },
   { id: ADMIN_TABS.MOVIES, label: "Phim", icon: "fa-film" },
   { id: ADMIN_TABS.USERS, label: "Người dùng", icon: "fa-users" },
+  { id: ADMIN_TABS.CASTS, label: "Diễn viên", icon: "fa-user-circle" },
   { id: ADMIN_TABS.COMMENTS, label: "Bình luận", icon: "fa-comments" },
   { id: ADMIN_TABS.VIRAL_CLIPS, label: "Viral Clips", icon: "fa-bolt" },
   { id: ADMIN_TABS.NOTIFICATIONS, label: "Thông báo", icon: "fa-bell" },
   { id: ADMIN_TABS.MAILBOX, label: "Hộp thư", icon: "fa-envelope" },
+  { id: ADMIN_TABS.SUBTITLES, label: "Phụ đề", icon: "fa-closed-captioning" },
   { id: ADMIN_TABS.SETTINGS, label: "Cài đặt", icon: "fa-cog" },
   { id: ADMIN_TABS.PRICING, label: "Quản lý giá", icon: "fa-dollar-sign" },
   { id: ADMIN_TABS.QUESTS, label: "Nhiệm vụ", icon: "fa-list-check" },

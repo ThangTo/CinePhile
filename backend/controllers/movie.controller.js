@@ -2,6 +2,8 @@ const movieService = require('../services/movie.service');
 const questService = require('../services/quest.service');
 const playbackHeartbeatService = require('../services/playbackHeartbeat.service');
 const trendingService = require('../services/trending.service');
+const subtitleService = require('../services/subtitle.service');
+const Episode = require('../models/episode.model');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const os = require('os');
@@ -30,6 +32,59 @@ const getRequestIpAddress = (req) =>
   req.headers['x-forwarded-for']?.split(',')[0]?.trim()
   || req.socket?.remoteAddress
   || '0.0.0.0';
+
+const isObjectId = (value) => typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value);
+
+const resolveEpisodeForMovie = async (movieId, episodeParam) => {
+  if (!movieId || !episodeParam) {
+    return null;
+  }
+
+  if (isObjectId(episodeParam)) {
+    const byObjectId = await Episode.findOne({ _id: episodeParam, movieId }).lean();
+    if (byObjectId) {
+      return byObjectId;
+    }
+  }
+
+  const episodeNumber = Number.parseInt(episodeParam, 10);
+  if (Number.isFinite(episodeNumber)) {
+    const episodeCandidates = await Episode.find({ movieId, episodeId: episodeNumber })
+      .sort({ _id: 1 })
+      .lean();
+
+    if (episodeCandidates.length === 1) {
+      return episodeCandidates[0];
+    }
+
+    if (episodeCandidates.length > 1) {
+      const preferredAudioOrder = ['vietsub', 'thuyet-minh', 'long-tieng'];
+      for (const preferredAudio of preferredAudioOrder) {
+        const matched = episodeCandidates.find(
+          (candidate) => String(candidate.audioType || '').toLowerCase() === preferredAudio,
+        );
+        if (matched) {
+          return matched;
+        }
+      }
+
+      return episodeCandidates[0];
+    }
+  }
+
+  return Episode.findOne({ movieId, slug: episodeParam }).lean();
+};
+
+const resolveMovieOrNull = async (identifier) => {
+  try {
+    return await movieService.getById(identifier);
+  } catch (error) {
+    if (error?.message === 'Movie not found') {
+      return null;
+    }
+    throw error;
+  }
+};
 
 const getOptionalUserId = (req) => {
   if (req.user && req.user._id) {
@@ -901,6 +956,120 @@ const getTrendingSocial = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/movies/:id/episodes/:episodeId/subtitles/korean/status
+ * Check if Korean subtitles are available for an episode
+ */
+const getKoreanSubtitleStatus = async (req, res) => {
+  try {
+    const { id, episodeId } = req.params;
+    
+    const movie = await resolveMovieOrNull(id);
+    if (!movie) {
+      return res.status(404).json({ success: false, message: 'Movie not found' });
+    }
+    
+    const movieId = movie.id || movie._id;
+    const episode = await resolveEpisodeForMovie(movieId, episodeId);
+    if (!episode) {
+      return res.status(404).json({ success: false, message: 'Episode not found' });
+    }
+    
+    const m3u8Url = episode.link_m3u8;
+    if (!m3u8Url) {
+      return res.status(404).json({ success: false, message: 'No M3U8 URL found' });
+    }
+    
+    const subtitleCacheIdentity = episode?._id
+      ? `episode:${String(episode._id)}`
+      : `movie:${String(movieId)}:episode:${String(episodeId)}`;
+
+    const status = await subtitleService.getSubtitleStatus(m3u8Url, 'ko', subtitleCacheIdentity);
+    res.json({ success: true, ...status });
+  } catch (error) {
+    console.error('Error in getKoreanSubtitleStatus:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/v1/movies/:id/episodes/:episodeId/subtitles/korean/request
+ * Request Korean subtitles for an episode
+ */
+const requestKoreanSubtitles = async (req, res) => {
+  try {
+    const { id, episodeId } = req.params;
+    
+    const movie = await resolveMovieOrNull(id);
+    if (!movie) {
+      return res.status(404).json({ success: false, message: 'Movie not found' });
+    }
+    
+    const movieId = movie.id || movie._id;
+    const episode = await resolveEpisodeForMovie(movieId, episodeId);
+    if (!episode) {
+      return res.status(404).json({ success: false, message: 'Episode not found' });
+    }
+    
+    if (episode._id) {
+      await Episode.findByIdAndUpdate(episode._id, { $inc: { subtitleRequestCount: 1 } });
+    }
+    
+    res.json({ success: true, message: 'Subtitle request recorded' });
+  } catch (error) {
+    console.error('Error in requestKoreanSubtitles:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/v1/movies/:id/episodes/:episodeId/subtitles/korean/generate
+ * Generate Korean subtitles for an episode
+ */
+const generateKoreanSubtitles = async (req, res) => {
+  try {
+    const { id, episodeId } = req.params;
+    
+    const movie = await resolveMovieOrNull(id);
+    if (!movie) {
+      return res.status(404).json({ success: false, message: 'Movie not found' });
+    }
+    
+    const movieId = movie.id || movie._id;
+    const episode = await resolveEpisodeForMovie(movieId, episodeId);
+    if (!episode) {
+      return res.status(404).json({ success: false, message: 'Episode not found' });
+    }
+    
+    const m3u8Url = episode.link_m3u8;
+    if (!m3u8Url) {
+      return res.status(404).json({ success: false, message: 'No M3U8 URL found' });
+    }
+    
+    const localPort = process.env.PORT || 5000;
+    const protocol = req.protocol === 'https' ? 'https' : 'http';
+    const proxyM3u8Url = `${protocol}://127.0.0.1:${localPort}/api/v1/movies/proxy-m3u8?url=${encodeURIComponent(m3u8Url)}&mode=proxy`;
+    const subtitleCacheIdentity = episode?._id
+      ? `episode:${String(episode._id)}`
+      : `movie:${String(movieId)}:episode:${String(episodeId)}`;
+
+    const result = await subtitleService.requestKoreanSubtitleGeneration(
+      m3u8Url,
+      proxyM3u8Url,
+      600,
+      subtitleCacheIdentity,
+    );
+    if (result.status === 'ready') {
+      return res.json({ success: true, ...result });
+    }
+
+    return res.status(202).json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error in generateKoreanSubtitles:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -934,4 +1103,7 @@ module.exports = {
   getCast,
   getForYou,
   getTrendingSocial,
+  getKoreanSubtitleStatus,
+  requestKoreanSubtitles,
+  generateKoreanSubtitles,
 };

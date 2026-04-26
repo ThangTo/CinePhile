@@ -18,7 +18,11 @@ import {
   FiEye,
   FiTrash2,
   FiEdit2,
+  FiUser,
+  FiSearch,
 } from "react-icons/fi";
+import { castAPI } from "services/admin.service";
+import { BarSpinner } from "components/common/LoadingState";
 
 // --- UI COMPONENTS ---
 
@@ -108,7 +112,12 @@ const GalleryManageModal = ({ isOpen, onClose, onSave, title, initialString, asp
 
   useEffect(() => {
     if (isOpen) {
-      const parsed = initialString ? initialString.split(/[\n,]+/).map((u) => u.trim()).filter(Boolean) : [];
+      const parsed = initialString
+        ? initialString
+            .split(/[\n,]+/)
+            .map((u) => u.trim())
+            .filter(Boolean)
+        : [];
       setUrls(parsed);
       setNewUrl("");
       setEditingIndex(null);
@@ -158,7 +167,10 @@ const GalleryManageModal = ({ isOpen, onClose, onSave, title, initialString, asp
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <FiImage className="text-primaryColor" /> Quản Lý Gallery: {title}
           </h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+          >
             <FiX size={24} />
           </button>
         </div>
@@ -176,7 +188,10 @@ const GalleryManageModal = ({ isOpen, onClose, onSave, title, initialString, asp
             {editingIndex !== null && (
               <button
                 type="button"
-                onClick={() => { setEditingIndex(null); setNewUrl(""); }}
+                onClick={() => {
+                  setEditingIndex(null);
+                  setNewUrl("");
+                }}
                 className="px-6 py-3 rounded-xl bg-gray-500/20 text-gray-300 font-bold border border-white/10 hover:bg-gray-500/40 hover:text-white transition-all shrink-0"
               >
                 Hủy Sửa
@@ -198,14 +213,24 @@ const GalleryManageModal = ({ isOpen, onClose, onSave, title, initialString, asp
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {urls.map((url, i) => (
-              <div key={i} className={`relative group rounded-xl overflow-hidden border ${editingIndex === i ? "border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]" : "border-white/10"} ${aspectRatio} bg-black/40`}>
-                <img src={url} alt="" className={`w-full h-full object-cover ${editingIndex === i ? "opacity-30" : ""}`} onError={(e) => (e.target.style.display = "none")} />
+              <div
+                key={i}
+                className={`relative group rounded-xl overflow-hidden border ${editingIndex === i ? "border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]" : "border-white/10"} ${aspectRatio} bg-black/40`}
+              >
+                <img
+                  src={url}
+                  alt=""
+                  className={`w-full h-full object-cover ${editingIndex === i ? "opacity-30" : ""}`}
+                  onError={(e) => (e.target.style.display = "none")}
+                />
                 {editingIndex === i && (
                   <div className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg shadow-blue-500/50">
                     ĐANG SỬA
                   </div>
                 )}
-                <div className={`absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 gap-2 backdrop-blur-sm ${editingIndex === i ? "opacity-100" : ""}`}>
+                <div
+                  className={`absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 gap-2 backdrop-blur-sm ${editingIndex === i ? "opacity-100" : ""}`}
+                >
                   <div className="flex gap-3">
                     <button
                       type="button"
@@ -224,7 +249,12 @@ const GalleryManageModal = ({ isOpen, onClose, onSave, title, initialString, asp
                       <FiTrash2 size={20} />
                     </button>
                   </div>
-                  <span className="text-[10px] text-gray-300 truncate w-full px-2 text-center" title={url}>{url}</span>
+                  <span
+                    className="text-[10px] text-gray-300 truncate w-full px-2 text-center"
+                    title={url}
+                  >
+                    {url}
+                  </span>
                 </div>
               </div>
             ))}
@@ -238,10 +268,18 @@ const GalleryManageModal = ({ isOpen, onClose, onSave, title, initialString, asp
         </div>
 
         <div className="px-6 py-4 border-t border-white/10 flex justify-end gap-3 bg-black/20 shrink-0">
-          <button type="button" onClick={onClose} className="px-6 py-2 rounded-xl text-gray-400 font-medium hover:bg-white/5 transition-all">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-6 py-2 rounded-xl text-gray-400 font-medium hover:bg-white/5 transition-all"
+          >
             Hủy
           </button>
-          <button type="button" onClick={handleSave} className="px-6 py-2 rounded-xl bg-primaryColor text-black font-bold shadow-lg shadow-primaryColor/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-6 py-2 rounded-xl bg-primaryColor text-black font-bold shadow-lg shadow-primaryColor/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
             Lưu Gallery
           </button>
         </div>
@@ -272,7 +310,13 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     logo: "",
     backdrops: "",
     posters: "",
+    castIds: [],
   });
+  // Cast management state
+  const [castSearch, setCastSearch] = useState("");
+  const [castResults, setCastResults] = useState([]);
+  const [castLoading, setCastLoading] = useState(false);
+  const [characterInput, setCharacterInput] = useState({});
   const [galleryModal, setGalleryModal] = useState({
     isOpen: false,
     type: null, // "posters" or "backdrops"
@@ -308,7 +352,23 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         logo: movie.logo || movie.images?.logo || "",
         backdrops: movie.backdrops?.join(",\n") || movie.images?.backdrops?.join(",\n") || "",
         posters: movie.posters?.join(",\n") || movie.images?.posters?.join(",\n") || "",
+        castIds: Array.isArray(movie.castIds)
+          ? movie.castIds.map((c) => ({
+              castId: c.castId || c._id || c,
+              character: c.character || "",
+              order: c.order || 0,
+            }))
+          : [],
       });
+      // Reset character input
+      if (Array.isArray(movie.castIds)) {
+        const charMap = {};
+        movie.castIds.forEach((c) => {
+          const id = c.castId || c._id || c;
+          if (id) charMap[id] = c.character || "";
+        });
+        setCharacterInput(charMap);
+      }
     } else {
       setFormData({
         title: "",
@@ -332,10 +392,51 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         logo: "",
         backdrops: "",
         posters: "",
+        castIds: [],
       });
+      setCharacterInput({});
     }
     setErrors({});
+    setCastSearch("");
+    setCastResults([]);
   }, [movie, isOpen]);
+
+  // Fetch cast details for display in list
+  useEffect(() => {
+    if (!isOpen || formData.castIds.length === 0) return;
+
+    const fetchCastDetails = async () => {
+      const castIdsToFetch = formData.castIds
+        .filter((c) => !c._name && !c._avatar)
+        .map((c) => c.castId);
+
+      if (castIdsToFetch.length === 0) return;
+
+      try {
+        const promises = castIdsToFetch.map((id) => castAPI.getById(id).catch(() => null));
+        const results = await Promise.all(promises);
+
+        setFormData((prev) => ({
+          ...prev,
+          castIds: prev.castIds.map((c) => {
+            const fetched = results.find((r) => r && (r._id === c.castId || r.id === c.castId));
+            if (fetched) {
+              return {
+                ...c,
+                _name: fetched.name,
+                _avatar: fetched.profileUrl || fetched.profilePath,
+              };
+            }
+            return c;
+          }),
+        }));
+      } catch (err) {
+        console.error("Error fetching cast details:", err);
+      }
+    };
+
+    fetchCastDetails();
+  }, [isOpen, formData.castIds]);
 
   // Tạo slug tự động để hiển thị preview
   useEffect(() => {
@@ -366,6 +467,99 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
     return newErrors;
   };
 
+  // ============ CAST MANAGEMENT ============
+
+  const searchCast = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setCastResults([]);
+      return;
+    }
+    setCastLoading(true);
+    try {
+      const response = await castAPI.getAll({ search: query, limit: 10 });
+      const results = Array.isArray(response.data) ? response.data : [];
+      // Lọc bỏ các cast đã được thêm
+      const existingIds = new Set(formData.castIds.map((c) => c.castId));
+      setCastResults(results.filter((c) => !existingIds.has(c._id || c.id)));
+    } catch (err) {
+      console.error("Error searching cast:", err);
+      setCastResults([]);
+    } finally {
+      setCastLoading(false);
+    }
+  };
+
+  // Debounce search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (castSearch.trim().length >= 2) {
+        searchCast(castSearch);
+      } else {
+        setCastResults([]);
+      }
+    }, 400);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [castSearch, formData.castIds]);
+
+  const addCastToMovie = (cast) => {
+    const castId = cast._id || cast.id;
+    const alreadyAdded = formData.castIds.some((c) => c.castId === castId);
+    if (alreadyAdded) return;
+
+    const newOrder = formData.castIds.length;
+    setFormData((prev) => ({
+      ...prev,
+      castIds: [...prev.castIds, { castId, character: "", order: newOrder }],
+    }));
+    setCastResults([]);
+    setCastSearch("");
+  };
+
+  const removeCastFromMovie = (castId) => {
+    setFormData((prev) => ({
+      ...prev,
+      castIds: prev.castIds.filter((c) => c.castId !== castId),
+    }));
+    // Update order
+    setFormData((prev) => ({
+      ...prev,
+      castIds: prev.castIds.map((c, i) => ({ ...c, order: i })),
+    }));
+  };
+
+  const updateCastCharacter = (castId, character) => {
+    setCharacterInput((prev) => ({ ...prev, [castId]: character }));
+    setFormData((prev) => ({
+      ...prev,
+      castIds: prev.castIds.map((c) => (c.castId === castId ? { ...c, character } : c)),
+    }));
+  };
+
+  const moveCastUp = (index) => {
+    if (index <= 0) return;
+    setFormData((prev) => {
+      const newCastIds = [...prev.castIds];
+      [newCastIds[index - 1], newCastIds[index]] = [newCastIds[index], newCastIds[index - 1]];
+      return {
+        ...prev,
+        castIds: newCastIds.map((c, i) => ({ ...c, order: i })),
+      };
+    });
+  };
+
+  const moveCastDown = (index) => {
+    if (index >= formData.castIds.length - 1) return;
+    setFormData((prev) => {
+      const newCastIds = [...prev.castIds];
+      [newCastIds[index], newCastIds[index + 1]] = [newCastIds[index + 1], newCastIds[index]];
+      return {
+        ...prev,
+        castIds: newCastIds.map((c, i) => ({ ...c, order: i })),
+      };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = validate();
@@ -378,7 +572,10 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
       const movieData = {
         ...formData,
         genres: formData.genres
-          ? formData.genres.split(",").map((g) => g.trim()).filter(Boolean)
+          ? formData.genres
+              .split(",")
+              .map((g) => g.trim())
+              .filter(Boolean)
           : [],
         rating: parseFloat(formData.rating) || 0,
         year: parseInt(formData.year) || new Date().getFullYear(),
@@ -387,8 +584,18 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
         backgroundImage: formData.backgroundImage || "",
         trailer: formData.trailer || "",
         logo: formData.logo || "",
-        backdrops: formData.backdrops ? formData.backdrops.split(/[\n,]+/).map((u) => u.trim()).filter(Boolean) : [],
-        posters: formData.posters ? formData.posters.split(/[\n,]+/).map((u) => u.trim()).filter(Boolean) : [],
+        backdrops: formData.backdrops
+          ? formData.backdrops
+              .split(/[\n,]+/)
+              .map((u) => u.trim())
+              .filter(Boolean)
+          : [],
+        posters: formData.posters
+          ? formData.posters
+              .split(/[\n,]+/)
+              .map((u) => u.trim())
+              .filter(Boolean)
+          : [],
         views: parseInt(formData.views) || 0,
         totalEpisodes: parseInt(formData.totalEpisodes) || 0,
       };
@@ -465,7 +672,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                     </h3>
                     {movie?.tmdb?.id && (
                       <a
-                        href={`https://www.themoviedb.org/${movie.tmdb.type || 'movie'}/${movie.tmdb.id}`}
+                        href={`https://www.themoviedb.org/${movie.tmdb.type || "movie"}/${movie.tmdb.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-white rounded-lg transition-colors border border-blue-500/20"
@@ -539,7 +746,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                       onChange={handleChange}
                       error={errors.rating}
                     />
-                    
+
                     {/* View & Readonly Watch Time */}
                     <div className="space-y-1 w-full">
                       <label className="text-xs font-semibold uppercase text-gray-400 tracking-wider flex items-center gap-1.5">
@@ -628,23 +835,23 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                     />
 
                     <div className="grid grid-cols-2 gap-4">
-                       <FormField
-                         label="Tập hiện tại"
-                         name="currentEpisode"
-                         icon={FiMonitor}
-                         value={formData.currentEpisode}
-                         onChange={handleChange}
-                         placeholder="VD: 7 hoặc Full"
-                       />
-                       <FormField
-                         label="Tổng số tập"
-                         name="totalEpisodes"
-                         type="number"
-                         icon={FiMonitor}
-                         value={formData.totalEpisodes}
-                         onChange={handleChange}
-                         placeholder="VD: 12"
-                       />
+                      <FormField
+                        label="Tập hiện tại"
+                        name="currentEpisode"
+                        icon={FiMonitor}
+                        value={formData.currentEpisode}
+                        onChange={handleChange}
+                        placeholder="VD: 7 hoặc Full"
+                      />
+                      <FormField
+                        label="Tổng số tập"
+                        name="totalEpisodes"
+                        type="number"
+                        icon={FiMonitor}
+                        value={formData.totalEpisodes}
+                        onChange={handleChange}
+                        placeholder="VD: 12"
+                      />
                     </div>
                   </div>
 
@@ -659,7 +866,183 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                     />
                   </div>
 
-                  {/* Row 4: SEO / Slug Preview (Lấp đầy khoảng trống cuối cùng) */}
+                  {/* Row 4: Cast Management */}
+                  <div className="border-t border-white/5 pt-4">
+                    <h3 className="text-white font-bold flex items-center gap-2 mb-4">
+                      <FiUser className="text-primaryColor" /> Diễn Viên ({formData.castIds.length})
+                    </h3>
+
+                    {/* Search Cast */}
+                    <div className="relative mb-4">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FiSearch className="text-gray-500" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Tìm diễn viên (tên, alias)..."
+                        value={castSearch}
+                        onChange={(e) => setCastSearch(e.target.value)}
+                        className="w-full bg-black/20 border border-white/5 focus:border-primaryColor rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primaryColor/50 transition-all"
+                      />
+                      {castLoading && (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                          <BarSpinner size="sm" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Search Results Dropdown */}
+                    {castResults.length > 0 && (
+                      <div className="bg-black/40 border border-white/10 rounded-xl max-h-40 overflow-y-auto mb-4 custom-scrollbar">
+                        {castResults.map((cast) => (
+                          <button
+                            key={cast._id || cast.id}
+                            type="button"
+                            onClick={() => addCastToMovie(cast)}
+                            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-white/10 transition-colors text-left"
+                          >
+                            <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-500 flex-shrink-0">
+                              {cast.profileUrl || cast.profilePath ? (
+                                <img
+                                  src={cast.profileUrl || cast.profilePath}
+                                  alt={cast.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.target.style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
+                                  {(cast.name || "C").charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm text-white truncate">{cast.name}</div>
+                              {cast.knownForDepartment && (
+                                <div className="text-[10px] text-gray-500">
+                                  {cast.knownForDepartment}
+                                </div>
+                              )}
+                            </div>
+                            <FiCheck className="text-primaryColor flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Cast List */}
+                    {formData.castIds.length > 0 ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                        {formData.castIds.map((castItem, index) => {
+                          const castId = castItem.castId;
+                          return (
+                            <div
+                              key={castId}
+                              className="flex items-center gap-3 bg-black/20 border border-white/5 rounded-xl p-3 group hover:border-primaryColor/30 transition-colors"
+                            >
+                              {/* Order Number */}
+                              <div className="w-6 h-6 rounded-full bg-primaryColor/20 text-primaryColor text-xs font-bold flex items-center justify-center flex-shrink-0">
+                                {index + 1}
+                              </div>
+
+                              {/* Cast Avatar */}
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-500 flex-shrink-0">
+                                {castItem._avatar ? (
+                                  <img
+                                    src={castItem._avatar}
+                                    alt={castItem._name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-white text-sm font-bold">
+                                    {(castItem._name || "C").charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Cast Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm text-white font-medium truncate">
+                                  {castItem._name || "Diễn viên"}
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder="Vai diễn..."
+                                  value={characterInput[castId] || castItem.character || ""}
+                                  onChange={(e) => updateCastCharacter(castId, e.target.value)}
+                                  className="w-full bg-transparent text-xs text-gray-400 placeholder-gray-600 focus:outline-none focus:text-gray-300"
+                                />
+                              </div>
+
+                              {/* Move Buttons */}
+                              <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => moveCastUp(index)}
+                                  disabled={index === 0}
+                                  className="p-1 text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+                                  title="Di chuyển lên"
+                                >
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 15l7-7 7 7"
+                                    />
+                                  </svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveCastDown(index)}
+                                  disabled={index === formData.castIds.length - 1}
+                                  className="p-1 text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+                                  title="Di chuyển xuống"
+                                >
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M19 9l-7 7-7-7"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {/* Remove Button */}
+                              <button
+                                type="button"
+                                onClick={() => removeCastFromMovie(castId)}
+                                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                title="Xóa diễn viên"
+                              >
+                                <FiTrash2 size={16} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500 text-sm border border-dashed border-white/10 rounded-xl">
+                        <FiUser className="mx-auto mb-2 opacity-50" size={24} />
+                        Chưa thêm diễn viên nào. Tìm kiếm và thêm ở trên.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Row 5: SEO / Slug Preview */}
                   <div className="mt-auto">
                     <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3 flex items-start gap-3">
                       <FiLink className="text-blue-400 mt-1 shrink-0" />
@@ -714,52 +1097,108 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
                         aspectRatio="aspect-video"
                       />
                     </div>
-                    
+
                     {/* Gallery Manager for Posters */}
                     <div className="space-y-3 border-t border-white/5 pt-4">
                       <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-gray-300">TMDB Posters Gallery</label>
+                        <label className="text-sm font-medium text-gray-300">
+                          TMDB Posters Gallery
+                        </label>
                         <button
                           type="button"
-                          onClick={() => setGalleryModal({ isOpen: true, type: "posters", title: "TMDB Posters", aspectRatio: "aspect-[2/3]" })}
+                          onClick={() =>
+                            setGalleryModal({
+                              isOpen: true,
+                              type: "posters",
+                              title: "TMDB Posters",
+                              aspectRatio: "aspect-[2/3]",
+                            })
+                          }
                           className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-primaryColor font-medium transition-colors border border-primaryColor/30"
                         >
-                          Quản Lý Gallery ({formData.posters ? formData.posters.split(/[\n,]+/).filter(Boolean).length : 0})
+                          Quản Lý Gallery (
+                          {formData.posters
+                            ? formData.posters.split(/[\n,]+/).filter(Boolean).length
+                            : 0}
+                          )
                         </button>
                       </div>
                       <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                        {formData.posters ? formData.posters.split(/[\n,]+/).map(u => u.trim()).filter(Boolean).slice(0, 5).map((url, i) => (
-                          <img key={`p-${i}`} src={url} alt="" className="h-20 aspect-[2/3] object-cover rounded shrink-0 border border-white/10" />
-                        )) : <span className="text-xs text-gray-500 italic">Trống</span>}
-                        {formData.posters && formData.posters.split(/[\n,]+/).filter(Boolean).length > 5 && (
-                          <div className="h-20 aspect-[2/3] rounded shrink-0 border border-white/10 flex items-center justify-center bg-white/5 text-gray-400 text-xs font-bold">
-                            +{formData.posters.split(/[\n,]+/).filter(Boolean).length - 5}
-                          </div>
+                        {formData.posters ? (
+                          formData.posters
+                            .split(/[\n,]+/)
+                            .map((u) => u.trim())
+                            .filter(Boolean)
+                            .slice(0, 5)
+                            .map((url, i) => (
+                              <img
+                                key={`p-${i}`}
+                                src={url}
+                                alt=""
+                                className="h-20 aspect-[2/3] object-cover rounded shrink-0 border border-white/10"
+                              />
+                            ))
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">Trống</span>
                         )}
+                        {formData.posters &&
+                          formData.posters.split(/[\n,]+/).filter(Boolean).length > 5 && (
+                            <div className="h-20 aspect-[2/3] rounded shrink-0 border border-white/10 flex items-center justify-center bg-white/5 text-gray-400 text-xs font-bold">
+                              +{formData.posters.split(/[\n,]+/).filter(Boolean).length - 5}
+                            </div>
+                          )}
                       </div>
                     </div>
 
                     {/* Gallery Manager for Backdrops */}
                     <div className="space-y-3 border-t border-white/5 pt-4">
                       <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-gray-300">TMDB Backdrops Gallery</label>
+                        <label className="text-sm font-medium text-gray-300">
+                          TMDB Backdrops Gallery
+                        </label>
                         <button
                           type="button"
-                          onClick={() => setGalleryModal({ isOpen: true, type: "backdrops", title: "TMDB Backdrops", aspectRatio: "aspect-video" })}
+                          onClick={() =>
+                            setGalleryModal({
+                              isOpen: true,
+                              type: "backdrops",
+                              title: "TMDB Backdrops",
+                              aspectRatio: "aspect-video",
+                            })
+                          }
                           className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-primaryColor font-medium transition-colors border border-primaryColor/30"
                         >
-                          Quản Lý Gallery ({formData.backdrops ? formData.backdrops.split(/[\n,]+/).filter(Boolean).length : 0})
+                          Quản Lý Gallery (
+                          {formData.backdrops
+                            ? formData.backdrops.split(/[\n,]+/).filter(Boolean).length
+                            : 0}
+                          )
                         </button>
                       </div>
                       <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                        {formData.backdrops ? formData.backdrops.split(/[\n,]+/).map(u => u.trim()).filter(Boolean).slice(0, 5).map((url, i) => (
-                          <img key={`b-${i}`} src={url} alt="" className="h-20 aspect-video object-cover rounded shrink-0 border border-white/10" />
-                        )) : <span className="text-xs text-gray-500 italic">Trống</span>}
-                        {formData.backdrops && formData.backdrops.split(/[\n,]+/).filter(Boolean).length > 5 && (
-                          <div className="h-20 aspect-video rounded shrink-0 border border-white/10 flex items-center justify-center bg-white/5 text-gray-400 text-xs font-bold">
-                            +{formData.backdrops.split(/[\n,]+/).filter(Boolean).length - 5}
-                          </div>
+                        {formData.backdrops ? (
+                          formData.backdrops
+                            .split(/[\n,]+/)
+                            .map((u) => u.trim())
+                            .filter(Boolean)
+                            .slice(0, 5)
+                            .map((url, i) => (
+                              <img
+                                key={`b-${i}`}
+                                src={url}
+                                alt=""
+                                className="h-20 aspect-video object-cover rounded shrink-0 border border-white/10"
+                              />
+                            ))
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">Trống</span>
                         )}
+                        {formData.backdrops &&
+                          formData.backdrops.split(/[\n,]+/).filter(Boolean).length > 5 && (
+                            <div className="h-20 aspect-video rounded shrink-0 border border-white/10 flex items-center justify-center bg-white/5 text-gray-400 text-xs font-bold">
+                              +{formData.backdrops.split(/[\n,]+/).filter(Boolean).length - 5}
+                            </div>
+                          )}
                       </div>
                     </div>
 
@@ -809,7 +1248,7 @@ const MovieFormModal = ({ isOpen, onClose, movie = null, onSave }) => {
           </button>
         </div>
       </div>
-      
+
       {/* Kéo Modal con gọi ở đây để đè lên form */}
       <GalleryManageModal
         isOpen={galleryModal.isOpen}

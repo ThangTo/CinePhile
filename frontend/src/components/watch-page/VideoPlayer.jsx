@@ -111,11 +111,36 @@ const VideoPlayer = ({
   const [downloadCompletedSegments, setDownloadCompletedSegments] = useState(0);
   const [useProxyMode, setUseProxyMode] = useState(false);
   const [doubleTapInfo, setDoubleTapInfo] = useState(null); // { side, totalSeconds, id }
+  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
+  const [currentSubtitle, setCurrentSubtitle] = useState(null);
+  const [koreanSubtitleUrl, setKoreanSubtitleUrl] = useState(null);
+  const [isGeneratingSubtitle, setIsGeneratingSubtitle] = useState(false);
+  const [subtitleProgress, setSubtitleProgress] = useState(0);
+  const [subtitleError, setSubtitleError] = useState(null);
+
+  const [featurePermissions, setFeaturePermissions] = useState({
+    download_movie: { requiresPremium: false },
+    korean_subtitles: { requiresPremium: false }
+  });
 
   const { user, openAuthModal } = useAuth();
   const isPremium = isPremiumActive(user);
   const isAdmin = user?.role === "admin";
   const isRegularUser = !isPremium && !isAdmin;
+  const apiBaseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+  const apiOrigin = apiBaseUrl.replace(/\/api\/v1\/?$/, "");
+
+  useEffect(() => {
+    // Fetch feature permissions on mount
+    fetch(`${apiBaseUrl}/settings/features`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setFeaturePermissions(data.data);
+        }
+      })
+      .catch(err => console.error("Failed to fetch feature permissions", err));
+  }, [apiBaseUrl]);
 
   const { toasts, showToast, removeToast } = useToast();
 
@@ -138,6 +163,23 @@ const VideoPlayer = ({
   const networkErrorCountRef = useRef(0);
   const lastPlaybackModeRef = useRef("direct");
   const lastPlaybackProgressRef = useRef(0);
+  const subtitlePollIntervalRef = useRef(null);
+  const activeSubtitleRequestKeyRef = useRef("");
+
+  // Custom Subtitle Refs
+  const subtitleOverlayRef = useRef(null);
+  const subtitleContainerRef = useRef(null);
+  const parsedSubtitlesRef = useRef([]);
+  const subPosRef = useRef({ x: 0, y: -40 });
+  const subDragRef = useRef({ isDragging: false, startX: 0, startY: 0, initX: 0, initY: 0 });
+
+  const subtitleMovieId = movie?._id || movie?.id || movie?.slug || null;
+  const subtitleEpisodeId =
+    episode?._id || episode?.id || episode?.episodeId || episode?.episode || episode?.slug || null;
+
+  useEffect(() => {
+    activeSubtitleRequestKeyRef.current = `${subtitleMovieId || ""}:${subtitleEpisodeId || ""}`;
+  }, [subtitleEpisodeId, subtitleMovieId]);
 
   // Hybrid Proxy: Check if source needs proxy mode
   const hlsSource = useMemo(() => {
@@ -252,6 +294,25 @@ const VideoPlayer = ({
       }
 
       lastPlaybackProgressRef.current = nextTime;
+
+      // Update custom subtitles
+      if (parsedSubtitlesRef.current.length > 0 && subtitleOverlayRef.current) {
+        let foundText = "";
+        for (let i = 0; i < parsedSubtitlesRef.current.length; i++) {
+          const cue = parsedSubtitlesRef.current[i];
+          if (nextTime >= cue.start && nextTime <= cue.end) {
+            foundText = cue.text;
+            break;
+          }
+        }
+        if (subtitleOverlayRef.current.innerHTML !== foundText) {
+          subtitleOverlayRef.current.innerHTML = foundText;
+          subtitleOverlayRef.current.style.opacity = foundText ? "1" : "0";
+        }
+      } else if (subtitleOverlayRef.current) {
+        subtitleOverlayRef.current.innerHTML = "";
+        subtitleOverlayRef.current.style.opacity = "0";
+      }
     };
 
     const handleDurationChange = () => {
@@ -499,13 +560,28 @@ const VideoPlayer = ({
 
   // Reset auto-play/seek state
   useEffect(() => {
-    const currentEpisodeId = episode?._id || episode?.id;
+    const currentEpisodeId = episode?._id || episode?.id || episode?.episodeId || episode?.episode;
     if (lastEpisodeIdRef.current !== currentEpisodeId) {
+      if (subtitlePollIntervalRef.current) {
+        clearInterval(subtitlePollIntervalRef.current);
+        subtitlePollIntervalRef.current = null;
+      }
       hasAutoSeekedRef.current = false;
       setHasAutoPlayed(false);
       lastEpisodeIdRef.current = currentEpisodeId;
+      setCurrentSubtitle(null);
+      setKoreanSubtitleUrl(null);
+      setIsGeneratingSubtitle(false);
+      setSubtitleProgress(0);
+      setSubtitleError(null);
+      parsedSubtitlesRef.current = [];
+      if (subtitleOverlayRef.current) {
+        subtitleOverlayRef.current.innerHTML = "";
+        subtitleOverlayRef.current.style.opacity = "0";
+      }
+      setShowSubtitleMenu(false);
     }
-  }, [episode?._id, episode?.id]);
+  }, [episode?._id, episode?.id, episode?.episodeId, episode?.episode]);
 
   // === TỐI ƯU: Auto-play khi video sẵn sàng (không seek ở đây, startPosition lo) ===
   useEffect(() => {
@@ -1304,6 +1380,369 @@ const VideoPlayer = ({
     });
   };
 
+  const toggleSubtitleMenu = () => {
+    setShowSubtitleMenu((prev) => {
+      if (!prev) {
+        setShowAudioMenu(false);
+        setShowSpeedMenu(false);
+        setShowQualityMenu(false);
+      }
+      return !prev;
+    });
+  };
+
+  const subtitleOptions = [
+    { key: null, label: "Tat phu de" },
+    { key: "ko", label: "한국어 (Korean)" },
+  ];
+
+  const stopSubtitleStatusPolling = useCallback(() => {
+    if (subtitlePollIntervalRef.current) {
+      clearInterval(subtitlePollIntervalRef.current);
+      subtitlePollIntervalRef.current = null;
+    }
+  }, []);
+
+  const loadKoreanSubtitle = useCallback(async (vttUrl) => {
+    if (!vttUrl) {
+      parsedSubtitlesRef.current = [];
+      if (subtitleOverlayRef.current) {
+        subtitleOverlayRef.current.innerHTML = "";
+        subtitleOverlayRef.current.style.opacity = "0";
+      }
+      return;
+    }
+    
+    try {
+      const response = await fetch(vttUrl);
+      const text = await response.text();
+      
+      const cues = [];
+      const lines = text.split('\n');
+      let currentCue = null;
+      
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        if (!line || line.startsWith('WEBVTT')) continue;
+        
+        const timeMatch = line.match(/(?:(\d{2}):)?(\d{2}):(\d{2})[.,](\d{3})\s*-->\s*(?:(\d{2}):)?(\d{2}):(\d{2})[.,](\d{3})/);
+        if (timeMatch) {
+          const parseTime = (h, m, s, ms) => (h ? parseInt(h, 10)*3600 : 0) + parseInt(m, 10)*60 + parseInt(s, 10) + parseInt(ms, 10)/1000;
+          const start = parseTime(timeMatch[1], timeMatch[2], timeMatch[3], timeMatch[4]);
+          const end = parseTime(timeMatch[5], timeMatch[6], timeMatch[7], timeMatch[8]);
+          currentCue = { start, end, text: '' };
+          cues.push(currentCue);
+        } else if (currentCue && !line.includes('-->')) {
+          currentCue.text += (currentCue.text ? '<br/>' : '') + line;
+        }
+      }
+
+      const cleanedCues = cues
+        .map((cue) => {
+          const text = String(cue.text || '').trim();
+          const plainText = text
+            .replace(/<br\s*\/?>/gi, ' ')
+            .replace(/<[^>]*>/g, ' ')
+            .trim();
+          const hasAlphanumeric = /[A-Za-z0-9\uAC00-\uD7AF]/.test(plainText);
+
+          return {
+            ...cue,
+            text,
+            plainText,
+            hasAlphanumeric,
+          };
+        })
+        .filter((cue) => cue.plainText.length > 0 && (cue.hasAlphanumeric || cue.plainText.length > 1))
+        .map(({ plainText, hasAlphanumeric, ...cue }) => cue);
+
+      parsedSubtitlesRef.current = cleanedCues;
+
+      if (subtitleOverlayRef.current && cleanedCues.length === 0) {
+        subtitleOverlayRef.current.innerHTML = "";
+        subtitleOverlayRef.current.style.opacity = "0";
+      }
+
+      console.log(`[VideoPlayer] Loaded ${cleanedCues.length} custom subtitle cues`);
+    } catch (e) {
+      console.error("Failed to load or parse custom VTT", e);
+      parsedSubtitlesRef.current = [];
+      if (subtitleOverlayRef.current) {
+        subtitleOverlayRef.current.innerHTML = "";
+        subtitleOverlayRef.current.style.opacity = "0";
+      }
+    }
+  }, []);
+
+  const applySubtitleStatus = useCallback((data, requestKey = null) => {
+    if (requestKey && activeSubtitleRequestKeyRef.current !== requestKey) {
+      return;
+    }
+
+    if (!data?.success) {
+      return;
+    }
+
+    const nextProgress = Math.max(0, Math.min(100, Number(data.progress) || 0));
+
+    if (data.status === "ready" && data.subtitleUrl) {
+      const fullUrl = data.subtitleUrl.startsWith("http") 
+        ? data.subtitleUrl 
+        : `${apiOrigin}${data.subtitleUrl}`;
+      setKoreanSubtitleUrl(fullUrl);
+      setIsGeneratingSubtitle(false);
+      setSubtitleProgress(100);
+      setSubtitleError(null);
+      stopSubtitleStatusPolling();
+      return;
+    }
+
+    if (data.status === "processing") {
+      setIsGeneratingSubtitle(true);
+      setSubtitleProgress(nextProgress);
+      setSubtitleError(null);
+      return;
+    }
+
+    if (data.status === "failed") {
+      setKoreanSubtitleUrl(null);
+      setIsGeneratingSubtitle(false);
+      setSubtitleProgress(0);
+      setSubtitleError(data.error || "Không thể tạo phụ đề tiếng Hàn");
+      stopSubtitleStatusPolling();
+      return;
+    }
+
+    setKoreanSubtitleUrl(null);
+    setIsGeneratingSubtitle(false);
+    setSubtitleProgress(0);
+    setSubtitleError(null);
+    stopSubtitleStatusPolling();
+  }, [apiOrigin, stopSubtitleStatusPolling]);
+
+  const checkKoreanSubtitleStatus = useCallback(async () => {
+    if (!subtitleMovieId || !subtitleEpisodeId) return null;
+    const requestKey = `${subtitleMovieId}:${subtitleEpisodeId}`;
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/movies/${subtitleMovieId}/episodes/${subtitleEpisodeId}/subtitles/korean/status`
+      );
+      const data = await response.json();
+      if (activeSubtitleRequestKeyRef.current !== requestKey) {
+        return null;
+      }
+      applySubtitleStatus(data, requestKey);
+      return data;
+    } catch (error) {
+      if (activeSubtitleRequestKeyRef.current !== requestKey) {
+        return null;
+      }
+      console.error("Error checking Korean subtitle status:", error);
+      setIsGeneratingSubtitle(false);
+      setSubtitleProgress(0);
+      setSubtitleError(error.message || "Không thể kiểm tra trạng thái phụ đề");
+      stopSubtitleStatusPolling();
+      return null;
+    }
+  }, [
+    apiBaseUrl,
+    applySubtitleStatus,
+    stopSubtitleStatusPolling,
+    subtitleEpisodeId,
+    subtitleMovieId,
+  ]);
+
+  const startSubtitleStatusPolling = useCallback(() => {
+    if (subtitlePollIntervalRef.current) {
+      return;
+    }
+
+    subtitlePollIntervalRef.current = setInterval(() => {
+      checkKoreanSubtitleStatus();
+    }, 2000);
+  }, [checkKoreanSubtitleStatus]);
+
+  const generateKoreanSubtitles = useCallback(async () => {
+    if (!subtitleMovieId || !subtitleEpisodeId) return;
+    const requestKey = `${subtitleMovieId}:${subtitleEpisodeId}`;
+
+    setIsGeneratingSubtitle(true);
+    setSubtitleProgress(0);
+    setSubtitleError(null);
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/movies/${subtitleMovieId}/episodes/${subtitleEpisodeId}/subtitles/korean/generate`,
+        { method: "POST" }
+      );
+      const data = await response.json();
+      if (activeSubtitleRequestKeyRef.current !== requestKey) {
+        return;
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || "Khong the tao phu de");
+      }
+
+      applySubtitleStatus(data, requestKey);
+
+      if (data.status === "ready" && data.subtitleUrl) {
+        showToast("Da tao phu de tieng Han thanh cong!", "success");
+        return;
+      }
+
+      if (data.status === "processing") {
+        startSubtitleStatusPolling();
+        showToast("Dang tao phu de tieng Han, vui long doi...", "info");
+      }
+    } catch (error) {
+      if (activeSubtitleRequestKeyRef.current !== requestKey) {
+        return;
+      }
+      console.error("Error generating Korean subtitles:", error);
+      setSubtitleError(error.message);
+      setIsGeneratingSubtitle(false);
+      setSubtitleProgress(0);
+      stopSubtitleStatusPolling();
+      showToast("Loi khi tao phu de tieng Han", "error");
+    }
+  }, [
+    apiBaseUrl,
+    applySubtitleStatus,
+    showToast,
+    startSubtitleStatusPolling,
+    stopSubtitleStatusPolling,
+    subtitleEpisodeId,
+    subtitleMovieId,
+  ]);
+
+  const requestKoreanSubtitleForUser = useCallback(async () => {
+    if (!subtitleMovieId || !subtitleEpisodeId) {
+      showToast("Khong xac dinh duoc tap phim de gui yeu cau.", "error");
+      return false;
+    }
+
+    try {
+      const token = localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken") || "";
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(
+        `${apiBaseUrl}/movies/${subtitleMovieId}/episodes/${subtitleEpisodeId}/subtitles/korean/request`,
+        {
+          method: "POST",
+          headers,
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Khong the ghi nhan yeu cau phu de");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error requesting Korean subtitles:", error);
+      showToast("Gui yeu cau that bai. Vui long thu lai.", "error");
+      return false;
+    }
+  }, [apiBaseUrl, showToast, subtitleEpisodeId, subtitleMovieId]);
+
+  const handleSubtitleChange = (key) => {
+    if (key === currentSubtitle) return;
+
+    if (key === "ko" && featurePermissions?.korean_subtitles?.requiresPremium && !isPremium && !isAdmin) {
+      setShowPremiumModal(true);
+      setShowSubtitleMenu(false);
+      return;
+    }
+
+    setShowSubtitleMenu(false);
+
+    if (key === "ko") {
+      setCurrentSubtitle("ko");
+
+      if (koreanSubtitleUrl) {
+        loadKoreanSubtitle(koreanSubtitleUrl);
+      } else {
+        (async () => {
+          const statusData = await checkKoreanSubtitleStatus();
+          if (statusData?.success && statusData.status === "ready" && statusData.subtitleUrl) {
+            return;
+          }
+          if (statusData?.success && statusData.status === "processing") {
+            startSubtitleStatusPolling();
+            showToast("Phu de dang duoc tao. Vui long doi trong giay lat...", "info");
+            return;
+          }
+
+          if (isAdmin) {
+            setIsGeneratingSubtitle(true);
+            setSubtitleProgress(0);
+            setSubtitleError(null);
+            startSubtitleStatusPolling();
+            generateKoreanSubtitles();
+          } else {
+            setIsGeneratingSubtitle(false);
+            setCurrentSubtitle(null);
+            const requested = await requestKoreanSubtitleForUser();
+            if (requested) {
+              showToast(
+                "Phu de Tieng Han chua co san. He thong da ghi nhan yeu cau cua ban va Admin se som cap nhat!",
+                "info"
+              );
+            }
+          }
+        })();
+      }
+      return;
+    }
+
+    setCurrentSubtitle(null);
+
+    const tracks = hlsRef.current?.media?.textTracks || videoRef.current?.textTracks;
+    if (tracks) {
+      for (let i = 0; i < tracks.length; i++) {
+        if (tracks[i].kind === "subtitles" || tracks[i].kind === "captions") {
+          tracks[i].mode = "disabled";
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const syncSubtitleStatus = async () => {
+      const data = await checkKoreanSubtitleStatus();
+      if (isCancelled || !data?.success) return;
+
+      if (data.status === "processing") {
+        startSubtitleStatusPolling();
+      } else {
+        stopSubtitleStatusPolling();
+      }
+    };
+
+    syncSubtitleStatus();
+
+    return () => {
+      isCancelled = true;
+      stopSubtitleStatusPolling();
+    };
+  }, [checkKoreanSubtitleStatus, startSubtitleStatusPolling, stopSubtitleStatusPolling]);
+
+  useEffect(() => {
+    if (currentSubtitle === "ko" && koreanSubtitleUrl) {
+      loadKoreanSubtitle(koreanSubtitleUrl);
+    }
+  }, [loadKoreanSubtitle, currentSubtitle, koreanSubtitleUrl]);
+
+  useEffect(() => {
+    if (subtitleError) {
+      console.warn("[VideoPlayer] Korean subtitle error:", subtitleError);
+    }
+  }, [subtitleError]);
+
   const qualityOptions = useMemo(() => {
     const standardOptions = ["Auto", "1080p", "720p", "480p", "360p"];
     const levels = Array.isArray(availableLevels) ? availableLevels : [];
@@ -1537,6 +1976,11 @@ const VideoPlayer = ({
       return;
     }
 
+    if (featurePermissions?.download_movie?.requiresPremium && !isPremium && !isAdmin) {
+      setShowPremiumModal(true);
+      return;
+    }
+
     if (isDownloading) {
       showToast("Đang có một tiến trình tải phim, vui lòng đợi!", "warning");
       return;
@@ -1665,7 +2109,18 @@ const VideoPlayer = ({
     } finally {
       setIsDownloading(false);
     }
-  }, [user, episode, videoUrl, movie, showToast, openAuthModal, isDownloading]);
+  }, [
+    user,
+    episode,
+    videoUrl,
+    movie,
+    showToast,
+    openAuthModal,
+    isDownloading,
+    featurePermissions?.download_movie?.requiresPremium,
+    isAdmin,
+    isPremium,
+  ]);
 
   const handleCancelDownload = useCallback(() => {
     if (downloadAbortControllerRef.current) {
@@ -1753,10 +2208,13 @@ const VideoPlayer = ({
       if (showQualityMenu && !e.target.closest(".quality-menu-container"))
         setShowQualityMenu(false);
       if (showAudioMenu && !e.target.closest(".audio-menu-container")) setShowAudioMenu(false);
+      if (showSubtitleMenu && !e.target.closest(".subtitle-menu-container")) {
+        setShowSubtitleMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMoreMenu, showSpeedMenu, showQualityMenu, showAudioMenu]);
+  }, [showMoreMenu, showSpeedMenu, showQualityMenu, showAudioMenu, showSubtitleMenu]);
 
   useEffect(() => {
     if (!showMoreMenu) {
@@ -1778,6 +2236,7 @@ const VideoPlayer = ({
         setShowSpeedMenu(false);
         setShowQualityMenu(false);
         setShowAudioMenu(false);
+        setShowSubtitleMenu(false);
       }}
       onTouchStart={(e) => {
         if (e.target.closest(".pointer-events-auto")) e.stopPropagation();
@@ -1789,6 +2248,7 @@ const VideoPlayer = ({
           className="w-full h-full rounded-lg"
           src={!hlsSource ? fileSource : undefined}
           onClick={handleVideoClick}
+          crossOrigin="anonymous"
           playsInline
           webkit-playsinline="true"
           x5-playsinline="true"
@@ -1893,6 +2353,61 @@ const VideoPlayer = ({
         </div>
       )}
 
+      {/* ═══ Custom Subtitle Overlay ═══ */}
+      {currentSubtitle && (
+        <div
+          ref={subtitleContainerRef}
+          className="absolute z-30 left-0 right-0 bottom-[10%] flex justify-center pointer-events-none"
+        >
+          <div
+            ref={subtitleOverlayRef}
+            className="pointer-events-auto cursor-move select-none"
+            style={{
+              color: "#fde047",
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+              fontSize: "clamp(1rem, 2.5vw, 2rem)",
+              fontFamily: "Inter, 'Malgun Gothic', sans-serif",
+              textShadow: "1px 1px 3px rgba(0, 0, 0, 0.9)",
+              borderRadius: "5px",
+              padding: "4px 8px",
+              textAlign: "center",
+              maxWidth: "90%",
+              whiteSpace: "pre-line",
+              opacity: 0,
+              transform: `translate(${subPosRef.current.x}px, ${subPosRef.current.y}px)`,
+            }}
+            onPointerDown={(e) => {
+              if (e.button !== 0 && e.type !== "touchstart") return;
+              subDragRef.current.isDragging = true;
+              subDragRef.current.startX = e.clientX || (e.touches && e.touches[0].clientX);
+              subDragRef.current.startY = e.clientY || (e.touches && e.touches[0].clientY);
+              subDragRef.current.initX = subPosRef.current.x;
+              subDragRef.current.initY = subPosRef.current.y;
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              if (!subDragRef.current.isDragging) return;
+              const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+              const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+              const dx = clientX - subDragRef.current.startX;
+              const dy = clientY - subDragRef.current.startY;
+              subPosRef.current.x = subDragRef.current.initX + dx;
+              subPosRef.current.y = subDragRef.current.initY + dy;
+              if (subtitleOverlayRef.current) {
+                subtitleOverlayRef.current.style.transform = `translate(${subPosRef.current.x}px, ${subPosRef.current.y}px)`;
+              }
+            }}
+            onPointerUp={(e) => {
+              subDragRef.current.isDragging = false;
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }}
+            onPointerCancel={(e) => {
+              subDragRef.current.isDragging = false;
+            }}
+          ></div>
+        </div>
+      )}
+
       <VideoOverlays
         hasNativePlayer={hasNativePlayer}
         isBuffering={isBuffering}
@@ -1950,6 +2465,13 @@ const VideoPlayer = ({
         downloadProgress={downloadProgress}
         isDownloadMinimized={isDownloadMinimized}
         onToggleDownloadMinimize={() => setIsDownloadMinimized(!isDownloadMinimized)}
+        showSubtitleMenu={showSubtitleMenu}
+        onToggleSubtitleMenu={toggleSubtitleMenu}
+        subtitleOptions={subtitleOptions}
+        currentSubtitle={currentSubtitle}
+        onSubtitleChange={handleSubtitleChange}
+        isGeneratingSubtitle={isGeneratingSubtitle}
+        subtitleProgress={subtitleProgress}
       />
 
       {/* Download Progress Overlay */}

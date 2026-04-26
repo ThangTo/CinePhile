@@ -79,6 +79,19 @@ function trackLocally(identifier, visitsKey, now) {
   analyticsService.localVisits.get(visitsKey).add(identifier);
 }
 
+// In-memory rate limiting and state keeping for Redis
+const lastTrackingMap = new Map();
+const expiredKeys = new Set();
+
+setInterval(() => {
+  const cutoff = Date.now() - 60000; // 1 minute
+  for (const [key, timestamp] of lastTrackingMap.entries()) {
+    if (timestamp < cutoff) {
+      lastTrackingMap.delete(key);
+    }
+  }
+}, 60000).unref();
+
 async function trackingMiddleware(req, res, next) {
   if (shouldSkipTracking(req)) {
     return next();
@@ -88,15 +101,34 @@ async function trackingMiddleware(req, res, next) {
   const identifier = getTrackingIdentifier(req);
   const visitsKey = `analytics:visits:${moment().tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD')}`;
 
+  const lastTracked = lastTrackingMap.get(identifier);
+  if (lastTracked && (now - lastTracked < 60000)) {
+    return next();
+  }
+
+  lastTrackingMap.set(identifier, now);
+
   try {
     if (!redisService.isConnected || !redisService.client) {
       trackLocally(identifier, visitsKey, now);
     } else {
-      await Promise.all([
+      const commands = [
         redisService.client.sendCommand(['ZADD', 'analytics:active_users', now.toString(), identifier]),
         redisService.client.sendCommand(['SADD', visitsKey, identifier]),
-        redisService.client.sendCommand(['EXPIRE', visitsKey, (60 * 60 * 24 * 60).toString()]),
-      ]);
+      ];
+
+      // Send EXPIRE once per visitKey (per node runtime) instead of on every request
+      if (!expiredKeys.has(visitsKey)) {
+        commands.push(redisService.client.sendCommand(['EXPIRE', visitsKey, (60 * 60 * 24 * 60).toString()]));
+        expiredKeys.add(visitsKey);
+        if (expiredKeys.size > 10) {
+          const keysArray = Array.from(expiredKeys);
+          expiredKeys.clear();
+          expiredKeys.add(keysArray[keysArray.length - 1]);
+        }
+      }
+
+      await Promise.all(commands);
     }
   } catch (error) {
     if (!degradeRedisGracefully(error)) {
@@ -133,9 +165,12 @@ async function trackingMiddleware(req, res, next) {
       };
 
       const locationKey = `analytics:location:${identifier}`;
-      await Promise.all([
-        redisService.client.sendCommand(['SET', locationKey, JSON.stringify(locationData)]),
-        redisService.client.sendCommand(['EXPIRE', locationKey, (60 * 60 * 24 * 60).toString()]),
+      await redisService.client.sendCommand([
+        'SET',
+        locationKey,
+        JSON.stringify(locationData),
+        'EX',
+        (60 * 60 * 24 * 60).toString(),
       ]);
     } catch (error) {
       if (!degradeRedisGracefully(error)) {

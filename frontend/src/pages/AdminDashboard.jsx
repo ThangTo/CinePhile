@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import MovieTable from "components/admin/MovieTable";
 import UserTable from "components/admin/UserTable";
 import CommentTable from "components/admin/CommentTable";
+import CastTable from "components/admin/CastTable";
 import AdminSidebar from "components/admin/AdminSidebar";
 import AdminOverviewTab from "components/admin/AdminOverviewTab";
 import AdminNotificationTab from "components/admin/AdminNotificationTab";
@@ -11,6 +12,7 @@ import AdminViralClipsTab from "components/admin/AdminViralClipsTab";
 import AdminMailboxTab from "components/admin/AdminMailboxTab";
 import SettingsPricingTab from "components/admin/SettingsPricingTab";
 import AdminQuestsTab from "components/admin/AdminQuestsTab";
+import AdminSubtitlesTab from "components/admin/AdminSubtitlesTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminDashboard = () => {
@@ -68,6 +70,13 @@ const AdminDashboard = () => {
             <UserTable />
           </div>
         );
+      case ADMIN_TABS.CASTS:
+        return (
+          <div className="animate-fade-in">
+            <h1 className="text-2xl font-bold text-white mb-6">Quản Lý Diễn Viên</h1>
+            <CastTable />
+          </div>
+        );
       case ADMIN_TABS.COMMENTS:
         return (
           <div className="animate-fade-in">
@@ -90,6 +99,8 @@ const AdminDashboard = () => {
             <AdminMailboxTab />
           </div>
         );
+      case ADMIN_TABS.SUBTITLES:
+        return <AdminSubtitlesTab />;
       case ADMIN_TABS.SETTINGS:
         return <AdminSettingsTab />;
       case ADMIN_TABS.PRICING:

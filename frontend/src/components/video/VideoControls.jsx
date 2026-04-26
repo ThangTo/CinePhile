@@ -4,6 +4,7 @@ import ProgressBar from "./ProgressBar";
 import QualityMenu from "./QualityMenu";
 import SpeedMenu from "./SpeedMenu";
 import AudioMenu from "./AudioMenu";
+import SubtitleMenu from "./SubtitleMenu";
 import MobileMoreMenu from "./MobileMoreMenu";
 import { formatTime } from "utils/ultils";
 
@@ -68,6 +69,14 @@ const VideoControls = ({
   downloadProgress,
   isDownloadMinimized,
   onToggleDownloadMinimize,
+  // Subtitle
+  showSubtitleMenu,
+  onToggleSubtitleMenu,
+  subtitleOptions,
+  currentSubtitle,
+  onSubtitleChange,
+  isGeneratingSubtitle,
+  subtitleProgress,
 }) => {
   if ((!showControls && !isBuffering) || !hasNativePlayer) {
     return null;
@@ -239,6 +248,19 @@ const VideoControls = ({
               />
             </div>
           )}
+
+          {/* Subtitle Menu - Desktop only */}
+          <div className="hidden md:flex">
+            <SubtitleMenu
+              subtitleOptions={subtitleOptions}
+              currentSubtitle={currentSubtitle}
+              showSubtitleMenu={showSubtitleMenu}
+              onToggleSubtitleMenu={onToggleSubtitleMenu}
+              onSubtitleChange={onSubtitleChange}
+              isGenerating={isGeneratingSubtitle}
+              generatingProgress={subtitleProgress}
+            />
+          </div>
 
           {/* Picture in Picture - Desktop/Tablet only */}
           <div className="hidden md:block">

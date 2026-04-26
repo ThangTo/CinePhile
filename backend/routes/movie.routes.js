@@ -84,6 +84,15 @@ router.post('/:id/rate', authMiddleware, movieController.rateMovie);
 // GET /api/v1/movies/trending-social - AI-curated trending movies (TMDB + Google Trends + LLM)
 router.get('/trending-social', movieController.getTrendingSocial);
 
+// GET /api/v1/movies/:id/episodes/:episodeId/subtitles/korean/status - Check Korean subtitle status
+router.get('/:id/episodes/:episodeId/subtitles/korean/status', movieController.getKoreanSubtitleStatus);
+
+// POST /api/v1/movies/:id/episodes/:episodeId/subtitles/korean/request - Request Korean subtitles
+router.post('/:id/episodes/:episodeId/subtitles/korean/request', movieController.requestKoreanSubtitles);
+
+// POST /api/v1/movies/:id/episodes/:episodeId/subtitles/korean/generate - Generate Korean subtitles
+router.post('/:id/episodes/:episodeId/subtitles/korean/generate', movieController.generateKoreanSubtitles);
+
 // GET /api/v1/movies/:id - Get movie by ID (must be LAST to avoid conflicts)
 router.get('/:id', movieController.getById);
 module.exports = router;

@@ -127,20 +127,30 @@ const transformMovieData = (movieData, isUpdate = false) => {
     isFeatured: 'isFeatured',
     logo: 'logo', // special handling below
     backdrops: 'backdrops', // special handling below
-    posters: 'posters' // special handling below
+    posters: 'posters', // special handling below
   };
 
   // Apply field mappings
   Object.keys(fieldMappings).forEach((frontendField) => {
     // For URL fields (poster, backgroundImage, trailer, logo, backdrops, posters), include empty strings/arrays
     // For other fields, skip undefined and null
-    const isUrlField = frontendField === 'poster' || frontendField === 'backgroundImage' || frontendField === 'trailer' || frontendField === 'logo' || frontendField === 'backdrops' || frontendField === 'posters';
-    
+    const isUrlField =
+      frontendField === 'poster' ||
+      frontendField === 'backgroundImage' ||
+      frontendField === 'trailer' ||
+      frontendField === 'logo' ||
+      frontendField === 'backdrops' ||
+      frontendField === 'posters';
+
     if (isUrlField) {
-      if (frontendField === 'logo' || frontendField === 'backdrops' || frontendField === 'posters') {
+      if (
+        frontendField === 'logo' ||
+        frontendField === 'backdrops' ||
+        frontendField === 'posters'
+      ) {
         if (movieData[frontendField] !== undefined) {
-           transformed.images = transformed.images || {};
-           transformed.images[frontendField] = movieData[frontendField];
+          transformed.images = transformed.images || {};
+          transformed.images[frontendField] = movieData[frontendField];
         }
       }
       // URL fields: include if not undefined (empty string is valid)
@@ -157,13 +167,23 @@ const transformMovieData = (movieData, isUpdate = false) => {
     }
   });
 
-  // Keep original DB field names if they exist (but exclude actors/directors)
-  const excludedFields = ['actors', 'actor', 'directors', 'director'];
+  // Keep original DB field names if they exist
+  // Exclude actors/directors (not handled here) but allow castIds
+  const excludedFields = ['actors', 'actor', 'directors', 'director', 'castIds'];
   Object.keys(movieData).forEach((key) => {
     if (!fieldMappings[key] && !transformed[key] && !excludedFields.includes(key)) {
       transformed[key] = movieData[key];
     }
   });
+
+  // Handle castIds separately - allow it to pass through
+  if (movieData.castIds !== undefined && Array.isArray(movieData.castIds)) {
+    transformed.castIds = movieData.castIds.map((item) => ({
+      castId: item.castId || item._id || item,
+      character: item.character || '',
+      order: item.order || 0,
+    }));
+  }
 
   // Transform categories/genres
   if (movieData.genres !== undefined || movieData.categories !== undefined) {
@@ -174,13 +194,6 @@ const transformMovieData = (movieData, isUpdate = false) => {
   if (movieData.country !== undefined) {
     transformed.country = transformCountry(movieData.country);
   }
-
-  // Explicitly exclude actors and directors from transformation
-  // These fields should not be updated via create/update endpoints
-  delete transformed.actor;
-  delete transformed.actors;
-  delete transformed.director;
-  delete transformed.directors;
 
   // Handle slug generation (only for create, not for update)
   if (!isUpdate && !transformed.slug && transformed.name) {

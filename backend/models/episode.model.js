@@ -50,6 +50,10 @@ const episodeSchema = new mongoose.Schema(
       default: 0,
       index: true,
     },
+    subtitleRequestCount: {
+      type: Number,
+      default: 0,
+    },
     totalWatchTime: {
       type: Number,
       default: 0, // Tổng thời lượng xem (giây)

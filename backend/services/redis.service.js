@@ -282,7 +282,12 @@ class RedisService {
     if (!this.isConnected || !this.client) return false;
 
     try {
-      await this.client.del(key);
+      if (Array.isArray(key)) {
+        if (key.length === 0) return true;
+        await this.client.del(key);
+      } else {
+        await this.client.del(key);
+      }
       return true;
     } catch (error) {
       this._logOperationalError('Redis DEL error', error);
@@ -310,16 +315,16 @@ class RedisService {
         return this.client.delByPattern(pattern);
       }
 
-      let cursor = 0;
+      let cursor = '0';
       let deletedCount = 0;
       do {
         const result = await this.client.scan(cursor, { MATCH: pattern, COUNT: 100 });
-        cursor = result.cursor;
+        cursor = String(result.cursor);
         if (result.keys.length > 0) {
           const deleted = await this.client.del(result.keys);
           deletedCount += deleted;
         }
-      } while (cursor !== 0);
+      } while (cursor !== '0');
 
       return deletedCount;
     } catch (error) {

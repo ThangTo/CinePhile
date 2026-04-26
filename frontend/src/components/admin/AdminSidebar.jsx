@@ -30,7 +30,7 @@ const AdminSidebar = ({
       </div>
 
       {/* Menu Items */}
-      <nav className="p-2 space-y-2">
+      <nav className="p-2 space-y-2 h-[calc(100vh-4rem)] overflow-y-auto overflow-x-hidden custom-scrollbar pb-8">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -41,19 +41,11 @@ const AdminSidebar = ({
                 : "text-gray-300 hover:bg-white/10"
             }`}
           >
-            <i className={`fa-solid ${item.icon} text-lg w-10 text-center`}></i>
-            {isOpen && <span>{item.label}</span>}
+            <i className={`fa-solid ${item.icon} text-lg w-10 text-center shrink-0`}></i>
+            {isOpen && <span className="whitespace-nowrap truncate">{item.label}</span>}
           </button>
         ))}
       </nav>
-
-      {/* Logout */}
-      <div className="absolute bottom-4 left-0 right-0 px-4">
-        <button className="w-full flex items-center gap-4 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-all">
-          <i className="fa-solid fa-sign-out-alt text-lg"></i>
-          {isOpen && <span>Đăng Xuất</span>}
-        </button>
-      </div>
     </aside>
   );
 };

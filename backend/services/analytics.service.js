@@ -404,8 +404,8 @@ class AnalyticsService {
     let skipped = 0;
     const now = moment().tz('Asia/Ho_Chi_Minh');
 
-    // Scan up to 60 days back (current Redis TTL)
-    for (let i = 0; i < 60; i++) {
+    // Scan up to 2 days back (instead of 60) to reduce load on startup
+    for (let i = 0; i < 2; i++) {
       const dateStr = now.clone().subtract(i, 'days').format('YYYY-MM-DD');
 
       // Skip if already snapshotted
@@ -606,8 +606,8 @@ class AnalyticsService {
     let skipped = 0;
     const now = moment().tz('Asia/Ho_Chi_Minh');
 
-    // Last 8 weeks
-    for (let w = 0; w < 8; w++) {
+    // Last 1 week (instead of 8)
+    for (let w = 0; w < 1; w++) {
       const weekMoment = now.clone().subtract(w, 'weeks');
       const year = weekMoment.isoWeekYear();
       const periodKey = `${year}-W${String(weekMoment.isoWeek()).padStart(2, '0')}`;

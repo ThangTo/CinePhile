@@ -3,6 +3,7 @@ const router = express.Router();
 const adminController = require('../controllers/admin.controller');
 const adminQuestController = require('../controllers/admin.quest.controller');
 const thumbnailController = require('../controllers/thumbnail.controller');
+const castController = require('../controllers/cast.controller');
 
 const authMiddleware = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/admin.middleware');
@@ -140,6 +141,21 @@ router.get('/settings/theme', adminController.getTheme);
 // PUT /api/v1/admin/settings/theme - Update theme
 router.put('/settings/theme', adminController.setTheme);
 
+// GET /api/v1/admin/settings/features - Get feature permissions
+router.get('/settings/features', adminController.getFeaturePermissions);
+
+// PUT /api/v1/admin/settings/features - Update feature permissions
+router.put('/settings/features', adminController.updateFeaturePermissions);
+
+// GET /api/v1/admin/colab-url - Get current Colab Whisper URL
+router.get('/colab-url', adminController.getColabUrl);
+
+// POST /api/v1/admin/colab-url - Update Colab Whisper URL
+router.post('/colab-url', adminController.updateColabUrl);
+
+// GET /api/v1/admin/subtitles/requests - Get episodes requiring subtitles sorted by request count
+router.get('/subtitles/requests', adminController.getSubtitleRequests);
+
 // ===== ADMIN PRICING =====
 // Note: GET routes are public (in app.js) — anyone can read coin packages & premium plans.
 // Only write operations (POST/PUT/DELETE) require admin role.
@@ -174,6 +190,22 @@ router.post('/quests/templates', adminQuestController.upsertQuestTemplate);
 
 // DELETE /api/v1/admin/quests/templates/:id
 router.delete('/quests/templates/:id', adminQuestController.archiveQuestTemplate);
+
+// ===== ADMIN CASTS =====
+// GET /api/v1/admin/casts - Get all casts
+router.get('/casts', castController.getAllCasts);
+
+// GET /api/v1/admin/casts/:id - Get cast by ID
+router.get('/casts/:id', castController.getCastById);
+
+// POST /api/v1/admin/casts - Create cast
+router.post('/casts', castController.createCast);
+
+// PUT /api/v1/admin/casts/:id - Update cast
+router.put('/casts/:id', castController.updateCast);
+
+// DELETE /api/v1/admin/casts/:id - Delete cast
+router.delete('/casts/:id', castController.deleteCast);
 
 // function isAdmin(req, res, next) {
 //   if (req.isAuthenticated() && (req.user.role === 'admin')) {

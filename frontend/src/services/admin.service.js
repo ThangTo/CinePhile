@@ -1001,10 +1001,32 @@ export const settingsAPI = {
       data: { theme },
       requiresAuth: true,
     });
-    return response.data || response;
+    return response;
   },
 
-  // ─── Coin Packages ─────────────────────────────────────────────────────────
+  /**
+   * Get feature permissions
+   */
+  getFeaturePermissions: async () => {
+    const response = await apiRequest("/admin/settings/features", {
+      requiresAuth: true,
+    });
+    return response.data || {};
+  },
+
+  /**
+   * Update feature permissions
+   */
+  updateFeaturePermissions: async (features) => {
+    const response = await apiRequest("/admin/settings/features", {
+      method: "PUT",
+      data: { features },
+      requiresAuth: true,
+    });
+    return response.data || {};
+  },
+
+  // ─── Pricing ──────────────────────────────────────────────────────────────
 
   /**
    * Get all coin packages — public endpoint, no auth required
@@ -1090,6 +1112,45 @@ export const settingsAPI = {
     });
     return response.data || response;
   },
+
+  // ─── Remote Whisper ────────────────────────────────────────────────────────
+
+  /**
+   * Get episodes requiring subtitles sorted by request count
+   * @param {Object} params - { page, limit }
+   */
+  getSubtitleRequests: async (params = { page: 1, limit: 20 }) => {
+    const query = new URLSearchParams(params).toString();
+    const response = await apiRequest(`/admin/subtitles/requests?${query}`, {
+      requiresAuth: true,
+    });
+    return response;
+  },
+
+  /**
+   * Get current Colab Whisper URL
+   * @returns {Promise<string>} Colab Ngrok URL
+   */
+  getColabUrl: async () => {
+    const response = await apiRequest("/admin/colab-url", {
+      requiresAuth: true,
+    });
+    return response.url || "";
+  },
+
+  /**
+   * Update Colab Whisper URL
+   * @param {string} url - New Colab Ngrok URL
+   * @returns {Promise<Object>} Response object
+   */
+  updateColabUrl: async (url) => {
+    const response = await apiRequest("/admin/colab-url", {
+      method: "POST",
+      data: { url },
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };
 
 /**
@@ -1127,5 +1188,77 @@ export const questAdminAPI = {
       requiresAuth: true,
     });
     return response.data || response;
+  },
+};
+
+/**
+ * Cast API - Admin CRUD cho diễn viên
+ */
+export const castAPI = {
+  /**
+   * Lấy danh sách tất cả Cast với phân trang và tìm kiếm
+   * @param {Object} params - { page?, limit?, search?, role?, department? }
+   * @returns {Promise<Object>} { data: [], pagination: {} }
+   */
+  getAll: async (params = {}) => {
+    const response = await apiRequest("/admin/casts", {
+      params,
+      requiresAuth: true,
+    });
+    return response;
+  },
+
+  /**
+   * Lấy Cast theo ID
+   * @param {string} id - Cast ID
+   * @returns {Promise<Object>} Cast object
+   */
+  getById: async (id) => {
+    const response = await apiRequest(`/admin/casts/${id}`, {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Tạo Cast mới
+   * @param {Object} castData - Cast data
+   * @returns {Promise<Object>} Created cast
+   */
+  create: async (castData) => {
+    const response = await apiRequest("/admin/casts", {
+      method: "POST",
+      data: castData,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Cập nhật Cast
+   * @param {string} id - Cast ID
+   * @param {Object} castData - Updated cast data
+   * @returns {Promise<Object>} Updated cast
+   */
+  update: async (id, castData) => {
+    const response = await apiRequest(`/admin/casts/${id}`, {
+      method: "PUT",
+      data: castData,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
+   * Xóa Cast
+   * @param {string} id - Cast ID
+   * @returns {Promise<Object>} { success: true }
+   */
+  delete: async (id) => {
+    const response = await apiRequest(`/admin/casts/${id}`, {
+      method: "DELETE",
+      requiresAuth: true,
+    });
+    return response.data || response || { success: true };
   },
 };

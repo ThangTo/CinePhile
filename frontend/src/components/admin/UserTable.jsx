@@ -15,7 +15,6 @@ import {
   FiCalendar,
   FiUser,
   FiEdit2,
-  FiDollarSign,
 } from "react-icons/fi";
 
 const UserTable = () => {

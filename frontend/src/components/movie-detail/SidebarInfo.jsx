@@ -122,7 +122,7 @@ const SidebarInfo = ({ movie }) => {
       </div>
 
       {/* Cast */}
-      {movie.cast && movie.cast.length > 0 && (
+      {((movie.cast && movie.cast.length > 0) || (movie.castIds && movie.castIds.length > 0)) && (
         <div className="border-t border-white/10 pt-6">
           <CastSection movie={movie} layout="vertical" />
         </div>
