@@ -337,7 +337,19 @@ const EpisodeSection = ({
           const episodeMap = new Map();
           (movie.episodes || []).forEach((ep) => {
             const epNum = ep.episode || ep.episodeId;
-            if (epNum) episodeMap.set(epNum, ep);
+            if (epNum) {
+              const existing = episodeMap.get(epNum);
+              if (!existing) {
+                // Lưu tạm làm fallback nếu chưa có
+                episodeMap.set(epNum, ep);
+              } else if (audioType && ep.audioType === audioType) {
+                // Ưu tiên tập có audioType khớp với lựa chọn hiện tại
+                episodeMap.set(epNum, ep);
+              } else if (!audioType) {
+                // Backward compatibility: nếu không chọn audioType, ghi đè liên tục lấy tập cuối cùng
+                episodeMap.set(epNum, ep);
+              }
+            }
           });
 
           // Lấy totalEpisodes từ movie (fallback là số lượng episodes hiện có)

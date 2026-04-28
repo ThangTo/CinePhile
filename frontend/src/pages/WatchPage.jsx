@@ -100,18 +100,6 @@ const WatchPage = () => {
     navigate(`/watch/${id}?ep=${episodeNumber}${audioQuery}`);
   };
 
-  // Lọc danh sách tập theo audioType (vietsub / thuyet-minh / long-tieng)
-  const filteredEpisodes = useMemo(() => {
-    if (!episodes || episodes.length === 0) return [];
-    if (!audioType) return episodes;
-
-    const match = episodes.filter((ep) => ep.audioType === audioType);
-    if (match.length > 0) return match;
-
-    // Fallback: nếu dữ liệu cũ chưa có audioType, dùng toàn bộ
-    return episodes;
-  }, [episodes, audioType]);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
@@ -140,9 +128,9 @@ const WatchPage = () => {
         link_embed: getYouTubeEmbedUrl(movie.trailer_url || movie.trailerUrl || movie.trailer),
         videoUrl: getYouTubeEmbedUrl(movie.trailer_url || movie.trailerUrl || movie.trailer),
       }
-    : filteredEpisodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
-      filteredEpisodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
-      filteredEpisodes[0];
+    : episodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
+      episodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
+      episodes[0];
 
   console.log("🎬 [WatchPage] Current episode:", {
     activeEp,
@@ -176,7 +164,7 @@ const WatchPage = () => {
               movie={movie}
               episode={currentEpisode}
               onEpisodeChange={handleEpisodeChange}
-              totalEpisodes={filteredEpisodes.length}
+              totalEpisodes={episodes.length}
               audioType={audioType}
               onAudioTypeChange={setAudioType}
               resumeTime={startFromBeginning ? 0 : resumeTime}
@@ -198,7 +186,7 @@ const WatchPage = () => {
             {/* Episodes Section - Hidden for hidden/trailer-only movies */}
             {!isTrailerOnly && (
               <EpisodesSection
-                movie={{ ...movie, episodes: filteredEpisodes }}
+                movie={{ ...movie, episodes: episodes }}
                 activeEpisode={activeEp}
                 onEpisodeClick={handleEpisodeChange}
                 audioType={audioType}
