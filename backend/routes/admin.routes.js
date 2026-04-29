@@ -4,6 +4,7 @@ const adminController = require('../controllers/admin.controller');
 const adminQuestController = require('../controllers/admin.quest.controller');
 const thumbnailController = require('../controllers/thumbnail.controller');
 const castController = require('../controllers/cast.controller');
+const tiktokController = require('../controllers/tiktok.controller');
 
 const authMiddleware = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/admin.middleware');
@@ -11,6 +12,11 @@ const { isAdmin } = require('../middleware/admin.middleware');
 // All admin routes require authentication first, then check admin role
 router.use(authMiddleware);
 router.use(isAdmin);
+
+// ===== ADMIN TIKTOK =====
+router.post('/tiktok/download-segment', tiktokController.downloadSegment);
+router.get('/tiktok/download-segment/status/:jobId', tiktokController.getDownloadStatus);
+router.get('/tiktok/download/:filename', tiktokController.getFile);
 
 const adminCommentRoutes = require('./admin.comment.routes');
 

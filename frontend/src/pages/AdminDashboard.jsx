@@ -10,6 +10,7 @@ import AdminNotificationTab from "components/admin/AdminNotificationTab";
 import AdminSettingsTab from "components/admin/AdminSettingsTab";
 import AdminViralClipsTab from "components/admin/AdminViralClipsTab";
 import AdminMailboxTab from "components/admin/AdminMailboxTab";
+import AdminTikTokTab from "components/admin/AdminTikTokTab";
 import SettingsPricingTab from "components/admin/SettingsPricingTab";
 import AdminQuestsTab from "components/admin/AdminQuestsTab";
 import AdminSubtitlesTab from "components/admin/AdminSubtitlesTab";
@@ -88,6 +89,12 @@ const AdminDashboard = () => {
         return (
           <div className="animate-fade-in">
             <AdminViralClipsTab />
+          </div>
+        );
+      case ADMIN_TABS.TIKTOK:
+        return (
+          <div className="animate-fade-in">
+            <AdminTikTokTab />
           </div>
         );
       case ADMIN_TABS.NOTIFICATIONS:

@@ -30,6 +30,7 @@ app.use(
       if (req.path.includes('/update-episodes')) return false;
       if (req.path.includes('/update-quality')) return false;
       if (req.path.includes('/crawl/by-page')) return false;
+      if (req.path.includes('/tiktok/download-segment')) return false;
       // Use default filter for other requests
       return compression.filter(req, res);
     },

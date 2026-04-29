@@ -15,6 +15,7 @@ export const ADMIN_TABS = {
   MAILBOX: "mailbox",
   QUESTS: "quests",
   CASTS: "casts",
+  TIKTOK: "tiktok",
 };
 
 export const ADMIN_MENU_ITEMS = [
@@ -24,6 +25,7 @@ export const ADMIN_MENU_ITEMS = [
   { id: ADMIN_TABS.CASTS, label: "Diễn viên", icon: "fa-user-circle" },
   { id: ADMIN_TABS.COMMENTS, label: "Bình luận", icon: "fa-comments" },
   { id: ADMIN_TABS.VIRAL_CLIPS, label: "Viral Clips", icon: "fa-bolt" },
+  { id: ADMIN_TABS.TIKTOK, label: "TikTok Worker", icon: "fa-brands fa-tiktok" },
   { id: ADMIN_TABS.NOTIFICATIONS, label: "Thông báo", icon: "fa-bell" },
   { id: ADMIN_TABS.MAILBOX, label: "Hộp thư", icon: "fa-envelope" },
   { id: ADMIN_TABS.SUBTITLES, label: "Phụ đề", icon: "fa-closed-captioning" },
