@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-
-const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+const { processM3u8StreamDirect } = require('./m3u8Utils');
 
 function parseTimemarkToSeconds(timemark) {
   if (typeof timemark !== 'string') return null;
@@ -101,54 +100,13 @@ async function downloadVideoFromM3U8(m3u8Url, outputPath, options = {}) {
       }
     }
 
-    // Filter ads
+    // Filter ads using the same playlist sanitizer as the watch proxy path.
     if (sendProgress) {
       sendProgress({ type: 'progress', percent: 3, message: 'Dang loc playlist...' });
     }
 
-    const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-    const lines = content.split('\n');
-    const cleanLines = [];
-    let skipNext = false;
-    let adsRemoved = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-      let line = lines[i].trim();
-      if (!line) continue;
-
-      if (line.startsWith('#EXTINF')) {
-        let nextLine = (lines[i + 1] || '').trim();
-
-        if (nextLine && !nextLine.startsWith('#')) {
-          const isAd = AD_KEYWORDS.some((k) => nextLine.includes(k));
-
-          if (isAd) {
-            skipNext = true;
-            adsRemoved++;
-            continue;
-          }
-        }
-      }
-
-      if (skipNext) {
-        skipNext = false;
-        continue;
-      }
-
-      if (line.includes('#EXT-X-DISCONTINUITY')) continue;
-
-      if (!line.startsWith('#')) {
-        if (!line.startsWith('http')) {
-          line = new URL(line, baseUrl).toString();
-        }
-
-        if (line.includes('convertv7/')) {
-          line = line.replace('convertv7/', '');
-        }
-      }
-
-      cleanLines.push(line);
-    }
+    const cleanContent = await processM3u8StreamDirect(currentUrl);
+    const cleanLines = cleanContent.split('\n').filter(Boolean);
 
     const playlistDuration = getPlaylistDurationSeconds(cleanLines);
     const estimatedDuration =
