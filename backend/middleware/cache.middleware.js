@@ -1,5 +1,7 @@
 const redisService = require('../services/redis.service');
 
+const CACHE_LOGS_ENABLED = String(process.env.CACHE_LOGS || '').toLowerCase() === 'true';
+
 /**
  * Cache middleware - Cache API responses
  * @param {number} duration - Cache duration in seconds (default: 300 = 5 minutes)
@@ -40,11 +42,15 @@ const cacheMiddleware = (duration = 300, options = {}) => {
       // Try to get from cache
       const cached = await redisService.get(cacheKey);
       if (cached) {
-        console.log(`✅ Cache HIT: ${cacheKey}`);
+        if (CACHE_LOGS_ENABLED) {
+          console.log(`Cache HIT: ${cacheKey}`);
+        }
         return res.json(cached);
       }
 
-      console.log(`❌ Cache MISS: ${cacheKey}`);
+      if (CACHE_LOGS_ENABLED) {
+        console.log(`Cache MISS: ${cacheKey}`);
+      }
 
       // Cache miss - override res.json to cache response
       const originalJson = res.json.bind(res);

@@ -6,6 +6,11 @@ const Movie = require('../models/movie.model');
 
 const downloadJobs = new Map();
 const JOB_TTL_MS = 30 * 60 * 1000;
+const MAX_CONCURRENT_TIKTOK_DOWNLOADS = Math.max(
+  1,
+  Number.parseInt(process.env.TIKTOK_DOWNLOAD_MAX_CONCURRENT || '1', 10) || 1,
+);
+let activeTikTokDownloads = 0;
 
 function normalizeJobId(jobId) {
   return typeof jobId === 'string' && jobId.trim() ? jobId.trim().slice(0, 120) : null;
@@ -47,6 +52,8 @@ function scheduleJobCleanup(jobId) {
 }
 
 exports.downloadSegment = async (req, res) => {
+  let releaseDownloadSlot = null;
+
   try {
     const { movieId, episodeId, startTime, duration } = req.body;
     const jobId = normalizeJobId(req.body?.jobId);
@@ -78,6 +85,27 @@ exports.downloadSegment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Thoi luong clip khong hop le' });
     }
 
+    if (activeTikTokDownloads >= MAX_CONCURRENT_TIKTOK_DOWNLOADS) {
+      updateDownloadJob(jobId, {
+        status: 'failed',
+        percent: 0,
+        message: 'Server dang tao clip khac, vui long thu lai sau',
+        error: 'Too many active TikTok downloads',
+      });
+      return res.status(429).json({
+        success: false,
+        message: 'Server dang tao clip khac, vui long thu lai sau',
+      });
+    }
+
+    activeTikTokDownloads += 1;
+    let slotReleased = false;
+    releaseDownloadSlot = () => {
+      if (slotReleased) return;
+      slotReleased = true;
+      activeTikTokDownloads = Math.max(0, activeTikTokDownloads - 1);
+    };
+
     // Prepare headers for SSE
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -108,12 +136,14 @@ exports.downloadSegment = async (req, res) => {
     const episode = await Episode.findOne({ _id: episodeId, movieId });
     if (!episode) {
       sendProgress({ type: 'error', message: 'Không tìm thấy tập phim' });
+      releaseDownloadSlot();
       return res.end();
     }
 
     const m3u8Url = episode.link_m3u8 || episode.link_embed;
     if (!m3u8Url || !m3u8Url.includes('m3u8')) {
       sendProgress({ type: 'error', message: 'Không có m3u8Url hợp lệ để tải' });
+      releaseDownloadSlot();
       return res.end();
     }
 
@@ -145,9 +175,15 @@ exports.downloadSegment = async (req, res) => {
         console.error('Error downloading TikTok segment:', error);
         sendProgress({ type: 'error', message: `Lỗi tải video: ${error.message}` });
         res.end();
+      })
+      .finally(() => {
+        releaseDownloadSlot();
       });
 
   } catch (error) {
+    if (releaseDownloadSlot) {
+      releaseDownloadSlot();
+    }
     console.error('Error in downloadSegment controller:', error);
     if (!res.headersSent) {
       res.status(500).json({

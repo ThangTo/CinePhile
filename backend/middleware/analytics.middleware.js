@@ -2,6 +2,15 @@ const moment = require('moment-timezone');
 const analyticsService = require('../services/analytics.service');
 const redisService = require('../services/redis.service');
 
+const ANALYTICS_LOCAL_MAX_IDENTIFIERS = Math.max(
+  100,
+  Number.parseInt(process.env.ANALYTICS_LOCAL_MAX_IDENTIFIERS || '5000', 10) || 5000,
+);
+const ANALYTICS_LOCAL_VISIT_RETENTION_DAYS = Math.max(
+  1,
+  Number.parseInt(process.env.ANALYTICS_LOCAL_VISIT_RETENTION_DAYS || '2', 10) || 2,
+);
+
 const TRACKING_SKIP_PREFIXES = [
   '/health',
   '/api/v1/avatars',
@@ -70,13 +79,21 @@ function degradeRedisGracefully(error) {
 }
 
 function trackLocally(identifier, visitsKey, now) {
-  analyticsService.localActiveUsers.set(identifier, now);
+  if (
+    analyticsService.localActiveUsers.has(identifier) ||
+    analyticsService.localActiveUsers.size < ANALYTICS_LOCAL_MAX_IDENTIFIERS
+  ) {
+    analyticsService.localActiveUsers.set(identifier, now);
+  }
 
   if (!analyticsService.localVisits.has(visitsKey)) {
     analyticsService.localVisits.set(visitsKey, new Set());
   }
 
-  analyticsService.localVisits.get(visitsKey).add(identifier);
+  const visitSet = analyticsService.localVisits.get(visitsKey);
+  if (visitSet.has(identifier) || visitSet.size < ANALYTICS_LOCAL_MAX_IDENTIFIERS) {
+    visitSet.add(identifier);
+  }
 }
 
 // In-memory rate limiting and state keeping for Redis
@@ -88,6 +105,25 @@ setInterval(() => {
   for (const [key, timestamp] of lastTrackingMap.entries()) {
     if (timestamp < cutoff) {
       lastTrackingMap.delete(key);
+    }
+  }
+
+  const activeCutoff = Date.now() - analyticsService.ACTIVE_WINDOW_MS;
+  for (const [key, timestamp] of analyticsService.localActiveUsers.entries()) {
+    if (timestamp < activeCutoff) {
+      analyticsService.localActiveUsers.delete(key);
+    }
+  }
+
+  const oldestAllowedDate = moment()
+    .tz('Asia/Ho_Chi_Minh')
+    .subtract(ANALYTICS_LOCAL_VISIT_RETENTION_DAYS, 'days')
+    .format('YYYY-MM-DD');
+
+  for (const [key, identifiers] of analyticsService.localVisits.entries()) {
+    const date = key.replace('analytics:visits:', '');
+    if (date < oldestAllowedDate || identifiers.size === 0) {
+      analyticsService.localVisits.delete(key);
     }
   }
 }, 60000).unref();

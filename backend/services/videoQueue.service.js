@@ -3,7 +3,11 @@ const { renderClip16x9 } = require('./render.service');
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 const REDIS_URL = process.env.REDIS_URL;
-const CONCURRENCY = parseInt(process.env.VIDEO_QUEUE_CONCURRENCY, 10) || 2;
+const CONCURRENCY = Math.max(1, parseInt(process.env.VIDEO_QUEUE_CONCURRENCY, 10) || 1);
+const VIDEO_QUEUE_TIMEOUT_MS = Math.max(
+  60000,
+  parseInt(process.env.VIDEO_QUEUE_TIMEOUT_MS, 10) || 300000,
+);
 
 let viralVideoQueue;
 
@@ -23,7 +27,7 @@ if (REDIS_URL) {
       },
       removeOnComplete: 50,  
       removeOnFail: 100,     
-      timeout: 300000,       
+      timeout: VIDEO_QUEUE_TIMEOUT_MS,
     },
   });
 

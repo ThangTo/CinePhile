@@ -40,7 +40,7 @@ services:
           'CMD',
           'node',
           '-e',
-          "require('http').get('http://localhost:5000/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
+          "require('http').get('http://localhost:5000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
         ]
       interval: 30s
       timeout: 10s
@@ -92,6 +92,8 @@ services:
   whisper:
     image: fedirz/faster-whisper-server:latest-cuda
     container_name: cinephine-whisper
+    profiles:
+      - gpu
     restart: unless-stopped
     ports:
       - '8000:8000'
@@ -124,6 +126,8 @@ services:
       context: ./tiktok_worker
       dockerfile: Dockerfile
     container_name: cinephine-tiktok-worker
+    profiles:
+      - tiktok
     restart: unless-stopped
     ports:
       - '8787:8787'

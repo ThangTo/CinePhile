@@ -12,7 +12,10 @@ const { processM3u8StreamDirect, processM3u8StreamWithProxy } = require('../util
 const { buildSourceHeaders, fetchWithIpv4 } = require('../utils/httpFetch');
 
 let activeDownloads = 0;
-const MAX_CONCURRENT_DOWNLOADS = 3;
+const MAX_CONCURRENT_DOWNLOADS = Math.max(
+  1,
+  Number.parseInt(process.env.MOBILE_DOWNLOAD_MAX_CONCURRENT || process.env.MAX_CONCURRENT_DOWNLOADS || '1', 10) || 1,
+);
 const TS_PROXY_TIMEOUT_MS = Math.max(10000, Number(process.env.TS_PROXY_TIMEOUT_MS || 30000));
 const DOWNLOAD_M3U8_TIMEOUT_MS = Math.max(
   10000,

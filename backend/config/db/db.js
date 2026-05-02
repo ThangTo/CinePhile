@@ -6,9 +6,20 @@ let isConnecting = false;
 let reconnectTimer = null;
 let hasLoggedInitialSuccess = false;
 
+function parsePoolSize(name, fallback) {
+  const value = Number.parseInt(process.env[name], 10);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+const configuredMaxPoolSize = Math.max(1, parsePoolSize('MONGODB_MAX_POOL_SIZE', 10));
+const configuredMinPoolSize = Math.min(
+  configuredMaxPoolSize,
+  parsePoolSize('MONGODB_MIN_POOL_SIZE', 0),
+);
+
 const options = {
-  maxPoolSize: 30,
-  minPoolSize: 10,
+  maxPoolSize: configuredMaxPoolSize,
+  minPoolSize: configuredMinPoolSize,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
   family: 4,

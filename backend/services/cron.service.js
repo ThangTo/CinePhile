@@ -6,6 +6,14 @@ const { runPipeline: runTrendingPipeline } = require('./trending.service');
 const analyticsService = require('./analytics.service');
 const questService = require('./quest.service');
 
+function isEnvEnabled(name, defaultValue = true) {
+  const rawValue = process.env[name];
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return defaultValue;
+  }
+  return !['0', 'false', 'no', 'off'].includes(String(rawValue).toLowerCase());
+}
+
 /**
  * Cron Service
  * Automated scheduled tasks for movie updates and crawling
@@ -211,16 +219,21 @@ const runAnalyticsBackfill = () => {
  * Initialize all cron jobs
  */
 const initCronJobs = () => {
+  if (!isEnvEnabled('CRON_ENABLED', true)) {
+    console.log('\nCron jobs disabled by CRON_ENABLED=false\n');
+    return;
+  }
+
   console.log('\n🕐 Initializing cron jobs...');
 
-  scheduleEpisodeUpdates();
-  scheduleMovieCrawling();
-  scheduleTrendingUpdate();
-  scheduleDailyAnalyticsSnapshot();
-  scheduleQuestAutoClaim();
+  if (isEnvEnabled('CRON_EPISODE_UPDATES_ENABLED', true)) scheduleEpisodeUpdates();
+  if (isEnvEnabled('CRON_MOVIE_CRAWLING_ENABLED', true)) scheduleMovieCrawling();
+  if (isEnvEnabled('CRON_TRENDING_UPDATE_ENABLED', true)) scheduleTrendingUpdate();
+  if (isEnvEnabled('CRON_ANALYTICS_SNAPSHOT_ENABLED', true)) scheduleDailyAnalyticsSnapshot();
+  if (isEnvEnabled('CRON_QUEST_AUTO_CLAIM_ENABLED', true)) scheduleQuestAutoClaim();
 
   // Run one-time backfill to seed MongoDB from existing Redis data
-  runAnalyticsBackfill();
+  if (isEnvEnabled('CRON_ANALYTICS_BACKFILL_ENABLED', true)) runAnalyticsBackfill();
 
   console.log('✅ All cron jobs initialized successfully\n');
 };
