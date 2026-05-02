@@ -5,6 +5,29 @@ const authController = require('../controllers/auth.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 const avatarUploadMiddleware = require('../middleware/avatarUpload.middleware');
 
+function handleGoogleCallback(req, res, next) {
+  if (req.query?.error) {
+    console.warn(`[Auth] Google OAuth rejected callback: ${req.query.error}`);
+    return res.redirect(authController.GOOGLE_FAILURE_REDIRECT);
+  }
+
+  return passport.authenticate('google', { session: false }, (error, user, info) => {
+    if (error) {
+      console.warn(`[Auth] Google OAuth callback failed: ${error.message || error}`);
+      return res.redirect(authController.GOOGLE_FAILURE_REDIRECT);
+    }
+
+    if (!user) {
+      const reason = info?.message || 'No Google user returned';
+      console.warn(`[Auth] Google OAuth callback failed: ${reason}`);
+      return res.redirect(authController.GOOGLE_FAILURE_REDIRECT);
+    }
+
+    req.user = user;
+    return authController.googleCallback(req, res, next);
+  })(req, res, next);
+}
+
 // GET /api/v1/auth/google - Start Google OAuth
 router.get(
   '/google',
@@ -15,14 +38,7 @@ router.get(
 );
 
 // GET /api/v1/auth/google/callback - Google OAuth callback
-router.get(
-  '/google/callback',
-  passport.authenticate('google', {
-    session: false,
-    failureRedirect: authController.GOOGLE_FAILURE_REDIRECT,
-  }),
-  authController.googleCallback,
-);
+router.get('/google/callback', handleGoogleCallback);
 
 // POST /api/v1/auth/request-registration-otp - Request OTP for registration
 router.post('/request-registration-otp', authController.requestRegistrationOTP);

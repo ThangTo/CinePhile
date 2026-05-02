@@ -1,20 +1,48 @@
 const fs = require('fs');
-const axios = require('axios');
 const path = require('path');
 const crypto = require('crypto');
 const { tempFilePath, cleanupTempFile } = require('./audio.service');
-
-const WHISPER_API_URL = process.env.WHISPER_API_URL || 'http://localhost:8000';
-const DEFAULT_WHISPER_MODEL = process.env.WHISPER_MODEL || 'Systran/faster-whisper-small';
+const { getLanguageCacheKey, transcribeAudioFile } = require('./whisperClient.service');
+const { isSubtitleBoilerplate } = require('./vttClip.service');
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableWhisperError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return (
+    message.includes('timeout') ||
+    message.includes('econnaborted') ||
+    message.includes('econnreset') ||
+    message.includes('etimedout') ||
+    message.includes('socket hang up') ||
+    message.includes('network') ||
+    message.includes('http 408') ||
+    message.includes('http 429') ||
+    message.includes('http 500') ||
+    message.includes('http 502') ||
+    message.includes('http 503') ||
+    message.includes('http 504')
+  );
+}
+
 const WHISPER_CONCURRENCY = Math.min(
   parsePositiveInt(process.env.WHISPER_CONCURRENCY, 4),
   8
+);
+const WHISPER_CHUNK_ATTEMPTS = Math.max(
+  1,
+  Math.min(parsePositiveInt(process.env.WHISPER_CHUNK_ATTEMPTS, 2), 5),
+);
+const WHISPER_CHUNK_RETRY_DELAY_MS = Math.max(
+  1000,
+  parsePositiveInt(process.env.WHISPER_CHUNK_RETRY_DELAY_MS, 5000),
 );
 
 function cleanVttContent(vttContent) {
@@ -36,6 +64,16 @@ function cleanVttContent(vttContent) {
 
     if (line === '') {
       cleanedLines.push(lines[i]);
+      continue;
+    }
+
+    if (isSubtitleBoilerplate(line)) {
+      if (cleanedLines.length > 0 && cleanedLines[cleanedLines.length - 1].includes('-->')) {
+        cleanedLines.pop();
+        if (cleanedLines.length > 0 && cleanedLines[cleanedLines.length - 1] === '') {
+          cleanedLines.pop();
+        }
+      }
       continue;
     }
 
@@ -97,36 +135,37 @@ function cleanVttContent(vttContent) {
   return cleanedLines.join('\n');
 }
 
-async function transcribeChunk(audioPath, language = 'vi', previousText = '') {
-  const FormData = (await import('form-data')).default;
-  const form = new FormData();
-  
-  form.append('file', fs.createReadStream(audioPath));
-  form.append('model', DEFAULT_WHISPER_MODEL);
-  form.append('response_format', 'vtt');
-  form.append('language', language);
-  form.append('temperature', '0'); // Reduce hallucinations
-  
-  const defaultPrompt = 'This is a movie subtitle. Keep it concise and sync with dialogue. Ignore background noise and music.';
-  const finalPrompt = previousText ? `${defaultPrompt} Previous context: ${previousText}` : defaultPrompt;
-  form.append('prompt', finalPrompt);
+async function transcribeChunk(audioPath, language = 'auto', previousText = '') {
+  return transcribeAudioFile(audioPath, {
+    language,
+    previousText,
+    responseFormat: 'vtt',
+  });
+}
 
-  const response = await axios.post(
-    `${WHISPER_API_URL}/v1/audio/transcriptions`,
-    form,
-    {
-      headers: { ...form.getHeaders() },
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
-      timeout: 1800000,
-      responseType: 'text',
-      transformResponse: [(data) => data],
+async function transcribeChunkWithRetry(audioPath, language, previousText, context = {}) {
+  const maxAttempts = context.maxAttempts || WHISPER_CHUNK_ATTEMPTS;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await transcribeChunk(audioPath, language, previousText);
+    } catch (error) {
+      lastError = error;
+      const retryable = isRetryableWhisperError(error);
+      if (!retryable || attempt >= maxAttempts) {
+        throw error;
+      }
+
+      const retryDelay = WHISPER_CHUNK_RETRY_DELAY_MS * attempt;
+      console.warn(
+        `[WhisperService] Chunk ${context.chunkNumber || '?'} failed on attempt ${attempt}/${maxAttempts}: ${error.message}. Retrying in ${retryDelay}ms...`,
+      );
+      await sleep(retryDelay);
     }
-  );
+  }
 
-  return typeof response.data === 'string'
-    ? response.data
-    : response.data.text || JSON.stringify(response.data);
+  throw lastError;
 }
 
 function vttTimeToSeconds(vttTime) {
@@ -238,24 +277,79 @@ function shiftVttTimestamps(vttContent, offsetSeconds) {
   });
 }
 
+function getChunkCacheDir(cacheDir, cacheKey) {
+  return path.join(cacheDir, `${cacheKey}.chunks`);
+}
+
+function getChunkCacheFile(chunkCacheDir, index) {
+  return path.join(chunkCacheDir, `chunk_${String(index).padStart(4, '0')}.vtt`);
+}
+
+function hasUsableFile(filePath) {
+  return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
+}
+
+function extractPreviousText(vtt) {
+  const plainText = String(vtt || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}/g, ' ')
+    .replace(/WEBVTT/g, ' ')
+    .trim();
+
+  const words = plainText.split(/\s+/).filter(Boolean);
+  return words.slice(-50).join(' ');
+}
+
 /**
  * Process multiple audio chunks in parallel.
  */
-async function processChunksConcurrently(chunks, chunkDurationSec, concurrency = WHISPER_CONCURRENCY, onProgress, language = 'vi') {
+async function processChunksConcurrently(
+  chunks,
+  chunkDurationSec,
+  concurrency = WHISPER_CONCURRENCY,
+  onProgress,
+  language = 'auto',
+  options = {},
+) {
   const results = new Array(chunks.length);
   let completed = 0;
   let previousText = '';
+  const { chunkCacheDir = null } = options;
+
+  if (chunkCacheDir && !fs.existsSync(chunkCacheDir)) {
+    fs.mkdirSync(chunkCacheDir, { recursive: true });
+  }
 
   // We process sequentially to enable prompt chaining across chunks
   for (let index = 0; index < chunks.length; index++) {
     console.log(`[WhisperService] Processing chunk ${index + 1}/${chunks.length}...`);
-    const rawVtt = await transcribeChunk(chunks[index], language, previousText);
-    const vtt = cleanVttContent(rawVtt);
-    
+    const chunkCacheFile = chunkCacheDir ? getChunkCacheFile(chunkCacheDir, index) : null;
+    let vtt;
+
+    if (chunkCacheFile && hasUsableFile(chunkCacheFile)) {
+      console.log(`[WhisperService] Chunk cache hit ${index + 1}/${chunks.length}.`);
+      vtt = fs.readFileSync(chunkCacheFile, 'utf-8');
+    } else {
+      let rawVtt;
+      try {
+        rawVtt = await transcribeChunkWithRetry(chunks[index], language, previousText, {
+          chunkNumber: index + 1,
+          totalChunks: chunks.length,
+        });
+      } catch (error) {
+        throw new Error(
+          `Whisper failed on chunk ${index + 1}/${chunks.length}: ${error.message || String(error)}`
+        );
+      }
+
+      vtt = cleanVttContent(rawVtt);
+      if (chunkCacheFile) {
+        fs.writeFileSync(chunkCacheFile, vtt, 'utf-8');
+      }
+    }
+
     // Extract last 50 words for next chunk prompt
-    const plainText = vtt.replace(/<[^>]*>/g, ' ').replace(/\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}/g, ' ').replace(/WEBVTT/g, ' ').trim();
-    const words = plainText.split(/\s+/).filter(Boolean);
-    previousText = words.slice(-50).join(' ');
+    previousText = extractPreviousText(vtt);
     
     const offsetSeconds = index * chunkDurationSec;
     let shiftedVtt = shiftVttTimestamps(vtt, offsetSeconds);
@@ -285,7 +379,7 @@ async function processChunksConcurrently(chunks, chunkDurationSec, concurrency =
 /**
  * Coordinate chunks processing and caching.
  */
-async function speechToTextPipeline(mp3Files, videoUrl, chunkDurationSec, onProgress, language = 'vi') {
+async function speechToTextPipeline(mp3Files, videoUrl, chunkDurationSec, onProgress, language = 'auto') {
   const cacheDir = path.join(__dirname, '..', 'temp_output', 'vtt_cache');
   if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
   
@@ -302,7 +396,8 @@ async function speechToTextPipeline(mp3Files, videoUrl, chunkDurationSec, onProg
     chunkDurationSec,
     WHISPER_CONCURRENCY,
     onProgress,
-    language
+    language,
+    { chunkCacheDir: getChunkCacheDir(cacheDir, cacheKey) }
   );
   
   fs.copyFileSync(vttPath, cacheFile);
@@ -312,16 +407,19 @@ async function speechToTextPipeline(mp3Files, videoUrl, chunkDurationSec, onProg
   return cacheFile;
 }
 
-function getCacheKey(videoUrl, language = 'vi') {
+function getCacheKey(videoUrl, language = 'auto') {
   const normalizedUrl = normalizeVideoUrlForCache(videoUrl);
   const urlHash = crypto.createHash('sha256').update(normalizedUrl).digest('hex');
-  return `${urlHash}.${language}.v2.vtt`; // Use v2 to bypass old cached files with ad sync bug
+  return `${urlHash}.${getLanguageCacheKey(language)}.v2.vtt`; // Use v2 to bypass old cached files with ad sync bug
 }
 
 module.exports = {
   speechToTextPipeline,
   transcribeChunk,
+  transcribeChunkWithRetry,
+  getChunkCacheDir,
   getCacheKey,
+  isRetryableWhisperError,
   vttTimeToSeconds,
   secondsToVttTime,
   shiftVttTimestamps

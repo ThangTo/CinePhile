@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { cleanupTempFile, extractAudioChunks } = require('./audio.service');
 const { getCacheKey, speechToTextPipeline } = require('./whisper.service');
+const { getLanguageCacheKey } = require('./whisperClient.service');
 const { detectScenes } = require('./scene.service');
 const { analyzeScenes } = require('./llm.service');
 const { addClipJob } = require('./videoQueue.service');
@@ -41,11 +42,129 @@ function timestampToSeconds(timestamp) {
 }
 
 // ─── Configuration ──────────────────────────────────────────────────────────
+function clampPercent(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(100, Math.round(parsed)));
+}
+
+const ANALYSIS_PIPELINE_STAGES = [
+  { key: 'extract', label: 'Extract audio', start: 10, end: 40 },
+  { key: 'whisper', label: 'Whisper subtitles', start: 40, end: 70 },
+  { key: 'analyze', label: 'AI scene analysis', start: 70, end: 90 },
+  { key: 'enqueue', label: 'Queue render jobs', start: 90, end: 100 },
+];
+
+function getStageProgress(globalProgress, start, end) {
+  const progress = clampPercent(globalProgress);
+  if (progress <= start) return 0;
+  if (progress >= end) return 100;
+  return clampPercent(((progress - start) / (end - start)) * 100);
+}
+
+function getStageState(stage, globalProgress, jobState) {
+  const progress = clampPercent(globalProgress);
+
+  if (jobState === 'completed') return 'completed';
+  if (progress >= stage.end) return 'completed';
+  if (progress < stage.start) return 'pending';
+
+  return jobState === 'failed' ? 'failed' : 'active';
+}
+
+function buildAnalysisPipelineStages(globalProgress = 0, jobState = 'waiting') {
+  const progress = clampPercent(globalProgress);
+  return ANALYSIS_PIPELINE_STAGES.map((stage) => ({
+    key: stage.key,
+    label: stage.label,
+    progress: getStageProgress(progress, stage.start, stage.end),
+    state: getStageState(stage, progress, jobState),
+  }));
+}
+
+function ensureDir(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+function safeCacheName(value) {
+  return String(value || 'unknown').replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function listAudioChunks(dirPath) {
+  if (!dirPath || !fs.existsSync(dirPath)) return [];
+
+  return fs.readdirSync(dirPath)
+    .filter((fileName) => fileName.endsWith('.mp3'))
+    .sort()
+    .map((fileName) => path.join(dirPath, fileName))
+    .filter((filePath) => fs.statSync(filePath).size > 0);
+}
+
+function readJsonCache(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  } catch (error) {
+    console.warn(`[AnalysisQueue] Ignoring invalid cache file ${filePath}: ${error.message}`);
+    return null;
+  }
+}
+
+function writeJsonCache(filePath, value) {
+  ensureDir(path.dirname(filePath));
+  const tempPath = `${filePath}.${Date.now()}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(value, null, 2), 'utf-8');
+  fs.renameSync(tempPath, filePath);
+}
+
+function moveDirectory(sourceDir, targetDir) {
+  ensureDir(path.dirname(targetDir));
+  if (fs.existsSync(targetDir)) {
+    fs.rmSync(targetDir, { recursive: true, force: true });
+  }
+
+  try {
+    fs.renameSync(sourceDir, targetDir);
+  } catch (_error) {
+    fs.cpSync(sourceDir, targetDir, { recursive: true });
+    cleanupTempFile(sourceDir);
+  }
+}
+
+function buildViralAnalysisCachePaths(proxyM3u8Url, language = VIRAL_TRANSCRIPTION_LANGUAGE) {
+  const vttCacheKey = getCacheKey(proxyM3u8Url, language);
+  const cacheId = safeCacheName(vttCacheKey.replace(/\.vtt$/i, ''));
+  const cacheRoot = path.join(__dirname, '..', 'temp_output', 'viral_cache', cacheId);
+
+  return {
+    cacheId,
+    cacheRoot,
+    audioDir: path.join(cacheRoot, `audio_${WHISPER_CHUNK_DURATION_SEC}`),
+    sceneBoundariesFile: path.join(cacheRoot, 'scene-boundaries.json'),
+    scenesFile: path.join(cacheRoot, 'scenes.json'),
+    vttCacheFile: path.join(__dirname, '..', 'temp_output', 'vtt_cache', vttCacheKey),
+    vttCacheKey,
+  };
+}
+
 const REDIS_URL = process.env.REDIS_URL;
 const ANALYSIS_QUEUE_TIMEOUT_MS = Number(process.env.ANALYSIS_QUEUE_TIMEOUT_MS);
 const WHISPER_CHUNK_DURATION_SEC = Math.max(
-  Number.parseInt(process.env.WHISPER_CHUNK_DURATION_SEC, 10) || 120,
+  Number.parseInt(
+    process.env.VIRAL_CLIP_WHISPER_CHUNK_DURATION_SEC ||
+    process.env.WHISPER_CHUNK_DURATION_SEC,
+    10,
+  ) || 300,
   30
+);
+const VIRAL_TRANSCRIPTION_LANGUAGE = getLanguageCacheKey(
+  process.env.VIRAL_CLIP_TRANSCRIPTION_LANGUAGE ||
+  process.env.SUBTITLE_TRANSCRIPTION_LANGUAGE ||
+  process.env.WHISPER_LANGUAGE ||
+  'auto',
 );
 
 const defaultAnalysisJobOptions = {
@@ -69,13 +188,18 @@ if (REDIS_URL) {
       enableReadyCheck: false,
       tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
     },
+    settings: {
+      lockDuration: Number.parseInt(process.env.ANALYSIS_QUEUE_LOCK_DURATION_MS, 10) || 30 * 60 * 1000,
+      stalledInterval: Number.parseInt(process.env.ANALYSIS_QUEUE_STALLED_INTERVAL_MS, 10) || 60 * 1000,
+      maxStalledCount: Number.parseInt(process.env.ANALYSIS_QUEUE_MAX_STALLED_COUNT, 10) || 2,
+    },
     defaultJobOptions: defaultAnalysisJobOptions,
   });
 
   // ─── Worker ─────────────────────────────────────────────────────────────────
   analysisQueue.process(1, async (job) => {
-    const { movieId, proxyM3u8Url, finalBgMusic, bgmStartTime, bgmDuration } = job.data;
-    let mp3Dir = null;
+    const { movieId, proxyM3u8Url, finalBgMusic, bgmStartTime, bgmDuration, renderOptions } = job.data;
+    let tempMp3Dir = null;
     let vttPath = null;
 
     console.log(`[AnalysisQueue] Starting job ${job.id} for movie ${movieId}`);
@@ -83,43 +207,70 @@ if (REDIS_URL) {
 
     try {
       job.log('Checking VTT cache...');
-      const cacheDir = path.join(__dirname, '..', 'temp_output', 'vtt_cache');
-      const cacheFile = path.join(cacheDir, getCacheKey(proxyM3u8Url));
+      const cachePaths = buildViralAnalysisCachePaths(proxyM3u8Url);
+      ensureDir(cachePaths.cacheRoot);
       
-      if (fs.existsSync(cacheFile)) {
+      if (fs.existsSync(cachePaths.vttCacheFile)) {
         job.log('Cache hit! Skipping audio extraction and Whisper.');
         job.progress(70);
-        vttPath = cacheFile;
+        vttPath = cachePaths.vttCacheFile;
       } else {
-        // 1. Extract audio chunks (Mapping 0-100% to 10-40% global progress)
-        job.log('Extracting audio chunks from M3U8 stream...');
-        const extraction = await extractAudioChunks(proxyM3u8Url, WHISPER_CHUNK_DURATION_SEC, (p) => {
-          job.progress(Math.round(10 + (p * 0.3)));
-        });
-        mp3Dir = extraction.outDir;
-        const mp3Files = extraction.files;
+        let mp3Files = listAudioChunks(cachePaths.audioDir);
+
+        if (mp3Files.length > 0) {
+          job.log(`Audio chunk cache hit (${mp3Files.length} chunks). Skipping extraction.`);
+        } else {
+          // 1. Extract audio chunks (Mapping 0-100% to 10-40% global progress)
+          job.log('Extracting audio chunks from M3U8 stream...');
+          const extraction = await extractAudioChunks(proxyM3u8Url, WHISPER_CHUNK_DURATION_SEC, (p) => {
+            job.progress(Math.round(10 + (p * 0.3)));
+          });
+          tempMp3Dir = extraction.outDir;
+          moveDirectory(tempMp3Dir, cachePaths.audioDir);
+          tempMp3Dir = null;
+          mp3Files = listAudioChunks(cachePaths.audioDir);
+        }
+
+        if (mp3Files.length === 0) {
+          throw new Error('No audio chunks were available after extraction');
+        }
+
         job.progress(40);
         
         // 2. Speech to Text chunks
         const startTimeSTT = new Date().toISOString();
-        job.log(`[${startTimeSTT}] Running parallel faster-whisper...`);
+        job.log(`[${startTimeSTT}] Running Whisper STT (${VIRAL_TRANSCRIPTION_LANGUAGE})...`);
         vttPath = await speechToTextPipeline(mp3Files, proxyM3u8Url, WHISPER_CHUNK_DURATION_SEC, (p) => {
           job.progress(Math.round(40 + (p * 0.3)));
-        });
+        }, VIRAL_TRANSCRIPTION_LANGUAGE);
         job.log(`[${new Date().toISOString()}] Finished Whisper STT.`);
         job.progress(70);
       }
 
       // 3. Analyze Scenes
-      job.log('Detecting physical scene boundaries...');
-      const sceneBoundaries = await detectScenes(proxyM3u8Url, (p) => {
-        job.progress(Math.round(70 + (p * 0.1)));
-      });
-      job.progress(80);
+      let scenes = readJsonCache(cachePaths.scenesFile);
+      if (Array.isArray(scenes) && scenes.length > 0) {
+        job.log(`Scene analysis cache hit (${scenes.length} clips). Skipping scene detection and LLM.`);
+        job.progress(90);
+      } else {
+        let sceneBoundaries = readJsonCache(cachePaths.sceneBoundariesFile);
+        if (Array.isArray(sceneBoundaries) && sceneBoundaries.length > 0) {
+          job.log(`Scene boundary cache hit (${sceneBoundaries.length} boundaries).`);
+          job.progress(80);
+        } else {
+          job.log('Detecting physical scene boundaries...');
+          sceneBoundaries = await detectScenes(proxyM3u8Url, (p) => {
+            job.progress(Math.round(70 + (p * 0.1)));
+          });
+          writeJsonCache(cachePaths.sceneBoundariesFile, sceneBoundaries);
+          job.progress(80);
+        }
 
-      job.log('Analyzing scenes via LLM...');
-      const vttContent = fs.readFileSync(vttPath, 'utf-8');
-      const scenes = await analyzeScenes(vttContent, sceneBoundaries);
+        job.log('Analyzing scenes via LLM...');
+        const vttContent = fs.readFileSync(vttPath, 'utf-8');
+        scenes = await analyzeScenes(vttContent, sceneBoundaries);
+        writeJsonCache(cachePaths.scenesFile, scenes);
+      }
       job.progress(90);
 
       // 4. Queue Individual Viral Clips
@@ -161,6 +312,7 @@ if (REDIS_URL) {
           bgmStartTime: bgmStartTime || '0',
           bgmDuration: bgmDuration || null,
           subtitleFile: vttPath,
+          renderOptions,
           startTime,
           duration,
           outputPath,
@@ -182,16 +334,13 @@ if (REDIS_URL) {
         throw new Error('No valid viral clips were returned by the analyzer');
       }
 
-      // Clean up mp3 chunks directory
-      if (mp3Dir) cleanupTempFile(mp3Dir);
-      
       job.progress(100);
       console.log(`[AnalysisQueue] Finished job ${job.id} for movie ${movieId}. Created ${renderJobs.length} render jobs.`);
       
       return renderJobs;
     } catch (error) {
       console.error(`[AnalysisQueue] Job ${job.id} failed: ${error.message}`);
-      if (mp3Dir) cleanupTempFile(mp3Dir);
+      if (tempMp3Dir) cleanupTempFile(tempMp3Dir);
       throw error;
     }
   });
@@ -243,13 +392,16 @@ async function getAnalysisJobStatus(jobId) {
 
   const state = await job.getState();
   const progress = job._progress;
+  const isFailed = state === 'failed';
   return {
     id: job.id,
     state,
     progress,
+    stages: buildAnalysisPipelineStages(progress, state),
     result: job.returnvalue,
     data: job.data,
-    error: job.failedReason,
+    error: isFailed ? job.failedReason : null,
+    attemptsMade: job.attemptsMade,
   };
 }
 
@@ -260,7 +412,10 @@ async function closeAnalysisQueue() {
 
 module.exports = {
   addAnalysisJob,
+  buildAnalysisPipelineStages,
+  buildViralAnalysisCachePaths,
   getAnalysisJobStatus,
+  listAudioChunks,
   closeAnalysisQueue,
   analysisQueue,
 };
