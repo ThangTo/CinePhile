@@ -6,6 +6,8 @@ const Episode = require('../models/episode.model');
 
 const DEFAULT_OPTIONS = {
   sampleSize: 5,
+  episodeSelectionMode: 'sample',
+  maxEpisodesPerJob: 500,
   sampleSeconds: 420,
   sampleRate: 8000,
   stepSec: 1,
@@ -17,6 +19,7 @@ const DEFAULT_OPTIONS = {
   minVotes: 2,
   applySeasonDefault: true,
 };
+const VALID_EPISODE_SELECTION_MODES = new Set(['sample', 'remaining', 'all', 'specific']);
 const FFMPEG_TIMEOUT_MS = Math.max(
   30000,
   Number.parseInt(process.env.INTRO_DETECTION_FFMPEG_TIMEOUT_MS, 10) || 180000,
@@ -52,6 +55,105 @@ function clamp(value, min, max) {
 
 function sha1(value) {
   return crypto.createHash('sha1').update(String(value || '')).digest('hex');
+}
+
+function parsePositiveInt(value, fallback, min = 1, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return clamp(parsed, min, max);
+}
+
+function parseEpisodeNumberList(value) {
+  const numbers = new Set();
+  const addNumber = (item) => {
+    const parsed = Number.parseInt(item, 10);
+    if (Number.isFinite(parsed) && parsed > 0) numbers.add(parsed);
+  };
+
+  if (Array.isArray(value)) {
+    value.forEach(addNumber);
+    return [...numbers].sort((a, b) => a - b);
+  }
+
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach((part) => {
+      const rangeMatch = part.match(/(\d+)\s*-\s*(\d+)/);
+      if (rangeMatch) {
+        const start = Number.parseInt(rangeMatch[1], 10);
+        const end = Number.parseInt(rangeMatch[2], 10);
+        if (Number.isFinite(start) && Number.isFinite(end)) {
+          const from = Math.min(start, end);
+          const to = Math.max(start, end);
+          for (let number = from; number <= to && number - from <= 200; number += 1) {
+            addNumber(number);
+          }
+        }
+        return;
+      }
+
+      const singleMatch = part.match(/\d+/);
+      if (singleMatch) addNumber(singleMatch[0]);
+    });
+
+  return [...numbers].sort((a, b) => a - b);
+}
+
+function normalizeEpisodeSelectionOptions(rawOptions = {}) {
+  const mode = VALID_EPISODE_SELECTION_MODES.has(rawOptions.episodeSelectionMode)
+    ? rawOptions.episodeSelectionMode
+    : 'sample';
+  const maxEpisodesPerJob = parsePositiveInt(
+    rawOptions.maxEpisodesPerJob ?? DEFAULT_OPTIONS.maxEpisodesPerJob,
+    DEFAULT_OPTIONS.maxEpisodesPerJob,
+    2,
+    500,
+  );
+
+  return {
+    mode,
+    sampleSize: parsePositiveInt(rawOptions.sampleSize, DEFAULT_OPTIONS.sampleSize, 2, maxEpisodesPerJob),
+    maxEpisodesPerJob,
+    episodeNumbers: parseEpisodeNumberList(rawOptions.episodeNumbers),
+  };
+}
+
+function hasValidEpisodeIntro(episode = {}) {
+  const intro = episode.playbackMeta?.intro || {};
+  const startSec = Number(intro.startSec);
+  const endSec = Number(intro.endSec);
+
+  return intro.enabled === true && Number.isFinite(startSec) && Number.isFinite(endSec) && startSec >= 0 && endSec > startSec;
+}
+
+function selectIntroDetectionEpisodes(episodes = [], rawOptions = {}) {
+  const selection = normalizeEpisodeSelectionOptions(rawOptions);
+  const ordered = [...episodes].sort((first, second) => {
+    const episodeDelta = (Number(first.episodeId) || 0) - (Number(second.episodeId) || 0);
+    if (episodeDelta !== 0) return episodeDelta;
+    return String(first.audioType || '').localeCompare(String(second.audioType || ''));
+  });
+
+  if (selection.mode === 'all') {
+    return ordered.slice(0, selection.maxEpisodesPerJob);
+  }
+
+  if (selection.mode === 'remaining') {
+    return ordered
+      .filter((episode) => !hasValidEpisodeIntro(episode))
+      .slice(0, selection.sampleSize);
+  }
+
+  if (selection.mode === 'specific') {
+    const wanted = new Set(selection.episodeNumbers);
+    return ordered
+      .filter((episode) => wanted.has(Number(episode.episodeId)))
+      .slice(0, selection.maxEpisodesPerJob);
+  }
+
+  return ordered.slice(0, selection.sampleSize);
 }
 
 function cosineSimilarity(first = [], second = []) {
@@ -383,6 +485,7 @@ async function resolveMovie(identifier) {
 
 async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = null) {
   const options = { ...DEFAULT_OPTIONS, ...rawOptions };
+  const selectionOptions = normalizeEpisodeSelectionOptions(options);
   if (onProgress) {
     onProgress({ percent: 2, step: 'load-movie', message: 'Loading movie metadata' });
   }
@@ -394,16 +497,17 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
     onProgress({ percent: 4, step: 'load-episodes', message: 'Loading playable episodes' });
   }
 
-  const episodes = await Episode.find({
+  const playableEpisodes = await Episode.find({
     movieId: movie._id,
     link_m3u8: { $type: 'string', $ne: '' },
   })
     .sort({ episodeId: 1, audioType: 1 })
-    .limit(Math.max(2, options.sampleSize))
+    .limit(selectionOptions.mode === 'sample' ? selectionOptions.sampleSize : selectionOptions.maxEpisodesPerJob)
     .lean();
+  const episodes = selectIntroDetectionEpisodes(playableEpisodes, options);
 
   if (episodes.length < 2) {
-    throw new Error('At least two playable episodes are required for intro detection');
+    throw new Error('At least two selected playable episodes are required for intro detection');
   }
 
   const samples = [];
@@ -435,7 +539,11 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
   }
 
   if (onProgress) {
-    onProgress({ percent: 70, step: 'match-intro', message: 'Matching common intro audio' });
+      onProgress({
+        percent: 70,
+        step: 'match-intro',
+        message: `Matching common intro audio (${selectionOptions.mode})`,
+      });
   }
   const detections = detectCommonIntroFromFeatures(samples, options);
   const now = new Date();
@@ -495,7 +603,7 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
   }
 
   let inferredEpisodes = 0;
-  if (options.applySeasonDefault !== false && detections.length >= 2) {
+  if (selectionOptions.mode === 'sample' && options.applySeasonDefault !== false && detections.length >= 2) {
     if (onProgress) {
       onProgress({ percent: 90, step: 'infer-season', message: 'Applying season-level candidates' });
     }
@@ -538,6 +646,8 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
   const result = {
     movieId: movie._id.toString(),
     movieName: movie.name,
+    selectionMode: selectionOptions.mode,
+    eligibleEpisodes: playableEpisodes.length,
     sampledEpisodes: samples.length,
     detectedEpisodes: detections.length,
     inferredEpisodes,
@@ -564,4 +674,6 @@ module.exports = {
   extractAudioFeatures,
   featureSimilarity,
   findBestPairMatch,
+  parseEpisodeNumberList,
+  selectIntroDetectionEpisodes,
 };

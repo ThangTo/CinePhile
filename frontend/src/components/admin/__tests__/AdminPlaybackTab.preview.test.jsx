@@ -163,9 +163,60 @@ describe("AdminPlaybackTab preview helpers", () => {
     await waitFor(() => expect(playbackAPI.getEpisodes).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByTitle(/Intro/i));
+    fireEvent.click(screen.getByLabelText("Bắt đầu detect intro"));
 
     await waitFor(() => expect(playbackAPI.getEpisodes).toHaveBeenCalledTimes(2));
     expect(screen.getByDisplayValue("42")).toBeTruthy();
     expect(screen.getByDisplayValue("101")).toBeTruthy();
+  });
+
+  it("sends configurable remaining-episode detect options from the admin modal", async () => {
+    const episode = {
+      id: "episode-1",
+      episode: 1,
+      link_m3u8: "https://media.example.test/video/master.m3u8",
+      movie: { id: "movie-1", name: "Đại Chiến Người Khổng Lồ" },
+      playbackMeta: {
+        introStartSec: null,
+        introEndSec: null,
+        outroStartSec: null,
+        detectionStatus: "none",
+        detectionSource: "none",
+        confidence: 0,
+      },
+    };
+
+    playbackAPI.getEpisodes.mockResolvedValue({
+      data: [episode],
+      pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+    });
+    playbackAPI.detectIntro.mockResolvedValue({
+      jobId: "job-remaining",
+      state: "waiting",
+      backend: "memory",
+    });
+
+    await act(async () => {
+      render(<AdminPlaybackTab />);
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(playbackAPI.getEpisodes).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByTitle(/Intro/i));
+    fireEvent.click(screen.getByLabelText("Chọn chế độ remaining"));
+    fireEvent.change(screen.getByLabelText("Số tập detect"), {
+      target: { value: "7" },
+    });
+    fireEvent.click(screen.getByLabelText("Bắt đầu detect intro"));
+
+    await waitFor(() => expect(playbackAPI.detectIntro).toHaveBeenCalledTimes(1));
+    expect(playbackAPI.detectIntro).toHaveBeenCalledWith({
+      movieId: "movie-1",
+      sampleSeconds: 300,
+      episodeSelectionMode: "remaining",
+      maxEpisodesPerJob: 500,
+      applySeasonDefault: false,
+      sampleSize: 7,
+    });
   });
 });

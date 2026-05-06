@@ -5,6 +5,8 @@ const {
   buildAutoWritableEpisodeFilter,
   detectCommonIntroFromFeatures,
   findBestPairMatch,
+  parseEpisodeNumberList,
+  selectIntroDetectionEpisodes,
 } = require('./introDetection.service');
 
 function makeFeature(seed, rms = 0.4) {
@@ -92,5 +94,37 @@ test('buildAutoWritableEpisodeFilter preserves approved or manual metadata only 
         },
       ],
     },
+  );
+});
+
+test('parseEpisodeNumberList accepts comma lists and ranges', () => {
+  assert.deepEqual(parseEpisodeNumberList('6, 7-9, 9, tap 12'), [6, 7, 8, 9, 12]);
+  assert.deepEqual(parseEpisodeNumberList([3, '4', 'bad', 3]), [3, 4]);
+});
+
+test('selectIntroDetectionEpisodes supports sample, remaining, all, and specific modes', () => {
+  const episodes = [
+    { _id: 'ep-1', episodeId: 1, audioType: 'vietsub', playbackMeta: { intro: { enabled: true, startSec: 10, endSec: 70 } } },
+    { _id: 'ep-2', episodeId: 2, audioType: 'vietsub', playbackMeta: { intro: { enabled: false } } },
+    { _id: 'ep-3', episodeId: 3, audioType: 'vietsub', playbackMeta: { intro: { enabled: true, startSec: 11, endSec: 71 } } },
+    { _id: 'ep-4', episodeId: 4, audioType: 'vietsub', playbackMeta: { intro: { enabled: true, startSec: null, endSec: null } } },
+    { _id: 'ep-5', episodeId: 5, audioType: 'vietsub', playbackMeta: { intro: { enabled: false } } },
+  ];
+
+  assert.deepEqual(
+    selectIntroDetectionEpisodes(episodes, { episodeSelectionMode: 'sample', sampleSize: 3 }).map((episode) => episode.episodeId),
+    [1, 2, 3],
+  );
+  assert.deepEqual(
+    selectIntroDetectionEpisodes(episodes, { episodeSelectionMode: 'remaining', sampleSize: 2 }).map((episode) => episode.episodeId),
+    [2, 4],
+  );
+  assert.deepEqual(
+    selectIntroDetectionEpisodes(episodes, { episodeSelectionMode: 'all' }).map((episode) => episode.episodeId),
+    [1, 2, 3, 4, 5],
+  );
+  assert.deepEqual(
+    selectIntroDetectionEpisodes(episodes, { episodeSelectionMode: 'specific', episodeNumbers: '4,2' }).map((episode) => episode.episodeId),
+    [2, 4],
   );
 });

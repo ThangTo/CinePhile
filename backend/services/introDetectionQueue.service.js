@@ -42,8 +42,20 @@ function parseFloatOption(value, fallback) {
 }
 
 function normalizeJobOptions(options = {}) {
+  const sampleSize = Math.max(2, Math.min(500, Number.parseInt(options.sampleSize, 10) || 5));
+  const validSelectionModes = new Set(['sample', 'remaining', 'all', 'specific']);
+  const episodeSelectionMode = validSelectionModes.has(options.episodeSelectionMode)
+    ? options.episodeSelectionMode
+    : 'sample';
+
   return {
-    sampleSize: Math.max(2, Math.min(10, Number.parseInt(options.sampleSize, 10) || 5)),
+    sampleSize,
+    episodeSelectionMode,
+    episodeNumbers: options.episodeNumbers || null,
+    maxEpisodesPerJob: Math.max(
+      2,
+      Math.min(500, Number.parseInt(options.maxEpisodesPerJob, 10) || 500),
+    ),
     sampleSeconds: Math.max(180, Math.min(900, Number.parseInt(options.sampleSeconds, 10) || 420)),
     minDurationSec: Math.max(20, Math.min(180, Number.parseInt(options.minDurationSec, 10) || 30)),
     maxDurationSec: Math.max(45, Math.min(240, Number.parseInt(options.maxDurationSec, 10) || 140)),

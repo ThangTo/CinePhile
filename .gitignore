@@ -9,6 +9,7 @@ build/
 
 
 .vscode/
+.codex/agents/
 *.md
 !README.md
 *.rdb

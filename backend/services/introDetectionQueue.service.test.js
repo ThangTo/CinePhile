@@ -19,6 +19,18 @@ test('normalizeJobOptions accepts bounded similarity threshold overrides', () =>
   assert.equal(normalizeJobOptions({ similarityThreshold: 0.9 }).similarityThreshold, 0.9);
 });
 
+test('normalizeJobOptions keeps admin episode selection options configurable', () => {
+  const options = normalizeJobOptions({
+    episodeSelectionMode: 'remaining',
+    sampleSize: 25,
+    episodeNumbers: '6,7-9',
+  });
+
+  assert.equal(options.episodeSelectionMode, 'remaining');
+  assert.equal(options.sampleSize, 25);
+  assert.equal(options.episodeNumbers, '6,7-9');
+});
+
 test('shouldRequirePersistentQueue requires Bull Redis for production and batch runs', () => {
   assert.equal(shouldRequirePersistentQueue({ NODE_ENV: 'production' }), true);
   assert.equal(shouldRequirePersistentQueue({ NODE_ENV: 'development', INTRO_BATCH_ENABLED: 'true' }), true);

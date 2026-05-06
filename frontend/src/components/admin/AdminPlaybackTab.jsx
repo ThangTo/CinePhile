@@ -206,6 +206,161 @@ const PreviewModal = ({ preview, saving, onClose, onApprove, onNeedsReview }) =>
   );
 };
 
+const DETECT_MODE_OPTIONS = [
+  { value: "sample", label: "Nhanh", icon: "fa-bolt" },
+  { value: "remaining", label: "Chưa có", icon: "fa-filter" },
+  { value: "all", label: "Tất cả", icon: "fa-layer-group" },
+  { value: "specific", label: "Chỉ định", icon: "fa-list-ol" },
+];
+
+const DetectOptionsModal = ({ config, saving, onClose, onChange, onSubmit }) => {
+  if (!config) return null;
+
+  const showSampleSize = config.mode === "sample" || config.mode === "remaining";
+  const canSubmit = config.mode !== "specific" || String(config.episodeNumbers || "").trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-md animate-fade-in">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-[#121212] shadow-2xl animate-fade-in-up">
+
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-primaryColor/10 to-transparent px-6 py-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primaryColor/20 text-primaryColor">
+              <i className="fa-solid fa-wand-magic-sparkles text-lg"></i>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Nhận diện Intro tự động</h2>
+              <p className="mt-0.5 text-sm font-medium text-gray-400">
+                Phim: <span className="text-primaryColor">{config.episode?.movie?.name || "Chưa có tên"}</span>
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-red-500/20 hover:text-red-400"
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="space-y-6 p-6">
+
+          {/* Detect Mode */}
+          <div>
+            <label className="mb-3 block text-sm font-semibold text-gray-300">
+              Chọn chế độ nhận diện:
+            </label>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {DETECT_MODE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-label={`Chọn chế độ ${option.value}`}
+                  onClick={() => onChange({ mode: option.value })}
+                  className={`flex flex-col items-center justify-center gap-2 rounded-xl border p-3 transition-all duration-200 ${
+                    config.mode === option.value
+                      ? "border-primaryColor bg-primaryColor/10 text-primaryColor shadow-[0_0_15px_rgba(253,224,71,0.15)]"
+                      : "border-white/5 bg-white/5 text-gray-400 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <i className={`fa-solid ${option.icon} text-lg`}></i>
+                  <span className="text-xs font-bold uppercase tracking-wider">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Dynamic Inputs */}
+          <div className="min-h-[80px] rounded-xl border border-white/5 bg-black/40 p-4">
+            {showSampleSize && (
+              <div className="animate-fade-in">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-gray-300">
+                    Số lượng tập dùng để lấy mẫu phân tích:
+                  </span>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="2"
+                      max="500"
+                      value={config.sampleSize}
+                      onChange={(event) => onChange({ sampleSize: event.target.value })}
+                      aria-label="Số tập detect"
+                      className="h-12 w-full rounded-lg border border-white/10 bg-black/60 pl-12 pr-4 text-white placeholder-gray-500 outline-none transition-colors focus:border-primaryColor focus:bg-black focus:ring-1 focus:ring-primaryColor/50"
+                    />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
+                      <i className="fa-solid fa-layer-group"></i>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">Nên để từ 3-5 tập để AI có đủ dữ liệu so sánh chính xác âm thanh Intro chung.</p>
+                </label>
+              </div>
+            )}
+
+            {config.mode === "specific" && (
+              <div className="animate-fade-in">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-gray-300">
+                    Danh sách tập cần nhận diện:
+                  </span>
+                  <div className="relative">
+                    <input
+                      value={config.episodeNumbers}
+                      onChange={(event) => onChange({ episodeNumbers: event.target.value })}
+                      placeholder="VD: 6, 7, 8 hoặc 6-10"
+                      aria-label="Danh sách tập detect"
+                      className="h-12 w-full rounded-lg border border-white/10 bg-black/60 pl-12 pr-4 text-white placeholder-gray-600 outline-none transition-colors focus:border-primaryColor focus:bg-black focus:ring-1 focus:ring-primaryColor/50"
+                    />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
+                      <i className="fa-solid fa-list-ol"></i>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">Nhập các tập cách nhau bằng dấu phẩy (VD: 1, 2, 3) hoặc khoảng (VD: 1-5).</p>
+                </label>
+              </div>
+            )}
+
+            {config.mode === "all" && (
+              <div className="flex h-full items-center gap-3 text-sm text-gray-400 animate-fade-in">
+                <i className="fa-solid fa-circle-info text-blue-400 text-lg"></i>
+                <p>Hệ thống sẽ quét toàn bộ các tập hiện có của bộ phim này để tìm kiếm đoạn nhạc Intro.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 border-t border-white/10 bg-black/40 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-11 rounded-lg px-6 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            aria-label="Bắt đầu detect intro"
+            disabled={saving || !canSubmit}
+            className="flex h-11 items-center justify-center gap-2 rounded-lg bg-primaryColor px-8 text-sm font-bold text-black shadow-[0_4px_15px_rgba(253,224,71,0.3)] transition-all hover:bg-primaryColor/90 active:scale-95 disabled:opacity-50 disabled:shadow-none"
+          >
+            {saving ? (
+              <i className="fa-solid fa-circle-notch fa-spin text-lg"></i>
+            ) : (
+              <i className="fa-solid fa-play"></i>
+            )}
+            {saving ? "Đang xử lý..." : "Tiến hành quét"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const getStatusColor = (status) => {
   switch (status) {
     case "approved":
@@ -236,6 +391,7 @@ const AdminPlaybackTab = () => {
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeJob, setActiveJob] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [detectConfig, setDetectConfig] = useState(null);
   const refreshedJobIdRef = useRef(null);
 
   useEffect(() => {
@@ -412,18 +568,45 @@ const AdminPlaybackTab = () => {
     setPreview(null);
   };
 
-  const detectSeasonIntro = async (episode) => {
+  const openDetectOptions = (episode) => {
+    setError("");
+    setDetectConfig({
+      episode,
+      mode: "sample",
+      sampleSize: 5,
+      episodeNumbers: "",
+    });
+  };
+
+  const updateDetectConfig = (patch) => {
+    setDetectConfig((prev) => (prev ? { ...prev, ...patch } : prev));
+  };
+
+  const detectSeasonIntro = async (episode, detectOptions = {}) => {
     const movieId = episode.movie?.id;
     if (!movieId) return;
 
+    const mode = detectOptions.mode || "sample";
+    const sampleSize = Math.max(2, Math.min(500, Number.parseInt(detectOptions.sampleSize, 10) || 5));
+    const payload = {
+      movieId,
+      sampleSeconds: 300,
+      episodeSelectionMode: mode,
+      maxEpisodesPerJob: 500,
+      applySeasonDefault: mode === "sample",
+    };
+
+    if (mode === "sample" || mode === "remaining") {
+      payload.sampleSize = sampleSize;
+    }
+
+    if (mode === "specific") {
+      payload.episodeNumbers = detectOptions.episodeNumbers;
+    }
+
     setError("");
     try {
-      const result = await playbackAPI.detectIntro({
-        movieId,
-        sampleSize: 5,
-        sampleSeconds: 300,
-        applySeasonDefault: true,
-      });
+      const result = await playbackAPI.detectIntro(payload);
       refreshedJobIdRef.current = null;
       setActiveJobId(result.jobId);
       setActiveJob({
@@ -436,6 +619,12 @@ const AdminPlaybackTab = () => {
     } catch (err) {
       setError(err.message || "Không tạo được job detect intro");
     }
+  };
+
+  const submitDetectOptions = async () => {
+    if (!detectConfig?.episode) return;
+    await detectSeasonIntro(detectConfig.episode, detectConfig);
+    setDetectConfig(null);
   };
 
   return (
@@ -710,7 +899,7 @@ const AdminPlaybackTab = () => {
                             </button>
                             <div className="w-px bg-white/10"></div>
                             <button
-                              onClick={() => detectSeasonIntro(episode)}
+                              onClick={() => openDetectOptions(episode)}
                               title="Dùng AI nhận diện Intro/Outro"
                               className="flex h-9 w-9 items-center justify-center text-blue-400 hover:bg-blue-500/20 transition-colors"
                             >
@@ -766,6 +955,13 @@ const AdminPlaybackTab = () => {
         onClose={() => setPreview(null)}
         onApprove={() => savePreviewEpisode("approved")}
         onNeedsReview={() => savePreviewEpisode("needs_review")}
+      />
+      <DetectOptionsModal
+        config={detectConfig}
+        saving={Boolean(activeJobId)}
+        onClose={() => setDetectConfig(null)}
+        onChange={updateDetectConfig}
+        onSubmit={submitDetectOptions}
       />
     </div>
   );
