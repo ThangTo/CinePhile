@@ -2,8 +2,8 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const crypto = require('crypto');
-const { extractAudioChunks, cleanupTempFile } = require('./audio.service');
-const { speechToTextPipeline, getCacheKey } = require('./whisper.service');
+const Queue = require('bull');
+const { getCacheKey } = require('./whisper.service');
 const { getLanguageCacheKey, getWhisperProvider } = require('./whisperClient.service');
 const r2Service = require('./r2.service');
 const Episode = require('../models/episode.model');
@@ -16,7 +16,40 @@ const WHISPER_CHUNK_DURATION_SEC = Math.max(
   Number.parseInt(process.env.WHISPER_CHUNK_DURATION_SEC, 10) || 600,
   30,
 );
+const REDIS_URL = process.env.REDIS_URL;
+const SUBTITLE_QUEUE_TIMEOUT_MS = Math.max(
+  60000,
+  Number.parseInt(process.env.SUBTITLE_QUEUE_TIMEOUT_MS, 10) || 60 * 60 * 1000,
+);
 const subtitleJobs = new Map();
+let subtitleQueue = null;
+let subtitleQueueWorkerStarted = false;
+
+if (REDIS_URL) {
+  subtitleQueue = new Queue('subtitle-generation-queue', REDIS_URL, {
+    redis: {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+    },
+    defaultJobOptions: {
+      attempts: 2,
+      backoff: {
+        type: 'exponential',
+        delay: 5000,
+      },
+      removeOnComplete: 100,
+      removeOnFail: 100,
+      timeout: SUBTITLE_QUEUE_TIMEOUT_MS,
+    },
+  });
+
+  subtitleQueue.on('error', (error) => {
+    console.error(`[SubtitleQueue] Queue error: ${error.message}`);
+  });
+} else {
+  console.log('[SubtitleQueue] Persistent queue disabled: REDIS_URL missing.');
+}
 
 function ensureCacheDir() {
   if (!fs.existsSync(VTT_CACHE_DIR)) {
@@ -139,6 +172,52 @@ function getActiveJob(cacheKey) {
   return job;
 }
 
+function reportGenerationJob(cacheKey, patch, onJobProgress = null) {
+  updateJob(cacheKey, patch);
+
+  if (onJobProgress && Number.isFinite(Number(patch.progress))) {
+    onJobProgress(Number(patch.progress));
+  }
+}
+
+async function getQueuedSubtitleStatus(cacheKey, languageKey) {
+  if (!subtitleQueue) {
+    return null;
+  }
+
+  const job = await subtitleQueue.getJob(cacheKey);
+  if (!job) {
+    return null;
+  }
+
+  const state = await job.getState();
+  const progress = Number(job.progress()) || 0;
+
+  if (state === 'completed') {
+    const subtitleUrl = job.returnvalue?.subtitleUrl || toSubtitleUrl(languageKey, cacheKey);
+    return {
+      status: 'ready',
+      progress: 100,
+      subtitleUrl,
+    };
+  }
+
+  if (state === 'failed') {
+    return {
+      status: 'failed',
+      progress: 0,
+      subtitleUrl: null,
+      error: job.failedReason || 'Failed to generate subtitle',
+    };
+  }
+
+  return {
+    status: 'processing',
+    progress: Math.max(1, Math.min(99, progress || 1)),
+    subtitleUrl: null,
+  };
+}
+
 async function getSubtitleStatus(videoUrl, language = DEFAULT_SUBTITLE_LANGUAGE, cacheIdentity = null) {
   const languageKey = getLanguageCacheKey(language);
   const cachedPath = await getCachedSubtitlePath(videoUrl, languageKey, cacheIdentity);
@@ -184,6 +263,11 @@ async function getSubtitleStatus(videoUrl, language = DEFAULT_SUBTITLE_LANGUAGE,
     };
   }
 
+  const queuedStatus = await getQueuedSubtitleStatus(cacheKey, languageKey);
+  if (queuedStatus) {
+    return queuedStatus;
+  }
+
   return {
     status: 'not_requested',
     progress: 0,
@@ -197,7 +281,10 @@ async function runSubtitleGeneration(
   chunkDurationSec = WHISPER_CHUNK_DURATION_SEC,
   cacheIdentity = null,
   language = DEFAULT_SUBTITLE_LANGUAGE,
+  onJobProgress = null,
 ) {
+  const { extractAudioChunks, cleanupTempFile } = require('./audio.service');
+  const { speechToTextPipeline } = require('./whisper.service');
   const languageKey = getLanguageCacheKey(language);
   const cacheKey = getStableSubtitleCacheKey(m3u8Url, languageKey, cacheIdentity);
   const cacheFile = path.join(VTT_CACHE_DIR, cacheKey);
@@ -216,16 +303,16 @@ async function runSubtitleGeneration(
         `[SubtitleService] Proxy extraction failed, retrying original source. Error: ${primaryError.message}`,
       );
 
-      updateJob(cacheKey, {
+      reportGenerationJob(cacheKey, {
         status: 'processing',
         progress: Math.max(1, Number(fallbackProgress) || 1),
-      });
+      }, onJobProgress);
 
       return extractAudioChunks(m3u8Url, durationSec, onProgress);
     }
   };
 
-  updateJob(cacheKey, { status: 'processing', progress: 1, error: null });
+  reportGenerationJob(cacheKey, { status: 'processing', progress: 1, error: null }, onJobProgress);
 
   try {
     const provider = await ensureWhisperReady();
@@ -233,10 +320,10 @@ async function runSubtitleGeneration(
 
     audioChunks = await extractChunksWithFallback(chunkDurationSec, (progress) => {
       const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
-      updateJob(cacheKey, {
+      reportGenerationJob(cacheKey, {
         status: 'processing',
         progress: Math.max(1, Math.min(30, Math.round(safeProgress * 0.3))),
-      });
+      }, onJobProgress);
     }, 5);
 
     const generatedCachePath = await speechToTextPipeline(
@@ -245,10 +332,10 @@ async function runSubtitleGeneration(
       chunkDurationSec,
       (progress) => {
         const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
-        updateJob(cacheKey, {
+        reportGenerationJob(cacheKey, {
           status: 'processing',
           progress: Math.min(99, Math.max(30, 30 + Math.round(safeProgress * 0.7))),
-        });
+        }, onJobProgress);
       },
       languageKey,
     );
@@ -271,23 +358,29 @@ async function runSubtitleGeneration(
     // Upload to R2 after generation
     const r2Url = await r2Service.uploadSubtitle(cacheFile, cacheKey, languageKey);
 
-    updateJob(cacheKey, {
+    const subtitleUrl = r2Url || toSubtitleUrl(languageKey, cacheKey);
+    reportGenerationJob(cacheKey, {
       status: 'ready',
       progress: 100,
-      subtitleUrl: r2Url || toSubtitleUrl(languageKey, cacheKey),
+      subtitleUrl,
       error: null,
       promise: null,
-    });
+    }, onJobProgress);
 
     await clearSubtitleRequestCount(cacheIdentity);
+    return {
+      status: 'ready',
+      progress: 100,
+      subtitleUrl,
+    };
   } catch (error) {
     console.error('[SubtitleService] Generation error:', error.message);
-    updateJob(cacheKey, {
+    reportGenerationJob(cacheKey, {
       status: 'failed',
       progress: 0,
       error: error.message || 'Failed to generate subtitles',
       promise: null,
-    });
+    }, onJobProgress);
     throw error;
   } finally {
     if (audioChunks?.outDir) {
@@ -307,7 +400,7 @@ async function requestKoreanSubtitleGeneration(
   const languageKey = getLanguageCacheKey(language);
 
   const currentStatus = await getSubtitleStatus(m3u8Url, languageKey, cacheIdentity);
-  if (currentStatus.status === 'ready') {
+  if (currentStatus.status === 'ready' || currentStatus.status === 'processing') {
     return currentStatus;
   }
 
@@ -317,6 +410,39 @@ async function requestKoreanSubtitleGeneration(
     return {
       status: 'processing',
       progress: Number.isFinite(activeJob.progress) ? activeJob.progress : 0,
+      subtitleUrl: null,
+    };
+  }
+
+  if (subtitleQueue) {
+    const existingJob = await subtitleQueue.getJob(cacheKey);
+    if (existingJob) {
+      const state = await existingJob.getState();
+      if (state === 'waiting' || state === 'active' || state === 'delayed') {
+        return getQueuedSubtitleStatus(cacheKey, languageKey);
+      }
+
+      if (state === 'failed') {
+        await existingJob.remove().catch(() => {});
+      }
+    }
+
+    await subtitleQueue.add(
+      {
+        m3u8Url,
+        fetchM3u8Url,
+        chunkDurationSec,
+        cacheIdentity,
+        languageKey,
+      },
+      {
+        jobId: cacheKey,
+      },
+    );
+
+    return {
+      status: 'processing',
+      progress: 1,
       subtitleUrl: null,
     };
   }
@@ -390,12 +516,64 @@ async function generateKoreanSubtitles(
 const requestSubtitleGeneration = requestKoreanSubtitleGeneration;
 const generateSubtitles = generateKoreanSubtitles;
 
+function startSubtitleQueueWorker() {
+  if (!subtitleQueue) {
+    console.log('[SubtitleQueue] Worker disabled: REDIS_URL missing.');
+    return false;
+  }
+
+  if (subtitleQueueWorkerStarted) {
+    return true;
+  }
+
+  subtitleQueueWorkerStarted = true;
+  subtitleQueue.process(1, async (job) => {
+    const {
+      m3u8Url,
+      fetchM3u8Url,
+      chunkDurationSec,
+      cacheIdentity,
+      languageKey,
+    } = job.data;
+
+    job.progress(1);
+    return runSubtitleGeneration(
+      m3u8Url,
+      fetchM3u8Url,
+      chunkDurationSec,
+      cacheIdentity,
+      languageKey,
+      (progress) => job.progress(progress),
+    );
+  });
+
+  subtitleQueue.on('completed', (job) => {
+    console.log(`[SubtitleQueue] Job ${job.id} completed`);
+  });
+
+  subtitleQueue.on('failed', (job, error) => {
+    console.error(`[SubtitleQueue] Job ${job?.id} failed: ${error.message}`);
+  });
+
+  console.log('[SubtitleQueue] Worker started with concurrency=1');
+  return true;
+}
+
+async function closeSubtitleQueue() {
+  if (subtitleQueue) {
+    await subtitleQueue.close();
+  }
+}
+
 module.exports = {
   DEFAULT_SUBTITLE_LANGUAGE,
+  closeSubtitleQueue,
   generateSubtitles,
   generateKoreanSubtitles,
   requestSubtitleGeneration,
   requestKoreanSubtitleGeneration,
   getSubtitleStatus,
   getCachedSubtitlePath,
+  runSubtitleGeneration,
+  startSubtitleQueueWorker,
 };

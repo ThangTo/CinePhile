@@ -1,5 +1,4 @@
 const Queue = require('bull');
-const { detectIntroForMovie } = require('./introDetection.service');
 
 const REDIS_URL = process.env.REDIS_URL;
 const CONCURRENCY = Math.max(1, Number.parseInt(process.env.INTRO_DETECTION_CONCURRENCY, 10) || 1);
@@ -15,6 +14,8 @@ const QUEUE_ADD_TIMEOUT_MS = Math.max(
 const memoryJobs = new Map();
 let introDetectionQueue = null;
 let introDetectionQueueReady = false;
+let introDetectionWorkerStarted = false;
+let introDetectionEventsRegistered = false;
 
 function parseBool(value, fallback) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -68,6 +69,7 @@ function normalizeJobOptions(options = {}) {
 function runMemoryJob(jobRecord) {
   setImmediate(async () => {
     try {
+      const { detectIntroForMovie } = require('./introDetection.service');
       jobRecord.state = 'active';
       jobRecord.progress = 1;
       jobRecord.step = 'starting';
@@ -159,6 +161,82 @@ function timeoutPromise(ms, message) {
   });
 }
 
+async function processIntroDetectionJob(job) {
+  const { detectIntroForMovie } = require('./introDetection.service');
+  job.progress(1);
+  const result = await detectIntroForMovie(
+    job.data.movieId,
+    { ...job.data.options, jobId: job.id },
+    (progressPayload) => {
+      const payload =
+        typeof progressPayload === 'object'
+          ? progressPayload
+          : { percent: progressPayload };
+      const percent = Math.max(0, Math.min(100, Number(payload.percent) || 0));
+      job.progress(percent);
+      if (payload.step || payload.message) {
+        job
+          .update({
+            ...job.data,
+            lastStatus: {
+              step: payload.step || null,
+              message: payload.message || null,
+              percent,
+              updatedAt: Date.now(),
+            },
+          })
+          .catch(() => {});
+      }
+    },
+  );
+  job.progress(100);
+  return result;
+}
+
+function registerIntroDetectionQueueEvents() {
+  if (!introDetectionQueue || introDetectionEventsRegistered) {
+    return false;
+  }
+
+  introDetectionEventsRegistered = true;
+
+  introDetectionQueue.on('ready', () => {
+    introDetectionQueueReady = true;
+    console.log('[IntroDetection] Queue ready');
+  });
+
+  introDetectionQueue.on('global:completed', (jobId) => {
+    console.log(`[IntroDetection] Job ${jobId} completed`);
+  });
+
+  introDetectionQueue.on('global:failed', (jobId, failedReason) => {
+    console.error(`[IntroDetection] Job ${jobId} failed: ${failedReason}`);
+  });
+
+  introDetectionQueue.on('error', (error) => {
+    introDetectionQueueReady = false;
+    console.error(`[IntroDetection] Queue error: ${error.message}`);
+  });
+
+  return true;
+}
+
+function startIntroDetectionWorker() {
+  if (!introDetectionQueue) {
+    console.log('[IntroDetection] Worker disabled: persistent queue is unavailable.');
+    return false;
+  }
+
+  if (introDetectionWorkerStarted) {
+    return true;
+  }
+
+  introDetectionWorkerStarted = true;
+  introDetectionQueue.process(CONCURRENCY, processIntroDetectionJob);
+  console.log(`[IntroDetection] Worker started with concurrency=${CONCURRENCY}`);
+  return true;
+}
+
 if (REDIS_URL) {
   introDetectionQueue = new Queue('intro-detection-queue', REDIS_URL, {
     redis: {
@@ -178,54 +256,7 @@ if (REDIS_URL) {
     },
   });
 
-  introDetectionQueue.process(CONCURRENCY, async (job) => {
-    job.progress(1);
-    const result = await detectIntroForMovie(
-      job.data.movieId,
-      { ...job.data.options, jobId: job.id },
-      (progressPayload) => {
-        const payload =
-          typeof progressPayload === 'object'
-            ? progressPayload
-            : { percent: progressPayload };
-        const percent = Math.max(0, Math.min(100, Number(payload.percent) || 0));
-        job.progress(percent);
-        if (payload.step || payload.message) {
-          job
-            .update({
-              ...job.data,
-              lastStatus: {
-                step: payload.step || null,
-                message: payload.message || null,
-                percent,
-                updatedAt: Date.now(),
-              },
-            })
-            .catch(() => {});
-        }
-      },
-    );
-    job.progress(100);
-    return result;
-  });
-
-  introDetectionQueue.on('failed', (job, error) => {
-    console.error(`[IntroDetection] Job ${job?.id} failed: ${error.message}`);
-  });
-
-  introDetectionQueue.on('ready', () => {
-    introDetectionQueueReady = true;
-    console.log('[IntroDetection] Queue ready');
-  });
-
-  introDetectionQueue.on('completed', (job) => {
-    console.log(`[IntroDetection] Job ${job.id} completed`);
-  });
-
-  introDetectionQueue.on('error', (error) => {
-    introDetectionQueueReady = false;
-    console.error(`[IntroDetection] Queue error: ${error.message}`);
-  });
+  registerIntroDetectionQueueEvents();
 } else {
   const message = REQUIRE_PERSISTENT_QUEUE
     ? '[IntroDetection] REDIS_URL missing; intro detection jobs are disabled until TCP Redis is configured.'
@@ -312,4 +343,5 @@ module.exports = {
   getIntroDetectionJobStatus,
   normalizeJobOptions,
   shouldRequirePersistentQueue,
+  startIntroDetectionWorker,
 };

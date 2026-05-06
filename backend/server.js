@@ -6,9 +6,10 @@ const mongoose = require('mongoose');
 const http = require('http');
 const { connectDB } = require('./config/db/db');
 const redisService = require('./services/redis.service');
-const { initCronJobs } = require('./services/cron.service');
 const { initVoiceSocket } = require('./services/voiceSocket.service');
 const { initProgressSocket } = require('./services/progressSocket.service');
+const { registerAnalysisQueueEventBridge } = require('./services/analysisQueue.service');
+const { registerVideoQueueEventBridge } = require('./services/videoQueue.service');
 const app = require('./app');
 
 const PORT = process.env.PORT || 5000;
@@ -19,6 +20,11 @@ if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder(DNS_RESULT_ORDER);
 }
 
+function parseBool(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  return !['0', 'false', 'no', 'off'].includes(String(value).trim().toLowerCase());
+}
+
 connectDB().catch(() => {});
 
 redisService.connect().catch((err) => {
@@ -26,7 +32,12 @@ redisService.connect().catch((err) => {
   console.log('Server will continue without Redis cache');
 });
 
-initCronJobs();
+if (parseBool(process.env.API_CRON_ENABLED, false)) {
+  const { initCronJobs } = require('./services/cron.service');
+  initCronJobs();
+} else {
+  console.log('Cron jobs are not initialized in the API process. Use scheduler.js or set API_CRON_ENABLED=true.');
+}
 
 const httpServer = http.createServer(app);
 const openSockets = new Set();
@@ -40,6 +51,8 @@ httpServer.on('connection', (socket) => {
 
 initVoiceSocket(httpServer);
 initProgressSocket(httpServer);
+registerAnalysisQueueEventBridge();
+registerVideoQueueEventBridge();
 
 const server = httpServer.listen(PORT, () => {
   console.log(`Server (PID: ${process.pid}) listening at http://localhost:${PORT}`);
@@ -117,6 +130,13 @@ const gracefulShutdown = async (signal) => {
     queueClosers.push(closeIntroDetectionQueue());
   } catch (err) {
     console.warn(`Intro detection queue close setup error: ${err.message}`);
+  }
+
+  try {
+    const { closeSubtitleQueue } = require('./services/subtitle.service');
+    queueClosers.push(closeSubtitleQueue());
+  } catch (err) {
+    console.warn(`Subtitle queue close setup error: ${err.message}`);
   }
 
   if (queueClosers.length > 0) {

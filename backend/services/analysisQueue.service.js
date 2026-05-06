@@ -1,11 +1,8 @@
 const Queue = require('bull');
 const fs = require('fs');
 const path = require('path');
-const { cleanupTempFile, extractAudioChunks } = require('./audio.service');
-const { getCacheKey, speechToTextPipeline } = require('./whisper.service');
+const { getCacheKey } = require('./whisper.service');
 const { getLanguageCacheKey } = require('./whisperClient.service');
-const { detectScenes } = require('./scene.service');
-const { analyzeScenes } = require('./llm.service');
 const { addClipJob } = require('./videoQueue.service');
 
 function normalizeTimestamp(timestamp) {
@@ -37,11 +34,10 @@ function timestampToSeconds(timestamp) {
 
   return parts.reverse().reduce(
     (total, part, index) => total + (Number(part) * (60 ** index)),
-    0
+    0,
   );
 }
 
-// ─── Configuration ──────────────────────────────────────────────────────────
 function clampPercent(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
@@ -158,7 +154,7 @@ const WHISPER_CHUNK_DURATION_SEC = Math.max(
     process.env.WHISPER_CHUNK_DURATION_SEC,
     10,
   ) || 300,
-  30
+  30,
 );
 const VIRAL_TRANSCRIPTION_LANGUAGE = getLanguageCacheKey(
   process.env.VIRAL_CLIP_TRANSCRIPTION_LANGUAGE ||
@@ -178,11 +174,28 @@ if (Number.isFinite(ANALYSIS_QUEUE_TIMEOUT_MS) && ANALYSIS_QUEUE_TIMEOUT_MS > 0)
   defaultAnalysisJobOptions.timeout = ANALYSIS_QUEUE_TIMEOUT_MS;
 }
 
-let analysisQueue;
+let analysisWorkerStarted = false;
+let analysisEventBridgeStarted = false;
 
-if (REDIS_URL) {
-  // ─── Queue Instance ─────────────────────────────────────────────────────────
-  analysisQueue = new Queue('viral-analysis-queue', REDIS_URL, {
+function createDisabledQueue() {
+  return {
+    add: async () => {
+      throw new Error('Feature disabled');
+    },
+    getJob: async () => null,
+    close: async () => {},
+    on: () => {},
+    process: () => {},
+  };
+}
+
+function createQueue() {
+  if (!REDIS_URL) {
+    console.log('[Queue] Analysis Queue disabled: REDIS_URL missing.');
+    return createDisabledQueue();
+  }
+
+  return new Queue('viral-analysis-queue', REDIS_URL, {
     redis: {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
@@ -195,193 +208,265 @@ if (REDIS_URL) {
     },
     defaultJobOptions: defaultAnalysisJobOptions,
   });
+}
 
-  // ─── Worker ─────────────────────────────────────────────────────────────────
-  analysisQueue.process(1, async (job) => {
-    const { movieId, proxyM3u8Url, finalBgMusic, bgmStartTime, bgmDuration, renderOptions } = job.data;
-    let tempMp3Dir = null;
-    let vttPath = null;
+const analysisQueue = createQueue();
 
-    console.log(`[AnalysisQueue] Starting job ${job.id} for movie ${movieId}`);
-    job.progress(10);
+async function processAnalysisJob(job) {
+  const { cleanupTempFile, extractAudioChunks } = require('./audio.service');
+  const { speechToTextPipeline } = require('./whisper.service');
+  const { detectScenes } = require('./scene.service');
+  const { analyzeScenes } = require('./llm.service');
+  const { movieId, proxyM3u8Url, finalBgMusic, bgmStartTime, bgmDuration, renderOptions } = job.data;
+  let tempMp3Dir = null;
+  let vttPath = null;
 
-    try {
-      job.log('Checking VTT cache...');
-      const cachePaths = buildViralAnalysisCachePaths(proxyM3u8Url);
-      ensureDir(cachePaths.cacheRoot);
-      
-      if (fs.existsSync(cachePaths.vttCacheFile)) {
-        job.log('Cache hit! Skipping audio extraction and Whisper.');
-        job.progress(70);
-        vttPath = cachePaths.vttCacheFile;
+  console.log(`[AnalysisQueue] Starting job ${job.id} for movie ${movieId}`);
+  job.progress(10);
+
+  try {
+    job.log('Checking VTT cache...');
+    const cachePaths = buildViralAnalysisCachePaths(proxyM3u8Url);
+    ensureDir(cachePaths.cacheRoot);
+
+    if (fs.existsSync(cachePaths.vttCacheFile)) {
+      job.log('Cache hit. Skipping audio extraction and Whisper.');
+      job.progress(70);
+      vttPath = cachePaths.vttCacheFile;
+    } else {
+      let mp3Files = listAudioChunks(cachePaths.audioDir);
+
+      if (mp3Files.length > 0) {
+        job.log(`Audio chunk cache hit (${mp3Files.length} chunks). Skipping extraction.`);
       } else {
-        let mp3Files = listAudioChunks(cachePaths.audioDir);
-
-        if (mp3Files.length > 0) {
-          job.log(`Audio chunk cache hit (${mp3Files.length} chunks). Skipping extraction.`);
-        } else {
-          // 1. Extract audio chunks (Mapping 0-100% to 10-40% global progress)
-          job.log('Extracting audio chunks from M3U8 stream...');
-          const extraction = await extractAudioChunks(proxyM3u8Url, WHISPER_CHUNK_DURATION_SEC, (p) => {
-            job.progress(Math.round(10 + (p * 0.3)));
-          });
-          tempMp3Dir = extraction.outDir;
-          moveDirectory(tempMp3Dir, cachePaths.audioDir);
-          tempMp3Dir = null;
-          mp3Files = listAudioChunks(cachePaths.audioDir);
-        }
-
-        if (mp3Files.length === 0) {
-          throw new Error('No audio chunks were available after extraction');
-        }
-
-        job.progress(40);
-        
-        // 2. Speech to Text chunks
-        const startTimeSTT = new Date().toISOString();
-        job.log(`[${startTimeSTT}] Running Whisper STT (${VIRAL_TRANSCRIPTION_LANGUAGE})...`);
-        vttPath = await speechToTextPipeline(mp3Files, proxyM3u8Url, WHISPER_CHUNK_DURATION_SEC, (p) => {
-          job.progress(Math.round(40 + (p * 0.3)));
-        }, VIRAL_TRANSCRIPTION_LANGUAGE);
-        job.log(`[${new Date().toISOString()}] Finished Whisper STT.`);
-        job.progress(70);
+        job.log('Extracting audio chunks from M3U8 stream...');
+        const extraction = await extractAudioChunks(proxyM3u8Url, WHISPER_CHUNK_DURATION_SEC, (progress) => {
+          job.progress(Math.round(10 + (progress * 0.3)));
+        });
+        tempMp3Dir = extraction.outDir;
+        moveDirectory(tempMp3Dir, cachePaths.audioDir);
+        tempMp3Dir = null;
+        mp3Files = listAudioChunks(cachePaths.audioDir);
       }
 
-      // 3. Analyze Scenes
-      let scenes = readJsonCache(cachePaths.scenesFile);
-      if (Array.isArray(scenes) && scenes.length > 0) {
-        job.log(`Scene analysis cache hit (${scenes.length} clips). Skipping scene detection and LLM.`);
-        job.progress(90);
-      } else {
-        let sceneBoundaries = readJsonCache(cachePaths.sceneBoundariesFile);
-        if (Array.isArray(sceneBoundaries) && sceneBoundaries.length > 0) {
-          job.log(`Scene boundary cache hit (${sceneBoundaries.length} boundaries).`);
-          job.progress(80);
-        } else {
-          job.log('Detecting physical scene boundaries...');
-          sceneBoundaries = await detectScenes(proxyM3u8Url, (p) => {
-            job.progress(Math.round(70 + (p * 0.1)));
-          });
-          writeJsonCache(cachePaths.sceneBoundariesFile, sceneBoundaries);
-          job.progress(80);
-        }
-
-        job.log('Analyzing scenes via LLM...');
-        const vttContent = fs.readFileSync(vttPath, 'utf-8');
-        scenes = await analyzeScenes(vttContent, sceneBoundaries);
-        writeJsonCache(cachePaths.scenesFile, scenes);
+      if (mp3Files.length === 0) {
+        throw new Error('No audio chunks were available after extraction');
       }
+
+      job.progress(40);
+
+      const startTimeSTT = new Date().toISOString();
+      job.log(`[${startTimeSTT}] Running Whisper STT (${VIRAL_TRANSCRIPTION_LANGUAGE})...`);
+      vttPath = await speechToTextPipeline(
+        mp3Files,
+        proxyM3u8Url,
+        WHISPER_CHUNK_DURATION_SEC,
+        (progress) => {
+          job.progress(Math.round(40 + (progress * 0.3)));
+        },
+        VIRAL_TRANSCRIPTION_LANGUAGE,
+      );
+      job.log(`[${new Date().toISOString()}] Finished Whisper STT.`);
+      job.progress(70);
+    }
+
+    let scenes = readJsonCache(cachePaths.scenesFile);
+    if (Array.isArray(scenes) && scenes.length > 0) {
+      job.log(`Scene analysis cache hit (${scenes.length} clips). Skipping scene detection and LLM.`);
       job.progress(90);
-
-      // 4. Queue Individual Viral Clips
-      job.log(`Queueing ${scenes.length} viral clip render jobs...`);
-      const outputDir = path.join(__dirname, '..', 'temp_output', 'viral_clips', movieId);
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
+    } else {
+      let sceneBoundaries = readJsonCache(cachePaths.sceneBoundariesFile);
+      if (Array.isArray(sceneBoundaries) && sceneBoundaries.length > 0) {
+        job.log(`Scene boundary cache hit (${sceneBoundaries.length} boundaries).`);
+        job.progress(80);
+      } else {
+        job.log('Detecting physical scene boundaries...');
+        sceneBoundaries = await detectScenes(proxyM3u8Url, (progress) => {
+          job.progress(Math.round(70 + (progress * 0.1)));
+        });
+        writeJsonCache(cachePaths.sceneBoundariesFile, sceneBoundaries);
+        job.progress(80);
       }
 
-      const renderJobs = [];
-      for (const scene of scenes) {
-        const startTime = normalizeTimestamp(scene.start_time);
-        const endTime = normalizeTimestamp(scene.end_time);
-        const startSeconds = timestampToSeconds(startTime);
-        const endSeconds = timestampToSeconds(endTime);
-        const duration = Number((endSeconds - startSeconds).toFixed(3));
+      job.log('Analyzing scenes via LLM...');
+      const vttContent = fs.readFileSync(vttPath, 'utf-8');
+      scenes = await analyzeScenes(vttContent, sceneBoundaries);
+      writeJsonCache(cachePaths.scenesFile, scenes);
+    }
+    job.progress(90);
 
-        if (!startTime || !endTime || !Number.isFinite(startSeconds) || !Number.isFinite(endSeconds) || duration <= 0) {
-          console.warn(
-            `[AnalysisQueue] Skipping invalid scene from analyzer: ${JSON.stringify({
-              start_time: scene.start_time,
-              end_time: scene.end_time,
-              category: scene.category,
-            })}`
-          );
-          continue;
-        }
+    job.log(`Queueing ${scenes.length} viral clip render jobs...`);
+    const outputDir = path.join(__dirname, '..', 'temp_output', 'viral_clips', movieId);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
 
-        const safeTime = startTime.replace(/[:.,]/g, '-');
-        const outputPath = path.join(
-          outputDir,
-          `${(scene.category || 'clip').toLowerCase()}_${safeTime}.mp4`
+    const renderJobs = [];
+    for (const scene of scenes) {
+      const startTime = normalizeTimestamp(scene.start_time);
+      const endTime = normalizeTimestamp(scene.end_time);
+      const startSeconds = timestampToSeconds(startTime);
+      const endSeconds = timestampToSeconds(endTime);
+      const duration = Number((endSeconds - startSeconds).toFixed(3));
+
+      if (!startTime || !endTime || !Number.isFinite(startSeconds) || !Number.isFinite(endSeconds) || duration <= 0) {
+        console.warn(
+          `[AnalysisQueue] Skipping invalid scene from analyzer: ${JSON.stringify({
+            start_time: scene.start_time,
+            end_time: scene.end_time,
+            category: scene.category,
+          })}`,
         );
-
-        const renderJob = await addClipJob({
-          movieId,
-          videoUrl: proxyM3u8Url,
-          bgMusic: finalBgMusic,
-          bgmStartTime: bgmStartTime || '0',
-          bgmDuration: bgmDuration || null,
-          subtitleFile: vttPath,
-          renderOptions,
-          startTime,
-          duration,
-          outputPath,
-          category: scene.category,
-          reason: scene.reason,
-        });
-
-        renderJobs.push({
-          jobId: renderJob.id,
-          category: scene.category,
-          start_time: startTime,
-          end_time: endTime,
-          reason: scene.reason,
-          outputPath,
-        });
+        continue;
       }
 
-      if (renderJobs.length === 0) {
-        throw new Error('No valid viral clips were returned by the analyzer');
-      }
+      const safeTime = startTime.replace(/[:.,]/g, '-');
+      const outputPath = path.join(
+        outputDir,
+        `${(scene.category || 'clip').toLowerCase()}_${safeTime}.mp4`,
+      );
 
-      job.progress(100);
-      console.log(`[AnalysisQueue] Finished job ${job.id} for movie ${movieId}. Created ${renderJobs.length} render jobs.`);
-      
-      return renderJobs;
-    } catch (error) {
-      console.error(`[AnalysisQueue] Job ${job.id} failed: ${error.message}`);
-      if (tempMp3Dir) cleanupTempFile(tempMp3Dir);
-      throw error;
+      const renderJob = await addClipJob({
+        movieId,
+        videoUrl: proxyM3u8Url,
+        bgMusic: finalBgMusic,
+        bgmStartTime: bgmStartTime || '0',
+        bgmDuration: bgmDuration || null,
+        subtitleFile: vttPath,
+        renderOptions,
+        startTime,
+        duration,
+        outputPath,
+        category: scene.category,
+        reason: scene.reason,
+      });
+
+      renderJobs.push({
+        jobId: renderJob.id,
+        category: scene.category,
+        start_time: startTime,
+        end_time: endTime,
+        reason: scene.reason,
+        outputPath,
+      });
     }
+
+    if (renderJobs.length === 0) {
+      throw new Error('No valid viral clips were returned by the analyzer');
+    }
+
+    job.progress(100);
+    console.log(`[AnalysisQueue] Finished job ${job.id} for movie ${movieId}. Created ${renderJobs.length} render jobs.`);
+
+    return renderJobs;
+  } catch (error) {
+    console.error(`[AnalysisQueue] Job ${job.id} failed: ${error.message}`);
+    if (tempMp3Dir) cleanupTempFile(tempMp3Dir);
+    throw error;
+  }
+}
+
+function parseBullResult(rawResult) {
+  if (typeof rawResult !== 'string') {
+    return rawResult;
+  }
+
+  try {
+    return JSON.parse(rawResult);
+  } catch (_error) {
+    return rawResult;
+  }
+}
+
+async function getQueueJob(jobId) {
+  try {
+    return await analysisQueue.getJob(jobId);
+  } catch (error) {
+    console.warn(`[AnalysisQueue] Failed to load job ${jobId}: ${error.message}`);
+    return null;
+  }
+}
+
+function emitAnalysisProgress(job, payload) {
+  const { emitJobProgress } = require('./progressSocket.service');
+  emitJobProgress(job.id, payload);
+
+  if (job.data && job.data.movieId) {
+    emitJobProgress(job.data.movieId, payload);
+  }
+}
+
+function registerAnalysisQueueEventBridge() {
+  if (!REDIS_URL || analysisEventBridgeStarted) {
+    return false;
+  }
+
+  analysisEventBridgeStarted = true;
+
+  analysisQueue.on('global:progress', async (jobId, progress) => {
+    const job = await getQueueJob(jobId);
+    if (!job) return;
+    emitAnalysisProgress(job, { step: 'analysis', percent: progress });
   });
 
-  analysisQueue.on('progress', (job, progress) => {
-    const { emitJobProgress } = require('./progressSocket.service');
-    // progress is already a number 0-100
-    emitJobProgress(job.id, { step: 'analysis', percent: progress });
-    if(job.data && job.data.movieId) {
-      emitJobProgress(job.data.movieId, { step: 'analysis', percent: progress });
-    }
+  analysisQueue.on('global:completed', async (jobId, rawResult) => {
+    const job = await getQueueJob(jobId);
+    if (!job) return;
+    emitAnalysisProgress(job, {
+      step: 'analysis',
+      percent: 100,
+      status: 'completed',
+      result: parseBullResult(rawResult),
+    });
   });
 
-  analysisQueue.on('completed', (job, result) => {
-    const { emitJobProgress } = require('./progressSocket.service');
-    emitJobProgress(job.id, { step: 'analysis', percent: 100, status: 'completed', result });
-    if(job.data && job.data.movieId) {
-      emitJobProgress(job.data.movieId, { step: 'analysis', percent: 100, status: 'completed', result });
+  analysisQueue.on('global:failed', async (jobId, failedReason) => {
+    const job = await getQueueJob(jobId);
+    if (!job) {
+      const { emitJobProgress } = require('./progressSocket.service');
+      emitJobProgress(jobId, { step: 'analysis', status: 'failed', error: failedReason });
+      return;
     }
+
+    emitAnalysisProgress(job, { step: 'analysis', status: 'failed', error: failedReason });
+  });
+
+  analysisQueue.on('error', (error) => {
+    console.error(`[AnalysisQueue] Queue error: ${error.message}`);
+  });
+
+  return true;
+}
+
+function startAnalysisQueueWorker() {
+  if (!REDIS_URL) {
+    console.log('[AnalysisQueue] Worker disabled: REDIS_URL missing.');
+    return false;
+  }
+
+  if (analysisWorkerStarted) {
+    return true;
+  }
+
+  analysisWorkerStarted = true;
+  analysisQueue.process(1, processAnalysisJob);
+
+  analysisQueue.on('completed', (job) => {
+    console.log(`[AnalysisQueue] Job ${job.id} completed successfully.`);
   });
 
   analysisQueue.on('failed', (job, err) => {
-    console.error(`[AnalysisQueue] DLQ: Job ${job.id} failed permanently/transiently. Reason: ${err.message}`);
-    const { emitJobProgress } = require('./progressSocket.service');
-    emitJobProgress(job.id, { step: 'analysis', status: 'failed', error: err.message });
-    if(job.data && job.data.movieId) {
-      emitJobProgress(job.data.movieId, { step: 'analysis', status: 'failed', error: err.message });
-    }
+    console.error(`[AnalysisQueue] DLQ: Job ${job?.id} failed. Reason: ${err.message}`);
   });
-} else {
-  console.log('[Queue] Analysis Queue disabled: REDIS_URL missing.');
-  analysisQueue = {
-    add: async () => { throw new Error("Feature disabled") },
-    getJob: async () => null,
-    close: async () => {},
-    on: () => {},
-    process: () => {}
-  };
+
+  analysisQueue.on('error', (error) => {
+    console.error(`[AnalysisQueue] Queue error: ${error.message}`);
+  });
+
+  console.log('[AnalysisQueue] Worker started with concurrency=1');
+  return true;
 }
 
-// ─── Functions ─────────────────────────────────────────────────────────────
 async function addAnalysisJob(jobData) {
   return analysisQueue.add(jobData);
 }
@@ -391,7 +476,7 @@ async function getAnalysisJobStatus(jobId) {
   if (!job) return null;
 
   const state = await job.getState();
-  const progress = job._progress;
+  const progress = typeof job.progress === 'function' ? job.progress() : job._progress;
   const isFailed = state === 'failed';
   return {
     id: job.id,
@@ -405,17 +490,18 @@ async function getAnalysisJobStatus(jobId) {
   };
 }
 
-// Ensure the queue gracefully closes on shutdown
 async function closeAnalysisQueue() {
   await analysisQueue.close();
 }
 
 module.exports = {
   addAnalysisJob,
+  analysisQueue,
   buildAnalysisPipelineStages,
   buildViralAnalysisCachePaths,
+  closeAnalysisQueue,
   getAnalysisJobStatus,
   listAudioChunks,
-  closeAnalysisQueue,
-  analysisQueue,
+  registerAnalysisQueueEventBridge,
+  startAnalysisQueueWorker,
 };

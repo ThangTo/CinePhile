@@ -1,8 +1,6 @@
 const Queue = require('bull');
-const { renderClip16x9 } = require('./render.service');
 const { getClipFileInfo } = require('./viralClipFile.service');
 
-// ─── Configuration ──────────────────────────────────────────────────────────
 const REDIS_URL = process.env.REDIS_URL;
 const CONCURRENCY = Math.max(1, parseInt(process.env.VIDEO_QUEUE_CONCURRENCY, 10) || 1);
 const VIDEO_QUEUE_TIMEOUT_MS = Math.max(
@@ -10,11 +8,28 @@ const VIDEO_QUEUE_TIMEOUT_MS = Math.max(
   parseInt(process.env.VIDEO_QUEUE_TIMEOUT_MS, 10) || 300000,
 );
 
-let viralVideoQueue;
+let videoWorkerStarted = false;
+let videoEventBridgeStarted = false;
 
-if (REDIS_URL) {
-  // ─── Queue Instance ─────────────────────────────────────────────────────────
-  viralVideoQueue = new Queue('viral-video-processing', REDIS_URL, {
+function createDisabledQueue() {
+  return {
+    add: async () => {
+      throw new Error('Feature disabled');
+    },
+    getJob: async () => null,
+    close: async () => {},
+    on: () => {},
+    process: () => {},
+  };
+}
+
+function createQueue() {
+  if (!REDIS_URL) {
+    console.log('[Queue] Video Queue disabled: REDIS_URL missing.');
+    return createDisabledQueue();
+  }
+
+  return new Queue('viral-video-processing', REDIS_URL, {
     redis: {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
@@ -24,134 +39,199 @@ if (REDIS_URL) {
       attempts: 3,
       backoff: {
         type: 'exponential',
-        delay: 5000, 
+        delay: 5000,
       },
-      removeOnComplete: 50,  
-      removeOnFail: 100,     
+      removeOnComplete: 50,
+      removeOnFail: 100,
       timeout: VIDEO_QUEUE_TIMEOUT_MS,
     },
   });
+}
 
-  // ─── Worker ─────────────────────────────────────────────────────────────────
-  viralVideoQueue.process(CONCURRENCY, async (job) => {
-    const {
+const viralVideoQueue = createQueue();
+
+async function processVideoJob(job) {
+  const { renderClip16x9 } = require('./render.service');
+  const {
+    videoUrl,
+    bgMusic,
+    bgmStartTime,
+    bgmDuration,
+    subtitleFile,
+    renderOptions,
+    startTime,
+    duration,
+    outputPath,
+  } = job.data;
+
+  console.log(`[Queue] Processing job ${job.id}: ${JSON.stringify({
+    category: job.data.category,
+    startTime,
+    duration,
+    outputPath,
+  })}`);
+
+  job.progress(10);
+
+  try {
+    const result = await renderClip16x9(
       videoUrl,
       bgMusic,
+      subtitleFile,
+      startTime,
+      duration,
+      outputPath,
       bgmStartTime,
       bgmDuration,
-      subtitleFile,
+      (progress) => job.progress(progress),
       renderOptions,
-      startTime,
-      duration,
-      outputPath,
-    } = job.data;
+    );
+    job.progress(100);
+    console.log(`[Queue] Job ${job.id} completed: ${result}`);
+    return { success: true, outputPath: result };
+  } catch (error) {
+    console.error(`[Queue] Job ${job.id} failed (attempt ${job.attemptsMade + 1}/${job.opts.attempts}): ${error.message}`);
+    throw error;
+  }
+}
 
-    console.log(`[Queue] Processing job ${job.id}: ${JSON.stringify({
-      category: job.data.category,
-      startTime,
-      duration,
-      outputPath,
-    })}`);
+function parseBullResult(rawResult) {
+  if (typeof rawResult !== 'string') {
+    return rawResult;
+  }
 
-    job.progress(10);
+  try {
+    return JSON.parse(rawResult);
+  } catch (_error) {
+    return rawResult;
+  }
+}
 
-    try {
-      const result = await renderClip16x9(
-        videoUrl,
-        bgMusic,
-        subtitleFile,
-        startTime,
-        duration,
-        outputPath,
-        bgmStartTime,
-        bgmDuration,
-        (progress) => job.progress(progress),
-        renderOptions,
-      );
-      job.progress(100);
-      console.log(`[Queue] Job ${job.id} completed: ${result}`);
-      return { success: true, outputPath: result };
-    } catch (error) {
-      console.error(`[Queue] Job ${job.id} failed (attempt ${job.attemptsMade + 1}/${job.opts.attempts}): ${error.message}`);
-      throw error; 
+async function getQueueJob(jobId) {
+  try {
+    return await viralVideoQueue.getJob(jobId);
+  } catch (error) {
+    console.warn(`[Queue] Failed to load job ${jobId}: ${error.message}`);
+    return null;
+  }
+}
+
+function emitRenderProgress(job, payload) {
+  const { emitJobProgress } = require('./progressSocket.service');
+  emitJobProgress(job.id, payload);
+
+  if (job.data && job.data.movieId) {
+    emitJobProgress(job.data.movieId, {
+      ...payload,
+      renderJobId: job.id,
+    });
+  }
+}
+
+function registerVideoQueueEventBridge() {
+  if (!REDIS_URL || videoEventBridgeStarted) {
+    return false;
+  }
+
+  videoEventBridgeStarted = true;
+
+  viralVideoQueue.on('global:progress', async (jobId, progress) => {
+    const job = await getQueueJob(jobId);
+    if (!job) return;
+
+    emitRenderProgress(job, { step: 'render', percent: progress });
+  });
+
+  viralVideoQueue.on('global:completed', async (jobId, rawResult) => {
+    const job = await getQueueJob(jobId);
+    if (!job) return;
+
+    emitRenderProgress(job, {
+      step: 'render',
+      percent: 100,
+      status: 'completed',
+      result: parseBullResult(rawResult),
+    });
+  });
+
+  viralVideoQueue.on('global:failed', async (jobId, failedReason) => {
+    const job = await getQueueJob(jobId);
+    if (!job) {
+      const { emitJobProgress } = require('./progressSocket.service');
+      emitJobProgress(jobId, { step: 'render', status: 'failed', error: failedReason });
+      return;
     }
-  });
 
-  // ─── Event Listeners ────────────────────────────────────────────────────────
-  viralVideoQueue.on('progress', (job, progress) => {
-    const { emitJobProgress } = require('./progressSocket.service');
-    emitJobProgress(job.id, { step: 'render', percent: progress });
-    if (job.data && job.data.movieId) {
-      emitJobProgress(job.data.movieId, { step: 'render', renderJobId: job.id, percent: progress });
-    }
-  });
-  
-  viralVideoQueue.on('completed', (job, result) => {
-    console.log(`[Queue] ✅ Job ${job.id} completed successfully:`, result);
-    const { emitJobProgress } = require('./progressSocket.service');
-    emitJobProgress(job.id, { step: 'render', percent: 100, status: 'completed', result });
-    if (job.data && job.data.movieId) {
-      emitJobProgress(job.data.movieId, { step: 'render', renderJobId: job.id, percent: 100, status: 'completed', result });
-    }
-  });
-
-  viralVideoQueue.on('failed', (job, err) => {
-    console.error(`[Queue] ❌ DLQ: Job ${job.id} failed permanently after ${job.attemptsMade} attempts: ${err.message}`);
-    const { emitJobProgress } = require('./progressSocket.service');
-    emitJobProgress(job.id, { step: 'render', status: 'failed', error: err.message });
-  });
-
-  viralVideoQueue.on('stalled', (job) => {
-    console.warn(`[Queue] ⚠️ Job ${job.id || job} stalled — will be retried`);
+    emitRenderProgress(job, { step: 'render', status: 'failed', error: failedReason });
   });
 
   viralVideoQueue.on('error', (error) => {
     console.error(`[Queue] Queue error: ${error.message}`);
   });
 
+  return true;
+}
+
+function startVideoQueueWorker() {
+  if (!REDIS_URL) {
+    console.log('[Queue] Video worker disabled: REDIS_URL missing.');
+    return false;
+  }
+
+  if (videoWorkerStarted) {
+    return true;
+  }
+
+  videoWorkerStarted = true;
+  viralVideoQueue.process(CONCURRENCY, processVideoJob);
+
+  viralVideoQueue.on('completed', (job, result) => {
+    console.log(`[Queue] Job ${job.id} completed successfully:`, result);
+  });
+
+  viralVideoQueue.on('failed', (job, err) => {
+    console.error(`[Queue] DLQ: Job ${job?.id} failed after ${job?.attemptsMade || 0} attempts: ${err.message}`);
+  });
+
+  viralVideoQueue.on('stalled', (job) => {
+    console.warn(`[Queue] Job ${job.id || job} stalled; Bull will retry it.`);
+  });
+
   viralVideoQueue.on('waiting', (jobId) => {
     console.log(`[Queue] Job ${jobId} is waiting`);
   });
-} else {
-  console.log('[Queue] Video Queue disabled: REDIS_URL missing.');
-  viralVideoQueue = {
-    add: async () => { throw new Error("Feature disabled") },
-    getJob: async () => null,
-    close: async () => {},
-    on: () => {},
-    process: () => {}
-  };
+
+  viralVideoQueue.on('error', (error) => {
+    console.error(`[Queue] Queue error: ${error.message}`);
+  });
+
+  console.log(`[Queue] Video worker started with concurrency=${CONCURRENCY}`);
+  return true;
 }
 
-// ─── Helper: Add a job ──────────────────────────────────────────────────────
 /**
  * Add a clip rendering job to the queue.
  *
  * @param {Object} jobData
- * @param {string} jobData.videoUrl      - Source video URL
- * @param {string} jobData.bgMusic       - Background music path/URL
- * @param {string} jobData.bgmStartTime  - BGM start time
- * @param {number} jobData.bgmDuration   - Exact duration of BGM to force on the clip
- * @param {string} jobData.subtitleFile  - Path to .vtt subtitle file
- * @param {Object} [jobData.renderOptions] - Render-only options such as subtitle style
- * @param {string} jobData.startTime     - Start timestamp (HH:MM:SS)
- * @param {number} jobData.duration      - Duration in seconds
- * @param {string} jobData.outputPath    - Output file path
- * @param {string} [jobData.category]    - Clip category (Funny/Romantic/Action)
- * @param {string} [jobData.movieId]     - Associated movie ID
+ * @param {string} jobData.videoUrl
+ * @param {string} jobData.bgMusic
+ * @param {string} jobData.bgmStartTime
+ * @param {number} jobData.bgmDuration
+ * @param {string} jobData.subtitleFile
+ * @param {Object} [jobData.renderOptions]
+ * @param {string} jobData.startTime
+ * @param {number} jobData.duration
+ * @param {string} jobData.outputPath
+ * @param {string} [jobData.category]
+ * @param {string} [jobData.movieId]
  * @returns {Promise<import('bull').Job>}
  */
 async function addClipJob(jobData) {
-  const job = await viralVideoQueue.add(jobData, {
-    // Job-specific overrides can go here
-  });
+  const job = await viralVideoQueue.add(jobData);
   console.log(`[Queue] Added job ${job.id} for category: ${jobData.category || 'unknown'}`);
   return job;
 }
 
-/**
- * Get the status of a job by its ID.
- */
 async function getJobStatus(jobId) {
   const job = await viralVideoQueue.getJob(jobId);
   if (!job) return null;
@@ -175,17 +255,16 @@ async function getJobStatus(jobId) {
   };
 }
 
-/**
- * Gracefully close the queue (call on shutdown)
- */
 async function closeQueue() {
   await viralVideoQueue.close();
-  console.log('[Queue] ✅ Queue closed');
+  console.log('[Queue] Video queue closed');
 }
 
 module.exports = {
   viralVideoQueue,
   addClipJob,
-  getJobStatus,
   closeQueue,
+  getJobStatus,
+  registerVideoQueueEventBridge,
+  startVideoQueueWorker,
 };
