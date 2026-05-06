@@ -134,10 +134,6 @@ const VideoPlayer = ({
   const apiBaseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
   const apiOrigin = apiBaseUrl.replace(/\/api\/v1\/?$/, "");
 
-  const isMobileDevice = useMemo(() => {
-    return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  }, []);
-
   useEffect(() => {
     // Fetch feature permissions on mount
     fetch(`${apiBaseUrl}/settings/features`)

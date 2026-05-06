@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import VideoPlayer from "components/watch-page/VideoPlayer";
 import ActionBar from "components/watch-page/ActionBar";
