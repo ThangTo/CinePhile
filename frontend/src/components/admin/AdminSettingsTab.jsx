@@ -238,8 +238,8 @@ const AdminSettingsTab = () => {
             {/* Subtitles Toggle */}
             <div className="flex items-center justify-between bg-black/40 border border-white/5 p-4 rounded-xl">
               <div>
-                <h3 className="text-white font-medium">Phụ đề Tiếng Hàn</h3>
-                <p className="text-gray-500 text-xs mt-1">Gửi yêu cầu tạo sub và hiển thị sub tiếng Hàn.</p>
+                <h3 className="text-white font-medium">Phu de AI theo ngon ngu goc</h3>
+                <p className="text-gray-500 text-xs mt-1">Gui yeu cau tao sub bang Whisper va hien thi phu de theo ngon ngu phim.</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input 

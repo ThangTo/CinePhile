@@ -961,7 +961,8 @@ const getTrendingSocial = async (req, res) => {
 
 /**
  * GET /api/v1/movies/:id/episodes/:episodeId/subtitles/korean/status
- * Check if Korean subtitles are available for an episode
+ * Check if AI-generated source-language subtitles are available for an episode.
+ * The route name is kept for backward compatibility with the current frontend.
  */
 const getKoreanSubtitleStatus = async (req, res) => {
   try {
@@ -987,7 +988,11 @@ const getKoreanSubtitleStatus = async (req, res) => {
       ? `episode:${String(episode._id)}`
       : `movie:${String(movieId)}:episode:${String(episodeId)}`;
 
-    const status = await subtitleService.getSubtitleStatus(m3u8Url, 'ko', subtitleCacheIdentity);
+    const status = await subtitleService.getSubtitleStatus(
+      m3u8Url,
+      subtitleService.DEFAULT_SUBTITLE_LANGUAGE,
+      subtitleCacheIdentity,
+    );
     res.json({ success: true, ...status });
   } catch (error) {
     console.error('Error in getKoreanSubtitleStatus:', error);
@@ -1027,7 +1032,8 @@ const requestKoreanSubtitles = async (req, res) => {
 
 /**
  * POST /api/v1/movies/:id/episodes/:episodeId/subtitles/korean/generate
- * Generate Korean subtitles for an episode
+ * Generate AI source-language subtitles for an episode.
+ * The route name is kept for backward compatibility with the current frontend.
  */
 const generateKoreanSubtitles = async (req, res) => {
   try {
@@ -1059,8 +1065,9 @@ const generateKoreanSubtitles = async (req, res) => {
     const result = await subtitleService.requestKoreanSubtitleGeneration(
       m3u8Url,
       proxyM3u8Url,
-      600,
+      undefined,
       subtitleCacheIdentity,
+      subtitleService.DEFAULT_SUBTITLE_LANGUAGE,
     );
     if (result.status === 'ready') {
       return res.json({ success: true, ...result });

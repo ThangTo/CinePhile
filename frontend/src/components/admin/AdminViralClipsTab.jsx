@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { viralClipAPI } from "services/viralClip.service";
 import { movieAPI } from "services/admin.service";
 import { fetchEpisodes } from "services/movie.service";
@@ -16,6 +16,11 @@ import {
   FiScissors,
   FiTrendingUp,
   FiAlertCircle,
+  FiDownload,
+  FiExternalLink,
+  FiType,
+  FiEye,
+  FiEyeOff,
 } from "react-icons/fi";
 
 // ─── Status Badge ──────────────────────────────────────────────────────────
@@ -115,7 +120,8 @@ const ProgressBar = ({ progress = 0, state }) => {
 };
 
 // ─── Step Indicator (Pipeline Progress) ────────────────────────────────────
-const PipelineSteps = ({ analysisProgress }) => {
+// eslint-disable-next-line no-unused-vars
+const LegacyPipelineSteps = ({ analysisProgress }) => {
   // Map progress (0-100) from AnalysisQueue to visual steps:
   // 10-39: Extracting audio (Step 0)
   // 40-69: STT Whisper (Step 1)
@@ -191,6 +197,269 @@ const PipelineSteps = ({ analysisProgress }) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Main Component
 // ═══════════════════════════════════════════════════════════════════════════
+const PIPELINE_STAGE_META = {
+  extract: {
+    icon: FiMusic,
+    label: "Trich xuat audio",
+    description: "Doc HLS va tach audio",
+  },
+  whisper: {
+    icon: FiScissors,
+    label: "Whisper",
+    description: "Tao transcript VTT",
+  },
+  analyze: {
+    icon: FiTrendingUp,
+    label: "AI analysis",
+    description: "Chon khoanh khac viral",
+  },
+  render: {
+    icon: FiZap,
+    label: "Render clips",
+    description: "Xuat video thanh pham",
+  },
+};
+
+const getJobClipUrl = (job) => {
+  if (job?.clip?.exists === false || job?.result?.clip?.exists === false) return "";
+
+  return viralClipAPI.getClipAssetUrl(
+    job?.clipUrl ||
+    job?.clip?.url ||
+    job?.result?.clipUrl ||
+    job?.result?.clip?.url
+  );
+};
+
+const getJobDownloadUrl = (job) => {
+  const url = getJobClipUrl(job);
+  if (!url) return "";
+  return `${url}${url.includes("?") ? "&" : "?"}download=1`;
+};
+
+const isJobPlayable = (job) => job?.state === "completed" && Boolean(getJobClipUrl(job));
+
+const ClipPreviewPanel = ({ job }) => {
+  const clipUrl = getJobClipUrl(job);
+  if (!job || !clipUrl) return null;
+
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-4 bg-[#ffffff05] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-black min-h-[260px] xl:min-h-[360px] flex items-center justify-center">
+        <video
+          key={job.jobId}
+          src={clipUrl}
+          controls
+          preload="metadata"
+          playsInline
+          className="w-full h-full max-h-[68vh] object-contain bg-black"
+        />
+      </div>
+
+      <div className="p-5 flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <CategoryBadge category={job.category} />
+          <StatusBadge state={job.state} />
+        </div>
+
+        <div>
+          <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Preview</p>
+          <h3 className="mt-1 text-xl font-bold text-white">Clip #{job.jobId}</h3>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <FiClock size={15} className="text-gray-500" />
+          <span className="font-mono">
+            {job.start_time} - {job.end_time}
+          </span>
+        </div>
+
+        {job.reason && (
+          <p className="text-sm text-gray-300 leading-relaxed">
+            {job.reason}
+          </p>
+        )}
+
+        <div className="mt-auto grid grid-cols-2 gap-2">
+          <a
+            href={clipUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 text-sm font-semibold border border-white/10 transition-colors"
+          >
+            <FiExternalLink size={15} />
+            Mo tab
+          </a>
+          <a
+            href={getJobDownloadUrl(job)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-sm font-semibold border border-emerald-400/20 transition-colors"
+          >
+            <FiDownload size={15} />
+            Tai ve
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PIPELINE_STAGE_ORDER = ["extract", "whisper", "analyze", "render"];
+
+const SUBTITLE_FONT_OPTIONS = [
+  { value: "Arial", label: "Arial Bold" },
+  { value: "Arial Black", label: "Arial Black" },
+  { value: "Impact", label: "Impact" },
+  { value: "Arial Rounded MT Bold", label: "Rounded Bold" },
+  { value: "Segoe UI Black", label: "Segoe UI Black" },
+  { value: "Bahnschrift", label: "Bahnschrift" },
+  { value: "Trebuchet MS", label: "Trebuchet" },
+  { value: "Cooper Black", label: "Cooper Black" },
+  { value: "Comic Sans MS", label: "Comic Pop" },
+  { value: "Bangers", label: "Bangers" },
+  { value: "Anton", label: "Anton" },
+  { value: "Bebas Neue", label: "Bebas Neue" },
+  { value: "Luckiest Guy", label: "Luckiest Guy" },
+  { value: "Fredoka", label: "Fredoka" },
+  { value: "Baloo 2", label: "Baloo 2" },
+  { value: "Pacifico", label: "Pacifico" },
+  { value: "Dancing Script", label: "Dancing Script" },
+  { value: "Poppins ExtraBold", label: "Poppins ExtraBold" },
+  { value: "Montserrat ExtraBold", label: "Montserrat ExtraBold" },
+];
+
+const SUBTITLE_SIZE_OPTIONS = [18, 20, 22, 24, 26, 28, 30, 32, 36];
+
+const SUBTITLE_COLOR_OPTIONS = [
+  { value: "FFFFFF", label: "White" },
+  { value: "FFE66D", label: "Yellow" },
+  { value: "FF4D6D", label: "Pink" },
+  { value: "4D96FF", label: "Blue" },
+  { value: "72EFDD", label: "Mint" },
+  { value: "B983FF", label: "Purple" },
+  { value: "FF9F1C", label: "Orange" },
+];
+
+const createDefaultPipelineStages = (activeKey = null) =>
+  PIPELINE_STAGE_ORDER.map((key) => ({
+    key,
+    progress: 0,
+    state: key === activeKey ? "active" : "pending",
+  }));
+
+const normalizeStage = (stage) => ({
+  key: stage.key,
+  progress: Math.max(0, Math.min(100, Math.round(Number(stage.progress) || 0))),
+  state: stage.state || "pending",
+});
+
+const mapAnalysisStagesToPipeline = (analysisStages = [], analysisState = "waiting") => {
+  const byKey = new Map(analysisStages.map((stage) => [stage.key, normalizeStage(stage)]));
+  const stages = createDefaultPipelineStages();
+  const extract = byKey.get("extract");
+  const whisper = byKey.get("whisper");
+  const analyze = byKey.get("analyze");
+  const enqueue = byKey.get("enqueue");
+
+  if (extract) stages[0] = { ...stages[0], ...extract };
+  if (whisper) stages[1] = { ...stages[1], ...whisper };
+
+  if (analysisState === "completed" || enqueue?.state === "active" || enqueue?.state === "completed") {
+    stages[2] = { ...stages[2], progress: 100, state: "completed" };
+  } else if (analyze) {
+    stages[2] = { ...stages[2], ...analyze };
+  }
+
+  if (analysisState === "completed" || enqueue?.state === "active") {
+    stages[3] = { ...stages[3], progress: 0, state: "active" };
+  }
+
+  if (analysisState === "failed" && enqueue?.state === "failed") {
+    stages[3] = { ...stages[3], progress: 0, state: "failed" };
+  }
+
+  return stages;
+};
+
+const applyRenderProgressToStages = (stages, jobs) => {
+  if (!jobs.length) return stages;
+
+  const progress = Math.round(
+    jobs.reduce((sum, job) => sum + (Number(job.progress) || 0), 0) / jobs.length
+  );
+  const allCompleted = jobs.every((job) => job.state === "completed");
+  const allFinished = jobs.every((job) => ["completed", "failed"].includes(job.state));
+  const anyFailed = jobs.some((job) => job.state === "failed");
+  const renderState = allCompleted ? "completed" : anyFailed && allFinished ? "failed" : "active";
+
+  return stages.map((stage) => {
+    if (stage.key === "render") {
+      return {
+        ...stage,
+        progress: allCompleted ? 100 : Math.max(0, Math.min(100, progress)),
+        state: renderState,
+      };
+    }
+
+    return { ...stage, progress: 100, state: "completed" };
+  });
+};
+
+const PipelineStageList = ({ stages = [] }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 w-full">
+    {stages.map((stage) => {
+      const meta = PIPELINE_STAGE_META[stage.key] || PIPELINE_STAGE_META.extract;
+      const Icon = meta.icon;
+      const isCompleted = stage.state === "completed";
+      const isActive = stage.state === "active";
+      const isFailed = stage.state === "failed";
+      const color = isCompleted
+        ? "text-emerald-400"
+        : isFailed
+          ? "text-red-400"
+          : isActive
+            ? "text-amber-400"
+            : "text-gray-500";
+      const barColor = isCompleted
+        ? "bg-emerald-500"
+        : isFailed
+          ? "bg-red-500"
+          : "bg-amber-500";
+
+      return (
+        <div key={stage.key} className="min-w-0 border border-white/10 bg-black/20 rounded-xl p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center ${color}`}>
+                {isCompleted ? (
+                  <FiCheckCircle size={16} />
+                ) : isActive ? (
+                  <FiLoader size={16} className="animate-spin" />
+                ) : (
+                  <Icon size={16} />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold truncate ${color}`}>{meta.label}</p>
+                <p className="text-[11px] text-gray-500 truncate">{meta.description}</p>
+              </div>
+            </div>
+            <span className={`text-xs font-mono font-bold ${color}`}>
+              {Math.min(stage.progress || 0, 100)}%
+            </span>
+          </div>
+
+          <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out ${barColor}`}
+              style={{ width: `${Math.min(stage.progress || 0, 100)}%` }}
+            />
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+
 const AdminViralClipsTab = () => {
   // Form state
   const [movieSearch, setMovieSearch] = useState("");
@@ -211,13 +480,21 @@ const AdminViralClipsTab = () => {
   const [bgmStartTime, setBgmStartTime] = useState("0");
   const [bgmDuration, setBgmDuration] = useState("");
 
+  // Render subtitle style
+  const [subtitleEnabled, setSubtitleEnabled] = useState(true);
+  const [subtitleFont, setSubtitleFont] = useState("Arial");
+  const [subtitleFontSize, setSubtitleFontSize] = useState(24);
+  const [subtitleColor, setSubtitleColor] = useState("FFFFFF");
+
   // Pipeline state
   const [isGenerating, setIsGenerating] = useState(false);
   const [pipelineError, setPipelineError] = useState(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [pipelineStages, setPipelineStages] = useState(createDefaultPipelineStages());
 
   // Jobs state
   const [jobs, setJobs] = useState([]);
+  const [selectedPreviewJobId, setSelectedPreviewJobId] = useState(null);
   const [isPolling, setIsPolling] = useState(false);
   const pollIntervalRef = useRef(null);
   const searchTimeoutRef = useRef(null);
@@ -278,7 +555,9 @@ const AdminViralClipsTab = () => {
     setIsGenerating(true);
     setPipelineError(null);
     setJobs([]);
+    setSelectedPreviewJobId(null);
     setAnalysisProgress(0);
+    setPipelineStages(createDefaultPipelineStages("extract"));
 
     try {
       // Set to 10 immediately to trigger visual "Extracting audio" step
@@ -293,19 +572,23 @@ const AdminViralClipsTab = () => {
         bgmFile: bgMusicSource === "file" ? bgmFile : undefined,
         bgmStartTime: bgmStartTime || undefined,
         bgmDuration: bgmDuration || undefined,
+        subtitleEnabled,
+        subtitleFont,
+        subtitleFontSize,
+        subtitleColor,
       });
 
       if (res.success && res.analysisJobId) {
         startAnalysisPolling(res.analysisJobId);
       } else if (res.success && res.jobs) {
         // Fallback for older version
-        setJobs(
-          res.jobs.map((j) => ({
-            ...j,
-            state: "waiting",
-            progress: 0,
-          }))
-        );
+        const nextJobs = res.jobs.map((j) => ({
+          ...j,
+          state: "waiting",
+          progress: 0,
+        }));
+        setJobs(nextJobs);
+        setPipelineStages((prev) => applyRenderProgressToStages(prev, nextJobs));
         startPolling(res.jobs.map((j) => j.jobId));
       } else {
         setPipelineError(res.error || "Không thể tạo clip");
@@ -332,13 +615,18 @@ const AdminViralClipsTab = () => {
           const res = await viralClipAPI.getAnalysisJobStatus(jobId);
           if (res.success && res.job) {
             setAnalysisProgress(res.job.progress || 0);
+            if (res.job.stages) {
+              setPipelineStages(mapAnalysisStagesToPipeline(res.job.stages, res.job.state));
+            }
 
             if (res.job.state === "completed") {
               clearInterval(pollIntervalRef.current);
               pollIntervalRef.current = null;
               
               if (res.job.result && res.job.result.length > 0) {
-                 setJobs(res.job.result.map((j) => ({ ...j, state: "waiting", progress: 0 })));
+                 const nextJobs = res.job.result.map((j) => ({ ...j, state: "waiting", progress: 0 }));
+                 setJobs(nextJobs);
+                 setPipelineStages((prev) => applyRenderProgressToStages(prev, nextJobs));
                  startPolling(res.job.result.map((j) => j.jobId));
               } else {
                  setIsPolling(false);
@@ -350,6 +638,9 @@ const AdminViralClipsTab = () => {
               pollIntervalRef.current = null;
               setIsPolling(false);
               setPipelineError(res.job.error || "Lỗi khi phân tích dữ liệu AI");
+              if (res.job.stages) {
+                setPipelineStages(mapAnalysisStagesToPipeline(res.job.stages, res.job.state));
+              }
               setIsGenerating(false);
             }
           }
@@ -381,20 +672,24 @@ const AdminViralClipsTab = () => {
           try {
             const res = await viralClipAPI.getJobStatus(jobId);
             if (res.success && res.job) {
-              setJobs((prev) =>
-                prev.map((j) =>
+              setJobs((prev) => {
+                const next = prev.map((j) =>
                   String(j.jobId) === String(jobId)
                     ? {
                         ...j,
                         state: res.job.state,
                         progress: res.job.progress || 0,
                         result: res.job.result,
+                        clip: res.job.clip,
+                        clipUrl: res.job.clipUrl,
                         failedReason: res.job.failedReason,
                         attemptsMade: res.job.attemptsMade,
                       }
                     : j
-                )
-              );
+                );
+                setPipelineStages((prevStages) => applyRenderProgressToStages(prevStages, next));
+                return next;
+              });
 
               if (!["completed", "failed"].includes(res.job.state)) {
                 allDone = false;
@@ -409,6 +704,7 @@ const AdminViralClipsTab = () => {
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
           setIsPolling(false);
+          setIsGenerating(false);
         }
       };
 
@@ -431,6 +727,23 @@ const AdminViralClipsTab = () => {
   const processingCount = jobs.filter((j) =>
     ["active", "waiting", "delayed"].includes(j.state)
   ).length;
+  const playableJobs = useMemo(() => jobs.filter(isJobPlayable), [jobs]);
+  const selectedPreviewJob =
+    playableJobs.find((job) => String(job.jobId) === String(selectedPreviewJobId)) ||
+    playableJobs[0] ||
+    null;
+
+  useEffect(() => {
+    if (!playableJobs.length) {
+      if (selectedPreviewJobId) setSelectedPreviewJobId(null);
+      return;
+    }
+
+    const hasSelected = playableJobs.some((job) => String(job.jobId) === String(selectedPreviewJobId));
+    if (!hasSelected) {
+      setSelectedPreviewJobId(String(playableJobs[0].jobId));
+    }
+  }, [jobs, playableJobs, selectedPreviewJobId]);
 
   return (
     <div className="space-y-8 animate-fade-in pb-10 w-full">
@@ -693,6 +1006,106 @@ const AdminViralClipsTab = () => {
             </div>
           </div>
 
+          {/* Subtitle Render Style */}
+          <div className="lg:col-span-2 border-t border-white/5 pt-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                  <FiType size={15} />
+                  Subtitle render
+                </label>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={subtitleEnabled}
+                  onClick={() => setSubtitleEnabled((value) => !value)}
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${
+                    subtitleEnabled
+                      ? "bg-emerald-500/15 border-emerald-400/25 text-emerald-300"
+                      : "bg-white/5 border-white/10 text-gray-400"
+                  }`}
+                >
+                  {subtitleEnabled ? <FiEye size={15} /> : <FiEyeOff size={15} />}
+                  {subtitleEnabled ? "Sub on" : "Sub off"}
+                </button>
+              </div>
+
+              <div className={`grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_120px_minmax(0,1fr)] gap-4 ${subtitleEnabled ? "" : "opacity-45 pointer-events-none"}`}>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-400">Font</label>
+                  <select
+                    value={subtitleFont}
+                    onChange={(event) => setSubtitleFont(event.target.value)}
+                    className="w-full bg-[#ffffff08] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-all"
+                  >
+                    {SUBTITLE_FONT_OPTIONS.map((font) => (
+                      <option key={font.value} value={font.value} className="bg-[#1a1b23]">
+                        {font.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-400">Size</label>
+                  <select
+                    value={subtitleFontSize}
+                    onChange={(event) => setSubtitleFontSize(Number(event.target.value))}
+                    className="w-full bg-[#ffffff08] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-all"
+                  >
+                    {SUBTITLE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size} className="bg-[#1a1b23]">
+                        {size}px
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-400">Color</label>
+                  <div className="flex flex-wrap items-center gap-2 min-h-[46px]">
+                    {SUBTITLE_COLOR_OPTIONS.map((color) => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        title={color.label}
+                        onClick={() => setSubtitleColor(color.value)}
+                        className={`w-9 h-9 rounded-full border transition-transform hover:scale-105 ${
+                          subtitleColor === color.value
+                            ? "border-white ring-2 ring-amber-400/60"
+                            : "border-white/15"
+                        }`}
+                        style={{ backgroundColor: `#${color.value}` }}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={`#${subtitleColor}`}
+                      onChange={(event) => setSubtitleColor(event.target.value.replace("#", "").toUpperCase())}
+                      className="w-9 h-9 rounded-full bg-transparent border border-white/10 p-0 overflow-hidden cursor-pointer"
+                      title="Custom color"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-xl bg-black/25 border border-white/10 px-4 py-3 ${subtitleEnabled ? "" : "opacity-45"}`}>
+                <p
+                  className="text-center font-bold leading-snug"
+                  style={{
+                    color: `#${subtitleColor}`,
+                    fontFamily: `${subtitleFont}, Arial, sans-serif`,
+                    fontSize: `${Math.max(14, Math.min(36, Number(subtitleFontSize)))}px`,
+                    textShadow: "0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000, 0 4px 10px rgba(0,0,0,0.65)",
+                  }}
+                >
+                  {subtitleEnabled ? "Sub preview theo phong cach TikTok" : "Render khong burn subtitle"}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Generate Button */}
           <div className="flex items-end lg:col-span-2 mt-4 border-t border-white/5 pt-6">
             <button
@@ -720,22 +1133,31 @@ const AdminViralClipsTab = () => {
         </div>
 
         {/* Pipeline Steps Indicator */}
-        {isGenerating && analysisProgress > 0 && (
+        {isGenerating && (analysisProgress > 0 || pipelineStages.length > 0) && (
           <div className="mt-6 z-10 relative">
-            <PipelineSteps analysisProgress={analysisProgress} />
+            <PipelineStageList stages={pipelineStages} />
           </div>
         )}
 
         {/* Error */}
         {pipelineError && (
-          <div className="mt-4 flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4 z-10 relative">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4 z-10 relative">
             <FiAlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={18} />
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-red-400">
                 Pipeline thất bại
               </p>
               <p className="text-xs text-red-300/80 mt-1">{pipelineError}</p>
             </div>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={isGenerating || !selectedMovie || (!m3u8Url && !selectedEpisodeId)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 disabled:cursor-not-allowed text-red-200 text-xs font-semibold border border-red-400/20 transition-colors"
+            >
+              <FiRefreshCw size={14} />
+              Retry
+            </button>
           </div>
         )}
       </div>
@@ -768,7 +1190,7 @@ const AdminViralClipsTab = () => {
                   {failedCount} thất bại
                 </span>
               )}
-              {isPolling && (
+              {jobs.length > 0 && (
                 <button
                   onClick={() => startPolling(jobs.map((j) => j.jobId))}
                   className="text-gray-400 hover:text-white transition-colors"
@@ -780,13 +1202,91 @@ const AdminViralClipsTab = () => {
             </div>
           </div>
 
+          <ClipPreviewPanel job={selectedPreviewJob} />
+
           {/* Job Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {jobs.map((job) => (
+            {jobs.map((job) => {
+              const clipUrl = getJobClipUrl(job);
+              const canPreview = isJobPlayable(job);
+              const isSelected = selectedPreviewJob && String(selectedPreviewJob.jobId) === String(job.jobId);
+
+              return (
               <div
                 key={job.jobId}
-                className="relative bg-[#ffffff05] rounded-2xl border border-white/5 overflow-hidden shadow-lg hover:bg-[#ffffff08] transition-all duration-300 group"
+                role={canPreview ? "button" : undefined}
+                tabIndex={canPreview ? 0 : undefined}
+                onClick={() => {
+                  if (canPreview) setSelectedPreviewJobId(String(job.jobId));
+                }}
+                onKeyDown={(event) => {
+                  if (canPreview && (event.key === "Enter" || event.key === " ")) {
+                    event.preventDefault();
+                    setSelectedPreviewJobId(String(job.jobId));
+                  }
+                }}
+                className={`relative bg-[#ffffff05] rounded-2xl border overflow-hidden shadow-lg transition-all duration-300 group ${
+                  isSelected
+                    ? "border-amber-400/60 ring-1 ring-amber-400/30 bg-amber-500/5"
+                    : "border-white/5 hover:bg-[#ffffff08]"
+                } ${canPreview ? "cursor-pointer" : ""}`}
               >
+                <div className="relative aspect-video bg-black/50 border-b border-white/5 overflow-hidden">
+                  {canPreview ? (
+                    <>
+                      <video
+                        src={clipUrl}
+                        preload="metadata"
+                        muted
+                        playsInline
+                        className="pointer-events-none w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-opacity"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                          <FiPlay size={20} className="ml-0.5" />
+                        </div>
+                      </div>
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-white/80 font-semibold bg-black/50 rounded-full px-2.5 py-1">
+                          Xem preview
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={clipUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Mo tab moi"
+                            onClick={(event) => event.stopPropagation()}
+                            className="w-8 h-8 rounded-full bg-black/55 border border-white/15 flex items-center justify-center text-white hover:bg-white/15 transition-colors"
+                          >
+                            <FiExternalLink size={14} />
+                          </a>
+                          <a
+                            href={getJobDownloadUrl(job)}
+                            title="Tai ve"
+                            onClick={(event) => event.stopPropagation()}
+                            className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/25 flex items-center justify-center text-emerald-200 hover:bg-emerald-500/30 transition-colors"
+                          >
+                            <FiDownload size={14} />
+                          </a>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center gap-2 text-gray-500">
+                      {job.state === "failed" ? (
+                        <FiXCircle size={28} className="text-red-400" />
+                      ) : (
+                        <FiLoader size={28} className={job.state === "active" ? "animate-spin text-amber-400" : ""} />
+                      )}
+                      <span className="text-xs font-semibold">
+                        {job.state === "completed" ? "Dang cho file" : "Dang render"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 {/* Header */}
                 <div className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -830,7 +1330,8 @@ const AdminViralClipsTab = () => {
                 {/* Progress Bar at bottom */}
                 <ProgressBar progress={job.progress} state={job.state} />
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

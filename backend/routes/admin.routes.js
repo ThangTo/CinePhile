@@ -5,6 +5,7 @@ const adminQuestController = require('../controllers/admin.quest.controller');
 const thumbnailController = require('../controllers/thumbnail.controller');
 const castController = require('../controllers/cast.controller');
 const tiktokController = require('../controllers/tiktok.controller');
+const playbackController = require('../controllers/playback.controller');
 
 const authMiddleware = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/admin.middleware');
@@ -22,6 +23,12 @@ const adminCommentRoutes = require('./admin.comment.routes');
 
 // ===== ADMIN COMMENTS =====
 router.use('/comments', adminCommentRoutes);
+
+// ===== ADMIN PLAYBACK METADATA =====
+router.get('/playback/episodes', playbackController.listPlaybackEpisodes);
+router.patch('/playback/episodes/:episodeId', playbackController.updateEpisodePlaybackMeta);
+router.post('/playback/detect-intro', playbackController.detectIntro);
+router.get('/playback/detect-intro/:jobId', playbackController.getIntroDetectionStatus);
 
 // ===== ADMIN MOVIES =====
 // GET /api/v1/admin/movies - Get all movies

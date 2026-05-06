@@ -1,7 +1,6 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 
 function parseTimemarkToSeconds(timemark) {
   if (!timemark || typeof timemark !== 'string') {
@@ -28,7 +27,20 @@ function parseTimemarkToSeconds(timemark) {
 
 function tempFilePath(ext) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  return path.join(os.tmpdir(), `cinephine_${id}${ext}`);
+  return path.join(getTempRoot(), `cinephine_${id}${ext}`);
+}
+
+function getTempRoot() {
+  const configuredRoot = process.env.CINEPHINE_TEMP_DIR || process.env.TEMP_OUTPUT_DIR;
+  const root = configuredRoot
+    ? path.resolve(configuredRoot)
+    : path.join(__dirname, '..', 'temp_output', 'work');
+
+  if (!fs.existsSync(root)) {
+    fs.mkdirSync(root, { recursive: true });
+  }
+
+  return root;
 }
 
 function cleanupTempFile(filePath) {
@@ -52,7 +64,7 @@ function cleanupTempFile(filePath) {
 function extractAudioChunks(m3u8Url, chunkDurationSec = 60, onProgress) {
   return new Promise((resolve, reject) => {
     const baseId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    const outDir = path.join(os.tmpdir(), `cinephine_chunks_${baseId}`);
+    const outDir = path.join(getTempRoot(), `cinephine_chunks_${baseId}`);
     fs.mkdirSync(outDir, { recursive: true });
 
     let totalDurationSec = null;
@@ -149,6 +161,7 @@ function extractAudioChunks(m3u8Url, chunkDurationSec = 60, onProgress) {
 
 module.exports = {
   extractAudioChunks,
+  getTempRoot,
   tempFilePath,
   cleanupTempFile
 };

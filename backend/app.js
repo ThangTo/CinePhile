@@ -161,13 +161,17 @@ app.use(passport.initialize());
 // Serve static avatar files
 app.use('/api/v1/avatars', express.static(path.join(__dirname, 'data/avatars')));
 
-// Serve Korean subtitle VTT files
+// Serve generated subtitle VTT files
 const vttCachePath = path.join(__dirname, 'temp_output', 'vtt_cache');
 if (!fs.existsSync(vttCachePath)) {
   fs.mkdirSync(vttCachePath, { recursive: true });
 }
-app.use('/subtitles/ko', (req, res, next) => {
-  const filePath = path.join(vttCachePath, req.path);
+app.use('/subtitles/:language', (req, res, next) => {
+  const filePath = path.resolve(vttCachePath, `.${req.path}`);
+  if (!filePath.startsWith(path.resolve(vttCachePath) + path.sep)) {
+    return res.status(400).json({ error: 'Invalid subtitle path' });
+  }
+
   if (req.path.endsWith('.vtt') && fs.existsSync(filePath)) {
     let content = fs.readFileSync(filePath, 'utf-8');
     

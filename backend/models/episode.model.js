@@ -1,5 +1,77 @@
 const mongoose = require('mongoose');
 
+const playbackRangeSchema = new mongoose.Schema(
+  {
+    enabled: {
+      type: Boolean,
+      default: false,
+    },
+    startSec: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    endSec: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+  },
+  { _id: false },
+);
+
+const playbackDetectionSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['none', 'queued', 'processing', 'detected', 'needs_review', 'approved', 'failed', 'no_match'],
+      default: 'none',
+      index: true,
+    },
+    source: {
+      type: String,
+      enum: ['none', 'manual', 'auto'],
+      default: 'none',
+    },
+    confidence: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 1,
+    },
+    sourceKey: {
+      type: String,
+      default: null,
+    },
+    sourceHash: {
+      type: String,
+      default: null,
+    },
+    jobId: {
+      type: String,
+      default: null,
+    },
+    detectedAt: {
+      type: Date,
+      default: null,
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    note: {
+      type: String,
+      default: '',
+    },
+  },
+  { _id: false },
+);
+
 const episodeSchema = new mongoose.Schema(
   {
     // Tham chiếu đến Movie (ObjId)
@@ -45,6 +117,20 @@ const episodeSchema = new mongoose.Schema(
       type: String, // URL của VTT file (WebVTT format)
     },
     // --- THỐNG KÊ ---
+    playbackMeta: {
+      intro: {
+        type: playbackRangeSchema,
+        default: () => ({}),
+      },
+      outro: {
+        type: playbackRangeSchema,
+        default: () => ({}),
+      },
+      detection: {
+        type: playbackDetectionSchema,
+        default: () => ({}),
+      },
+    },
     viewCount: {
       type: Number,
       default: 0,

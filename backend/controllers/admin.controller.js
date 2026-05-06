@@ -4,6 +4,7 @@ const { transformMovieData, slugify } = require('../utils/movieAdminUtils');
 const { transformMovie } = require('../utils/movieTransformer');
 const Settings = require('../models/Settings');
 const Episode = require('../models/episode.model');
+const { normalizeRemoteWhisperUrl } = require('../services/whisperClient.service');
 
 /**
  * Helper: Parse array query parameters (genres, countries)
@@ -116,17 +117,18 @@ const getSubtitleRequests = async (req, res) => {
 const updateColabUrl = async (req, res) => {
   try {
     const { url } = req.body;
+    const normalizedUrl = normalizeRemoteWhisperUrl(url);
     await Settings.findOneAndUpdate(
       { key: 'colab_whisper_url' },
       { 
-        value: url,
+        value: normalizedUrl,
         description: 'Google Colab Ngrok URL for Whisper Large-v3'
       },
       { upsert: true, new: true }
     );
     res.json({ success: true, message: 'Updated Colab Whisper URL successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 

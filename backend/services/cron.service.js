@@ -5,6 +5,7 @@ const { runPageRange } = require('./crawler.service');
 const { runPipeline: runTrendingPipeline } = require('./trending.service');
 const analyticsService = require('./analytics.service');
 const questService = require('./quest.service');
+const { runIntroDetectionBatch } = require('./introDetectionBatch.service');
 
 function isEnvEnabled(name, defaultValue = true) {
   const rawValue = process.env[name];
@@ -198,6 +199,37 @@ const scheduleQuestAutoClaim = () => {
   console.log('âœ… Scheduled: Quest auto-claim every day at 00:05 (Vietnam Time)');
 };
 
+const scheduleIntroDetectionBatch = () => {
+  const cronExpression = process.env.INTRO_BATCH_CRON || '0 4 * * *';
+  const timezone = process.env.INTRO_BATCH_TIMEZONE || 'Asia/Ho_Chi_Minh';
+
+  cron.schedule(
+    cronExpression,
+    async () => {
+      console.log('\n[IntroBatch] Nightly intro detection cron started...');
+      try {
+        const summary = await runIntroDetectionBatch({ trigger: 'cron' });
+        if (summary.state === 'skipped') {
+          console.log(`[IntroBatch] Cron skipped: ${summary.reason}`);
+          return;
+        }
+
+        console.log(
+          `[IntroBatch] Cron finished: state=${summary.state}, processed=${summary.processedMovies}/${summary.totalMovies}, detected=${summary.detectedMovies}, no_match=${summary.noMatchMovies}, failed=${summary.failedMovies}`,
+        );
+      } catch (error) {
+        console.error(`[IntroBatch] Cron failed: ${error.message}`);
+      }
+    },
+    {
+      scheduled: true,
+      timezone,
+    },
+  );
+
+  console.log(`[IntroBatch] Scheduled: nightly intro detection at "${cronExpression}" (${timezone})`);
+};
+
 const runAnalyticsBackfill = () => {
   // Defer slightly to ensure DB connection is ready
   setTimeout(async () => {
@@ -231,6 +263,12 @@ const initCronJobs = () => {
   if (isEnvEnabled('CRON_TRENDING_UPDATE_ENABLED', true)) scheduleTrendingUpdate();
   if (isEnvEnabled('CRON_ANALYTICS_SNAPSHOT_ENABLED', true)) scheduleDailyAnalyticsSnapshot();
   if (isEnvEnabled('CRON_QUEST_AUTO_CLAIM_ENABLED', true)) scheduleQuestAutoClaim();
+  if (
+    isEnvEnabled('INTRO_BATCH_ENABLED', true) &&
+    isEnvEnabled('CRON_INTRO_BATCH_ENABLED', true)
+  ) {
+    scheduleIntroDetectionBatch();
+  }
 
   // Run one-time backfill to seed MongoDB from existing Redis data
   if (isEnvEnabled('CRON_ANALYTICS_BACKFILL_ENABLED', true)) runAnalyticsBackfill();
@@ -245,5 +283,6 @@ module.exports = {
   scheduleTrendingUpdate,
   scheduleDailyAnalyticsSnapshot,
   scheduleQuestAutoClaim,
+  scheduleIntroDetectionBatch,
   runAnalyticsBackfill,
 };

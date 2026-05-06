@@ -41,7 +41,7 @@ const AdminSidebar = ({
                 : "text-gray-300 hover:bg-white/10"
             }`}
           >
-            <i className={`fa-solid ${item.icon} text-lg w-10 text-center shrink-0`}></i>
+            <i className={`fa-solid ${item.icon} text-lg w-6 text-center shrink-0`}></i>
             {isOpen && <span className="whitespace-nowrap truncate">{item.label}</span>}
           </button>
         ))}

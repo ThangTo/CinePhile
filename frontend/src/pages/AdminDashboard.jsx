@@ -14,6 +14,7 @@ import AdminTikTokTab from "components/admin/AdminTikTokTab";
 import SettingsPricingTab from "components/admin/SettingsPricingTab";
 import AdminQuestsTab from "components/admin/AdminQuestsTab";
 import AdminSubtitlesTab from "components/admin/AdminSubtitlesTab";
+import AdminPlaybackTab from "components/admin/AdminPlaybackTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
 
 const AdminDashboard = () => {
@@ -108,6 +109,8 @@ const AdminDashboard = () => {
         );
       case ADMIN_TABS.SUBTITLES:
         return <AdminSubtitlesTab />;
+      case ADMIN_TABS.PLAYBACK:
+        return <AdminPlaybackTab />;
       case ADMIN_TABS.SETTINGS:
         return <AdminSettingsTab />;
       case ADMIN_TABS.PRICING:

@@ -1,5 +1,6 @@
 const Queue = require('bull');
 const { renderClip16x9 } = require('./render.service');
+const { getClipFileInfo } = require('./viralClipFile.service');
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 const REDIS_URL = process.env.REDIS_URL;
@@ -33,7 +34,17 @@ if (REDIS_URL) {
 
   // ─── Worker ─────────────────────────────────────────────────────────────────
   viralVideoQueue.process(CONCURRENCY, async (job) => {
-    const { videoUrl, bgMusic, bgmStartTime, bgmDuration, subtitleFile, startTime, duration, outputPath } = job.data;
+    const {
+      videoUrl,
+      bgMusic,
+      bgmStartTime,
+      bgmDuration,
+      subtitleFile,
+      renderOptions,
+      startTime,
+      duration,
+      outputPath,
+    } = job.data;
 
     console.log(`[Queue] Processing job ${job.id}: ${JSON.stringify({
       category: job.data.category,
@@ -45,7 +56,18 @@ if (REDIS_URL) {
     job.progress(10);
 
     try {
-      const result = await renderClip16x9(videoUrl, bgMusic, subtitleFile, startTime, duration, outputPath, bgmStartTime, bgmDuration);
+      const result = await renderClip16x9(
+        videoUrl,
+        bgMusic,
+        subtitleFile,
+        startTime,
+        duration,
+        outputPath,
+        bgmStartTime,
+        bgmDuration,
+        (progress) => job.progress(progress),
+        renderOptions,
+      );
       job.progress(100);
       console.log(`[Queue] Job ${job.id} completed: ${result}`);
       return { success: true, outputPath: result };
@@ -111,6 +133,7 @@ if (REDIS_URL) {
  * @param {string} jobData.bgmStartTime  - BGM start time
  * @param {number} jobData.bgmDuration   - Exact duration of BGM to force on the clip
  * @param {string} jobData.subtitleFile  - Path to .vtt subtitle file
+ * @param {Object} [jobData.renderOptions] - Render-only options such as subtitle style
  * @param {string} jobData.startTime     - Start timestamp (HH:MM:SS)
  * @param {number} jobData.duration      - Duration in seconds
  * @param {string} jobData.outputPath    - Output file path
@@ -134,12 +157,17 @@ async function getJobStatus(jobId) {
   if (!job) return null;
 
   const state = await job.getState();
+  const outputPath = job.returnvalue?.outputPath || job.data?.outputPath;
+  const clip = getClipFileInfo(outputPath);
+
   return {
     id: job.id,
     state,
     progress: job.progress(),
     data: job.data,
     result: job.returnvalue,
+    clip,
+    clipUrl: clip?.url || null,
     failedReason: job.failedReason,
     attemptsMade: job.attemptsMade,
     timestamp: job.timestamp,

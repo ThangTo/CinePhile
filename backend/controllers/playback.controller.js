@@ -1,0 +1,69 @@
+const playbackMetadataService = require('../services/playbackMetadata.service');
+const {
+  addIntroDetectionJob,
+  getIntroDetectionJobStatus,
+} = require('../services/introDetectionQueue.service');
+
+const listPlaybackEpisodes = async (req, res) => {
+  try {
+    const result = await playbackMetadataService.listPlaybackEpisodes(req.query);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const updateEpisodePlaybackMeta = async (req, res) => {
+  try {
+    const result = await playbackMetadataService.updateEpisodePlaybackMeta(
+      req.params.episodeId,
+      req.body,
+      req.user,
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    const status = /not found/i.test(error.message) ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+const detectIntro = async (req, res) => {
+  try {
+    const { movieId, ...options } = req.body || {};
+    if (!movieId) {
+      return res.status(400).json({ success: false, message: 'Movie ID is required' });
+    }
+
+    const job = await addIntroDetectionJob(movieId, options);
+    res.status(202).json({
+      success: true,
+      jobId: job.id,
+      state: job.state,
+      backend: job.backend,
+      fallbackReason: job.fallbackReason,
+      data: job.data,
+    });
+  } catch (error) {
+    res.status(error.statusCode || 400).json({ success: false, message: error.message });
+  }
+};
+
+const getIntroDetectionStatus = async (req, res) => {
+  try {
+    const status = await getIntroDetectionJobStatus(req.params.jobId);
+    if (!status) {
+      return res.status(404).json({ success: false, message: 'Intro detection job not found' });
+    }
+
+    res.json({ success: true, job: status });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = {
+  detectIntro,
+  getIntroDetectionStatus,
+  listPlaybackEpisodes,
+  updateEpisodePlaybackMeta,
+};

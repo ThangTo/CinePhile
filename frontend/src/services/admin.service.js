@@ -1154,6 +1154,45 @@ export const settingsAPI = {
 };
 
 /**
+ * Playback Metadata API
+ */
+export const playbackAPI = {
+  getEpisodes: async (params = {}) => {
+    const response = await apiRequest("/admin/playback/episodes", {
+      params,
+      requiresAuth: true,
+    });
+    return response;
+  },
+
+  updateEpisode: async (episodeId, data) => {
+    const response = await apiRequest(`/admin/playback/episodes/${episodeId}`, {
+      method: "PATCH",
+      data,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  detectIntro: async (data) => {
+    const response = await apiRequest("/admin/playback/detect-intro", {
+      method: "POST",
+      data,
+      requiresAuth: true,
+      timeout: 60000,
+    });
+    return response;
+  },
+
+  getDetectionStatus: async (jobId) => {
+    const response = await apiRequest(`/admin/playback/detect-intro/${jobId}`, {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+};
+
+/**
  * Quest Admin API
  */
 export const questAdminAPI = {

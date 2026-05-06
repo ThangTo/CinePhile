@@ -8,6 +8,7 @@ const Comment = require('../models/comment.model');
 const Rating = require('../models/rating.model');
 const redisService = require('./redis.service');
 const commentQuestService = require('./commentQuest.service');
+const { serializePlaybackMeta } = require('./playbackMetadata.service');
 const {
   transformMovie,
   transformMovies,
@@ -244,6 +245,7 @@ const mapEpisode = (episode) => ({
   videoUrl: episode.link_m3u8 || episode.link_embed,
   thumbnail_sprite: episode.thumbnail_sprite,
   thumbnail_vtt: episode.thumbnail_vtt,
+  playbackMeta: serializePlaybackMeta(episode.playbackMeta),
 });
 
 /**

@@ -1,8 +1,21 @@
 import apiRequest from "./utils/apiRequest";
+import http from "lib/axios";
 
 // ============================================================================
 // Viral Clips Service - API calls for viral clip generation
 // ============================================================================
+
+const getApiOrigin = () => {
+  const baseURL = http.defaults.baseURL || process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+  return baseURL.replace(/\/api\/v1\/?$/, "");
+};
+
+export const getViralClipAssetUrl = (url) => {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  const origin = getApiOrigin();
+  return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
+};
 
 export const viralClipAPI = {
   /**
@@ -62,4 +75,6 @@ export const viralClipAPI = {
       requiresAuth: true,
     });
   },
+
+  getClipAssetUrl: getViralClipAssetUrl,
 };

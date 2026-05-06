@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { cleanupTempFile } = require('../services/audio.service');
 const { addClipJob, getJobStatus } = require('../services/videoQueue.service');
+const { resolveViralClipPath } = require('../services/viralClipFile.service');
 const Episode = require('../models/episode.model');
 
 /**
@@ -17,7 +18,19 @@ const Episode = require('../models/episode.model');
  *   5. Return job IDs immediately (non-blocking)
  */
 exports.generateViralClips = async (req, res) => {
-  const { movieId, episodeId, audioType, m3u8Url: rawM3u8Url, bgMusicUrl, bgmStartTime, bgmDuration } = req.body;
+  const {
+    movieId,
+    episodeId,
+    audioType,
+    m3u8Url: rawM3u8Url,
+    bgMusicUrl,
+    bgmStartTime,
+    bgmDuration,
+    subtitleEnabled,
+    subtitleFont,
+    subtitleFontSize,
+    subtitleColor,
+  } = req.body;
   const bgmFile = req.file;
 
   let m3u8Url = rawM3u8Url;
@@ -68,7 +81,13 @@ exports.generateViralClips = async (req, res) => {
       proxyM3u8Url,
       finalBgMusic,
       bgmStartTime,
-      bgmDuration
+      bgmDuration,
+      renderOptions: {
+        subtitleEnabled,
+        subtitleFont,
+        subtitleFontSize,
+        subtitleColor,
+      },
     });
 
     console.log(`[ViralClip] Analysis job ${job.id} queued for movie: ${movieId}`);
@@ -141,6 +160,39 @@ exports.getJobStatus = async (req, res) => {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/viral-clips/file/:movieId/:filename
+ *
+ * Stream a rendered viral clip for preview/download.
+ */
+exports.getClipFile = async (req, res) => {
+  try {
+    const filePath = resolveViralClipPath(req.params.movieId, req.params.filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Clip file not found',
+      });
+    }
+
+    const fileName = path.basename(filePath);
+    const disposition = req.query.download ? 'attachment' : 'inline';
+
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+
+    return res.sendFile(filePath);
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
 
 /**
  * Convert a HH:MM:SS or MM:SS timestamp to seconds.

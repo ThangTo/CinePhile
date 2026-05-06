@@ -10,11 +10,14 @@ import ToastContainer from "../common/ToastContainer";
 import PremiumRequiredModal from "../common/PremiumRequiredModal";
 import { isPremiumActive } from "utils/premiumUtils";
 import { getVideoSource, USE_SERVER_ADBLOCK } from "config/video.config";
+import { normalizePlaybackMeta, shouldShowNextEpisodePrompt as shouldShowNextEpisodePromptByTiming } from "utils/playbackTiming";
 
 const HYBRID_PROXY_STORAGE_KEY = "cinephine_proxy_sources";
 const PROXY_ESCALATION_THRESHOLD = 2;
 const START_POSITION_BUDGET_MS = 1200;
 const BUFFERING_INDICATOR_DELAY_MS = 400;
+const PROGRESS_SAVE_INTERVAL_MS = 15000;
+const NEXT_EPISODE_COUNTDOWN_SEC = 5;
 
 function getProxySources() {
   try {
@@ -117,6 +120,7 @@ const VideoPlayer = ({
   const [isGeneratingSubtitle, setIsGeneratingSubtitle] = useState(false);
   const [subtitleProgress, setSubtitleProgress] = useState(0);
   const [subtitleError, setSubtitleError] = useState(null);
+  const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(null);
 
   const [featurePermissions, setFeaturePermissions] = useState({
     download_movie: { requiresPremium: false },
@@ -228,6 +232,37 @@ const VideoPlayer = ({
   }, [episode]);
 
   const hasNativePlayer = Boolean(hlsSource || fileSource);
+  const playbackMeta = useMemo(() => normalizePlaybackMeta(episode?.playbackMeta), [episode?.playbackMeta]);
+  const hasNextEpisode = useMemo(() => {
+    const currentEpNumber = episode?.episode || episode?.episodeId || 1;
+    return Boolean(onEpisodeChange && currentEpNumber < totalEpisodes);
+  }, [episode?.episode, episode?.episodeId, onEpisodeChange, totalEpisodes]);
+
+  const showSkipIntro =
+    hasNativePlayer &&
+    playbackMeta.intro &&
+    currentTime >= playbackMeta.intro.startSec &&
+    currentTime < playbackMeta.intro.endSec - 1;
+  const skipIntroProgress = playbackMeta.intro
+    ? Math.max(
+        0,
+        Math.min(
+          100,
+          ((currentTime - playbackMeta.intro.startSec) /
+            Math.max(1, playbackMeta.intro.endSec - playbackMeta.intro.startSec)) *
+            100,
+        ),
+      )
+    : 0;
+
+  const showNextEpisodePrompt = shouldShowNextEpisodePromptByTiming({
+    hasNativePlayer,
+    hasNextEpisode,
+    duration,
+    currentTime,
+    nextEpisodeCountdown,
+    playbackMeta,
+  });
 
   // Parse available audio options
   const audioOptions = useMemo(() => {
@@ -581,6 +616,7 @@ const VideoPlayer = ({
       setIsGeneratingSubtitle(false);
       setSubtitleProgress(0);
       setSubtitleError(null);
+      setNextEpisodeCountdown(null);
       parsedSubtitlesRef.current = [];
       if (subtitleOverlayRef.current) {
         if (subtitleTextRef.current) subtitleTextRef.current.innerHTML = "";
@@ -737,7 +773,7 @@ const VideoPlayer = ({
       } catch (error) {}
     };
 
-    saveProgressIntervalRef.current = setInterval(saveProgress, 30000);
+    saveProgressIntervalRef.current = setInterval(saveProgress, PROGRESS_SAVE_INTERVAL_MS);
 
     return () => {
       if (saveProgressIntervalRef.current) {
@@ -1252,6 +1288,15 @@ const VideoPlayer = ({
     video.currentTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
   };
 
+  const handleSkipIntro = () => {
+    const video = videoRef.current;
+    const endSec = playbackMeta.intro?.endSec;
+    if (!video || !Number.isFinite(endSec)) return;
+
+    video.currentTime = Math.min(duration || endSec, endSec);
+    setShowControls(true);
+  };
+
   const toggleFullscreen = useCallback(() => {
     const container = containerRef.current;
     const video = videoRef.current;
@@ -1347,9 +1392,30 @@ const VideoPlayer = ({
   const handleNextEpisode = () => {
     const currentEpNumber = episode?.episode || episode?.episodeId || 1;
     if (currentEpNumber < totalEpisodes) {
+      setNextEpisodeCountdown(null);
       onEpisodeChange(currentEpNumber + 1);
     }
   };
+
+  const handleVideoEnded = () => {
+    if (!hasNextEpisode) return;
+    setShowControls(true);
+    setNextEpisodeCountdown(NEXT_EPISODE_COUNTDOWN_SEC);
+  };
+
+  useEffect(() => {
+    if (nextEpisodeCountdown === null) return undefined;
+    if (nextEpisodeCountdown <= 0) {
+      handleNextEpisode();
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      setNextEpisodeCountdown((value) => (value === null ? null : value - 1));
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [nextEpisodeCountdown]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAudioChange = (type) => {
     if (onAudioTypeChange) onAudioTypeChange(type);
@@ -1399,8 +1465,8 @@ const VideoPlayer = ({
   };
 
   const subtitleOptions = [
-    { key: null, label: "Tat phu de" },
-    { key: "ko", label: "한국어 (Korean)" },
+    { key: null, label: "Tắt phụ đề" },
+    { key: "ko", label: "AI subtitles (source)" },
   ];
 
   const stopSubtitleStatusPolling = useCallback(() => {
@@ -1515,7 +1581,7 @@ const VideoPlayer = ({
       setKoreanSubtitleUrl(null);
       setIsGeneratingSubtitle(false);
       setSubtitleProgress(0);
-      setSubtitleError(data.error || "Không thể tạo phụ đề tiếng Hàn");
+      setSubtitleError(data.error || "Không thể tạo phụ đề AI");
       stopSubtitleStatusPolling();
       return;
     }
@@ -1589,19 +1655,19 @@ const VideoPlayer = ({
       }
 
       if (!data.success) {
-        throw new Error(data.message || "Khong the tao phu de");
+        throw new Error(data.message || "Không thể tạo phụ đề");
       }
 
       applySubtitleStatus(data, requestKey);
 
       if (data.status === "ready" && data.subtitleUrl) {
-        showToast("Da tao phu de tieng Han thanh cong!", "success");
+        showToast("Da tao phu de AI thanh cong!", "success");
         return;
       }
 
       if (data.status === "processing") {
         startSubtitleStatusPolling();
-        showToast("Dang tao phu de tieng Han, vui long doi...", "info");
+        showToast("Dang tao phu de AI, vui long doi...", "info");
       }
     } catch (error) {
       if (activeSubtitleRequestKeyRef.current !== requestKey) {
@@ -1612,7 +1678,7 @@ const VideoPlayer = ({
       setIsGeneratingSubtitle(false);
       setSubtitleProgress(0);
       stopSubtitleStatusPolling();
-      showToast("Loi khi tao phu de tieng Han", "error");
+      showToast("Loi khi tao phu de AI", "error");
     }
   }, [
     apiBaseUrl,
@@ -1694,7 +1760,7 @@ const VideoPlayer = ({
             const requested = await requestKoreanSubtitleForUser();
             if (requested) {
               showToast(
-                "Phu de Tieng Han chua co san. He thong da ghi nhan yeu cau cua ban va Admin se som cap nhat!",
+                "Phụ đề AI chưa có sẵn. Hệ thống đã ghi nhận yêu cầu của bạn và Admin sẽ sớm cập nhật!",
                 "info"
               );
             }
@@ -1746,7 +1812,7 @@ const VideoPlayer = ({
 
   useEffect(() => {
     if (subtitleError) {
-      console.warn("[VideoPlayer] Korean subtitle error:", subtitleError);
+      console.warn("[VideoPlayer] AI subtitle error:", subtitleError);
     }
   }, [subtitleError]);
 
@@ -2255,6 +2321,7 @@ const VideoPlayer = ({
           className="w-full h-full rounded-lg"
           src={!hlsSource ? fileSource : undefined}
           onClick={handleVideoClick}
+          onEnded={handleVideoEnded}
           crossOrigin="anonymous"
           playsInline
           webkit-playsinline="true"
@@ -2448,6 +2515,60 @@ const VideoPlayer = ({
             >
               <i className="fa-solid fa-up-right-and-down-left-from-center text-[10px] text-white"></i>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showSkipIntro && (
+        <div className="pointer-events-auto absolute left-4 bottom-24 z-40 animate-fade-in-up sm:left-8 sm:bottom-28">
+          <button
+            type="button"
+            onClick={handleSkipIntro}
+            className="group relative flex items-center justify-center gap-3 overflow-hidden rounded bg-black/60 px-5 py-2.5 text-white border border-white/30 backdrop-blur-md transition-all duration-300 hover:bg-white hover:text-black hover:border-white shadow-lg active:scale-95"
+          >
+            <i className="fa-solid fa-forward-step text-lg opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+            <span className="text-base font-medium whitespace-nowrap">Bỏ qua giới thiệu</span>
+            <span className="absolute inset-x-0 bottom-0 h-[3px] bg-white/20">
+              <span
+                className="block h-full bg-white transition-[width] duration-300 ease-linear group-hover:bg-black"
+                style={{ width: `${skipIntroProgress}%` }}
+              />
+            </span>
+          </button>
+        </div>
+      )}
+
+      {showNextEpisodePrompt && (
+        <div className="pointer-events-auto absolute right-4 bottom-24 z-40 animate-fade-in-up sm:right-8 sm:bottom-28">
+          <div className="flex flex-col items-end gap-2">
+            <button
+              type="button"
+              onClick={handleNextEpisode}
+              className="group relative flex items-center justify-center gap-3 overflow-hidden rounded bg-black/60 px-5 py-2.5 text-white border border-white/30 backdrop-blur-md transition-all duration-300 hover:bg-white hover:text-black hover:border-white shadow-lg active:scale-95"
+            >
+              <span className="text-base font-medium whitespace-nowrap">
+                {nextEpisodeCountdown !== null
+                  ? `Tập tiếp theo (${nextEpisodeCountdown}s)`
+                  : "Chuyển tập tiếp theo"}
+              </span>
+              <i className="fa-solid fa-forward-step text-lg opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+              {nextEpisodeCountdown !== null && (
+                <span className="absolute inset-x-0 bottom-0 h-[3px] bg-white/20">
+                  <span
+                    className="block h-full bg-white transition-all duration-1000 ease-linear group-hover:bg-black"
+                    style={{ width: `${((NEXT_EPISODE_COUNTDOWN_SEC - nextEpisodeCountdown) / NEXT_EPISODE_COUNTDOWN_SEC) * 100}%` }}
+                  />
+                </span>
+              )}
+            </button>
+            {nextEpisodeCountdown !== null && (
+              <button
+                onClick={() => setNextEpisodeCountdown(null)}
+                className="text-xs font-medium text-white/60 hover:text-white drop-shadow-md transition-colors px-2 py-1 bg-black/40 rounded border border-transparent hover:border-white/20 backdrop-blur-sm"
+              >
+                Hủy tự động chuyển
+              </button>
+            )}
           </div>
         </div>
       )}

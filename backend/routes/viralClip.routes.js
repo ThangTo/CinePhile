@@ -18,4 +18,8 @@ router.get('/viral-clips/analysis-job/:jobId', viralClipController.getAnalysisJo
 // Check the status of a specific rendering job
 router.get('/viral-clips/job/:jobId', viralClipController.getJobStatus);
 
+// GET /api/v1/viral-clips/file/:movieId/:filename
+// Stream a rendered clip file for preview/download
+router.get('/viral-clips/file/:movieId/:filename', viralClipController.getClipFile);
+
 module.exports = router;

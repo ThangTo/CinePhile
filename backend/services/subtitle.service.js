@@ -2,17 +2,20 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const crypto = require('crypto');
-const FormData = require('form-data');
 const { extractAudioChunks, cleanupTempFile } = require('./audio.service');
 const { speechToTextPipeline, getCacheKey } = require('./whisper.service');
+const { getLanguageCacheKey, getWhisperProvider } = require('./whisperClient.service');
 const r2Service = require('./r2.service');
-const Settings = require('../models/Settings');
 const Episode = require('../models/episode.model');
 
 const VTT_CACHE_DIR = path.join(__dirname, '..', 'temp_output', 'vtt_cache');
 const FAILED_JOB_TTL_MS = 10 * 60 * 1000;
 const READY_JOB_TTL_MS = 24 * 60 * 60 * 1000; // Cache local jobs for 24h
-const WHISPER_API_URL = process.env.WHISPER_API_URL || 'http://localhost:8000';
+const DEFAULT_SUBTITLE_LANGUAGE = process.env.SUBTITLE_TRANSCRIPTION_LANGUAGE || process.env.WHISPER_LANGUAGE || 'auto';
+const WHISPER_CHUNK_DURATION_SEC = Math.max(
+  Number.parseInt(process.env.WHISPER_CHUNK_DURATION_SEC, 10) || 600,
+  30,
+);
 const subtitleJobs = new Map();
 
 function ensureCacheDir() {
@@ -21,32 +24,20 @@ function ensureCacheDir() {
   }
 }
 
-async function getColabUrl() {
-  if (String(process.env.WHISPER_FORCE_LOCAL || '').toLowerCase() === 'true') {
-    return null;
-  }
-
-  try {
-    const setting = await Settings.findOne({ key: 'colab_whisper_url' });
-    return setting ? setting.value : null;
-  } catch (error) {
-    return null;
-  }
-}
-
 function toSubtitleUrl(language, fileName) {
   return `/subtitles/${language}/${encodeURIComponent(fileName)}`;
 }
 
-function getStableSubtitleCacheKey(videoUrl, language = 'ko', cacheIdentity = null) {
+function getStableSubtitleCacheKey(videoUrl, language = DEFAULT_SUBTITLE_LANGUAGE, cacheIdentity = null) {
+  const languageKey = getLanguageCacheKey(language);
   if (cacheIdentity) {
     const stableHash = crypto
       .createHash('sha256')
       .update(String(cacheIdentity))
       .digest('hex');
-    return `${stableHash}.${language}.v2.vtt`;
+    return `${stableHash}.${languageKey}.v2.vtt`;
   }
-  return getCacheKey(videoUrl, language);
+  return getCacheKey(videoUrl, languageKey);
 }
 
 function extractEpisodeIdFromCacheIdentity(cacheIdentity) {
@@ -70,21 +61,30 @@ async function clearSubtitleRequestCount(cacheIdentity) {
   }
 }
 
-async function ensureLocalWhisperReady() {
+async function ensureWhisperReady() {
+  const provider = await getWhisperProvider();
+
+  if (provider.type === 'remote') {
+    console.log(`[SubtitleService] Using remote Whisper at: ${provider.baseUrl}`);
+    return provider;
+  }
+
   try {
-    await axios.get(`${WHISPER_API_URL}/health`, { timeout: 5000 });
+    await axios.get(`${provider.baseUrl}/health`, { timeout: 5000 });
+    return provider;
   } catch (_error) {
     throw new Error(
-      `Local Whisper server is unavailable at ${WHISPER_API_URL}. Please start Docker whisper service.`,
+      `Local Whisper server is unavailable at ${provider.baseUrl}. Please start Docker whisper service or configure the remote ngrok URL.`,
     );
   }
 }
 
-async function getCachedSubtitlePath(videoUrl, language = 'ko', cacheIdentity = null) {
+async function getCachedSubtitlePath(videoUrl, language = DEFAULT_SUBTITLE_LANGUAGE, cacheIdentity = null) {
   ensureCacheDir();
-  const stableCacheKey = getStableSubtitleCacheKey(videoUrl, language, cacheIdentity);
+  const languageKey = getLanguageCacheKey(language);
+  const stableCacheKey = getStableSubtitleCacheKey(videoUrl, languageKey, cacheIdentity);
   const stableCacheFile = path.join(VTT_CACHE_DIR, stableCacheKey);
-  const legacyCacheKey = getCacheKey(videoUrl, language);
+  const legacyCacheKey = getCacheKey(videoUrl, languageKey);
   const legacyCacheFile = path.join(VTT_CACHE_DIR, legacyCacheKey);
   
   if (fs.existsSync(stableCacheFile)) return stableCacheFile;
@@ -102,9 +102,9 @@ async function getCachedSubtitlePath(videoUrl, language = 'ko', cacheIdentity = 
   }
 
   // Check R2 if not in local cache
-  let r2Url = await r2Service.getSubtitleUrlIfMatch(stableCacheKey, language);
+  let r2Url = await r2Service.getSubtitleUrlIfMatch(stableCacheKey, languageKey);
   if (!r2Url && legacyCacheKey !== stableCacheKey) {
-    r2Url = await r2Service.getSubtitleUrlIfMatch(legacyCacheKey, language);
+    r2Url = await r2Service.getSubtitleUrlIfMatch(legacyCacheKey, languageKey);
   }
   if (r2Url) {
     // Optional: download from R2 to local cache for faster subsequent access
@@ -139,14 +139,15 @@ function getActiveJob(cacheKey) {
   return job;
 }
 
-async function getSubtitleStatus(videoUrl, language = 'ko', cacheIdentity = null) {
-  const cachedPath = await getCachedSubtitlePath(videoUrl, language, cacheIdentity);
+async function getSubtitleStatus(videoUrl, language = DEFAULT_SUBTITLE_LANGUAGE, cacheIdentity = null) {
+  const languageKey = getLanguageCacheKey(language);
+  const cachedPath = await getCachedSubtitlePath(videoUrl, languageKey, cacheIdentity);
   if (cachedPath) {
     await clearSubtitleRequestCount(cacheIdentity);
 
     const subtitleUrl = cachedPath.startsWith('R2:') 
       ? cachedPath.substring(3) 
-      : toSubtitleUrl(language, path.basename(cachedPath));
+      : toSubtitleUrl(languageKey, path.basename(cachedPath));
 
     return {
       status: 'ready',
@@ -155,7 +156,7 @@ async function getSubtitleStatus(videoUrl, language = 'ko', cacheIdentity = null
     };
   }
 
-  const cacheKey = getStableSubtitleCacheKey(videoUrl, language, cacheIdentity);
+  const cacheKey = getStableSubtitleCacheKey(videoUrl, languageKey, cacheIdentity);
   const job = getActiveJob(cacheKey);
 
   if (job?.status === 'processing') {
@@ -190,8 +191,15 @@ async function getSubtitleStatus(videoUrl, language = 'ko', cacheIdentity = null
   };
 }
 
-async function runKoreanSubtitleGeneration(m3u8Url, fetchM3u8Url = null, chunkDurationSec = 60, cacheIdentity = null) {
-  const cacheKey = getStableSubtitleCacheKey(m3u8Url, 'ko', cacheIdentity);
+async function runSubtitleGeneration(
+  m3u8Url,
+  fetchM3u8Url = null,
+  chunkDurationSec = WHISPER_CHUNK_DURATION_SEC,
+  cacheIdentity = null,
+  language = DEFAULT_SUBTITLE_LANGUAGE,
+) {
+  const languageKey = getLanguageCacheKey(language);
+  const cacheKey = getStableSubtitleCacheKey(m3u8Url, languageKey, cacheIdentity);
   const cacheFile = path.join(VTT_CACHE_DIR, cacheKey);
   const actualFetchUrl = fetchM3u8Url || m3u8Url;
   let audioChunks = null;
@@ -220,105 +228,53 @@ async function runKoreanSubtitleGeneration(m3u8Url, fetchM3u8Url = null, chunkDu
   updateJob(cacheKey, { status: 'processing', progress: 1, error: null });
 
   try {
-    const colabUrl = await getColabUrl();
-    
-    if (colabUrl) {
-      console.log(`[SubtitleService] Using Remote Colab Whisper at: ${colabUrl}`);
-      
-      // 1. Extract a single full audio file or first chunk for remote processing
-      // To keep it simple and high quality, we'll extract the first 10 minutes or full if short
-      // But for better results, let's extract the full audio as one mp3
-      audioChunks = await extractChunksWithFallback(600, (progress) => {
-        updateJob(cacheKey, { progress: Math.max(1, Math.min(20, Math.round(progress * 0.2))) });
-      }, 5);
+    const provider = await ensureWhisperReady();
+    console.log(`[SubtitleService] Generating subtitles with ${provider.type} Whisper (language=${languageKey}).`);
 
-      // We'll just send the first chunk if multiple, or implement full audio extraction
-      // For now, let's just use the local pipeline logic but replace the STT part
-      
-      // Actually, let's just use the existing chunking logic but call Colab for each chunk
-      // to keep progress updates granular and handle long videos
-      
-      const vttChunks = [];
-      for (let i = 0; i < audioChunks.files.length; i++) {
-        const file = audioChunks.files[i];
-        const formData = new FormData();
-        formData.append('file', fs.createReadStream(file));
-        formData.append('language', 'ko');
+    audioChunks = await extractChunksWithFallback(chunkDurationSec, (progress) => {
+      const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+      updateJob(cacheKey, {
+        status: 'processing',
+        progress: Math.max(1, Math.min(30, Math.round(safeProgress * 0.3))),
+      });
+    }, 5);
 
-        console.log(`[SubtitleService] Sending chunk ${i + 1} to Colab...`);
-        const response = await axios.post(`${colabUrl}/transcribe`, formData, {
-          headers: {
-            ...formData.getHeaders(),
-            'ngrok-skip-browser-warning': '69420', // Bypass ngrok warning page
-          },
-          timeout: 600000, // Increase to 10 minutes for large-v3
-        });
-
-        if (response.data && response.data.success) {
-          console.log(`[SubtitleService] Chunk ${i + 1} transcribed successfully.`);
-          vttChunks.push(response.data.vtt);
-        } else {
-          console.error(`[SubtitleService] Colab returned error for chunk ${i + 1}:`, response.data);
-          throw new Error('Colab Whisper failed to transcribe audio');
-        }
-        
-        const progress = 20 + Math.round(((i + 1) / audioChunks.files.length) * 70);
-        updateJob(cacheKey, { progress });
-      }
-
-      // Merge and save
-      let mergedVtt = vttChunks.join('\n\n').replace(/WEBVTT\n\n/g, '').trim();
-      mergedVtt = 'WEBVTT\n\n' + mergedVtt;
-      fs.writeFileSync(cacheFile, mergedVtt, 'utf-8');
-    } else {
-      // Local fallback
-      await ensureLocalWhisperReady();
-
-      audioChunks = await extractChunksWithFallback(chunkDurationSec, (progress) => {
+    const generatedCachePath = await speechToTextPipeline(
+      audioChunks.files,
+      m3u8Url, // Keep m3u8Url for consistent cacheKey
+      chunkDurationSec,
+      (progress) => {
         const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
         updateJob(cacheKey, {
           status: 'processing',
-          progress: Math.max(1, Math.min(30, Math.round(safeProgress * 0.3))),
+          progress: Math.min(99, Math.max(30, 30 + Math.round(safeProgress * 0.7))),
         });
-      }, 5);
+      },
+      languageKey,
+    );
 
-      const generatedCachePath = await speechToTextPipeline(
-        audioChunks.files,
-        m3u8Url, // Keep m3u8Url for consistent cacheKey
-        chunkDurationSec,
-        (progress) => {
-          const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
-          updateJob(cacheKey, {
-            status: 'processing',
-            progress: Math.min(99, Math.max(30, 30 + Math.round(safeProgress * 0.7))),
-          });
-        },
-        'ko',
-      );
-
-      // speechToTextPipeline may cache by URL-based key; keep subtitle cache aligned
-      // with our stable identity key (episode-based) to avoid regenerate loops.
-      if (
-        generatedCachePath &&
-        generatedCachePath !== cacheFile &&
-        fs.existsSync(generatedCachePath) &&
-        !fs.existsSync(cacheFile)
-      ) {
-        fs.copyFileSync(generatedCachePath, cacheFile);
-      }
+    // speechToTextPipeline may cache by URL-based key; keep subtitle cache aligned
+    // with our stable identity key (episode-based) to avoid regenerate loops.
+    if (
+      generatedCachePath &&
+      generatedCachePath !== cacheFile &&
+      fs.existsSync(generatedCachePath) &&
+      !fs.existsSync(cacheFile)
+    ) {
+      fs.copyFileSync(generatedCachePath, cacheFile);
     }
 
     if (!fs.existsSync(cacheFile)) {
-      throw new Error('Korean subtitle cache file was not created');
+      throw new Error('Subtitle cache file was not created');
     }
 
     // Upload to R2 after generation
-    const r2Url = await r2Service.uploadSubtitle(cacheFile, cacheKey, 'ko');
+    const r2Url = await r2Service.uploadSubtitle(cacheFile, cacheKey, languageKey);
 
     updateJob(cacheKey, {
       status: 'ready',
       progress: 100,
-      subtitleUrl: r2Url || toSubtitleUrl('ko', cacheKey),
+      subtitleUrl: r2Url || toSubtitleUrl(languageKey, cacheKey),
       error: null,
       promise: null,
     });
@@ -329,7 +285,7 @@ async function runKoreanSubtitleGeneration(m3u8Url, fetchM3u8Url = null, chunkDu
     updateJob(cacheKey, {
       status: 'failed',
       progress: 0,
-      error: error.message || 'Failed to generate Korean subtitles',
+      error: error.message || 'Failed to generate subtitles',
       promise: null,
     });
     throw error;
@@ -343,17 +299,19 @@ async function runKoreanSubtitleGeneration(m3u8Url, fetchM3u8Url = null, chunkDu
 async function requestKoreanSubtitleGeneration(
   m3u8Url,
   fetchM3u8Url = null,
-  chunkDurationSec = 60,
+  chunkDurationSec = WHISPER_CHUNK_DURATION_SEC,
   cacheIdentity = null,
+  language = DEFAULT_SUBTITLE_LANGUAGE,
 ) {
   ensureCacheDir();
+  const languageKey = getLanguageCacheKey(language);
 
-  const currentStatus = await getSubtitleStatus(m3u8Url, 'ko', cacheIdentity);
+  const currentStatus = await getSubtitleStatus(m3u8Url, languageKey, cacheIdentity);
   if (currentStatus.status === 'ready') {
     return currentStatus;
   }
 
-  const cacheKey = getStableSubtitleCacheKey(m3u8Url, 'ko', cacheIdentity);
+  const cacheKey = getStableSubtitleCacheKey(m3u8Url, languageKey, cacheIdentity);
   const activeJob = getActiveJob(cacheKey);
   if (activeJob?.status === 'processing') {
     return {
@@ -363,8 +321,8 @@ async function requestKoreanSubtitleGeneration(
     };
   }
 
-  const promise = runKoreanSubtitleGeneration(m3u8Url, fetchM3u8Url, chunkDurationSec, cacheIdentity).catch((error) => {
-    console.error(`[SubtitleService] Failed to generate Korean subtitles: ${error.message}`);
+  const promise = runSubtitleGeneration(m3u8Url, fetchM3u8Url, chunkDurationSec, cacheIdentity, languageKey).catch((error) => {
+    console.error(`[SubtitleService] Failed to generate subtitles: ${error.message}`);
   });
 
   updateJob(cacheKey, {
@@ -384,20 +342,28 @@ async function requestKoreanSubtitleGeneration(
 async function generateKoreanSubtitles(
   m3u8Url,
   fetchM3u8Url = null,
-  chunkDurationSec = 60,
+  chunkDurationSec = WHISPER_CHUNK_DURATION_SEC,
   onProgress,
   cacheIdentity = null,
+  language = DEFAULT_SUBTITLE_LANGUAGE,
 ) {
-  const request = await requestKoreanSubtitleGeneration(m3u8Url, fetchM3u8Url, chunkDurationSec, cacheIdentity);
+  const languageKey = getLanguageCacheKey(language);
+  const request = await requestKoreanSubtitleGeneration(
+    m3u8Url,
+    fetchM3u8Url,
+    chunkDurationSec,
+    cacheIdentity,
+    languageKey,
+  );
   if (request.status === 'ready') {
     if (onProgress) onProgress(100);
     return request;
   }
 
-  const cacheKey = getStableSubtitleCacheKey(m3u8Url, 'ko', cacheIdentity);
+  const cacheKey = getStableSubtitleCacheKey(m3u8Url, languageKey, cacheIdentity);
   const activeJob = getActiveJob(cacheKey);
   if (!activeJob?.promise) {
-    return getSubtitleStatus(m3u8Url, 'ko', cacheIdentity);
+    return getSubtitleStatus(m3u8Url, languageKey, cacheIdentity);
   }
 
   let progressTimer = null;
@@ -418,11 +384,17 @@ async function generateKoreanSubtitles(
     }
   }
 
-  return getSubtitleStatus(m3u8Url, 'ko', cacheIdentity);
+  return getSubtitleStatus(m3u8Url, languageKey, cacheIdentity);
 }
 
+const requestSubtitleGeneration = requestKoreanSubtitleGeneration;
+const generateSubtitles = generateKoreanSubtitles;
+
 module.exports = {
+  DEFAULT_SUBTITLE_LANGUAGE,
+  generateSubtitles,
   generateKoreanSubtitles,
+  requestSubtitleGeneration,
   requestKoreanSubtitleGeneration,
   getSubtitleStatus,
   getCachedSubtitlePath,

@@ -112,6 +112,13 @@ const gracefulShutdown = async (signal) => {
     console.warn(`Analysis queue close setup error: ${err.message}`);
   }
 
+  try {
+    const { closeIntroDetectionQueue } = require('./services/introDetectionQueue.service');
+    queueClosers.push(closeIntroDetectionQueue());
+  } catch (err) {
+    console.warn(`Intro detection queue close setup error: ${err.message}`);
+  }
+
   if (queueClosers.length > 0) {
     const queueResults = await Promise.allSettled(queueClosers);
     queueResults
