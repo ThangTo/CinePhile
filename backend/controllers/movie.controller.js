@@ -4,6 +4,7 @@ const playbackHeartbeatService = require('../services/playbackHeartbeat.service'
 const trendingService = require('../services/trending.service');
 const subtitleService = require('../services/subtitle.service');
 const Episode = require('../models/episode.model');
+const crypto = require('crypto');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const os = require('os');
@@ -21,6 +22,16 @@ const DOWNLOAD_M3U8_TIMEOUT_MS = Math.max(
   10000,
   Number(process.env.DOWNLOAD_M3U8_TIMEOUT_MS || 30000),
 );
+const PROXY_TS_MAX_ACTIVE_SESSIONS = Math.max(
+  1,
+  Number.parseInt(process.env.PROXY_TS_MAX_ACTIVE_SESSIONS || process.env.PROXY_TS_MAX_USERS || '3', 10) || 3,
+);
+const PROXY_TS_SESSION_TTL_MS = Math.max(
+  30000,
+  Number.parseInt(process.env.PROXY_TS_SESSION_TTL_MS, 10) || 90000,
+);
+const PROXY_TS_SESSION_ID_MAX_LENGTH = 120;
+const proxyTsSessions = new Map();
 /**
  * Helper: Parse array query parameters (genres, countries)
  * @param {string|string[]} param - Query parameter value
@@ -35,6 +46,89 @@ const getRequestIpAddress = (req) =>
   req.headers['x-forwarded-for']?.split(',')[0]?.trim()
   || req.socket?.remoteAddress
   || '0.0.0.0';
+
+function normalizeProxyTsSessionId(value) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const normalized = String(rawValue || '').trim();
+  if (!normalized || normalized.length > PROXY_TS_SESSION_ID_MAX_LENGTH) {
+    return null;
+  }
+
+  return /^[a-zA-Z0-9._:-]+$/.test(normalized) ? normalized : null;
+}
+
+function createProxyTsSessionId(value) {
+  return normalizeProxyTsSessionId(value) || crypto.randomUUID();
+}
+
+function addQueryParam(baseUrl, key, value) {
+  try {
+    const nextUrl = new URL(baseUrl);
+    nextUrl.searchParams.set(key, value);
+    return nextUrl.toString();
+  } catch (_error) {
+    return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+  }
+}
+
+function cleanupProxyTsSessions(now = Date.now()) {
+  for (const [sessionId, session] of proxyTsSessions.entries()) {
+    if ((session.activeRequests || 0) <= 0 && now - session.lastSeenAt > PROXY_TS_SESSION_TTL_MS) {
+      proxyTsSessions.delete(sessionId);
+    }
+  }
+}
+
+function getProxyTsSessionKey(req) {
+  return normalizeProxyTsSessionId(req.query.sid) || `ip:${getRequestIpAddress(req)}`;
+}
+
+function acquireProxyTsSession(req) {
+  const now = Date.now();
+  cleanupProxyTsSessions(now);
+
+  const sessionId = getProxyTsSessionKey(req);
+  let session = proxyTsSessions.get(sessionId);
+
+  if (!session) {
+    if (proxyTsSessions.size >= PROXY_TS_MAX_ACTIVE_SESSIONS) {
+      return {
+        allowed: false,
+        activeSessions: proxyTsSessions.size,
+        maxSessions: PROXY_TS_MAX_ACTIVE_SESSIONS,
+      };
+    }
+
+    session = {
+      id: sessionId,
+      ipAddress: getRequestIpAddress(req),
+      activeRequests: 0,
+      createdAt: now,
+      lastSeenAt: now,
+    };
+    proxyTsSessions.set(sessionId, session);
+  }
+
+  session.activeRequests += 1;
+  session.lastSeenAt = now;
+
+  return {
+    allowed: true,
+    id: sessionId,
+    activeSessions: proxyTsSessions.size,
+    maxSessions: PROXY_TS_MAX_ACTIVE_SESSIONS,
+  };
+}
+
+function releaseProxyTsSession(sessionId) {
+  if (!sessionId) return;
+
+  const session = proxyTsSessions.get(sessionId);
+  if (!session) return;
+
+  session.activeRequests = Math.max(0, (session.activeRequests || 0) - 1);
+  session.lastSeenAt = Date.now();
+}
 
 const isObjectId = (value) => typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value);
 
@@ -668,7 +762,11 @@ const proxyM3u8 = async (req, res) => {
     if (mode === 'direct') {
       cleanContent = await processM3u8StreamDirect(url, proxyBase);
     } else {
-      cleanContent = await processM3u8StreamWithProxy(url, proxyBase, tsProxyBase);
+      const proxyTsSessionId = createProxyTsSessionId(req.query.sid);
+      const proxyBaseWithSession = addQueryParam(proxyBase, 'sid', proxyTsSessionId);
+      const tsProxyBaseWithSession = addQueryParam(tsProxyBase, 'sid', proxyTsSessionId);
+      cleanContent = await processM3u8StreamWithProxy(url, proxyBaseWithSession, tsProxyBaseWithSession);
+      res.setHeader('X-Proxy-TS-Session', proxyTsSessionId);
     }
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -690,6 +788,7 @@ const proxyM3u8 = async (req, res) => {
 const proxyTs = async (req, res) => {
   const upstreamController = new AbortController();
   const abortUpstream = () => upstreamController.abort();
+  let proxyTsSession = null;
 
   req.on('close', abortUpstream);
   res.on('close', abortUpstream);
@@ -701,6 +800,16 @@ const proxyTs = async (req, res) => {
     }
 
     // Do NOT forward Range headers from client — TS segments are complete files
+    proxyTsSession = acquireProxyTsSession(req);
+    if (!proxyTsSession.allowed) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Retry-After', '30');
+      res.setHeader('X-Proxy-TS-Active-Sessions', String(proxyTsSession.activeSessions));
+      res.setHeader('X-Proxy-TS-Max-Sessions', String(proxyTsSession.maxSessions));
+      return res.status(429).send('Too many proxy-ts sessions. Please try again later.');
+    }
+
     const response = await fetchWithIpv4(url, {
       headers: buildSourceHeaders(url),
       timeoutMs: TS_PROXY_TIMEOUT_MS,
@@ -721,6 +830,9 @@ const proxyTs = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('X-Proxy-TS-Active-Sessions', String(proxyTsSession.activeSessions));
+    res.setHeader('X-Proxy-TS-Max-Sessions', String(proxyTsSession.maxSessions));
+    res.setHeader('X-Proxy-TS-Session', proxyTsSession.id);
 
     if (!response.body) {
       return res.status(502).send('Failed to fetch segment from source');
@@ -746,6 +858,9 @@ const proxyTs = async (req, res) => {
       res.status(500).send('Error fetching TS segment');
     }
   } finally {
+    if (proxyTsSession?.allowed) {
+      releaseProxyTsSession(proxyTsSession.id);
+    }
     req.off('close', abortUpstream);
     res.off('close', abortUpstream);
   }

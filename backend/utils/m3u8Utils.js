@@ -2,6 +2,24 @@ const { buildSourceHeaders, fetchWithIpv4 } = require('./httpFetch');
 
 const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
 
+function appendQueryParams(baseUrl, params = {}) {
+  const entries = Object.entries(params).filter(([, value]) => value !== undefined && value !== null);
+
+  try {
+    const nextUrl = new URL(baseUrl);
+    entries.forEach(([key, value]) => {
+      nextUrl.searchParams.set(key, String(value));
+    });
+    return nextUrl.toString();
+  } catch (_error) {
+    const query = entries
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+      .join('&');
+    if (!query) return baseUrl;
+    return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${query}`;
+  }
+}
+
 /**
  * Process M3U8 stream - returns content with DIRECT URLs (for hybrid approach)
  * Filters ads but keeps original segment URLs (client will fetch directly)
@@ -32,7 +50,7 @@ async function processM3u8StreamDirect(url, proxyBase = null) {
         // Sub-playlists must still go through proxy for ad filtering,
         // only TS segments (in media playlists) will be direct
         if (proxyBase) {
-          return `${proxyBase}?url=${encodeURIComponent(absoluteUrl)}&mode=direct`;
+          return appendQueryParams(proxyBase, { url: absoluteUrl, mode: 'direct' });
         }
         return absoluteUrl;
       }
@@ -107,7 +125,7 @@ async function processM3u8StreamWithProxy(url, proxyBase, tsProxyBase) {
         const absoluteUrl = trimmed.startsWith('http')
           ? trimmed
           : new URL(trimmed, baseUrl).toString();
-        return `${proxyBase}?url=${encodeURIComponent(absoluteUrl)}`;
+        return appendQueryParams(proxyBase, { url: absoluteUrl, mode: 'proxy' });
       }
       return line;
     });
@@ -145,7 +163,7 @@ async function processM3u8StreamWithProxy(url, proxyBase, tsProxyBase) {
         if (segmentUrl.includes('convertv7/')) {
           segmentUrl = segmentUrl.replace('convertv7/', '');
         }
-        line = `${tsProxyBase}?url=${encodeURIComponent(segmentUrl)}`;
+        line = appendQueryParams(tsProxyBase, { url: segmentUrl });
       }
       cleanLines.push(line);
     }
@@ -170,5 +188,6 @@ module.exports = {
   processM3u8Stream,
   processM3u8StreamDirect,
   processM3u8StreamWithProxy,
+  appendQueryParams,
   AD_KEYWORDS
 };
