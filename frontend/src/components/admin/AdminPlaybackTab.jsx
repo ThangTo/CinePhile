@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
+import PaginationV2 from "components/common/PaginationV2";
 import { getVideoSource } from "config/video.config";
 import { playbackAPI } from "services/admin.service";
 
@@ -226,6 +227,7 @@ const AdminPlaybackTab = () => {
   const [episodes, setEpisodes] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 0 });
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState(null);
@@ -234,22 +236,39 @@ const AdminPlaybackTab = () => {
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeJob, setActiveJob] = useState(null);
   const [preview, setPreview] = useState(null);
+  const refreshedJobIdRef = useRef(null);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 450);
+
+    return () => clearTimeout(timeout);
+  }, [search]);
 
   const loadEpisodes = useCallback(
-    async (page = 1) => {
+    async (page = 1, options = {}) => {
+      const effectiveSearch = options.searchOverride ?? debouncedSearch;
       setLoading(true);
       setError("");
       try {
         const result = await playbackAPI.getEpisodes({
           page,
           limit: pagination.limit,
-          search: search.trim() || undefined,
+          search: effectiveSearch || undefined,
           status,
         });
         const nextEpisodes = result.data || [];
         setEpisodes(nextEpisodes);
         setPagination(result.pagination || { page, limit: pagination.limit, total: 0, totalPages: 0 });
         setDrafts((prev) => {
+          if (options.resetDrafts) {
+            return nextEpisodes.reduce((next, episode) => {
+              next[episode.id] = getInitialDraft(episode);
+              return next;
+            }, {});
+          }
+
           const next = { ...prev };
           nextEpisodes.forEach((episode) => {
             if (!next[episode.id]) next[episode.id] = getInitialDraft(episode);
@@ -262,7 +281,7 @@ const AdminPlaybackTab = () => {
         setLoading(false);
       }
     },
-    [pagination.limit, search, status],
+    [pagination.limit, debouncedSearch, status],
   );
 
   useEffect(() => {
@@ -277,8 +296,9 @@ const AdminPlaybackTab = () => {
         const result = await playbackAPI.getDetectionStatus(activeJobId);
         const job = result.job || result;
         setActiveJob(job);
-        if (job.state === "completed" || job.state === "failed") {
-          loadEpisodes(pagination.page);
+        if ((job.state === "completed" || job.state === "failed") && refreshedJobIdRef.current !== (job.id || activeJobId)) {
+          refreshedJobIdRef.current = job.id || activeJobId;
+          loadEpisodes(pagination.page, { resetDrafts: true });
         }
       } catch (err) {
         setError(err.message || "Không kiểm tra được job detect intro");
@@ -324,6 +344,11 @@ const AdminPlaybackTab = () => {
 
   const saveEpisode = async (episode, detectionStatus = "approved") => {
     const draft = drafts[episode.id] || getInitialDraft(episode);
+    if ((detectionStatus === "approved" || detectionStatus === "needs_review") && !getIntroPreviewRange(draft)) {
+      setError("Cần có intro start/end hợp lệ trước khi duyệt metadata");
+      return;
+    }
+
     setSavingId(episode.id);
     setError("");
 
@@ -339,11 +364,15 @@ const AdminPlaybackTab = () => {
       });
 
       const updated = result.episode;
-      setEpisodes((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      setDrafts((prev) => ({
-        ...prev,
-        [updated.id]: getInitialDraft(updated),
-      }));
+      if (draft.applyToSeason || Number(result.updatedCount) > 1) {
+        await loadEpisodes(pagination.page, { resetDrafts: true });
+      } else {
+        setEpisodes((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+        setDrafts((prev) => ({
+          ...prev,
+          [updated.id]: getInitialDraft(updated),
+        }));
+      }
     } catch (err) {
       setError(err.message || "Không lưu được metadata");
     } finally {
@@ -395,6 +424,7 @@ const AdminPlaybackTab = () => {
         sampleSeconds: 300,
         applySeasonDefault: true,
       });
+      refreshedJobIdRef.current = null;
       setActiveJobId(result.jobId);
       setActiveJob({
         id: result.jobId,
@@ -466,7 +496,7 @@ const AdminPlaybackTab = () => {
             </div>
           </div>
           <button
-            onClick={() => loadEpisodes(1)}
+            onClick={() => loadEpisodes(1, { searchOverride: search.trim() })}
             className="flex h-11 items-center justify-center gap-2 rounded-lg bg-white/10 px-5 text-sm font-semibold text-white transition-all hover:bg-white/20 active:scale-95"
           >
             <i className="fa-solid fa-rotate-right"></i> Tải lại
@@ -644,7 +674,10 @@ const AdminPlaybackTab = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex justify-center">
-                          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/5 bg-black/30 px-3 py-1.5 transition-colors hover:bg-black/60">
+                          <label
+                            title="Copy thoi gian nay sang cac tap cung audio"
+                            className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/5 bg-black/30 px-3 py-1.5 transition-colors hover:bg-black/60"
+                          >
                             <div className="relative flex items-center">
                               <input
                                 type="checkbox"
@@ -716,22 +749,14 @@ const AdminPlaybackTab = () => {
           <span className="text-sm font-medium text-gray-400">
             Tổng cộng <span className="text-white font-bold">{pagination.total}</span> tập phim — Trang <span className="text-white font-bold">{pagination.page}</span> / {Math.max(1, pagination.totalPages || 1)}
           </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => loadEpisodes(Math.max(1, pagination.page - 1))}
-              disabled={pagination.page <= 1 || loading}
-              className="flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5"
-            >
-              <i className="fa-solid fa-chevron-left text-xs"></i> Trước
-            </button>
-            <button
-              onClick={() => loadEpisodes(Math.min(pagination.totalPages || 1, pagination.page + 1))}
-              disabled={pagination.page >= (pagination.totalPages || 1) || loading}
-              className="flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5"
-            >
-              Sau <i className="fa-solid fa-chevron-right text-xs"></i>
-            </button>
-          </div>
+          <PaginationV2
+            page={pagination.page}
+            totalPages={Math.max(1, pagination.totalPages || 1)}
+            onPageChange={(nextPage) => {
+              if (!loading) loadEpisodes(nextPage);
+            }}
+            className={loading ? "pointer-events-none opacity-60" : ""}
+          />
         </div>
       </div>
 

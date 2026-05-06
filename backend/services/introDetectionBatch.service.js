@@ -1,6 +1,8 @@
 const crypto = require('crypto');
+const moment = require('moment-timezone');
 const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
+const ViewHistory = require('../models/view_history.model');
 const redisService = require('./redis.service');
 const {
   addIntroDetectionJob,
@@ -12,6 +14,7 @@ const BATCH_LOCK_KEY = 'intro-detection:batch:lock';
 const BATCH_LATEST_KEY = 'intro-detection:batch:latest';
 const DEFAULT_COMPLETED_STATUSES = ['detected', 'needs_review', 'approved', 'no_match'];
 const RETRY_NO_MATCH_COMPLETED_STATUSES = ['detected', 'needs_review', 'approved'];
+const DEFAULT_BATCH_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
 let localLockOwner = null;
 let latestBatchSummary = null;
@@ -92,6 +95,125 @@ function getCompletedStatuses(options = {}) {
   return options.retryNoMatch ? RETRY_NO_MATCH_COMPLETED_STATUSES : DEFAULT_COMPLETED_STATUSES;
 }
 
+function buildValidIntroRangeExpression() {
+  return {
+    $and: [
+      { $eq: ['$playbackMeta.intro.enabled', true] },
+      { $gte: ['$playbackMeta.intro.startSec', 0] },
+      { $gt: ['$playbackMeta.intro.endSec', '$playbackMeta.intro.startSec'] },
+    ],
+  };
+}
+
+function buildCompletedDetectionExpression(completedStatuses = DEFAULT_COMPLETED_STATUSES) {
+  const statusExpression = { $ifNull: ['$playbackMeta.detection.status', 'none'] };
+  const rangeStatuses = completedStatuses.filter((status) => status !== 'no_match');
+  const completedClauses = [
+    {
+      $and: [
+        { $in: [statusExpression, rangeStatuses] },
+        buildValidIntroRangeExpression(),
+      ],
+    },
+  ];
+
+  if (completedStatuses.includes('no_match')) {
+    completedClauses.push({ $eq: [statusExpression, 'no_match'] });
+  }
+
+  return { $or: completedClauses };
+}
+
+function compareObjectIdAsc(first, second) {
+  return String(first.movieId || first._id || '').localeCompare(String(second.movieId || second._id || ''));
+}
+
+function getPreviousLocalDayWindow(timezone = DEFAULT_BATCH_TIMEZONE, now = new Date()) {
+  const localDay = moment(now).tz(timezone).subtract(1, 'day');
+  return {
+    start: localDay.clone().startOf('day').toDate(),
+    end: localDay.clone().endOf('day').toDate(),
+    timezone,
+    localDate: localDay.format('YYYY-MM-DD'),
+  };
+}
+
+function rankIntroDetectionCandidates({
+  eligibleMovies = [],
+  recentViews = [],
+  maxMovies = 30,
+} = {}) {
+  const eligibleById = new Map(
+    eligibleMovies
+      .filter((movie) => movie?.movieId)
+      .map((movie) => [String(movie.movieId), movie]),
+  );
+  const picked = new Set();
+  const ranked = [];
+
+  const addMovie = (movie, prioritySource, extra = {}) => {
+    if (!movie?.movieId) return;
+    const movieId = String(movie.movieId);
+    if (picked.has(movieId) || ranked.length >= maxMovies) return;
+    picked.add(movieId);
+    ranked.push({
+      ...movie,
+      ...extra,
+      prioritySource,
+      priorityRank: ranked.length + 1,
+    });
+  };
+
+  [...recentViews]
+    .filter((item) => eligibleById.has(String(item.movieId)))
+    .sort((first, second) => {
+      const watchDelta = (Number(second.totalWatchTime) || 0) - (Number(first.totalWatchTime) || 0);
+      if (watchDelta !== 0) return watchDelta;
+      const viewDelta = (Number(second.views) || 0) - (Number(first.views) || 0);
+      if (viewDelta !== 0) return viewDelta;
+      return String(first.movieId).localeCompare(String(second.movieId));
+    })
+    .forEach((item) => {
+      const movie = eligibleById.get(String(item.movieId));
+      addMovie(movie, 'recent_views', {
+        priorityViews: Number(item.views) || 0,
+        priorityWatchTime: Number(item.totalWatchTime) || 0,
+      });
+    });
+
+  [...eligibleMovies]
+    .filter((movie) => movie.isFeatured)
+    .sort((first, second) => {
+      const viewDelta = (Number(second.viewCount) || 0) - (Number(first.viewCount) || 0);
+      if (viewDelta !== 0) return viewDelta;
+      const updatedDelta = new Date(second.updatedAt || 0).getTime() - new Date(first.updatedAt || 0).getTime();
+      if (updatedDelta !== 0) return updatedDelta;
+      return compareObjectIdAsc(first, second);
+    })
+    .forEach((movie) => addMovie(movie, 'banner'));
+
+  [...eligibleMovies]
+    .filter((movie) => (Number(movie.viewCount) || 0) > 0)
+    .sort((first, second) => {
+      const viewDelta = (Number(second.viewCount) || 0) - (Number(first.viewCount) || 0);
+      if (viewDelta !== 0) return viewDelta;
+      return compareObjectIdAsc(first, second);
+    })
+    .forEach((movie) => addMovie(movie, 'total_views'));
+
+  [...eligibleMovies]
+    .sort((first, second) => {
+      const pendingDelta = (Number(second.pendingCount) || 0) - (Number(first.pendingCount) || 0);
+      if (pendingDelta !== 0) return pendingDelta;
+      const episodeDelta = (Number(second.episodeCount) || 0) - (Number(first.episodeCount) || 0);
+      if (episodeDelta !== 0) return episodeDelta;
+      return compareObjectIdAsc(first, second);
+    })
+    .forEach((movie) => addMovie(movie, 'backlog'));
+
+  return ranked.slice(0, maxMovies);
+}
+
 function sleep(ms) {
   if (!ms) return Promise.resolve();
   return new Promise((resolve) => {
@@ -158,10 +280,55 @@ async function getLatestIntroDetectionBatch() {
   return (await redisService.get(BATCH_LATEST_KEY)) || latestBatchSummary;
 }
 
+async function getRecentViewPriorities(options = {}) {
+  const timezone = options.timezone || process.env.INTRO_BATCH_TIMEZONE || DEFAULT_BATCH_TIMEZONE;
+  const window = options.viewWindow || getPreviousLocalDayWindow(timezone, options.now || new Date());
+  const limit = Math.max(options.maxMovies * 20, 200);
+
+  const data = await ViewHistory.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: window.start, $lte: window.end },
+        movieId: { $ne: null },
+      },
+    },
+    {
+      $group: {
+        _id: '$movieId',
+        views: { $sum: 1 },
+        totalWatchTime: { $sum: '$watchDuration' },
+      },
+    },
+    {
+      $sort: {
+        totalWatchTime: -1,
+        views: -1,
+        _id: 1,
+      },
+    },
+    {
+      $limit: limit,
+    },
+  ]);
+
+  return data.map((item) => ({
+    movieId: item._id?.toString(),
+    views: item.views,
+    totalWatchTime: item.totalWatchTime,
+  }));
+}
+
 async function findEligibleIntroDetectionMovies(rawOptions = {}) {
   const options = normalizeBatchOptions(rawOptions);
   const completedStatuses = getCompletedStatuses(options);
   const statusExpression = { $ifNull: ['$playbackMeta.detection.status', 'none'] };
+  const completedDetectionExpression = buildCompletedDetectionExpression(completedStatuses);
+  const detectedWithIntroExpression = {
+    $and: [
+      { $in: [statusExpression, ['detected', 'needs_review', 'approved']] },
+      buildValidIntroRangeExpression(),
+    ],
+  };
 
   const groupedEpisodes = await Episode.aggregate([
     {
@@ -175,17 +342,26 @@ async function findEligibleIntroDetectionMovies(rawOptions = {}) {
         episodeCount: { $sum: 1 },
         pendingCount: {
           $sum: {
-            $cond: [{ $in: [statusExpression, completedStatuses] }, 0, 1],
+            $cond: [completedDetectionExpression, 0, 1],
           },
         },
         approvedCount: {
           $sum: {
-            $cond: [{ $eq: [statusExpression, 'approved'] }, 1, 0],
+            $cond: [
+              {
+                $and: [
+                  { $eq: [statusExpression, 'approved'] },
+                  buildValidIntroRangeExpression(),
+                ],
+              },
+              1,
+              0,
+            ],
           },
         },
         detectedCount: {
           $sum: {
-            $cond: [{ $in: [statusExpression, ['detected', 'needs_review', 'approved']] }, 1, 0],
+            $cond: [detectedWithIntroExpression, 1, 0],
           },
         },
       },
@@ -195,16 +371,6 @@ async function findEligibleIntroDetectionMovies(rawOptions = {}) {
         episodeCount: { $gte: 2, $lte: options.maxEpisodesPerMovie },
         pendingCount: { $gt: 0 },
       },
-    },
-    {
-      $sort: {
-        pendingCount: -1,
-        episodeCount: -1,
-        _id: 1,
-      },
-    },
-    {
-      $limit: Math.max(options.maxMovies * 2, options.maxMovies),
     },
   ]);
 
@@ -217,11 +383,11 @@ async function findEligibleIntroDetectionMovies(rawOptions = {}) {
   }
 
   const movies = await Movie.find(movieQuery)
-    .select('_id name original_name slug isHidden')
+    .select('_id name original_name slug isHidden isFeatured viewCount updatedAt')
     .lean();
   const movieById = new Map(movies.map((movie) => [movie._id.toString(), movie]));
 
-  return groupedEpisodes
+  const eligibleMovies = groupedEpisodes
     .map((item) => {
       const movie = movieById.get(item._id?.toString());
       if (!movie) return null;
@@ -230,14 +396,23 @@ async function findEligibleIntroDetectionMovies(rawOptions = {}) {
         movieId: movie._id.toString(),
         movieName: movie.name,
         slug: movie.slug,
+        isFeatured: movie.isFeatured === true,
+        viewCount: Number(movie.viewCount) || 0,
+        updatedAt: movie.updatedAt || null,
         episodeCount: item.episodeCount,
         pendingCount: item.pendingCount,
         approvedCount: item.approvedCount,
         detectedCount: item.detectedCount,
       };
     })
-    .filter(Boolean)
-    .slice(0, options.maxMovies);
+    .filter(Boolean);
+
+  const recentViews = await getRecentViewPriorities(options);
+  return rankIntroDetectionCandidates({
+    eligibleMovies,
+    recentViews,
+    maxMovies: options.maxMovies,
+  });
 }
 
 async function waitForIntroDetectionJob(jobId, options = {}) {
@@ -354,7 +529,7 @@ async function runIntroDetectionBatch(rawOptions = {}) {
 
       try {
         console.log(
-          `[IntroBatch] Detecting ${movie.movieName} (${movie.movieId}) pending=${movie.pendingCount}/${movie.episodeCount}`,
+          `[IntroBatch] Detecting ${movie.movieName} (${movie.movieId}) priority=${movie.prioritySource || 'unknown'} pending=${movie.pendingCount}/${movie.episodeCount}`,
         );
 
         const job = await addIntroDetectionJob(movie.movieId, {
@@ -409,10 +584,13 @@ async function runIntroDetectionBatch(rawOptions = {}) {
 }
 
 module.exports = {
+  buildCompletedDetectionExpression,
   findEligibleIntroDetectionMovies,
   getCompletedStatuses,
   getLatestIntroDetectionBatch,
+  getPreviousLocalDayWindow,
   getQueueSkipReason,
+  rankIntroDetectionCandidates,
   normalizeBatchOptions,
   runIntroDetectionBatch,
   summarizeMovieDetectionResult,

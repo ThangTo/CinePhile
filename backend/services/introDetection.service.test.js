@@ -68,13 +68,29 @@ test('detectCommonIntroFromFeatures aggregates pair matches across a season samp
   assert.ok(detections.every((item) => item.confidence >= 0.8));
 });
 
-test('buildAutoWritableEpisodeFilter preserves approved or manual playback metadata', () => {
+test('buildAutoWritableEpisodeFilter preserves approved or manual metadata only when intro is valid', () => {
   assert.deepEqual(
     buildAutoWritableEpisodeFilter({ movieId: 'movie-1' }),
     {
       movieId: 'movie-1',
-      'playbackMeta.detection.status': { $ne: 'approved' },
-      'playbackMeta.detection.source': { $ne: 'manual' },
+      $nor: [
+        {
+          'playbackMeta.detection.status': 'approved',
+          'playbackMeta.intro.enabled': true,
+          'playbackMeta.intro.startSec': { $gte: 0 },
+          $expr: {
+            $gt: ['$playbackMeta.intro.endSec', '$playbackMeta.intro.startSec'],
+          },
+        },
+        {
+          'playbackMeta.detection.source': 'manual',
+          'playbackMeta.intro.enabled': true,
+          'playbackMeta.intro.startSec': { $gte: 0 },
+          $expr: {
+            $gt: ['$playbackMeta.intro.endSec', '$playbackMeta.intro.startSec'],
+          },
+        },
+      ],
     },
   );
 });

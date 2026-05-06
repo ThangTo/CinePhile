@@ -1,7 +1,15 @@
 import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
+import AdminPlaybackTab, {
   buildAdminPreviewSource,
   getIntroPreviewRange,
 } from "../AdminPlaybackTab";
+import { playbackAPI } from "services/admin.service";
 
 jest.mock("hls.js", () => ({
   __esModule: true,
@@ -32,6 +40,10 @@ jest.mock("services/admin.service", () => ({
 }));
 
 describe("AdminPlaybackTab preview helpers", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("builds preview source through backend proxy using direct segment mode", () => {
     const source = buildAdminPreviewSource(
       "https://media.example.test/video/master.m3u8",
@@ -51,5 +63,109 @@ describe("AdminPlaybackTab preview helpers", () => {
     });
     expect(getIntroPreviewRange({ introStartSec: "40", introEndSec: "1" })).toBeNull();
     expect(getIntroPreviewRange({ introStartSec: "", introEndSec: "40" })).toBeNull();
+  });
+
+  it("debounces admin playback search requests", async () => {
+    jest.useFakeTimers();
+    try {
+      playbackAPI.getEpisodes.mockResolvedValue({
+        data: [],
+        pagination: { page: 1, limit: 25, total: 0, totalPages: 0 },
+      });
+
+      await act(async () => {
+        render(<AdminPlaybackTab />);
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(playbackAPI.getEpisodes).toHaveBeenCalledTimes(1));
+
+      fireEvent.change(screen.getByPlaceholderText(/Tìm tên phim/i), {
+        target: { value: "d" },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/Tìm tên phim/i), {
+        target: { value: "dai chien" },
+      });
+
+      expect(playbackAPI.getEpisodes).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        jest.advanceTimersByTime(450);
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(playbackAPI.getEpisodes).toHaveBeenCalledTimes(2));
+      expect(playbackAPI.getEpisodes).toHaveBeenLastCalledWith({
+        page: 1,
+        limit: 25,
+        search: "dai chien",
+        status: "all",
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("refreshes blank intro drafts from server metadata after a completed detect job", async () => {
+    const emptyEpisode = {
+      id: "episode-1",
+      episode: 1,
+      link_m3u8: "https://media.example.test/video/master.m3u8",
+      movie: { id: "movie-1", name: "Đại Chiến Người Khổng Lồ" },
+      playbackMeta: {
+        introStartSec: null,
+        introEndSec: null,
+        outroStartSec: null,
+        detectionStatus: "none",
+        detectionSource: "none",
+        confidence: 0,
+      },
+    };
+    const detectedEpisode = {
+      ...emptyEpisode,
+      playbackMeta: {
+        ...emptyEpisode.playbackMeta,
+        introStartSec: 42,
+        introEndSec: 101,
+        detectionStatus: "detected",
+        detectionSource: "auto",
+        confidence: 0.93,
+        detectionNote: "Matched 4 episode pairs",
+      },
+    };
+
+    playbackAPI.getEpisodes
+      .mockResolvedValueOnce({
+        data: [emptyEpisode],
+        pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+      })
+      .mockResolvedValueOnce({
+        data: [detectedEpisode],
+        pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+      });
+    playbackAPI.detectIntro.mockResolvedValue({
+      jobId: "job-1",
+      state: "waiting",
+      backend: "memory",
+    });
+    playbackAPI.getDetectionStatus.mockResolvedValue({
+      job: {
+        id: "job-1",
+        state: "completed",
+        progress: 100,
+        result: { detectedEpisodes: 1, inferredEpisodes: 0 },
+      },
+    });
+
+    await act(async () => {
+      render(<AdminPlaybackTab />);
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(playbackAPI.getEpisodes).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByTitle(/Intro/i));
+
+    await waitFor(() => expect(playbackAPI.getEpisodes).toHaveBeenCalledTimes(2));
+    expect(screen.getByDisplayValue("42")).toBeTruthy();
+    expect(screen.getByDisplayValue("101")).toBeTruthy();
   });
 });

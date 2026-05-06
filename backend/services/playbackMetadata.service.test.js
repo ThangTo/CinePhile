@@ -2,7 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  normalizeSearchText,
   normalizePlaybackMetaInput,
+  scorePlaybackMovieSearchCandidate,
   serializePlaybackMeta,
 } = require('./playbackMetadata.service');
 
@@ -33,6 +35,17 @@ test('normalizePlaybackMetaInput rejects inverted ranges', () => {
   );
 });
 
+test('normalizePlaybackMetaInput rejects approved metadata without an intro range', () => {
+  assert.throws(
+    () => normalizePlaybackMetaInput({
+      detectionStatus: 'approved',
+      source: 'manual',
+      confidence: 1,
+    }),
+    /intro start\/end are required/i,
+  );
+});
+
 test('serializePlaybackMeta returns compact public metadata', () => {
   const serialized = serializePlaybackMeta({
     intro: { startSec: 42, endSec: 104, enabled: true },
@@ -59,6 +72,21 @@ test('serializePlaybackMeta returns compact public metadata', () => {
   });
 });
 
+test('serializePlaybackMeta does not expose approved status when intro range is missing', () => {
+  const serialized = serializePlaybackMeta({
+    intro: { startSec: null, endSec: null, enabled: false },
+    detection: {
+      status: 'approved',
+      source: 'manual',
+      confidence: 1,
+    },
+  });
+
+  assert.equal(serialized.introStartSec, null);
+  assert.equal(serialized.introEndSec, null);
+  assert.equal(serialized.detectionStatus, 'needs_review');
+});
+
 test('normalizePlaybackMetaInput accepts no-match detection status', () => {
   const result = normalizePlaybackMetaInput({
     detectionStatus: 'no_match',
@@ -70,4 +98,29 @@ test('normalizePlaybackMetaInput accepts no-match detection status', () => {
   assert.equal(result.playbackMeta.detection.status, 'no_match');
   assert.equal(result.playbackMeta.detection.source, 'auto');
   assert.equal(result.playbackMeta.detection.note, 'No common intro detected from 5 sampled episodes');
+});
+
+test('movie playback search scoring is accent-insensitive and token flexible', () => {
+  assert.equal(normalizeSearchText('Đại chiến người khổng lồ 2'), 'dai chien nguoi khong lo 2');
+
+  const titan = scorePlaybackMovieSearchCandidate(
+    {
+      name: 'Đại Chiến Người Khổng Lồ 2',
+      original_name: 'Attack on Titan Season 2',
+      slug: 'dai-chien-nguoi-khong-lo-2',
+    },
+    'dai chien nguoi khong lo 2',
+  );
+  const demon = scorePlaybackMovieSearchCandidate(
+    {
+      name: 'My Demon',
+      original_name: 'My Demon',
+      slug: 'my-demon',
+    },
+    'dai chien nguoi khong lo 2',
+  );
+
+  assert.equal(titan.matched, true);
+  assert.equal(demon.matched, false);
+  assert.ok(titan.score > demon.score);
 });

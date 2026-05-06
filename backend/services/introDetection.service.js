@@ -23,10 +23,26 @@ const FFMPEG_TIMEOUT_MS = Math.max(
 );
 
 function buildAutoWritableEpisodeFilter(baseFilter = {}) {
+  const validIntroFilter = {
+    'playbackMeta.intro.enabled': true,
+    'playbackMeta.intro.startSec': { $gte: 0 },
+    $expr: {
+      $gt: ['$playbackMeta.intro.endSec', '$playbackMeta.intro.startSec'],
+    },
+  };
+
   return {
     ...baseFilter,
-    'playbackMeta.detection.status': { $ne: 'approved' },
-    'playbackMeta.detection.source': { $ne: 'manual' },
+    $nor: [
+      {
+        'playbackMeta.detection.status': 'approved',
+        ...validIntroFilter,
+      },
+      {
+        'playbackMeta.detection.source': 'manual',
+        ...validIntroFilter,
+      },
+    ],
   };
 }
 

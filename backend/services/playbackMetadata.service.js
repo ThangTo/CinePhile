@@ -13,6 +13,7 @@ const VALID_DETECTION_STATUSES = new Set([
   'no_match',
 ]);
 const VALID_SOURCES = new Set(['none', 'manual', 'auto']);
+const DETECTION_STATUSES_REQUIRING_INTRO = new Set(['detected', 'needs_review', 'approved']);
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -91,6 +92,14 @@ function normalizeDetection(input = {}, defaults = {}) {
   };
 }
 
+function hasValidIntroRange(meta = {}) {
+  const intro = meta.intro || meta;
+  const startSec = Number(intro.startSec ?? meta.introStartSec);
+  const endSec = Number(intro.endSec ?? meta.introEndSec);
+
+  return intro.enabled === true && Number.isFinite(startSec) && Number.isFinite(endSec) && startSec >= 0 && endSec > startSec;
+}
+
 function normalizePlaybackMetaInput(input = {}) {
   const intro = normalizeRange(input, 'intro');
   const outro = normalizeRange(input, 'outro', { requireEnd: false });
@@ -98,6 +107,10 @@ function normalizePlaybackMetaInput(input = {}) {
     status: input.source === 'manual' || input.detectionSource === 'manual' ? 'approved' : 'detected',
     source: input.source || input.detectionSource || 'manual',
   });
+
+  if (DETECTION_STATUSES_REQUIRING_INTRO.has(detection.status) && !hasValidIntroRange({ intro })) {
+    throw new Error('Intro start/end are required before marking detection as approved or detected');
+  }
 
   return {
     playbackMeta: {
@@ -109,16 +122,122 @@ function normalizePlaybackMetaInput(input = {}) {
   };
 }
 
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function tokenizeSearch(value) {
+  return normalizeSearchText(value)
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+}
+
+function levenshteinDistance(first, second) {
+  if (first === second) return 0;
+  if (!first) return second.length;
+  if (!second) return first.length;
+
+  const previous = Array.from({ length: second.length + 1 }, (_, index) => index);
+  const current = new Array(second.length + 1);
+
+  for (let firstIndex = 1; firstIndex <= first.length; firstIndex += 1) {
+    current[0] = firstIndex;
+    for (let secondIndex = 1; secondIndex <= second.length; secondIndex += 1) {
+      const substitutionCost = first[firstIndex - 1] === second[secondIndex - 1] ? 0 : 1;
+      current[secondIndex] = Math.min(
+        previous[secondIndex] + 1,
+        current[secondIndex - 1] + 1,
+        previous[secondIndex - 1] + substitutionCost,
+      );
+    }
+
+    for (let index = 0; index <= second.length; index += 1) {
+      previous[index] = current[index];
+    }
+  }
+
+  return previous[second.length];
+}
+
+function scoreToken(token, words) {
+  if (words.includes(token)) return 1;
+
+  for (const word of words) {
+    if (word.startsWith(token) || token.startsWith(word)) return 0.75;
+    if (token.length >= 4 && word.length >= 4 && levenshteinDistance(token, word) <= 1) return 0.6;
+  }
+
+  return 0;
+}
+
+function scorePlaybackMovieSearchCandidate(movie = {}, search = '') {
+  const query = normalizeSearchText(search);
+  const tokens = tokenizeSearch(search);
+  if (!query || tokens.length === 0) {
+    return { matched: false, score: 0, matchedTokens: 0 };
+  }
+
+  const normalizedFields = [
+    normalizeSearchText(movie.name),
+    normalizeSearchText(movie.original_name),
+    normalizeSearchText(movie.slug),
+  ].filter(Boolean);
+  const haystack = normalizedFields.join(' ');
+  const compactHaystack = haystack.replace(/\s+/g, '');
+  const compactQuery = query.replace(/\s+/g, '');
+  const words = haystack.split(/\s+/).filter(Boolean);
+
+  let score = 0;
+  let matchedTokens = 0;
+
+  if (haystack.includes(query)) score += 100;
+  if (compactQuery.length >= 3 && compactHaystack.includes(compactQuery)) score += 80;
+
+  for (const token of tokens) {
+    const tokenScore = scoreToken(token, words);
+    if (tokenScore > 0) {
+      matchedTokens += tokenScore >= 0.75 ? 1 : 0.5;
+      score += Math.round(tokenScore * 12);
+    }
+  }
+
+  const coverage = matchedTokens / tokens.length;
+  const matched = score >= 80 || coverage >= 0.6;
+
+  return {
+    matched,
+    score: matched ? score + Math.round(coverage * 20) : score,
+    matchedTokens,
+  };
+}
+
 function serializePlaybackMeta(meta = {}) {
   const intro = meta.intro || {};
   const outro = meta.outro || {};
   const detection = meta.detection || {};
+  const rawDetectionStatus = detection.status || 'none';
+  const detectionStatus =
+    DETECTION_STATUSES_REQUIRING_INTRO.has(rawDetectionStatus) && !hasValidIntroRange({ intro })
+      ? 'needs_review'
+      : rawDetectionStatus;
 
   return {
     introStartSec: intro.enabled ? intro.startSec ?? null : null,
     introEndSec: intro.enabled ? intro.endSec ?? null : null,
     outroStartSec: outro.enabled ? outro.startSec ?? null : null,
-    detectionStatus: detection.status || 'none',
+    detectionStatus,
     detectionSource: detection.source || 'none',
     confidence: Number.isFinite(detection.confidence) ? detection.confidence : 0,
     detectionNote: detection.note || '',
@@ -155,15 +274,43 @@ async function resolveMovieIdsFromSearch(search) {
   const keyword = String(search || '').trim();
   if (!keyword) return null;
 
-  const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const tokens = tokenizeSearch(keyword).slice(0, 8);
+  const regex = new RegExp(escapeRegex(keyword), 'i');
+  const orderedTokenRegex = tokens.length > 0
+    ? new RegExp(tokens.map(escapeRegex).join('.*'), 'i')
+    : regex;
+  const tokenClauses = tokens.map((token) => {
+    const tokenRegex = new RegExp(escapeRegex(token), 'i');
+    return {
+      $or: [{ name: tokenRegex }, { original_name: tokenRegex }, { slug: tokenRegex }],
+    };
+  });
   const movies = await Movie.find({
-    $or: [{ name: regex }, { original_name: regex }, { slug: regex }],
+    $or: [
+      { name: regex },
+      { original_name: regex },
+      { slug: regex },
+      { slug: orderedTokenRegex },
+      ...tokenClauses,
+    ],
   })
-    .select('_id')
-    .limit(100)
+    .select('_id name original_name slug viewCount')
+    .sort({ viewCount: -1, updatedAt: -1 })
+    .limit(500)
     .lean();
 
-  return movies.map((movie) => movie._id);
+  return movies
+    .map((movie) => ({
+      movie,
+      ...scorePlaybackMovieSearchCandidate(movie, keyword),
+    }))
+    .filter((item) => item.matched)
+    .sort((first, second) => {
+      if (second.score !== first.score) return second.score - first.score;
+      return (Number(second.movie.viewCount) || 0) - (Number(first.movie.viewCount) || 0);
+    })
+    .slice(0, 100)
+    .map((item) => item.movie._id);
 }
 
 async function listPlaybackEpisodes(filters = {}) {
@@ -299,9 +446,12 @@ async function markEpisodesDetectionStatus(episodeIds, status, extra = {}) {
 }
 
 module.exports = {
+  hasValidIntroRange,
   listPlaybackEpisodes,
   markEpisodesDetectionStatus,
+  normalizeSearchText,
   normalizePlaybackMetaInput,
+  scorePlaybackMovieSearchCandidate,
   serializePlaybackMeta,
   updateEpisodePlaybackMeta,
 };

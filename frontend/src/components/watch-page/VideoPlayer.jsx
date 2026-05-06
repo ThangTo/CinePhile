@@ -2520,14 +2520,14 @@ const VideoPlayer = ({
       )}
 
       {showSkipIntro && (
-        <div className="pointer-events-auto absolute left-4 bottom-24 z-40 animate-fade-in-up sm:left-8 sm:bottom-28">
+        <div className={`pointer-events-auto absolute left-4 z-40 animate-fade-in-up md:left-8 transition-all duration-300 ${showControls ? "bottom-[4.5rem] md:bottom-28" : "bottom-6 md:bottom-8"}`}>
           <button
             type="button"
             onClick={handleSkipIntro}
-            className="group relative flex items-center justify-center gap-3 overflow-hidden rounded bg-black/60 px-5 py-2.5 text-white border border-white/30 backdrop-blur-md transition-all duration-300 hover:bg-white hover:text-black hover:border-white shadow-lg active:scale-95"
+            className="group relative flex items-center justify-center gap-2 overflow-hidden rounded bg-black/60 px-3 py-1.5 md:gap-3 md:px-5 md:py-2.5 text-white border border-white/30 backdrop-blur-md transition-all duration-300 hover:bg-white hover:text-black hover:border-white shadow-lg active:scale-95"
           >
-            <i className="fa-solid fa-forward-step text-lg opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
-            <span className="text-base font-medium whitespace-nowrap">Bỏ qua giới thiệu</span>
+            <i className="fa-solid fa-forward-step text-base md:text-lg opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+            <span className="text-sm md:text-base font-medium whitespace-nowrap">Bỏ qua giới thiệu</span>
             <span className="absolute inset-x-0 bottom-0 h-[3px] bg-white/20">
               <span
                 className="block h-full bg-white transition-[width] duration-300 ease-linear group-hover:bg-black"
@@ -2539,19 +2539,19 @@ const VideoPlayer = ({
       )}
 
       {showNextEpisodePrompt && (
-        <div className="pointer-events-auto absolute right-4 bottom-24 z-40 animate-fade-in-up sm:right-8 sm:bottom-28">
-          <div className="flex flex-col items-end gap-2">
+        <div className={`pointer-events-auto absolute right-4 z-40 animate-fade-in-up md:right-8 transition-all duration-300 ${showControls ? "bottom-[4.5rem] md:bottom-28" : "bottom-6 md:bottom-8"}`}>
+          <div className="flex flex-col items-end gap-1.5 md:gap-2">
             <button
               type="button"
               onClick={handleNextEpisode}
-              className="group relative flex items-center justify-center gap-3 overflow-hidden rounded bg-black/60 px-5 py-2.5 text-white border border-white/30 backdrop-blur-md transition-all duration-300 hover:bg-white hover:text-black hover:border-white shadow-lg active:scale-95"
+              className="group relative flex items-center justify-center gap-2 overflow-hidden rounded bg-black/60 px-3 py-1.5 md:gap-3 md:px-5 md:py-2.5 text-white border border-white/30 backdrop-blur-md transition-all duration-300 hover:bg-white hover:text-black hover:border-white shadow-lg active:scale-95"
             >
-              <span className="text-base font-medium whitespace-nowrap">
+              <span className="text-sm md:text-base font-medium whitespace-nowrap">
                 {nextEpisodeCountdown !== null
                   ? `Tập tiếp theo (${nextEpisodeCountdown}s)`
                   : "Chuyển tập tiếp theo"}
               </span>
-              <i className="fa-solid fa-forward-step text-lg opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+              <i className="fa-solid fa-forward-step text-base md:text-lg opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
               {nextEpisodeCountdown !== null && (
                 <span className="absolute inset-x-0 bottom-0 h-[3px] bg-white/20">
                   <span
@@ -2564,7 +2564,7 @@ const VideoPlayer = ({
             {nextEpisodeCountdown !== null && (
               <button
                 onClick={() => setNextEpisodeCountdown(null)}
-                className="text-xs font-medium text-white/60 hover:text-white drop-shadow-md transition-colors px-2 py-1 bg-black/40 rounded border border-transparent hover:border-white/20 backdrop-blur-sm"
+                className="text-[10px] md:text-xs font-medium text-white/60 hover:text-white drop-shadow-md transition-colors px-1.5 py-0.5 md:px-2 md:py-1 bg-black/40 rounded border border-transparent hover:border-white/20 backdrop-blur-sm"
               >
                 Hủy tự động chuyển
               </button>
