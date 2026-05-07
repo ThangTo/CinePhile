@@ -3,9 +3,12 @@ const assert = require('node:assert/strict');
 
 const {
   buildAutoWritableEpisodeFilter,
+  buildCopiedPlaybackMetaUpdate,
   detectCommonIntroFromFeatures,
   findBestPairMatch,
+  normalizeDetectionOptions,
   parseEpisodeNumberList,
+  selectPrimaryAudioGroup,
   selectIntroDetectionEpisodes,
 } = require('./introDetection.service');
 
@@ -97,6 +100,36 @@ test('buildAutoWritableEpisodeFilter preserves approved or manual metadata only 
   );
 });
 
+test('findBestPairMatch allows later starts when sampling a longer intro window', () => {
+  const introFeature = { rms: 0.7, vector: [0, 0, 1] };
+  const first = [
+    ...Array.from({ length: 520 }, () => ({ rms: 0.4, vector: [1, 0, 0] })),
+    ...Array.from({ length: 45 }, () => introFeature),
+    ...Array.from({ length: 20 }, () => ({ rms: 0.5, vector: [1, 1, 0] })),
+  ];
+  const second = [
+    ...Array.from({ length: 500 }, () => ({ rms: 0.4, vector: [0, 1, 0] })),
+    ...Array.from({ length: 45 }, () => introFeature),
+    ...Array.from({ length: 20 }, () => ({ rms: 0.5, vector: [0, 1, 1] })),
+  ];
+
+  const match = findBestPairMatch(first, second, {
+    sampleSeconds: 600,
+    minDurationSec: 40,
+    maxDurationSec: 80,
+    similarityThreshold: 0.9999,
+  });
+
+  assert.ok(match);
+  assert.equal(match.first.startSec, 520);
+  assert.equal(match.second.startSec, 500);
+});
+
+test('normalizeDetectionOptions expands maxStartSec from sampleSeconds', () => {
+  assert.equal(normalizeDetectionOptions({ sampleSeconds: 600 }).maxStartSec, 540);
+  assert.equal(normalizeDetectionOptions({ sampleSeconds: 300 }).maxStartSec, 300);
+});
+
 test('parseEpisodeNumberList accepts comma lists and ranges', () => {
   assert.deepEqual(parseEpisodeNumberList('6, 7-9, 9, tap 12'), [6, 7, 8, 9, 12]);
   assert.deepEqual(parseEpisodeNumberList([3, '4', 'bad', 3]), [3, 4]);
@@ -127,4 +160,62 @@ test('selectIntroDetectionEpisodes supports sample, remaining, all, and specific
     selectIntroDetectionEpisodes(episodes, { episodeSelectionMode: 'specific', episodeNumbers: '4,2' }).map((episode) => episode.episodeId),
     [2, 4],
   );
+});
+
+test('selectPrimaryAudioGroup prefers vietsub before thuyet minh and long tieng', () => {
+  const episodes = [
+    { _id: 'lt-1', episodeId: 1, audioType: 'long-tieng' },
+    { _id: 'lt-2', episodeId: 2, audioType: 'long-tieng' },
+    { _id: 'tm-1', episodeId: 1, audioType: 'thuyet-minh' },
+    { _id: 'tm-2', episodeId: 2, audioType: 'thuyet-minh' },
+    { _id: 'vs-1', episodeId: 1, audioType: 'vietsub' },
+    { _id: 'vs-2', episodeId: 2, audioType: 'vietsub' },
+  ];
+
+  const group = selectPrimaryAudioGroup(episodes, { episodeSelectionMode: 'all' });
+
+  assert.equal(group.audioKey, 'vietsub');
+  assert.deepEqual(group.selectedEpisodes.map((episode) => episode._id), ['vs-1', 'vs-2']);
+});
+
+test('selectPrimaryAudioGroup falls back when higher priority audio lacks enough selected episodes', () => {
+  const episodes = [
+    { _id: 'vs-1', episodeId: 1, audioType: 'vietsub' },
+    { _id: 'tm-1', episodeId: 1, audioType: 'thuyet-minh' },
+    { _id: 'tm-2', episodeId: 2, audioType: 'thuyet-minh' },
+  ];
+
+  const group = selectPrimaryAudioGroup(episodes, { episodeSelectionMode: 'specific', episodeNumbers: '1-2' });
+
+  assert.equal(group.audioKey, 'thuyet-minh');
+  assert.deepEqual(group.selectedEpisodes.map((episode) => episode._id), ['tm-1', 'tm-2']);
+});
+
+test('buildCopiedPlaybackMetaUpdate copies primary audio as reviewable auto metadata', () => {
+  const update = buildCopiedPlaybackMetaUpdate(
+    {
+      _id: 'source-episode',
+      audioType: 'vietsub',
+      playbackMeta: {
+        intro: { enabled: true, startSec: 35, endSec: 120 },
+        detection: {
+          status: 'approved',
+          confidence: 1,
+          sourceHash: 'hash-1',
+        },
+      },
+    },
+    {
+      movieId: 'movie-1',
+      primaryAudioType: 'vietsub',
+      jobId: 'job-1',
+      now: new Date('2026-05-07T00:00:00.000Z'),
+    },
+  ).update;
+
+  assert.equal(update['playbackMeta.intro.startSec'], 35);
+  assert.equal(update['playbackMeta.intro.endSec'], 120);
+  assert.equal(update['playbackMeta.detection.status'], 'needs_review');
+  assert.equal(update['playbackMeta.detection.confidence'], 0.82);
+  assert.equal(update['playbackMeta.detection.note'], 'Copied from primary audio: vietsub');
 });

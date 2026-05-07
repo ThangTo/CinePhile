@@ -20,6 +20,7 @@ const DEFAULT_OPTIONS = {
   applySeasonDefault: true,
 };
 const VALID_EPISODE_SELECTION_MODES = new Set(['sample', 'remaining', 'all', 'specific']);
+const AUDIO_PRIORITY_LABELS = ['vietsub', 'thuyet-minh', 'long-tieng'];
 const FFMPEG_TIMEOUT_MS = Math.max(
   30000,
   Number.parseInt(process.env.INTRO_DETECTION_FFMPEG_TIMEOUT_MS, 10) || 300000,
@@ -61,6 +62,52 @@ function parsePositiveInt(value, fallback, min = 1, max = Number.MAX_SAFE_INTEGE
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return fallback;
   return clamp(parsed, min, max);
+}
+
+function normalizeDetectionOptions(rawOptions = {}) {
+  const sampleSeconds = parsePositiveInt(
+    rawOptions.sampleSeconds ?? DEFAULT_OPTIONS.sampleSeconds,
+    DEFAULT_OPTIONS.sampleSeconds,
+    180,
+    900,
+  );
+  const dynamicMaxStartSec = Math.max(DEFAULT_OPTIONS.maxStartSec, sampleSeconds - 60);
+
+  return {
+    ...DEFAULT_OPTIONS,
+    ...rawOptions,
+    sampleSeconds,
+    maxStartSec: parsePositiveInt(
+      rawOptions.maxStartSec,
+      dynamicMaxStartSec,
+      60,
+      Math.max(dynamicMaxStartSec, DEFAULT_OPTIONS.maxStartSec),
+    ),
+  };
+}
+
+function normalizeAudioType(value) {
+  return String(value || '')
+    .replace(/[đĐ]/g, 'd')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function getAudioPriority(audioType) {
+  const normalized = normalizeAudioType(audioType);
+  if (!normalized) return 100;
+  if (normalized.includes('vietsub') || normalized.includes('phu-de') || normalized === 'sub') return 0;
+  if (normalized.includes('thuyet-minh') || normalized === 'thuyetminh' || normalized === 'tm') return 1;
+  if (normalized.includes('long-tieng') || normalized === 'longtieng' || normalized === 'lt') return 2;
+  return 10;
+}
+
+function getAudioPriorityLabel(audioType) {
+  const priority = getAudioPriority(audioType);
+  return AUDIO_PRIORITY_LABELS[priority] || normalizeAudioType(audioType) || 'unknown';
 }
 
 function parseEpisodeNumberList(value) {
@@ -156,6 +203,43 @@ function selectIntroDetectionEpisodes(episodes = [], rawOptions = {}) {
   return ordered.slice(0, selection.sampleSize);
 }
 
+function selectPrimaryAudioGroup(episodes = [], rawOptions = {}) {
+  const groupsByKey = new Map();
+
+  for (const episode of episodes) {
+    const audioKey = normalizeAudioType(episode.audioType || episode.serverName || 'unknown') || 'unknown';
+    if (!groupsByKey.has(audioKey)) {
+      groupsByKey.set(audioKey, {
+        audioKey,
+        audioType: episode.audioType || audioKey,
+        audioPriority: getAudioPriority(audioKey),
+        episodes: [],
+      });
+    }
+    groupsByKey.get(audioKey).episodes.push(episode);
+  }
+
+  const groups = [...groupsByKey.values()]
+    .map((group) => ({
+      ...group,
+      selectedEpisodes: selectIntroDetectionEpisodes(group.episodes, rawOptions),
+    }))
+    .sort((first, second) => {
+      const priorityDelta = first.audioPriority - second.audioPriority;
+      if (priorityDelta !== 0) return priorityDelta;
+      const selectedDelta = second.selectedEpisodes.length - first.selectedEpisodes.length;
+      if (selectedDelta !== 0) return selectedDelta;
+      const episodeDelta = second.episodes.length - first.episodes.length;
+      if (episodeDelta !== 0) return episodeDelta;
+      return first.audioKey.localeCompare(second.audioKey);
+    });
+
+  return groups.find((group) => group.selectedEpisodes.length >= 2)
+    || groups.find((group) => group.episodes.length >= 2)
+    || groups[0]
+    || null;
+}
+
 function cosineSimilarity(first = [], second = []) {
   const length = Math.min(first.length, second.length);
   if (!length) return 0;
@@ -195,7 +279,7 @@ function scoreCandidate(candidate, options) {
 }
 
 function findBestPairMatch(firstFeatures = [], secondFeatures = [], rawOptions = {}) {
-  const options = { ...DEFAULT_OPTIONS, ...rawOptions };
+  const options = normalizeDetectionOptions(rawOptions);
   const firstLength = firstFeatures.length;
   const secondLength = secondFeatures.length;
   if (!firstLength || !secondLength) return null;
@@ -325,7 +409,7 @@ function summarizeCandidateGroup(group, maxPossibleVotes) {
 }
 
 function detectCommonIntroFromFeatures(samples = [], rawOptions = {}) {
-  const options = { ...DEFAULT_OPTIONS, ...rawOptions };
+  const options = normalizeDetectionOptions(rawOptions);
   const usableSamples = samples.filter((sample) => Array.isArray(sample.features) && sample.features.length > 0);
   if (usableSamples.length < 2) return [];
 
@@ -473,6 +557,91 @@ async function extractAudioFeatures(sourceUrl, options = {}) {
   return bufferToAudioFeatures(pcm, options);
 }
 
+function hasCopyablePlaybackMeta(episode = {}) {
+  const detectionStatus = episode.playbackMeta?.detection?.status || 'none';
+  return hasValidEpisodeIntro(episode) || detectionStatus === 'no_match';
+}
+
+function buildCopiedPlaybackMetaUpdate(sourceEpisode = {}, context = {}) {
+  const intro = sourceEpisode.playbackMeta?.intro || {};
+  const detection = sourceEpisode.playbackMeta?.detection || {};
+  const hasIntro = hasValidEpisodeIntro(sourceEpisode);
+  const isNoMatch = detection.status === 'no_match' && !hasIntro;
+  const primaryAudioLabel = context.primaryAudioType || getAudioPriorityLabel(sourceEpisode.audioType);
+  const sourceStatus = detection.status || 'none';
+  const copiedStatus = isNoMatch
+    ? 'no_match'
+    : sourceStatus === 'detected'
+      ? 'detected'
+      : 'needs_review';
+  const confidence = Number.isFinite(detection.confidence) ? detection.confidence : 0;
+  const copiedConfidence = copiedStatus === 'needs_review'
+    ? Number(Math.min(confidence, 0.82).toFixed(3))
+    : confidence;
+
+  return {
+    isNoMatch,
+    update: {
+      'playbackMeta.intro.enabled': hasIntro,
+      'playbackMeta.intro.startSec': hasIntro ? intro.startSec : null,
+      'playbackMeta.intro.endSec': hasIntro ? intro.endSec : null,
+      'playbackMeta.detection.status': copiedStatus,
+      'playbackMeta.detection.source': 'auto',
+      'playbackMeta.detection.confidence': copiedConfidence,
+      'playbackMeta.detection.sourceKey': `movie:${context.movieId}:episode:${sourceEpisode._id}:audio-copy`,
+      'playbackMeta.detection.sourceHash': detection.sourceHash
+        || sha1(`${sourceEpisode._id}:${intro.startSec}:${intro.endSec}:${sourceStatus}`),
+      'playbackMeta.detection.jobId': context.jobId || null,
+      'playbackMeta.detection.detectedAt': context.now || new Date(),
+      'playbackMeta.detection.note': `Copied from primary audio: ${primaryAudioLabel}`,
+    },
+  };
+}
+
+async function copyPrimaryPlaybackMetaToAudioVariants({
+  movieId,
+  primaryEpisodes = [],
+  primaryAudioType = null,
+  jobId = null,
+  now = new Date(),
+} = {}) {
+  const sourceIds = primaryEpisodes.map((episode) => episode?._id).filter(Boolean);
+  if (!movieId || sourceIds.length === 0) {
+    return { copiedEpisodes: 0, copiedIntroEpisodes: 0, copiedNoMatchEpisodes: 0 };
+  }
+
+  const sources = await Episode.find({ _id: { $in: sourceIds } }).lean();
+  let copiedEpisodes = 0;
+  let copiedIntroEpisodes = 0;
+  let copiedNoMatchEpisodes = 0;
+
+  for (const source of sources) {
+    if (!hasCopyablePlaybackMeta(source)) continue;
+
+    const { isNoMatch, update } = buildCopiedPlaybackMetaUpdate(source, {
+      movieId,
+      primaryAudioType,
+      jobId,
+      now,
+    });
+    const result = await Episode.updateMany(
+      buildAutoWritableEpisodeFilter({
+        movieId,
+        episodeId: source.episodeId,
+        _id: { $ne: source._id },
+        link_m3u8: { $type: 'string', $ne: '' },
+      }),
+      { $set: update },
+    );
+    const modified = result.modifiedCount || 0;
+    copiedEpisodes += modified;
+    if (isNoMatch) copiedNoMatchEpisodes += modified;
+    else copiedIntroEpisodes += modified;
+  }
+
+  return { copiedEpisodes, copiedIntroEpisodes, copiedNoMatchEpisodes };
+}
+
 async function resolveMovie(identifier) {
   if (!identifier) return null;
   if (mongoose.Types.ObjectId.isValid(identifier)) {
@@ -484,7 +653,7 @@ async function resolveMovie(identifier) {
 }
 
 async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = null) {
-  const options = { ...DEFAULT_OPTIONS, ...rawOptions };
+  const options = normalizeDetectionOptions(rawOptions);
   const selectionOptions = normalizeEpisodeSelectionOptions(options);
   if (onProgress) {
     onProgress({ percent: 2, step: 'load-movie', message: 'Loading movie metadata' });
@@ -502,12 +671,56 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
     link_m3u8: { $type: 'string', $ne: '' },
   })
     .sort({ episodeId: 1, audioType: 1 })
-    .limit(selectionOptions.mode === 'sample' ? selectionOptions.sampleSize : selectionOptions.maxEpisodesPerJob)
+    .limit(Math.max(selectionOptions.maxEpisodesPerJob * 4, selectionOptions.maxEpisodesPerJob))
     .lean();
-  const episodes = selectIntroDetectionEpisodes(playableEpisodes, options);
+  const primaryGroup = selectPrimaryAudioGroup(playableEpisodes, options);
+  if (!primaryGroup) {
+    throw new Error('No playable episodes found for intro detection');
+  }
+
+  const episodes = primaryGroup.selectedEpisodes;
+  const primaryAudioType = primaryGroup.audioType || primaryGroup.audioKey;
 
   if (episodes.length < 2) {
-    throw new Error('At least two selected playable episodes are required for intro detection');
+    const now = new Date();
+    const jobId = options.jobId ? String(options.jobId) : null;
+    const copyResult = await copyPrimaryPlaybackMetaToAudioVariants({
+      movieId: movie._id,
+      primaryEpisodes: primaryGroup.episodes,
+      primaryAudioType,
+      jobId,
+      now,
+    });
+
+    if (copyResult.copiedEpisodes > 0) {
+      if (onProgress) {
+        onProgress({
+          percent: 100,
+          step: 'completed',
+          message: `Intro metadata copied to ${copyResult.copiedEpisodes} audio variants`,
+        });
+      }
+
+      return {
+        movieId: movie._id.toString(),
+        movieName: movie.name,
+        selectionMode: selectionOptions.mode,
+        audioStrategy: 'primary_audio_then_copy',
+        primaryAudioType,
+        eligibleEpisodes: playableEpisodes.length,
+        primaryEligibleEpisodes: primaryGroup.episodes.length,
+        sampledEpisodes: 0,
+        detectedEpisodes: 0,
+        inferredEpisodes: 0,
+        noMatchEpisodes: 0,
+        copiedEpisodes: copyResult.copiedEpisodes,
+        copiedIntroEpisodes: copyResult.copiedIntroEpisodes,
+        copiedNoMatchEpisodes: copyResult.copiedNoMatchEpisodes,
+        detections: [],
+      };
+    }
+
+    throw new Error('At least two selected playable episodes in the primary audio group are required for intro detection');
   }
 
   const samples = [];
@@ -542,7 +755,7 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
       onProgress({
         percent: 70,
         step: 'match-intro',
-        message: `Matching common intro audio (${selectionOptions.mode})`,
+        message: `Matching common intro audio (${selectionOptions.mode}, ${primaryAudioType})`,
       });
   }
   const detections = detectCommonIntroFromFeatures(samples, options);
@@ -620,7 +833,10 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
     const updateResult = await Episode.updateMany(
       buildAutoWritableEpisodeFilter({
         movieId: movie._id,
-        _id: { $nin: sampledIds },
+        _id: {
+          $in: primaryGroup.episodes.map((episode) => episode._id),
+          $nin: sampledIds,
+        },
         link_m3u8: { $type: 'string', $ne: '' },
       }),
       {
@@ -643,23 +859,37 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
     inferredEpisodes = updateResult.modifiedCount || 0;
   }
 
+  const copyResult = await copyPrimaryPlaybackMetaToAudioVariants({
+    movieId: movie._id,
+    primaryEpisodes: primaryGroup.episodes,
+    primaryAudioType,
+    jobId,
+    now,
+  });
+
   const result = {
     movieId: movie._id.toString(),
     movieName: movie.name,
     selectionMode: selectionOptions.mode,
+    audioStrategy: 'primary_audio_then_copy',
+    primaryAudioType,
     eligibleEpisodes: playableEpisodes.length,
+    primaryEligibleEpisodes: primaryGroup.episodes.length,
     sampledEpisodes: samples.length,
     detectedEpisodes: detections.length,
     inferredEpisodes,
     noMatchEpisodes,
+    copiedEpisodes: copyResult.copiedEpisodes,
+    copiedIntroEpisodes: copyResult.copiedIntroEpisodes,
+    copiedNoMatchEpisodes: copyResult.copiedNoMatchEpisodes,
     detections,
   };
 
   if (onProgress) {
-    const message =
+  const message =
       detections.length > 0
-        ? `Intro detection completed: ${detections.length} detected, ${inferredEpisodes} inferred`
-        : `Intro detection completed: no common intro found in ${samples.length} sampled episodes`;
+        ? `Intro detection completed: ${detections.length} detected, ${inferredEpisodes} inferred, ${copyResult.copiedEpisodes} copied`
+        : `Intro detection completed: no common intro found in ${samples.length} sampled episodes, ${copyResult.copiedEpisodes} copied`;
     onProgress({ percent: 100, step: 'completed', message });
   }
 
@@ -669,11 +899,16 @@ async function detectIntroForMovie(identifier, rawOptions = {}, onProgress = nul
 module.exports = {
   buildAutoWritableEpisodeFilter,
   bufferToAudioFeatures,
+  buildCopiedPlaybackMetaUpdate,
   detectCommonIntroFromFeatures,
   detectIntroForMovie,
   extractAudioFeatures,
   featureSimilarity,
   findBestPairMatch,
+  getAudioPriority,
+  normalizeAudioType,
+  normalizeDetectionOptions,
   parseEpisodeNumberList,
+  selectPrimaryAudioGroup,
   selectIntroDetectionEpisodes,
 };

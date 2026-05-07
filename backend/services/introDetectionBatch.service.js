@@ -452,12 +452,14 @@ function summarizeMovieDetectionResult(result = {}) {
   const detectedEpisodes = Number(result.detectedEpisodes) || 0;
   const inferredEpisodes = Number(result.inferredEpisodes) || 0;
   const noMatchEpisodes = Number(result.noMatchEpisodes) || 0;
+  const copiedIntroEpisodes = Number(result.copiedIntroEpisodes) || 0;
+  const copiedNoMatchEpisodes = Number(result.copiedNoMatchEpisodes) || 0;
 
-  if (detectedEpisodes > 0 || inferredEpisodes > 0) {
+  if (detectedEpisodes > 0 || inferredEpisodes > 0 || copiedIntroEpisodes > 0) {
     return 'detected';
   }
 
-  if (noMatchEpisodes > 0) {
+  if (noMatchEpisodes > 0 || copiedNoMatchEpisodes > 0) {
     return 'no_match';
   }
 
@@ -505,11 +507,16 @@ function createBatchMovieReport(movie = {}, patch = {}) {
     finishedAt: null,
     durationMs: 0,
     selectionMode: null,
+    audioStrategy: null,
+    primaryAudioType: null,
     eligibleEpisodes: 0,
     sampledEpisodes: 0,
     detectedEpisodes: 0,
     inferredEpisodes: 0,
     noMatchEpisodes: 0,
+    copiedEpisodes: 0,
+    copiedIntroEpisodes: 0,
+    copiedNoMatchEpisodes: 0,
     detections: [],
     error: { message: '' },
     ...patch,
@@ -685,11 +692,16 @@ async function runIntroDetectionBatch(rawOptions = {}) {
           finishedAt: movieFinishedAt,
           durationMs: movieFinishedAt.getTime() - movieStartedAt.getTime(),
           selectionMode: result.selectionMode || null,
+          audioStrategy: result.audioStrategy || null,
+          primaryAudioType: result.primaryAudioType || null,
           eligibleEpisodes: Number(result.eligibleEpisodes) || 0,
           sampledEpisodes: Number(result.sampledEpisodes) || 0,
           detectedEpisodes: Number(result.detectedEpisodes) || 0,
           inferredEpisodes: Number(result.inferredEpisodes) || 0,
           noMatchEpisodes: Number(result.noMatchEpisodes) || 0,
+          copiedEpisodes: Number(result.copiedEpisodes) || 0,
+          copiedIntroEpisodes: Number(result.copiedIntroEpisodes) || 0,
+          copiedNoMatchEpisodes: Number(result.copiedNoMatchEpisodes) || 0,
           detections: Array.isArray(result.detections) ? result.detections : [],
         });
 

@@ -90,6 +90,15 @@ const batchMovieSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    audioStrategy: {
+      type: String,
+      default: null,
+    },
+    primaryAudioType: {
+      type: String,
+      default: null,
+      index: true,
+    },
     eligibleEpisodes: {
       type: Number,
       default: 0,
@@ -107,6 +116,18 @@ const batchMovieSchema = new mongoose.Schema(
       default: 0,
     },
     noMatchEpisodes: {
+      type: Number,
+      default: 0,
+    },
+    copiedEpisodes: {
+      type: Number,
+      default: 0,
+    },
+    copiedIntroEpisodes: {
+      type: Number,
+      default: 0,
+    },
+    copiedNoMatchEpisodes: {
       type: Number,
       default: 0,
     },

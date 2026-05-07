@@ -10,8 +10,15 @@ test('normalizeJobOptions defaults to shorter intro-safe detection settings', ()
   const options = normalizeJobOptions({});
 
   assert.equal(options.sampleSeconds, 600);
+  assert.equal(options.maxStartSec, 540);
   assert.equal(options.minDurationSec, 30);
   assert.equal(options.similarityThreshold, 0.86);
+});
+
+test('normalizeJobOptions keeps five minute jobs compatible with the old start window', () => {
+  const options = normalizeJobOptions({ sampleSeconds: 300 });
+
+  assert.equal(options.maxStartSec, 300);
 });
 
 test('normalizeJobOptions accepts bounded similarity threshold overrides', () => {

@@ -970,12 +970,20 @@ const AdminPlaybackTab = () => {
                       {movie.priorityRank ? `${movie.priorityRank}. ` : ""}
                       {movie.movieName || "Không rõ tên"}
                     </span>
-                    <span className="truncate text-gray-300">{getPriorityLabel(movie.prioritySource)}</span>
+                    <span className="truncate text-gray-300">
+                      {getPriorityLabel(movie.prioritySource)}
+                      {movie.primaryAudioType && (
+                        <span className="ml-1 text-gray-500">({movie.primaryAudioType})</span>
+                      )}
+                    </span>
                     <span className={`font-semibold ${getBatchResultColor(movie.resultType)}`}>
                       {movie.resultType || movie.state || "pending"}
                     </span>
                     <span className="text-gray-300">
                       {(movie.detectedEpisodes || 0) + (movie.inferredEpisodes || 0)}/{movie.sampledEpisodes || 0}
+                      {Number(movie.copiedEpisodes) > 0 && (
+                        <span className="ml-1 text-blue-300">+{movie.copiedEpisodes}</span>
+                      )}
                     </span>
                     <span className="text-gray-300">{formatBatchDuration(movie.durationMs)}</span>
                   </div>

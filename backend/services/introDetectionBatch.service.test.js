@@ -73,7 +73,9 @@ test('buildCompletedDetectionExpression requires a valid intro range for detecte
 test('summarizeMovieDetectionResult categorizes batch outcomes', () => {
   assert.equal(summarizeMovieDetectionResult({ detectedEpisodes: 2 }), 'detected');
   assert.equal(summarizeMovieDetectionResult({ inferredEpisodes: 8 }), 'detected');
+  assert.equal(summarizeMovieDetectionResult({ copiedIntroEpisodes: 4 }), 'detected');
   assert.equal(summarizeMovieDetectionResult({ noMatchEpisodes: 5 }), 'no_match');
+  assert.equal(summarizeMovieDetectionResult({ copiedNoMatchEpisodes: 3 }), 'no_match');
   assert.equal(summarizeMovieDetectionResult({}), 'completed');
 });
 

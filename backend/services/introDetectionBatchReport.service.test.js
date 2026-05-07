@@ -32,8 +32,12 @@ test('normalizeBatchRun stores batch options and movie outcomes for history quer
         prioritySource: 'recent_views',
         state: 'completed',
         resultType: 'detected',
+        audioStrategy: 'primary_audio_then_copy',
+        primaryAudioType: 'vietsub',
         sampledEpisodes: 5,
         detectedEpisodes: 4,
+        copiedEpisodes: 8,
+        copiedIntroEpisodes: 8,
       },
     ],
   });
@@ -42,5 +46,7 @@ test('normalizeBatchRun stores batch options and movie outcomes for history quer
   assert.equal(batch.durationMs, 5 * 60 * 1000);
   assert.equal(batch.movies[0].prioritySource, 'recent_views');
   assert.equal(batch.movies[0].detectedEpisodes, 4);
+  assert.equal(batch.movies[0].primaryAudioType, 'vietsub');
+  assert.equal(batch.movies[0].copiedEpisodes, 8);
   assert.equal(batch.viewWindow.localDate, '2026-05-07');
 });

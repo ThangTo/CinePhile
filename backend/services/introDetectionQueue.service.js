@@ -44,6 +44,8 @@ function parseFloatOption(value, fallback) {
 
 function normalizeJobOptions(options = {}) {
   const sampleSize = Math.max(2, Math.min(500, Number.parseInt(options.sampleSize, 10) || 5));
+  const sampleSeconds = Math.max(180, Math.min(900, Number.parseInt(options.sampleSeconds, 10) || 600));
+  const defaultMaxStartSec = Math.max(300, sampleSeconds - 60);
   const validSelectionModes = new Set(['sample', 'remaining', 'all', 'specific']);
   const episodeSelectionMode = validSelectionModes.has(options.episodeSelectionMode)
     ? options.episodeSelectionMode
@@ -57,10 +59,13 @@ function normalizeJobOptions(options = {}) {
       2,
       Math.min(500, Number.parseInt(options.maxEpisodesPerJob, 10) || 500),
     ),
-    sampleSeconds: Math.max(180, Math.min(900, Number.parseInt(options.sampleSeconds, 10) || 600)),
+    sampleSeconds,
     minDurationSec: Math.max(20, Math.min(180, Number.parseInt(options.minDurationSec, 10) || 30)),
     maxDurationSec: Math.max(45, Math.min(240, Number.parseInt(options.maxDurationSec, 10) || 140)),
-    maxStartSec: Math.max(60, Math.min(600, Number.parseInt(options.maxStartSec, 10) || 300)),
+    maxStartSec: Math.max(
+      60,
+      Math.min(defaultMaxStartSec, Number.parseInt(options.maxStartSec, 10) || defaultMaxStartSec),
+    ),
     similarityThreshold: clamp(parseFloatOption(options.similarityThreshold, 0.86), 0.75, 0.98),
     applySeasonDefault: options.applySeasonDefault !== false && options.applySeasonDefault !== 'false',
   };

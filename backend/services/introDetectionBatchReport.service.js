@@ -69,6 +69,11 @@ function normalizeBatchMovie(movie = {}) {
     detectedEpisodes: normalizeNumber(movie.detectedEpisodes),
     inferredEpisodes: normalizeNumber(movie.inferredEpisodes),
     noMatchEpisodes: normalizeNumber(movie.noMatchEpisodes),
+    audioStrategy: movie.audioStrategy || null,
+    primaryAudioType: movie.primaryAudioType || null,
+    copiedEpisodes: normalizeNumber(movie.copiedEpisodes),
+    copiedIntroEpisodes: normalizeNumber(movie.copiedIntroEpisodes),
+    copiedNoMatchEpisodes: normalizeNumber(movie.copiedNoMatchEpisodes),
     detections: Array.isArray(movie.detections) ? movie.detections.map(normalizeDetection) : [],
     error: {
       message: movie.error?.message || movie.message || '',
