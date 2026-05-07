@@ -9,6 +9,11 @@ import MovieInfoBrief from "components/watch-page/MovieInfoBrief";
 import { fetchMovieById, fetchEpisodes } from "services/movie.service";
 import { enrichMovieWithSeriesParts } from "utils/seriesGrouping";
 import { getYouTubeEmbedUrl } from "utils/videoUtils";
+import {
+  countUniqueEpisodes,
+  findEpisodeVariant,
+  pickPreferredAudioType,
+} from "utils/episodeSelection";
 import movieService from "services/movie.service";
 import { BarSpinner } from "components/common/LoadingState";
 import CastSection from "components/movie-detail/CastSection";
@@ -53,8 +58,8 @@ const WatchPage = () => {
 
         setEpisodes(normalizedEpisodes);
 
-        // Ưu tiên audio từ URL (?audio=), nếu không có thì lấy audioType của tập đầu tiên
-        const initialAudio = audioParam || normalizedEpisodes[0]?.audioType || null;
+        // Prefer URL audio, then the best available variant from episode data.
+        const initialAudio = audioParam || pickPreferredAudioType(normalizedEpisodes);
         setAudioType(initialAudio);
       } catch (error) {
         console.error("Error loading movie:", error);
@@ -73,7 +78,7 @@ const WatchPage = () => {
       if (movie && episodes && episodes.length > 0) {
         const isTrailer = movie.isHidden || !movie.currentEpisode || movie.currentEpisode === 0;
         if (!isTrailer) {
-          const match = episodes.find((e) => e.episode === activeEp || e.episodeId === activeEp) || episodes[0];
+          const match = findEpisodeVariant(episodes, activeEp, audioType);
           epId = match?._id || match?.id;
         }
       }
@@ -87,7 +92,7 @@ const WatchPage = () => {
     } catch (error) {
       console.error("Error incrementing view count:", error);
     }
-  }, [id, movie, episodes, activeEp]);
+  }, [id, movie, episodes, activeEp, audioType]);
 
   useEffect(() => {
     setActiveEp(episodeParam);
@@ -128,9 +133,9 @@ const WatchPage = () => {
         link_embed: getYouTubeEmbedUrl(movie.trailer_url || movie.trailerUrl || movie.trailer),
         videoUrl: getYouTubeEmbedUrl(movie.trailer_url || movie.trailerUrl || movie.trailer),
       }
-    : episodes.find((ep) => ep.episode === activeEp || ep.episodeId === activeEp) ||
-      episodes.find((ep) => (ep.episode || ep.episodeId) === 1) ||
-      episodes[0];
+    : findEpisodeVariant(episodes, activeEp, audioType);
+
+  const totalPlayableEpisodes = movie.totalEpisodes || countUniqueEpisodes(episodes);
 
   console.log("🎬 [WatchPage] Current episode:", {
     activeEp,
@@ -164,7 +169,7 @@ const WatchPage = () => {
               movie={movie}
               episode={currentEpisode}
               onEpisodeChange={handleEpisodeChange}
-              totalEpisodes={episodes.length}
+              totalEpisodes={totalPlayableEpisodes}
               audioType={audioType}
               onAudioTypeChange={setAudioType}
               resumeTime={startFromBeginning ? 0 : resumeTime}

@@ -3,6 +3,7 @@ import movieService from "services/movie.service";
 import userService from "services/user.service";
 import useAuth from "hooks/useAuth";
 import { enrichMovieWithSeriesParts } from "utils/seriesGrouping";
+import { pickPreferredAudioType } from "utils/episodeSelection";
 
 /**
  * Custom hook to fetch and manage movie detail data
@@ -54,12 +55,12 @@ const useMovieDetail = (id) => {
     }
   }, [id]);
 
-  // Đặt audioType mặc định theo tập đầu tiên (nếu có)
+  // Default to the preferred available audio variant.
   useEffect(() => {
     if (!movie || audioType) return;
-    const firstEp = (movie.episodes || [])[0];
-    if (firstEp && firstEp.audioType) {
-      setAudioType(firstEp.audioType);
+    const defaultAudioType = pickPreferredAudioType(movie.episodes || []);
+    if (defaultAudioType) {
+      setAudioType(defaultAudioType);
     }
   }, [movie, audioType]);
 
