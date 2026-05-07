@@ -1,4 +1,5 @@
 const playbackMetadataService = require('../services/playbackMetadata.service');
+const batchReportService = require('../services/introDetectionBatchReport.service');
 const {
   addIntroDetectionJob,
   getIntroDetectionJobStatus,
@@ -61,9 +62,43 @@ const getIntroDetectionStatus = async (req, res) => {
   }
 };
 
+const listIntroDetectionBatches = async (req, res) => {
+  try {
+    const result = await batchReportService.listIntroDetectionBatchRuns(req.query);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getLatestIntroDetectionBatch = async (_req, res) => {
+  try {
+    const batch = await batchReportService.getLatestIntroDetectionBatchRun();
+    res.json({ success: true, batch });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getIntroDetectionBatch = async (req, res) => {
+  try {
+    const batch = await batchReportService.getIntroDetectionBatchRun(req.params.batchId);
+    if (!batch) {
+      return res.status(404).json({ success: false, message: 'Intro detection batch not found' });
+    }
+
+    res.json({ success: true, batch });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   detectIntro,
+  getIntroDetectionBatch,
+  getLatestIntroDetectionBatch,
   getIntroDetectionStatus,
+  listIntroDetectionBatches,
   listPlaybackEpisodes,
   updateEpisodePlaybackMeta,
 };

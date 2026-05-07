@@ -4,6 +4,7 @@ const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
 const ViewHistory = require('../models/view_history.model');
 const redisService = require('./redis.service');
+const batchReportService = require('./introDetectionBatchReport.service');
 const {
   addIntroDetectionJob,
   getIntroDetectionQueueState,
@@ -39,8 +40,12 @@ function normalizeBatchOptions(options = {}) {
     options.retryNoMatch ?? process.env.INTRO_BATCH_RETRY_NO_MATCH,
     false,
   );
+  const timezone = options.timezone || process.env.INTRO_BATCH_TIMEZONE || DEFAULT_BATCH_TIMEZONE;
+  const viewWindow = options.viewWindow || getPreviousLocalDayWindow(timezone, options.now || new Date());
 
   return {
+    timezone,
+    viewWindow,
     maxMovies: parseIntOption(options.maxMovies ?? process.env.INTRO_BATCH_MAX_MOVIES, 30, 1, 500),
     maxEpisodesPerMovie: parseIntOption(
       options.maxEpisodesPerMovie ?? process.env.INTRO_BATCH_MAX_EPISODES_PER_MOVIE,
@@ -58,7 +63,7 @@ function normalizeBatchOptions(options = {}) {
     ),
     jobTimeoutMs: parseIntOption(
       options.jobTimeoutMs ?? process.env.INTRO_BATCH_JOB_TIMEOUT_MS,
-      25 * 60 * 1000,
+      40 * 60 * 1000,
       60 * 1000,
       60 * 60 * 1000,
     ),
@@ -79,7 +84,7 @@ function normalizeBatchOptions(options = {}) {
       sampleSize: parseIntOption(options.sampleSize ?? process.env.INTRO_BATCH_SAMPLE_SIZE, 5, 2, 10),
       sampleSeconds: parseIntOption(
         options.sampleSeconds ?? process.env.INTRO_BATCH_SAMPLE_SECONDS,
-        300,
+        600,
         180,
         900,
       ),
@@ -274,6 +279,12 @@ async function releaseBatchLock(owner, backend) {
 async function saveLatestBatchSummary(summary) {
   latestBatchSummary = summary;
   await redisService.set(BATCH_LATEST_KEY, summary, 7 * 24 * 60 * 60);
+
+  try {
+    await batchReportService.upsertIntroDetectionBatchRun(summary);
+  } catch (error) {
+    console.warn(`[IntroBatch] Failed to persist batch report ${summary?.batchId || ''}: ${error.message}`);
+  }
 }
 
 async function getLatestIntroDetectionBatch() {
@@ -418,7 +429,7 @@ async function findEligibleIntroDetectionMovies(rawOptions = {}) {
 async function waitForIntroDetectionJob(jobId, options = {}) {
   const startedAt = Date.now();
   const pollMs = parseIntOption(options.pollMs, 5000, 1000, 60000);
-  const timeoutMs = parseIntOption(options.jobTimeoutMs, 25 * 60 * 1000, 60 * 1000, 60 * 60 * 1000);
+  const timeoutMs = parseIntOption(options.jobTimeoutMs, 40 * 60 * 1000, 60 * 1000, 60 * 60 * 1000);
 
   while (Date.now() - startedAt <= timeoutMs) {
     const status = await getIntroDetectionJobStatus(jobId);
@@ -453,6 +464,82 @@ function summarizeMovieDetectionResult(result = {}) {
   return 'completed';
 }
 
+function createBatchOptionsSnapshot(options = {}) {
+  return {
+    timezone: options.timezone,
+    viewWindow: options.viewWindow,
+    maxMovies: options.maxMovies,
+    maxEpisodesPerMovie: options.maxEpisodesPerMovie,
+    includeHidden: options.includeHidden,
+    retryNoMatch: options.retryNoMatch,
+    lockTtlSec: options.lockTtlSec,
+    jobTimeoutMs: options.jobTimeoutMs,
+    pollMs: options.pollMs,
+    betweenJobsMs: options.betweenJobsMs,
+    maxRuntimeMs: options.maxRuntimeMs,
+    detectionOptions: {
+      ...options.detectionOptions,
+    },
+  };
+}
+
+function createBatchMovieReport(movie = {}, patch = {}) {
+  return {
+    movieId: movie.movieId,
+    movieName: movie.movieName,
+    slug: movie.slug || '',
+    prioritySource: movie.prioritySource || 'unknown',
+    priorityRank: Number(movie.priorityRank) || 0,
+    priorityViews: Number(movie.priorityViews) || 0,
+    priorityWatchTime: Number(movie.priorityWatchTime) || 0,
+    viewCount: Number(movie.viewCount) || 0,
+    episodeCount: Number(movie.episodeCount) || 0,
+    pendingCount: Number(movie.pendingCount) || 0,
+    approvedCount: Number(movie.approvedCount) || 0,
+    detectedCount: Number(movie.detectedCount) || 0,
+    state: 'pending',
+    resultType: 'none',
+    jobId: null,
+    queueBackend: null,
+    startedAt: null,
+    finishedAt: null,
+    durationMs: 0,
+    selectionMode: null,
+    eligibleEpisodes: 0,
+    sampledEpisodes: 0,
+    detectedEpisodes: 0,
+    inferredEpisodes: 0,
+    noMatchEpisodes: 0,
+    detections: [],
+    error: { message: '' },
+    ...patch,
+  };
+}
+
+function updateSummaryMovie(summary, movie, patch = {}) {
+  if (!summary || !movie?.movieId) return null;
+
+  const movieId = String(movie.movieId);
+  const index = (summary.movies || []).findIndex((item) => String(item.movieId) === movieId);
+  const existing = index >= 0 ? summary.movies[index] : createBatchMovieReport(movie);
+  const updated = {
+    ...existing,
+    ...patch,
+  };
+
+  if (!Array.isArray(summary.movies)) {
+    summary.movies = [];
+  }
+
+  if (index >= 0) {
+    summary.movies[index] = updated;
+  } else {
+    summary.movies.push(updated);
+  }
+
+  return updated;
+}
+
 function getQueueSkipReason(queueState = {}) {
   if (queueState.requiresPersistentQueue && !queueState.hasPersistentQueue) {
     return queueState.unavailableReason || 'persistent intro detection queue is unavailable';
@@ -472,10 +559,22 @@ async function runIntroDetectionBatch(rawOptions = {}) {
     const skipped = {
       batchId,
       state: 'skipped',
+      trigger: rawOptions.trigger || 'manual',
       reason: queueSkipReason,
       queueBackend: queueState.backend,
       startedAt,
       finishedAt: new Date(),
+      timezone: options.timezone,
+      viewWindow: options.viewWindow,
+      options: createBatchOptionsSnapshot(options),
+      totalMovies: 0,
+      processedMovies: 0,
+      detectedMovies: 0,
+      noMatchMovies: 0,
+      failedMovies: 0,
+      skippedMovies: 0,
+      movies: [],
+      errors: [],
     };
     await saveLatestBatchSummary(skipped);
     return skipped;
@@ -487,10 +586,22 @@ async function runIntroDetectionBatch(rawOptions = {}) {
     const skipped = {
       batchId,
       state: 'skipped',
+      trigger: rawOptions.trigger || 'manual',
       reason: lock.reason || 'batch lock is already held',
       lockBackend: lock.backend,
       startedAt,
       finishedAt: new Date(),
+      timezone: options.timezone,
+      viewWindow: options.viewWindow,
+      options: createBatchOptionsSnapshot(options),
+      totalMovies: 0,
+      processedMovies: 0,
+      detectedMovies: 0,
+      noMatchMovies: 0,
+      failedMovies: 0,
+      skippedMovies: 0,
+      movies: [],
+      errors: [],
     };
     await saveLatestBatchSummary(skipped);
     return skipped;
@@ -503,6 +614,9 @@ async function runIntroDetectionBatch(rawOptions = {}) {
     lockBackend: lock.backend,
     startedAt,
     finishedAt: null,
+    timezone: options.timezone,
+    viewWindow: options.viewWindow,
+    options: createBatchOptionsSnapshot(options),
     totalMovies: 0,
     processedMovies: 0,
     detectedMovies: 0,
@@ -510,12 +624,14 @@ async function runIntroDetectionBatch(rawOptions = {}) {
     failedMovies: 0,
     skippedMovies: 0,
     stoppedReason: null,
+    movies: [],
     errors: [],
   };
 
   try {
     const movies = await findEligibleIntroDetectionMovies(options);
     summary.totalMovies = movies.length;
+    summary.movies = movies.map((movie) => createBatchMovieReport(movie));
     await saveLatestBatchSummary(summary);
 
     console.log(`[IntroBatch] ${batchId} started: ${movies.length} eligible movies`);
@@ -527,6 +643,14 @@ async function runIntroDetectionBatch(rawOptions = {}) {
         break;
       }
 
+      const movieStartedAt = new Date();
+      updateSummaryMovie(summary, movie, {
+        state: 'processing',
+        resultType: 'none',
+        startedAt: movieStartedAt,
+      });
+      await saveLatestBatchSummary(summary);
+
       try {
         console.log(
           `[IntroBatch] Detecting ${movie.movieName} (${movie.movieId}) priority=${movie.prioritySource || 'unknown'} pending=${movie.pendingCount}/${movie.episodeCount}`,
@@ -536,24 +660,57 @@ async function runIntroDetectionBatch(rawOptions = {}) {
           ...options.detectionOptions,
           batchId,
         });
+        updateSummaryMovie(summary, movie, {
+          state: 'processing',
+          jobId: job.id,
+          queueBackend: job.backend,
+        });
+        await saveLatestBatchSummary(summary);
+
         const status = await waitForIntroDetectionJob(job.id, options);
         const resultType = summarizeMovieDetectionResult(status.result);
+        const movieFinishedAt = new Date();
+        const result = status.result || {};
 
         summary.processedMovies += 1;
         if (resultType === 'detected') summary.detectedMovies += 1;
         else if (resultType === 'no_match') summary.noMatchMovies += 1;
         else summary.skippedMovies += 1;
 
+        updateSummaryMovie(summary, movie, {
+          state: 'completed',
+          resultType,
+          jobId: job.id,
+          queueBackend: status.backend || job.backend,
+          finishedAt: movieFinishedAt,
+          durationMs: movieFinishedAt.getTime() - movieStartedAt.getTime(),
+          selectionMode: result.selectionMode || null,
+          eligibleEpisodes: Number(result.eligibleEpisodes) || 0,
+          sampledEpisodes: Number(result.sampledEpisodes) || 0,
+          detectedEpisodes: Number(result.detectedEpisodes) || 0,
+          inferredEpisodes: Number(result.inferredEpisodes) || 0,
+          noMatchEpisodes: Number(result.noMatchEpisodes) || 0,
+          detections: Array.isArray(result.detections) ? result.detections : [],
+        });
+
         console.log(
           `[IntroBatch] ${movie.movieName} done: ${resultType} job=${job.id}`,
         );
       } catch (error) {
+        const movieFinishedAt = new Date();
         summary.processedMovies += 1;
         summary.failedMovies += 1;
         summary.errors.push({
           movieId: movie.movieId,
           movieName: movie.movieName,
           message: error.message,
+        });
+        updateSummaryMovie(summary, movie, {
+          state: 'failed',
+          resultType: 'failed',
+          finishedAt: movieFinishedAt,
+          durationMs: movieFinishedAt.getTime() - movieStartedAt.getTime(),
+          error: { message: error.message },
         });
         console.error(`[IntroBatch] ${movie.movieName} failed: ${error.message}`);
       }

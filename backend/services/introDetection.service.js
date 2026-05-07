@@ -8,7 +8,7 @@ const DEFAULT_OPTIONS = {
   sampleSize: 5,
   episodeSelectionMode: 'sample',
   maxEpisodesPerJob: 500,
-  sampleSeconds: 420,
+  sampleSeconds: 600,
   sampleRate: 8000,
   stepSec: 1,
   minDurationSec: 30,
@@ -22,7 +22,7 @@ const DEFAULT_OPTIONS = {
 const VALID_EPISODE_SELECTION_MODES = new Set(['sample', 'remaining', 'all', 'specific']);
 const FFMPEG_TIMEOUT_MS = Math.max(
   30000,
-  Number.parseInt(process.env.INTRO_DETECTION_FFMPEG_TIMEOUT_MS, 10) || 180000,
+  Number.parseInt(process.env.INTRO_DETECTION_FFMPEG_TIMEOUT_MS, 10) || 300000,
 );
 
 function buildAutoWritableEpisodeFilter(baseFilter = {}) {

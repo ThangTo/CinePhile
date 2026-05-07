@@ -30,6 +30,12 @@ test('normalizeBatchOptions keeps nightly batch resource usage bounded', () => {
   assert.equal(options.detectionOptions.sampleSeconds, 900);
 });
 
+test('normalizeBatchOptions defaults nightly audio sampling to ten minutes', () => {
+  const options = normalizeBatchOptions({});
+
+  assert.equal(options.detectionOptions.sampleSeconds, 600);
+});
+
 test('getCompletedStatuses skips no-match by default and can retry it explicitly', () => {
   assert.deepEqual(getCompletedStatuses({ retryNoMatch: false }), [
     'detected',

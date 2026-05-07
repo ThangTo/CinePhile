@@ -1190,6 +1190,28 @@ export const playbackAPI = {
     });
     return response.data || response;
   },
+
+  getIntroBatchLatest: async () => {
+    const response = await apiRequest("/admin/playback/intro-batches/latest", {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  getIntroBatches: async (params = {}) => {
+    const response = await apiRequest("/admin/playback/intro-batches", {
+      params,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  getIntroBatch: async (batchId) => {
+    const response = await apiRequest(`/admin/playback/intro-batches/${batchId}`, {
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };
 
 /**

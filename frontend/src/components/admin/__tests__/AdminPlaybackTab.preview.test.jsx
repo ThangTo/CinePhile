@@ -36,12 +36,14 @@ jest.mock("services/admin.service", () => ({
     updateEpisode: jest.fn(),
     detectIntro: jest.fn(),
     getDetectionStatus: jest.fn(),
+    getIntroBatchLatest: jest.fn(),
   },
 }));
 
 describe("AdminPlaybackTab preview helpers", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    playbackAPI.getIntroBatchLatest.mockResolvedValue({ batch: null });
   });
 
   it("builds preview source through backend proxy using direct segment mode", () => {
@@ -204,6 +206,7 @@ describe("AdminPlaybackTab preview helpers", () => {
 
     fireEvent.click(screen.getByTitle(/Intro/i));
     fireEvent.click(screen.getByLabelText("Chọn chế độ remaining"));
+    fireEvent.click(screen.getByLabelText("Chọn thời gian detect 900 giây"));
     fireEvent.change(screen.getByLabelText("Số tập detect"), {
       target: { value: "7" },
     });
@@ -212,7 +215,7 @@ describe("AdminPlaybackTab preview helpers", () => {
     await waitFor(() => expect(playbackAPI.detectIntro).toHaveBeenCalledTimes(1));
     expect(playbackAPI.detectIntro).toHaveBeenCalledWith({
       movieId: "movie-1",
-      sampleSeconds: 300,
+      sampleSeconds: 900,
       episodeSelectionMode: "remaining",
       maxEpisodesPerJob: 500,
       applySeasonDefault: false,

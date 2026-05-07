@@ -213,6 +213,13 @@ const DETECT_MODE_OPTIONS = [
   { value: "specific", label: "Chỉ định", icon: "fa-list-ol" },
 ];
 
+const DETECT_SAMPLE_SECONDS_OPTIONS = [
+  { value: 300, label: "5 phút" },
+  { value: 420, label: "7 phút" },
+  { value: 600, label: "10 phút" },
+  { value: 900, label: "15 phút" },
+];
+
 const DetectOptionsModal = ({ config, saving, onClose, onChange, onSubmit }) => {
   if (!config) return null;
 
@@ -268,6 +275,30 @@ const DetectOptionsModal = ({ config, saving, onClose, onChange, onSubmit }) => 
                 >
                   <i className={`fa-solid ${option.icon} text-lg`}></i>
                   <span className="text-xs font-bold uppercase tracking-wider">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Sample Duration */}
+          <div>
+            <label className="mb-3 block text-sm font-semibold text-gray-300">
+              Thời lượng đầu phim dùng để phân tích:
+            </label>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {DETECT_SAMPLE_SECONDS_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-label={`Chọn thời gian detect ${option.value} giây`}
+                  onClick={() => onChange({ sampleSeconds: option.value })}
+                  className={`flex h-12 items-center justify-center rounded-xl border px-3 text-sm font-bold transition-all duration-200 ${
+                    Number(config.sampleSeconds) === option.value
+                      ? "border-primaryColor bg-primaryColor/10 text-primaryColor shadow-[0_0_15px_rgba(253,224,71,0.15)]"
+                      : "border-white/5 bg-white/5 text-gray-400 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {option.label}
                 </button>
               ))}
             </div>
@@ -378,6 +409,77 @@ const getStatusColor = (status) => {
   }
 };
 
+const getBatchStateColor = (state) => {
+  switch (state) {
+    case "completed":
+      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+    case "completed_with_errors":
+      return "border-yellow-400/20 bg-yellow-400/10 text-yellow-300";
+    case "running":
+      return "border-blue-400/20 bg-blue-400/10 text-blue-300";
+    case "failed":
+      return "border-red-400/20 bg-red-400/10 text-red-300";
+    case "skipped":
+      return "border-gray-400/20 bg-gray-400/10 text-gray-300";
+    default:
+      return "border-white/10 bg-white/5 text-gray-300";
+  }
+};
+
+const getBatchResultColor = (resultType) => {
+  switch (resultType) {
+    case "detected":
+      return "text-emerald-300";
+    case "no_match":
+      return "text-gray-300";
+    case "failed":
+      return "text-red-300";
+    case "completed":
+      return "text-blue-300";
+    default:
+      return "text-gray-400";
+  }
+};
+
+const formatBatchDateTime = (value) => {
+  if (!value) return "Chưa có";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Không hợp lệ";
+
+  return date.toLocaleString("vi-VN", {
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatBatchDuration = (durationMs) => {
+  const seconds = Math.max(0, Math.round((Number(durationMs) || 0) / 1000));
+  if (!seconds) return "0s";
+  const minutes = Math.floor(seconds / 60);
+  const remainSeconds = seconds % 60;
+  if (!minutes) return `${remainSeconds}s`;
+  return `${minutes}m ${remainSeconds}s`;
+};
+
+const getPriorityLabel = (prioritySource) => {
+  switch (prioritySource) {
+    case "recent_views":
+      return "User xem hôm trước";
+    case "banner":
+      return "Banner";
+    case "total_views":
+      return "Lượt xem cao";
+    case "backlog":
+      return "Tồn đọng";
+    default:
+      return prioritySource || "Không rõ";
+  }
+};
+
 const AdminPlaybackTab = () => {
   const [episodes, setEpisodes] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 0 });
@@ -392,6 +494,9 @@ const AdminPlaybackTab = () => {
   const [activeJob, setActiveJob] = useState(null);
   const [preview, setPreview] = useState(null);
   const [detectConfig, setDetectConfig] = useState(null);
+  const [latestBatch, setLatestBatch] = useState(null);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchError, setBatchError] = useState("");
   const refreshedJobIdRef = useRef(null);
 
   useEffect(() => {
@@ -444,6 +549,23 @@ const AdminPlaybackTab = () => {
     loadEpisodes(1);
   }, [loadEpisodes]);
 
+  const loadLatestBatch = useCallback(async () => {
+    setBatchLoading(true);
+    setBatchError("");
+    try {
+      const result = await playbackAPI.getIntroBatchLatest();
+      setLatestBatch(result.batch || null);
+    } catch (err) {
+      setBatchError(err.message || "Không tải được batch report");
+    } finally {
+      setBatchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLatestBatch();
+  }, [loadLatestBatch]);
+
   useEffect(() => {
     if (!activeJobId) return undefined;
 
@@ -455,6 +577,7 @@ const AdminPlaybackTab = () => {
         if ((job.state === "completed" || job.state === "failed") && refreshedJobIdRef.current !== (job.id || activeJobId)) {
           refreshedJobIdRef.current = job.id || activeJobId;
           loadEpisodes(pagination.page, { resetDrafts: true });
+          loadLatestBatch();
         }
       } catch (err) {
         setError(err.message || "Không kiểm tra được job detect intro");
@@ -464,7 +587,7 @@ const AdminPlaybackTab = () => {
     poll();
     const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
-  }, [activeJobId, loadEpisodes, pagination.page]);
+  }, [activeJobId, loadEpisodes, loadLatestBatch, pagination.page]);
 
   const jobDone = activeJob?.state === "completed" || activeJob?.state === "failed";
   const jobResultMessage = formatJobResult(activeJob);
@@ -574,6 +697,7 @@ const AdminPlaybackTab = () => {
       episode,
       mode: "sample",
       sampleSize: 5,
+      sampleSeconds: 600,
       episodeNumbers: "",
     });
   };
@@ -588,9 +712,10 @@ const AdminPlaybackTab = () => {
 
     const mode = detectOptions.mode || "sample";
     const sampleSize = Math.max(2, Math.min(500, Number.parseInt(detectOptions.sampleSize, 10) || 5));
+    const sampleSeconds = Math.max(180, Math.min(900, Number.parseInt(detectOptions.sampleSeconds, 10) || 600));
     const payload = {
       movieId,
-      sampleSeconds: 300,
+      sampleSeconds,
       episodeSelectionMode: mode,
       maxEpisodesPerJob: 500,
       applySeasonDefault: mode === "sample",
@@ -626,6 +751,11 @@ const AdminPlaybackTab = () => {
     await detectSeasonIntro(detectConfig.episode, detectConfig);
     setDetectConfig(null);
   };
+
+  const latestBatchMovies = useMemo(
+    () => (Array.isArray(latestBatch?.movies) ? latestBatch.movies.slice(0, 8) : []),
+    [latestBatch],
+  );
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -745,6 +875,116 @@ const AdminPlaybackTab = () => {
           </div>
         </div>
       )}
+
+      <div className="rounded-xl border border-white/5 bg-[#1a1a1a] p-5 shadow-lg">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300">
+                <i className="fa-solid fa-clock-rotate-left"></i>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">Batch detect gần nhất</h2>
+                <p className="text-xs text-gray-400">
+                  {latestBatch
+                    ? `${formatBatchDateTime(latestBatch.startedAt)} • ${latestBatch.trigger || "manual"}`
+                    : "Chưa có dữ liệu batch"}
+                </p>
+              </div>
+            </div>
+            {batchError && <p className="mt-3 text-sm text-red-300">{batchError}</p>}
+          </div>
+
+          <button
+            type="button"
+            onClick={loadLatestBatch}
+            disabled={batchLoading}
+            className="flex h-10 items-center justify-center gap-2 rounded-lg bg-white/10 px-4 text-sm font-semibold text-white transition-all hover:bg-white/20 disabled:opacity-60"
+          >
+            <i className={`fa-solid fa-rotate-right ${batchLoading ? "fa-spin" : ""}`}></i>
+            Cập nhật batch
+          </button>
+        </div>
+
+        {latestBatch && (
+          <div className="mt-5 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <div className={`rounded-lg border px-4 py-3 ${getBatchStateColor(latestBatch.state)}`}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider opacity-80">Trạng thái</p>
+                <p className="mt-1 text-sm font-bold uppercase">{latestBatch.state || "unknown"}</p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-black/30 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Tổng phim</p>
+                <p className="mt-1 text-xl font-bold text-white">{latestBatch.totalMovies || 0}</p>
+              </div>
+              <div className="rounded-lg border border-emerald-400/10 bg-emerald-400/5 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300/80">Detected</p>
+                <p className="mt-1 text-xl font-bold text-emerald-300">{latestBatch.detectedMovies || 0}</p>
+              </div>
+              <div className="rounded-lg border border-gray-400/10 bg-gray-400/5 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">No match</p>
+                <p className="mt-1 text-xl font-bold text-gray-200">{latestBatch.noMatchMovies || 0}</p>
+              </div>
+              <div className="rounded-lg border border-red-400/10 bg-red-400/5 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-red-300/80">Failed</p>
+                <p className="mt-1 text-xl font-bold text-red-300">{latestBatch.failedMovies || 0}</p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-black/30 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Sample</p>
+                <p className="mt-1 text-xl font-bold text-white">
+                  {Math.round((Number(latestBatch.options?.sampleSeconds) || 0) / 60) || 0} phút
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 text-xs text-gray-400 md:grid-cols-3">
+              <div>
+                <span className="text-gray-500">Kết thúc: </span>
+                <span className="font-medium text-gray-200">{formatBatchDateTime(latestBatch.finishedAt)}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Thời lượng: </span>
+                <span className="font-medium text-gray-200">{formatBatchDuration(latestBatch.durationMs)}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Ngày ưu tiên view: </span>
+                <span className="font-medium text-gray-200">{latestBatch.viewWindow?.localDate || "Không rõ"}</span>
+              </div>
+            </div>
+
+            {latestBatchMovies.length > 0 && (
+              <div className="overflow-x-auto rounded-lg border border-white/5 bg-black/25">
+                <div className="grid grid-cols-[minmax(180px,1fr)_120px_100px_100px_120px] gap-3 border-b border-white/5 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                  <span>Phim</span>
+                  <span>Ưu tiên</span>
+                  <span>Kết quả</span>
+                  <span>Tập</span>
+                  <span>Thời lượng</span>
+                </div>
+                {latestBatchMovies.map((movie) => (
+                  <div
+                    key={`${movie.movieId || movie.movieName}-${movie.priorityRank}`}
+                    className="grid grid-cols-[minmax(180px,1fr)_120px_100px_100px_120px] gap-3 border-b border-white/5 px-4 py-3 text-sm last:border-b-0"
+                  >
+                    <span className="truncate font-semibold text-white" title={movie.movieName}>
+                      {movie.priorityRank ? `${movie.priorityRank}. ` : ""}
+                      {movie.movieName || "Không rõ tên"}
+                    </span>
+                    <span className="truncate text-gray-300">{getPriorityLabel(movie.prioritySource)}</span>
+                    <span className={`font-semibold ${getBatchResultColor(movie.resultType)}`}>
+                      {movie.resultType || movie.state || "pending"}
+                    </span>
+                    <span className="text-gray-300">
+                      {(movie.detectedEpisodes || 0) + (movie.inferredEpisodes || 0)}/{movie.sampledEpisodes || 0}
+                    </span>
+                    <span className="text-gray-300">{formatBatchDuration(movie.durationMs)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {error && (
         <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-200 animate-fade-in shadow-lg">

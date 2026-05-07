@@ -4,7 +4,7 @@ const REDIS_URL = process.env.REDIS_URL;
 const CONCURRENCY = Math.max(1, Number.parseInt(process.env.INTRO_DETECTION_CONCURRENCY, 10) || 1);
 const TIMEOUT_MS = Math.max(
   60000,
-  Number.parseInt(process.env.INTRO_DETECTION_QUEUE_TIMEOUT_MS, 10) || 20 * 60 * 1000,
+  Number.parseInt(process.env.INTRO_DETECTION_QUEUE_TIMEOUT_MS, 10) || 30 * 60 * 1000,
 );
 const QUEUE_ADD_TIMEOUT_MS = Math.max(
   1000,
@@ -57,7 +57,7 @@ function normalizeJobOptions(options = {}) {
       2,
       Math.min(500, Number.parseInt(options.maxEpisodesPerJob, 10) || 500),
     ),
-    sampleSeconds: Math.max(180, Math.min(900, Number.parseInt(options.sampleSeconds, 10) || 420)),
+    sampleSeconds: Math.max(180, Math.min(900, Number.parseInt(options.sampleSeconds, 10) || 600)),
     minDurationSec: Math.max(20, Math.min(180, Number.parseInt(options.minDurationSec, 10) || 30)),
     maxDurationSec: Math.max(45, Math.min(240, Number.parseInt(options.maxDurationSec, 10) || 140)),
     maxStartSec: Math.max(60, Math.min(600, Number.parseInt(options.maxStartSec, 10) || 300)),

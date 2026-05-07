@@ -26,4 +26,20 @@ describe("playbackAPI", () => {
     expect(result.backend).toBe("bull");
     expect(result.data.movieId).toBe("movie-1");
   });
+
+  it("requests the latest intro batch report from the admin playback API", async () => {
+    apiRequest.mockResolvedValue({
+      data: {
+        success: true,
+        batch: { batchId: "intro-batch-1" },
+      },
+    });
+
+    const result = await playbackAPI.getIntroBatchLatest();
+
+    expect(apiRequest).toHaveBeenCalledWith("/admin/playback/intro-batches/latest", {
+      requiresAuth: true,
+    });
+    expect(result.batch.batchId).toBe("intro-batch-1");
+  });
 });
