@@ -3,6 +3,7 @@ import Hls from "hls.js";
 import PaginationV2 from "components/common/PaginationV2";
 import { getVideoSource } from "config/video.config";
 import { playbackAPI } from "services/admin.service";
+import AdminBatchAnalytics from "./AdminBatchAnalytics";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Tất cả" },
@@ -409,38 +410,7 @@ const getStatusColor = (status) => {
   }
 };
 
-const getBatchStateColor = (state) => {
-  switch (state) {
-    case "completed":
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
-    case "completed_with_errors":
-      return "border-yellow-400/20 bg-yellow-400/10 text-yellow-300";
-    case "running":
-      return "border-blue-400/20 bg-blue-400/10 text-blue-300";
-    case "failed":
-      return "border-red-400/20 bg-red-400/10 text-red-300";
-    case "skipped":
-      return "border-gray-400/20 bg-gray-400/10 text-gray-300";
-    default:
-      return "border-white/10 bg-white/5 text-gray-300";
-  }
-};
-
-const getBatchResultColor = (resultType) => {
-  switch (resultType) {
-    case "detected":
-      return "text-emerald-300";
-    case "no_match":
-      return "text-gray-300";
-    case "failed":
-      return "text-red-300";
-    case "completed":
-      return "text-blue-300";
-    default:
-      return "text-gray-400";
-  }
-};
-
+// eslint-disable-next-line no-unused-vars
 const formatBatchDateTime = (value) => {
   if (!value) return "Chưa có";
   const date = new Date(value);
@@ -456,6 +426,7 @@ const formatBatchDateTime = (value) => {
   });
 };
 
+// eslint-disable-next-line no-unused-vars
 const formatBatchDuration = (durationMs) => {
   const seconds = Math.max(0, Math.round((Number(durationMs) || 0) / 1000));
   if (!seconds) return "0s";
@@ -465,6 +436,7 @@ const formatBatchDuration = (durationMs) => {
   return `${minutes}m ${remainSeconds}s`;
 };
 
+// eslint-disable-next-line no-unused-vars
 const getPriorityLabel = (prioritySource) => {
   switch (prioritySource) {
     case "recent_views":
@@ -495,8 +467,13 @@ const AdminPlaybackTab = () => {
   const [preview, setPreview] = useState(null);
   const [detectConfig, setDetectConfig] = useState(null);
   const [latestBatch, setLatestBatch] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [batchLoading, setBatchLoading] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [batchError, setBatchError] = useState("");
+  // eslint-disable-next-line no-unused-vars
+  const [isBatchExpanded, setIsBatchExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState("episodes"); // "episodes" | "analytics"
   const refreshedJobIdRef = useRef(null);
 
   useEffect(() => {
@@ -752,6 +729,7 @@ const AdminPlaybackTab = () => {
     setDetectConfig(null);
   };
 
+  // eslint-disable-next-line no-unused-vars
   const latestBatchMovies = useMemo(
     () => (Array.isArray(latestBatch?.movies) ? latestBatch.movies.slice(0, 8) : []),
     [latestBatch],
@@ -759,458 +737,374 @@ const AdminPlaybackTab = () => {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between rounded-xl bg-[#1a1a1a] p-6 border border-white/5 shadow-lg">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <i className="fa-solid fa-timeline text-primaryColor"></i>
-            Quản lý Playback Metadata
-          </h1>
-          <p className="text-sm text-gray-400 mt-1 mb-3">Tự động hóa bỏ qua Intro/Outro dựa trên phân tích âm thanh</p>
-          <div className="flex flex-wrap gap-3 text-xs font-medium">
-            <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-emerald-400 shadow-sm">
-              <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
-              Đã duyệt: <span className="text-white">{stats.approved}</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1.5 text-orange-400 shadow-sm">
-              <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></div>
-              Cần duyệt: <span className="text-white">{stats.review}</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-blue-400 shadow-sm">
-              <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-              Đã phát hiện: <span className="text-white">{stats.detected}</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-gray-500/30 bg-gray-500/10 px-3 py-1.5 text-gray-400 shadow-sm">
-              <div className="h-2 w-2 rounded-full bg-gray-500"></div>
-              Không khớp: <span className="text-white">{stats.noMatch}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row w-full xl:w-auto">
-          <div className="relative w-full sm:w-72">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <i className="fa-solid fa-search text-gray-400"></i>
-            </div>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm tên phim..."
-              className="h-11 w-full rounded-lg border border-white/10 bg-black/50 pl-10 pr-4 text-sm text-white outline-none transition-colors focus:border-primaryColor focus:bg-white/5"
-            />
-          </div>
-          <div className="relative">
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className="h-11 appearance-none rounded-lg border border-white/10 bg-black/50 pl-4 pr-10 text-sm text-white outline-none transition-colors focus:border-primaryColor focus:bg-white/5"
-            >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value} className="bg-[#1a1a1a]">
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <i className="fa-solid fa-chevron-down text-gray-400 text-xs"></i>
-            </div>
-          </div>
-          <button
-            onClick={() => loadEpisodes(1, { searchOverride: search.trim() })}
-            className="flex h-11 items-center justify-center gap-2 rounded-lg bg-white/10 px-5 text-sm font-semibold text-white transition-all hover:bg-white/20 active:scale-95"
-          >
-            <i className="fa-solid fa-rotate-right"></i> Tải lại
-          </button>
-        </div>
+      {/* Tabs Header */}
+      <div className="flex border-b border-white/10">
+        <button
+          onClick={() => setActiveTab("episodes")}
+          className={`flex items-center gap-2 px-6 py-4 text-sm font-bold transition-all ${
+            activeTab === "episodes"
+              ? "border-b-2 border-primaryColor text-primaryColor"
+              : "text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          <i className="fa-solid fa-list"></i>
+          Quản lý Tập phim
+        </button>
+        <button
+          onClick={() => setActiveTab("analytics")}
+          className={`flex items-center gap-2 px-6 py-4 text-sm font-bold transition-all ${
+            activeTab === "analytics"
+              ? "border-b-2 border-primaryColor text-primaryColor"
+              : "text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          <i className="fa-solid fa-chart-pie"></i>
+          Thống kê & Lịch sử Batch
+        </button>
       </div>
 
-      {activeJob && (
-        <div className="overflow-hidden rounded-xl border border-primaryColor/30 bg-[#1a1a1a] shadow-lg animate-fade-in-up">
-          <div className="bg-primaryColor/10 p-4 relative">
-            {/* Animated background gradient */}
-            <div className="absolute inset-0 bg-gradient-to-r from-primaryColor/0 via-primaryColor/5 to-primaryColor/0 animate-shimmer" style={{ backgroundSize: '200% 100%' }}></div>
-
-            <div className="relative z-10 flex flex-col gap-2 md:flex-row md:items-center md:justify-between text-sm">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-primaryColor/20 flex items-center justify-center">
-                  <i className="fa-solid fa-robot text-primaryColor"></i>
+      {activeTab === "episodes" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between rounded-xl bg-[#1a1a1a] p-6 border border-white/5 shadow-lg">
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <i className="fa-solid fa-timeline text-primaryColor"></i>
+                Quản lý Playback Metadata
+              </h1>
+              <p className="text-sm text-gray-400 mt-1 mb-3">Tự động hóa bỏ qua Intro/Outro dựa trên phân tích âm thanh</p>
+              <div className="flex flex-wrap gap-3 text-xs font-medium">
+                <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-emerald-400 shadow-sm">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+                  Đã duyệt: <span className="text-white">{stats.approved}</span>
                 </div>
-                <div>
-                  <h3 className="font-bold text-primaryColor">AI Detection Job Đang Chạy</h3>
-                  <p className="text-white/70">
-                    Trạng thái: <span className="text-white font-medium">{formatJobState(activeJob)}</span>
-                    {activeJob.backend && <span className="ml-2 text-xs opacity-60">({activeJob.backend})</span>}
-                  </p>
+                <div className="flex items-center gap-2 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1.5 text-orange-400 shadow-sm">
+                  <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></div>
+                  Cần duyệt: <span className="text-white">{stats.review}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-blue-400 shadow-sm">
+                  <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                  Đã phát hiện: <span className="text-white">{stats.detected}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-full border border-gray-500/30 bg-gray-500/10 px-3 py-1.5 text-gray-400 shadow-sm">
+                  <div className="h-2 w-2 rounded-full bg-gray-500"></div>
+                  Không khớp: <span className="text-white">{stats.noMatch}</span>
                 </div>
               </div>
-              {activeJob.failedReason && <div className="text-red-400 font-medium bg-red-400/10 px-3 py-1 rounded-md">{activeJob.failedReason}</div>}
             </div>
 
-            {activeJob.fallbackReason && (
-              <div className="relative z-10 mt-3 flex items-start gap-2 text-xs text-yellow-300 bg-yellow-400/10 p-2 rounded-lg">
-                <i className="fa-solid fa-triangle-exclamation mt-0.5"></i>
-                <span><strong className="block mb-0.5">Queue Fallback</strong> {activeJob.fallbackReason}</span>
+            <div className="flex flex-col gap-3 sm:flex-row w-full xl:w-auto">
+              <div className="relative w-full sm:w-72">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <i className="fa-solid fa-search text-gray-400"></i>
+                </div>
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Tìm tên phim..."
+                  className="h-11 w-full rounded-lg border border-white/10 bg-black/50 pl-10 pr-4 text-sm text-white outline-none transition-colors focus:border-primaryColor focus:bg-white/5"
+                />
               </div>
-            )}
-
-            {activeJob.message && (
-              <div className="relative z-10 mt-3 text-xs text-gray-300 italic">
-                <i className="fa-solid fa-info-circle mr-1.5 opacity-50"></i>{activeJob.message}
+              <div className="relative">
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value)}
+                  className="h-11 appearance-none rounded-lg border border-white/10 bg-black/50 pl-4 pr-10 text-sm text-white outline-none transition-colors focus:border-primaryColor focus:bg-white/5"
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-[#1a1a1a]">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <i className="fa-solid fa-chevron-down text-gray-400 text-xs"></i>
+                </div>
               </div>
-            )}
-
-            {jobResultMessage && (
-              <div className="relative z-10 mt-3 text-xs text-emerald-400 font-medium bg-emerald-400/10 p-2 rounded-lg border border-emerald-400/20">
-                <i className="fa-solid fa-check-circle mr-1.5"></i>{jobResultMessage}
-              </div>
-            )}
-
-            <div className="relative z-10 mt-4 h-2 w-full overflow-hidden rounded-full bg-black/50 shadow-inner">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-primaryColor/80 to-primaryColor transition-all duration-300 ease-out relative"
-                style={{ width: `${Math.max(0, Math.min(100, Number(activeJob.progress) || 0))}%` }}
+              <button
+                onClick={() => loadEpisodes(1, { searchOverride: search.trim() })}
+                className="flex h-11 items-center justify-center gap-2 rounded-lg bg-white/10 px-5 text-sm font-semibold text-white transition-all hover:bg-white/20 active:scale-95"
               >
-                <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-              </div>
+                <i className="fa-solid fa-rotate-right"></i> Tải lại
+              </button>
             </div>
           </div>
-        </div>
-      )}
 
-      <div className="rounded-xl border border-white/5 bg-[#1a1a1a] p-5 shadow-lg">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300">
-                <i className="fa-solid fa-clock-rotate-left"></i>
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-white">Batch detect gần nhất</h2>
-                <p className="text-xs text-gray-400">
-                  {latestBatch
-                    ? `${formatBatchDateTime(latestBatch.startedAt)} • ${latestBatch.trigger || "manual"}`
-                    : "Chưa có dữ liệu batch"}
-                </p>
-              </div>
-            </div>
-            {batchError && <p className="mt-3 text-sm text-red-300">{batchError}</p>}
-          </div>
+          {activeJob && (
+            <div className="overflow-hidden rounded-xl border border-primaryColor/30 bg-[#1a1a1a] shadow-lg animate-fade-in-up">
+              <div className="bg-primaryColor/10 p-4 relative">
+                {/* Animated background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-r from-primaryColor/0 via-primaryColor/5 to-primaryColor/0 animate-shimmer" style={{ backgroundSize: '200% 100%' }}></div>
 
-          <button
-            type="button"
-            onClick={loadLatestBatch}
-            disabled={batchLoading}
-            className="flex h-10 items-center justify-center gap-2 rounded-lg bg-white/10 px-4 text-sm font-semibold text-white transition-all hover:bg-white/20 disabled:opacity-60"
-          >
-            <i className={`fa-solid fa-rotate-right ${batchLoading ? "fa-spin" : ""}`}></i>
-            Cập nhật batch
-          </button>
-        </div>
-
-        {latestBatch && (
-          <div className="mt-5 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-              <div className={`rounded-lg border px-4 py-3 ${getBatchStateColor(latestBatch.state)}`}>
-                <p className="text-[11px] font-semibold uppercase tracking-wider opacity-80">Trạng thái</p>
-                <p className="mt-1 text-sm font-bold uppercase">{latestBatch.state || "unknown"}</p>
-              </div>
-              <div className="rounded-lg border border-white/5 bg-black/30 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Tổng phim</p>
-                <p className="mt-1 text-xl font-bold text-white">{latestBatch.totalMovies || 0}</p>
-              </div>
-              <div className="rounded-lg border border-emerald-400/10 bg-emerald-400/5 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300/80">Detected</p>
-                <p className="mt-1 text-xl font-bold text-emerald-300">{latestBatch.detectedMovies || 0}</p>
-              </div>
-              <div className="rounded-lg border border-gray-400/10 bg-gray-400/5 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">No match</p>
-                <p className="mt-1 text-xl font-bold text-gray-200">{latestBatch.noMatchMovies || 0}</p>
-              </div>
-              <div className="rounded-lg border border-red-400/10 bg-red-400/5 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-red-300/80">Failed</p>
-                <p className="mt-1 text-xl font-bold text-red-300">{latestBatch.failedMovies || 0}</p>
-              </div>
-              <div className="rounded-lg border border-white/5 bg-black/30 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Sample</p>
-                <p className="mt-1 text-xl font-bold text-white">
-                  {Math.round((Number(latestBatch.options?.sampleSeconds) || 0) / 60) || 0} phút
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-3 text-xs text-gray-400 md:grid-cols-3">
-              <div>
-                <span className="text-gray-500">Kết thúc: </span>
-                <span className="font-medium text-gray-200">{formatBatchDateTime(latestBatch.finishedAt)}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Thời lượng: </span>
-                <span className="font-medium text-gray-200">{formatBatchDuration(latestBatch.durationMs)}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Ngày ưu tiên view: </span>
-                <span className="font-medium text-gray-200">{latestBatch.viewWindow?.localDate || "Không rõ"}</span>
-              </div>
-            </div>
-
-            {latestBatchMovies.length > 0 && (
-              <div className="overflow-x-auto rounded-lg border border-white/5 bg-black/25">
-                <div className="grid grid-cols-[minmax(180px,1fr)_120px_100px_100px_120px] gap-3 border-b border-white/5 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                  <span>Phim</span>
-                  <span>Ưu tiên</span>
-                  <span>Kết quả</span>
-                  <span>Tập</span>
-                  <span>Thời lượng</span>
-                </div>
-                {latestBatchMovies.map((movie) => (
-                  <div
-                    key={`${movie.movieId || movie.movieName}-${movie.priorityRank}`}
-                    className="grid grid-cols-[minmax(180px,1fr)_120px_100px_100px_120px] gap-3 border-b border-white/5 px-4 py-3 text-sm last:border-b-0"
-                  >
-                    <span className="truncate font-semibold text-white" title={movie.movieName}>
-                      {movie.priorityRank ? `${movie.priorityRank}. ` : ""}
-                      {movie.movieName || "Không rõ tên"}
-                    </span>
-                    <span className="truncate text-gray-300">
-                      {getPriorityLabel(movie.prioritySource)}
-                      {movie.primaryAudioType && (
-                        <span className="ml-1 text-gray-500">({movie.primaryAudioType})</span>
-                      )}
-                    </span>
-                    <span className={`font-semibold ${getBatchResultColor(movie.resultType)}`}>
-                      {movie.resultType || movie.state || "pending"}
-                    </span>
-                    <span className="text-gray-300">
-                      {(movie.detectedEpisodes || 0) + (movie.inferredEpisodes || 0)}/{movie.sampledEpisodes || 0}
-                      {Number(movie.copiedEpisodes) > 0 && (
-                        <span className="ml-1 text-blue-300">+{movie.copiedEpisodes}</span>
-                      )}
-                    </span>
-                    <span className="text-gray-300">{formatBatchDuration(movie.durationMs)}</span>
+                <div className="relative z-10 flex flex-col gap-2 md:flex-row md:items-center md:justify-between text-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primaryColor/20 flex items-center justify-center">
+                      <i className="fa-solid fa-robot text-primaryColor"></i>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-primaryColor">AI Detection Job Đang Chạy</h3>
+                      <p className="text-white/70">
+                        Trạng thái: <span className="text-white font-medium">{formatJobState(activeJob)}</span>
+                        {activeJob.backend && <span className="ml-2 text-xs opacity-60">({activeJob.backend})</span>}
+                      </p>
+                    </div>
                   </div>
-                ))}
+                  {activeJob.failedReason && <div className="text-red-400 font-medium bg-red-400/10 px-3 py-1 rounded-md">{activeJob.failedReason}</div>}
+                </div>
+
+                {activeJob.fallbackReason && (
+                  <div className="relative z-10 mt-3 flex items-start gap-2 text-xs text-yellow-300 bg-yellow-400/10 p-2 rounded-lg">
+                    <i className="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                    <span><strong className="block mb-0.5">Queue Fallback</strong> {activeJob.fallbackReason}</span>
+                  </div>
+                )}
+
+                {activeJob.message && (
+                  <div className="relative z-10 mt-3 text-xs text-gray-300 italic">
+                    <i className="fa-solid fa-info-circle mr-1.5 opacity-50"></i>{activeJob.message}
+                  </div>
+                )}
+
+                {jobResultMessage && (
+                  <div className="relative z-10 mt-3 text-xs text-emerald-400 font-medium bg-emerald-400/10 p-2 rounded-lg border border-emerald-400/20">
+                    <i className="fa-solid fa-check-circle mr-1.5"></i>{jobResultMessage}
+                  </div>
+                )}
+
+                <div className="relative z-10 mt-4 h-2 w-full overflow-hidden rounded-full bg-black/50 shadow-inner">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primaryColor/80 to-primaryColor transition-all duration-300 ease-out relative"
+                    style={{ width: `${Math.max(0, Math.min(100, Number(activeJob.progress) || 0))}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
 
-      {error && (
-        <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-200 animate-fade-in shadow-lg">
-          <i className="fa-solid fa-circle-exclamation text-lg text-red-400"></i>
-          {error}
-        </div>
-      )}
+          {error && (
+            <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-200 animate-fade-in shadow-lg">
+              <i className="fa-solid fa-circle-exclamation text-lg text-red-400"></i>
+              {error}
+            </div>
+          )}
 
-      <div className="rounded-xl border border-white/5 bg-[#1a1a1a] shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-white/10 bg-white/5 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              <tr>
-                <th className="px-6 py-4 whitespace-nowrap">Thông tin Phim</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center">Tập</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center">Intro (Giây)</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center">Outro (Giây)</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center">Trạng thái AI</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center">Tùy chọn</th>
-                <th className="px-6 py-4 whitespace-nowrap text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {loading ? (
-                <tr>
-                  <td colSpan="7" className="px-6 py-16 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400 gap-3">
-                      <i className="fa-solid fa-circle-notch fa-spin text-3xl text-primaryColor"></i>
-                      <span className="font-medium">Đang tải dữ liệu...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : episodes.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="px-6 py-16 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-500 gap-3">
-                      <i className="fa-regular fa-folder-open text-4xl mb-2 opacity-50"></i>
-                      <span className="font-medium">Chưa có tập phim nào phù hợp với bộ lọc</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                episodes.map((episode) => {
-                  const draft = drafts[episode.id] || getInitialDraft(episode);
-                  const meta = episode.playbackMeta || {};
-                  const statusColorClass = getStatusColor(meta.detectionStatus);
-
-                  return (
-                    <tr key={episode.id} className="transition-colors hover:bg-white/[0.02] group">
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="max-w-[240px] truncate font-bold text-white group-hover:text-primaryColor transition-colors">
-                            {episode.movie?.name || "Chưa có tên"}
-                          </span>
-                          <span className="mt-1 inline-block rounded bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase text-gray-400 w-max">
-                            {episode.audioType || "Mặc định"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="inline-flex h-8 min-w-[32px] items-center justify-center rounded-lg bg-black/50 px-2 font-bold text-white border border-white/5 shadow-inner">
-                          {episode.episode}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="Bắt đầu"
-                            value={draft.introStartSec}
-                            onChange={(event) => updateDraft(episode.id, { introStartSec: event.target.value })}
-                            className="h-9 w-20 rounded-md border border-white/10 bg-black/60 px-2 text-center text-white outline-none transition-colors focus:border-primaryColor focus:bg-black"
-                          />
-                          <i className="fa-solid fa-arrow-right text-gray-600 text-[10px]"></i>
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="Kết thúc"
-                            value={draft.introEndSec}
-                            onChange={(event) => updateDraft(episode.id, { introEndSec: event.target.value })}
-                            className="h-9 w-20 rounded-md border border-white/10 bg-black/60 px-2 text-center text-white outline-none transition-colors focus:border-primaryColor focus:bg-black"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder="Giây bắt đầu outro"
-                          value={draft.outroStartSec}
-                          onChange={(event) => updateDraft(episode.id, { outroStartSec: event.target.value })}
-                          className="h-9 w-24 rounded-md border border-white/10 bg-black/60 px-2 text-center text-white outline-none transition-colors focus:border-primaryColor focus:bg-black"
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col items-center justify-center gap-1.5">
-                          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${statusColorClass}`}>
-                            {meta.detectionStatus === 'approved' && <i className="fa-solid fa-check"></i>}
-                            {meta.detectionStatus === 'needs_review' && <i className="fa-solid fa-eye"></i>}
-                            {meta.detectionStatus === 'detected' && <i className="fa-solid fa-wand-magic-sparkles"></i>}
-                            {meta.detectionStatus === 'failed' && <i className="fa-solid fa-xmark"></i>}
-                            {meta.detectionStatus || "CHƯA CÓ"}
-                          </span>
-                          {(meta.detectionSource || meta.confidence) && (
-                            <div className="text-[10px] text-gray-500 font-medium">
-                              {meta.detectionSource || "none"} • {Math.round((meta.confidence || 0) * 100)}% độ tin cậy
-                            </div>
-                          )}
-                          {meta.detectionNote && (
-                            <div className="mt-1 w-full max-w-[160px] truncate rounded bg-yellow-500/10 px-1.5 py-0.5 text-center text-[10px] text-yellow-300 border border-yellow-500/20" title={meta.detectionNote}>
-                              {meta.detectionNote}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex justify-center">
-                          <label
-                            title="Copy thoi gian nay sang cac tap cung audio"
-                            className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/5 bg-black/30 px-3 py-1.5 transition-colors hover:bg-black/60"
-                          >
-                            <div className="relative flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={draft.applyToSeason}
-                                onChange={(event) =>
-                                  updateDraft(episode.id, { applyToSeason: event.target.checked })
-                                }
-                                className="peer sr-only"
-                              />
-                              <div className="h-5 w-5 rounded border border-white/20 bg-transparent peer-checked:border-primaryColor peer-checked:bg-primaryColor transition-all flex items-center justify-center">
-                                <i className="fa-solid fa-check text-[10px] text-black opacity-0 peer-checked:opacity-100 transition-opacity"></i>
-                              </div>
-                            </div>
-                            <span className="text-xs font-medium text-gray-300 peer-checked:text-white select-none whitespace-nowrap">
-                              Áp dụng cả bộ
-                            </span>
-                          </label>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex justify-end gap-2">
-                          <div className="flex bg-black/40 rounded-lg border border-white/10 overflow-hidden shadow-sm">
-                            <button
-                              onClick={() => openPreview(episode)}
-                              disabled={!getIntroPreviewRange(draft)}
-                              title="Xem thử video"
-                              className="flex h-9 w-9 items-center justify-center text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                            >
-                              <i className="fa-solid fa-play"></i>
-                            </button>
-                            <div className="w-px bg-white/10"></div>
-                            <button
-                              onClick={() => openDetectOptions(episode)}
-                              title="Dùng AI nhận diện Intro/Outro"
-                              className="flex h-9 w-9 items-center justify-center text-blue-400 hover:bg-blue-500/20 transition-colors"
-                            >
-                              <i className="fa-solid fa-wand-magic-sparkles"></i>
-                            </button>
-                          </div>
-
-                          <div className="flex gap-1.5 ml-1">
-                            <button
-                              onClick={() => saveEpisode(episode, "needs_review")}
-                              disabled={savingId === episode.id}
-                              className="flex h-9 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 text-xs font-semibold text-orange-400 hover:bg-orange-500/20 disabled:opacity-50 transition-colors shadow-sm"
-                            >
-                              Cần duyệt
-                            </button>
-                            <button
-                              onClick={() => saveEpisode(episode, "approved")}
-                              disabled={savingId === episode.id}
-                              className="flex h-9 items-center justify-center rounded-lg bg-primaryColor px-4 text-xs font-bold text-black shadow-md hover:bg-primaryColor/90 disabled:opacity-50 transition-all active:scale-95"
-                            >
-                              <i className="fa-solid fa-check mr-1.5"></i> Duyệt
-                            </button>
-                          </div>
+          <div className="rounded-xl border border-white/5 bg-[#1a1a1a] shadow-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-white/10 bg-white/5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  <tr>
+                    <th className="px-6 py-4 whitespace-nowrap">Thông tin Phim</th>
+                    <th className="px-6 py-4 whitespace-nowrap text-center">Tập</th>
+                    <th className="px-6 py-4 whitespace-nowrap text-center">Intro (Giây)</th>
+                    <th className="px-6 py-4 whitespace-nowrap text-center">Outro (Giây)</th>
+                    <th className="px-6 py-4 whitespace-nowrap text-center">Trạng thái AI</th>
+                    <th className="px-6 py-4 whitespace-nowrap text-center">Tùy chọn</th>
+                    <th className="px-6 py-4 whitespace-nowrap text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {loading ? (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center justify-center text-gray-400 gap-3">
+                          <i className="fa-solid fa-circle-notch fa-spin text-3xl text-primaryColor"></i>
+                          <span className="font-medium">Đang tải dữ liệu...</span>
                         </div>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ) : episodes.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center justify-center text-gray-500 gap-3">
+                          <i className="fa-regular fa-folder-open text-4xl mb-2 opacity-50"></i>
+                          <span className="font-medium">Chưa có tập phim nào phù hợp với bộ lọc</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    episodes.map((episode) => {
+                      const draft = drafts[episode.id] || getInitialDraft(episode);
+                      const meta = episode.playbackMeta || {};
+                      const statusColorClass = getStatusColor(meta.detectionStatus);
 
-        {/* Pagination Footer */}
-        <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 bg-black/40 px-6 py-4 sm:flex-row">
-          <span className="text-sm font-medium text-gray-400">
-            Tổng cộng <span className="text-white font-bold">{pagination.total}</span> tập phim — Trang <span className="text-white font-bold">{pagination.page}</span> / {Math.max(1, pagination.totalPages || 1)}
-          </span>
-          <PaginationV2
-            page={pagination.page}
-            totalPages={Math.max(1, pagination.totalPages || 1)}
-            onPageChange={(nextPage) => {
-              if (!loading) loadEpisodes(nextPage);
-            }}
-            className={loading ? "pointer-events-none opacity-60" : ""}
+                      return (
+                        <tr key={episode.id} className="transition-colors hover:bg-white/[0.02] group">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="max-w-[240px] truncate font-bold text-white group-hover:text-primaryColor transition-colors">
+                                {episode.movie?.name || "Chưa có tên"}
+                              </span>
+                              <span className="mt-1 inline-block rounded bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase text-gray-400 w-max">
+                                {episode.audioType || "Mặc định"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div className="inline-flex h-8 min-w-[32px] items-center justify-center rounded-lg bg-black/50 px-2 font-bold text-white border border-white/5 shadow-inner">
+                              {episode.episode}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="Bắt đầu"
+                                value={draft.introStartSec}
+                                onChange={(event) => updateDraft(episode.id, { introStartSec: event.target.value })}
+                                className="h-9 w-20 rounded-md border border-white/10 bg-black/60 px-2 text-center text-white outline-none transition-colors focus:border-primaryColor focus:bg-black"
+                              />
+                              <i className="fa-solid fa-arrow-right text-gray-600 text-[10px]"></i>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="Kết thúc"
+                                value={draft.introEndSec}
+                                onChange={(event) => updateDraft(episode.id, { introEndSec: event.target.value })}
+                                className="h-9 w-20 rounded-md border border-white/10 bg-black/60 px-2 text-center text-white outline-none transition-colors focus:border-primaryColor focus:bg-black"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="Giây bắt đầu outro"
+                              value={draft.outroStartSec}
+                              onChange={(event) => updateDraft(episode.id, { outroStartSec: event.target.value })}
+                              className="h-9 w-24 rounded-md border border-white/10 bg-black/60 px-2 text-center text-white outline-none transition-colors focus:border-primaryColor focus:bg-black"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col items-center justify-center gap-1.5">
+                              <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${statusColorClass}`}>
+                                {meta.detectionStatus === 'approved' && <i className="fa-solid fa-check"></i>}
+                                {meta.detectionStatus === 'needs_review' && <i className="fa-solid fa-eye"></i>}
+                                {meta.detectionStatus === 'detected' && <i className="fa-solid fa-wand-magic-sparkles"></i>}
+                                {meta.detectionStatus === 'failed' && <i className="fa-solid fa-xmark"></i>}
+                                {meta.detectionStatus || "CHƯA CÓ"}
+                              </span>
+                              {(meta.detectionSource || meta.confidence) && (
+                                <div className="text-[10px] text-gray-500 font-medium">
+                                  {meta.detectionSource || "none"} • {Math.round((meta.confidence || 0) * 100)}% độ tin cậy
+                                </div>
+                              )}
+                              {meta.detectionNote && (
+                                <div className="mt-1 w-full max-w-[160px] truncate rounded bg-yellow-500/10 px-1.5 py-0.5 text-center text-[10px] text-yellow-300 border border-yellow-500/20" title={meta.detectionNote}>
+                                  {meta.detectionNote}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex justify-center">
+                              <label
+                                title="Copy thoi gian nay sang cac tap cung audio"
+                                className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/5 bg-black/30 px-3 py-1.5 transition-colors hover:bg-black/60"
+                              >
+                                <div className="relative flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={draft.applyToSeason}
+                                    onChange={(event) =>
+                                      updateDraft(episode.id, { applyToSeason: event.target.checked })
+                                    }
+                                    className="peer sr-only"
+                                  />
+                                  <div className="h-5 w-5 rounded border border-white/20 bg-transparent peer-checked:border-primaryColor peer-checked:bg-primaryColor transition-all flex items-center justify-center">
+                                    <i className="fa-solid fa-check text-[10px] text-black opacity-0 peer-checked:opacity-100 transition-opacity"></i>
+                                  </div>
+                                </div>
+                                <span className="text-xs font-medium text-gray-300 peer-checked:text-white select-none whitespace-nowrap">
+                                  Áp dụng cả bộ
+                                </span>
+                              </label>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex justify-end gap-2">
+                              <div className="flex bg-black/40 rounded-lg border border-white/10 overflow-hidden shadow-sm">
+                                <button
+                                  onClick={() => openPreview(episode)}
+                                  disabled={!getIntroPreviewRange(draft)}
+                                  title="Xem thử video"
+                                  className="flex h-9 w-9 items-center justify-center text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                >
+                                  <i className="fa-solid fa-play"></i>
+                                </button>
+                                <div className="w-px bg-white/10"></div>
+                                <button
+                                  onClick={() => openDetectOptions(episode)}
+                                  title="Dùng AI nhận diện Intro/Outro"
+                                  className="flex h-9 w-9 items-center justify-center text-blue-400 hover:bg-blue-500/20 transition-colors"
+                                >
+                                  <i className="fa-solid fa-wand-magic-sparkles"></i>
+                                </button>
+                              </div>
+
+                              <div className="flex gap-1.5 ml-1">
+                                <button
+                                  onClick={() => saveEpisode(episode, "needs_review")}
+                                  disabled={savingId === episode.id}
+                                  className="flex h-9 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 text-xs font-semibold text-orange-400 hover:bg-orange-500/20 disabled:opacity-50 transition-colors shadow-sm"
+                                >
+                                  Cần duyệt
+                                </button>
+                                <button
+                                  onClick={() => saveEpisode(episode, "approved")}
+                                  disabled={savingId === episode.id}
+                                  className="flex h-9 items-center justify-center rounded-lg bg-primaryColor px-4 text-xs font-bold text-black shadow-md hover:bg-primaryColor/90 disabled:opacity-50 transition-all active:scale-95"
+                                >
+                                  <i className="fa-solid fa-check mr-1.5"></i> Duyệt
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 bg-black/40 px-6 py-4 sm:flex-row">
+              <span className="text-sm font-medium text-gray-400">
+                Tổng cộng <span className="text-white font-bold">{pagination.total}</span> tập phim — Trang <span className="text-white font-bold">{pagination.page}</span> / {Math.max(1, pagination.totalPages || 1)}
+              </span>
+              <PaginationV2
+                page={pagination.page}
+                totalPages={Math.max(1, pagination.totalPages || 1)}
+                onPageChange={(nextPage) => {
+                  if (!loading) loadEpisodes(nextPage);
+                }}
+                className={loading ? "pointer-events-none opacity-60" : ""}
+              />
+            </div>
+          </div>
+
+          <PreviewModal
+            preview={preview}
+            saving={savingId === preview?.episode?.id}
+            onClose={() => setPreview(null)}
+            onApprove={() => savePreviewEpisode("approved")}
+            onNeedsReview={() => savePreviewEpisode("needs_review")}
+          />
+          <DetectOptionsModal
+            config={detectConfig}
+            saving={Boolean(activeJobId)}
+            onClose={() => setDetectConfig(null)}
+            onChange={updateDetectConfig}
+            onSubmit={submitDetectOptions}
           />
         </div>
-      </div>
+      )}
 
-      <PreviewModal
-        preview={preview}
-        saving={savingId === preview?.episode?.id}
-        onClose={() => setPreview(null)}
-        onApprove={() => savePreviewEpisode("approved")}
-        onNeedsReview={() => savePreviewEpisode("needs_review")}
-      />
-      <DetectOptionsModal
-        config={detectConfig}
-        saving={Boolean(activeJobId)}
-        onClose={() => setDetectConfig(null)}
-        onChange={updateDetectConfig}
-        onSubmit={submitDetectOptions}
-      />
+      {activeTab === "analytics" && (
+        <AdminBatchAnalytics />
+      )}
     </div>
   );
 };

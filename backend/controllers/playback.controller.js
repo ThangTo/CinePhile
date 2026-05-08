@@ -67,7 +67,16 @@ const listIntroDetectionBatches = async (req, res) => {
     const result = await batchReportService.listIntroDetectionBatchRuns(req.query);
     res.json({ success: true, ...result });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
+const getIntroDetectionBatchStats = async (req, res) => {
+  try {
+    const result = await batchReportService.getIntroDetectionBatchStats(req.query);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }
 };
 
@@ -93,11 +102,29 @@ const getIntroDetectionBatch = async (req, res) => {
   }
 };
 
+const listIntroDetectionBatchMovies = async (req, res) => {
+  try {
+    const result = await batchReportService.listIntroDetectionBatchMovies(
+      req.params.batchId,
+      req.query,
+    );
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'Intro detection batch not found' });
+    }
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   detectIntro,
   getIntroDetectionBatch,
+  getIntroDetectionBatchStats,
   getLatestIntroDetectionBatch,
   getIntroDetectionStatus,
+  listIntroDetectionBatchMovies,
   listIntroDetectionBatches,
   listPlaybackEpisodes,
   updateEpisodePlaybackMeta,

@@ -1212,6 +1212,22 @@ export const playbackAPI = {
     });
     return response.data || response;
   },
+
+  getIntroBatchMovies: async (batchId, params = {}) => {
+    const response = await apiRequest(`/admin/playback/intro-batches/${batchId}/movies`, {
+      params,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  getIntroBatchStats: async (params = {}) => {
+    const response = await apiRequest("/admin/playback/intro-batches/stats", {
+      params,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };
 
 /**
