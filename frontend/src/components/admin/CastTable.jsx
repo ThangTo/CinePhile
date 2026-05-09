@@ -143,9 +143,9 @@ const CastTable = () => {
   return (
     <div className="w-full animate-fade-in">
       {/* 1. Control Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
             <FiUser className="text-primaryColor" />
             Danh Sách Diễn Viên
           </h2>
@@ -154,14 +154,14 @@ const CastTable = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative group flex-1 md:w-80">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div className="relative group w-full sm:w-64 md:w-80">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <FiSearch className="text-gray-500 group-focus-within:text-primaryColor transition-colors" />
             </div>
             <input
               type="text"
-              placeholder="Tìm kiếm theo tên, alias, quê quán..."
+              placeholder="Tìm kiếm theo tên, alias..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="block w-full bg-bgColor3 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-primaryColor focus:ring-1 focus:ring-primaryColor transition-all shadow-lg"
@@ -170,10 +170,10 @@ const CastTable = () => {
 
           <button
             onClick={handleAdd}
-            className="flex items-center gap-2 bg-primaryColor hover:bg-primaryColor/90 text-black font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-primaryColor/20 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap"
+            className="flex justify-center w-full sm:w-auto items-center gap-2 bg-primaryColor hover:bg-primaryColor/90 text-black font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-primaryColor/20 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap"
           >
             <FiPlus size={20} />
-            <span className="hidden sm:inline">Thêm Diễn Viên</span>
+            <span className="inline">Thêm Diễn Viên</span>
           </button>
         </div>
       </div>
@@ -197,15 +197,15 @@ const CastTable = () => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-black/20 text-gray-400 text-xs uppercase tracking-wider font-semibold">
               <tr>
-                <th className="px-6 py-4">#</th>
-                <th className="px-6 py-4">Ảnh</th>
-                <th className="px-6 py-4">Tên</th>
-                <th className="px-6 py-4">Tên khác</th>
-                <th className="px-6 py-4 text-center">Vai trò</th>
-                <th className="px-6 py-4 text-center">Ngày sinh</th>
-                <th className="px-6 py-4">Quê quán</th>
-                <th className="px-6 py-4 text-center">Phim</th>
-                <th className="px-6 py-4 text-center">Hành động</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">#</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">Ảnh</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4">Tên</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden lg:table-cell">Tên khác</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">Vai trò</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden lg:table-cell">Ngày sinh</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden lg:table-cell">Quê quán</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">Phim</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center w-[100px]">Hành động</th>
               </tr>
             </thead>
 
@@ -218,12 +218,12 @@ const CastTable = () => {
                         key={castId}
                         className="group hover:bg-white/[0.02] transition-colors duration-200"
                       >
-                        <td className="px-6 py-4 text-sm text-gray-500 font-mono">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm text-gray-500 font-mono hidden sm:table-cell">
                           {(pagination.currentPage - 1) * pagination.limit + index + 1}
                         </td>
 
-                        <td className="px-6 py-4">
-                          <div className="relative w-12 h-12 rounded-full overflow-hidden shadow-lg shadow-black/50 group-hover:scale-110 transition-transform duration-300 bg-gradient-to-br from-blue-500 to-purple-500">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">
+                          <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shadow-lg shadow-black/50 group-hover:scale-110 transition-transform duration-300 bg-gradient-to-br from-blue-500 to-purple-500">
                             {cast.profileUrl || cast.profilePath ? (
                               <img
                                 src={cast.profileUrl || cast.profilePath}
@@ -239,16 +239,47 @@ const CastTable = () => {
                           </div>
                         </td>
 
-                        <td className="px-6 py-4 max-w-xs">
-                          <span className="text-white font-bold text-base truncate pr-4 group-hover:text-primaryColor transition-colors">
-                            {cast.name || "N/A"}
-                          </span>
-                          {cast.knownForDepartment && (
-                            <div className="text-xs text-gray-500 mt-0.5">{cast.knownForDepartment}</div>
-                          )}
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 max-w-[200px] sm:max-w-xs">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              {/* Mobile Avatar */}
+                              <div className="sm:hidden relative w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-500 shrink-0">
+                                {cast.profileUrl || cast.profilePath ? (
+                                  <img
+                                    src={cast.profileUrl || cast.profilePath}
+                                    alt={cast.name || "Cast"}
+                                    className="w-full h-full object-cover"
+                                    onError={handleAvatarError}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
+                                    {(cast.name || "C").charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-white font-bold text-sm sm:text-base truncate group-hover:text-primaryColor transition-colors">
+                                {cast.name || "N/A"}
+                              </span>
+                            </div>
+                            {cast.knownForDepartment && (
+                              <div className="text-[10px] sm:text-xs text-gray-500 truncate lg:hidden">{cast.knownForDepartment}</div>
+                            )}
+                            
+                            {/* Mobile Only Extra Info */}
+                            <div className="flex md:hidden flex-wrap items-center gap-1.5 mt-1 text-[10px]">
+                              {cast.movieCount > 0 && (
+                                <span className="bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-sm border border-blue-500/20">
+                                  <i className="fa-solid fa-film mr-1 text-[8px]"></i>{cast.movieCount} phim
+                                </span>
+                              )}
+                              <span className="bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded-sm border border-purple-500/20">
+                                {formatRole(cast.roles)}
+                              </span>
+                            </div>
+                          </div>
                         </td>
 
-                        <td className="px-6 py-4 max-w-xs">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 max-w-xs hidden lg:table-cell">
                           <div className="flex flex-wrap gap-1">
                             {cast.alsoKnownAs && cast.alsoKnownAs.length > 0 ? (
                               cast.alsoKnownAs.slice(0, 2).map((alias, i) => (
@@ -268,9 +299,9 @@ const CastTable = () => {
                           </div>
                         </td>
 
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-medium ${
                               cast.roles?.includes("director")
                                 ? "bg-purple-500/20 text-purple-400"
                                 : "bg-blue-500/20 text-blue-400"
@@ -281,11 +312,11 @@ const CastTable = () => {
                           </span>
                         </td>
 
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden lg:table-cell">
                           <div className="flex flex-col items-center gap-0.5">
                             {cast.birthday ? (
                               <>
-                                <div className="flex items-center gap-2 text-gray-300 text-sm">
+                                <div className="flex items-center gap-2 text-gray-300 text-[10px] sm:text-sm">
                                   <FiCalendar className="text-gray-600" size={14} />
                                   <span>{formatDate(cast.birthday)}</span>
                                 </div>
@@ -301,12 +332,12 @@ const CastTable = () => {
                           </div>
                         </td>
 
-                        <td className="px-6 py-4 max-w-[150px]">
-                          <div className="flex items-center gap-2 text-sm text-gray-300 truncate">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 max-w-[150px] hidden lg:table-cell">
+                          <div className="flex items-center gap-2 text-[10px] sm:text-sm text-gray-300 truncate">
                             {cast.place_of_birth ? (
                               <>
                                 <FiMapPin className="text-gray-600 flex-shrink-0" size={14} />
-                                <span className="truncate">{cast.place_of_birth}</span>
+                                <span className="truncate" title={cast.place_of_birth}>{cast.place_of_birth}</span>
                               </>
                             ) : (
                               <span className="text-gray-600 text-xs">—</span>
@@ -314,30 +345,30 @@ const CastTable = () => {
                           </div>
                         </td>
 
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-yellow-400 font-black text-base">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">
+                          <span className="text-yellow-400 font-black text-sm sm:text-base">
                             {cast.movieCount || 0}
                           </span>
                         </td>
 
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-3 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-center">
+                          <div className="flex sm:flex-row flex-wrap justify-center gap-1.5 opacity-100 sm:opacity-80 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => handleEdit(cast)}
-                              className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all"
                               title="Chỉnh sửa"
+                              className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all flex-1 sm:flex-none flex justify-center"
                             >
-                              <FiEdit2 size={18} />
+                              <FiEdit2 size={16} />
                             </button>
                             <button
                               onClick={() => {
                                 setSelectedCast(cast);
                                 setIsDeleteModalOpen(true);
                               }}
-                              className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
                               title="Xóa diễn viên"
+                              className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all flex-1 sm:flex-none flex justify-center"
                             >
-                              <FiTrash2 size={18} />
+                              <FiTrash2 size={16} />
                             </button>
                           </div>
                         </td>

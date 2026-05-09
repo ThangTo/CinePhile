@@ -231,20 +231,23 @@ const MovieTable = () => {
       {/* 1. Control Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
             <FiFilm className="text-primaryColor" />
             Danh Sách Phim
+            <span className="bg-primaryColor/10 text-primaryColor text-sm py-1 px-3 rounded-full border border-primaryColor/20 font-bold">
+              {pagination.totalItems}
+            </span>
           </h2>
           <p className="text-gray-400 text-sm mt-1">
             Quản lý kho phim, xếp hạng và thông tin chi tiết.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
           {/* Filter Dropdown - Đã ẩn / Banner */}
           <div className="relative group">
             <button
-              className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all whitespace-nowrap ${
+              className={`flex items-center justify-center gap-2 font-bold px-3 sm:px-4 py-2.5 rounded-xl shadow-lg transition-all whitespace-nowrap ${
                 showHiddenOnly || showFeaturedOnly
                   ? "bg-primaryColor text-black shadow-primaryColor/20"
                   : "bg-bgColor3 hover:text-primaryColor text-gray-400 border border-white/10"
@@ -256,7 +259,7 @@ const MovieTable = () => {
               </span>
               <i className="fa-solid fa-caret-down text-xs" />
             </button>
-            <div className="absolute right-0 mt-2 w-52 bg-bgColor3 border border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+            <div className="absolute left-0 md:left-auto md:right-0 mt-2 w-52 bg-bgColor3 border border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
               <button
                 onClick={() => {
                   setShowHiddenOnly(!showHiddenOnly);
@@ -379,15 +382,14 @@ const MovieTable = () => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-black/20 text-gray-400 text-xs uppercase tracking-wider font-semibold">
               <tr>
-                <th className="px-6 py-4">#</th>
-                <th className="px-6 py-4">Poster</th>
-                <th className="px-6 py-4">Thông tin phim</th>
-                <th className="px-6 py-4 text-center">Năm</th>
-                <th className="px-6 py-4 text-center">Loại phim</th>
-                <th className="px-6 py-4 text-center">Tập / Status</th>
-                {/* <th className="px-6 py-4 text-center">Rating</th> */}
-                <th className="px-6 py-4 text-right">Lượt xem</th>
-                <th className="px-6 py-4 text-center">Hành động</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">#</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">Poster</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4">Thông tin phim</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">Năm</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden lg:table-cell">Loại phim</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden sm:table-cell">Tập / Status</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-right hidden sm:table-cell">Lượt xem</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center w-[120px]">Hành động</th>
               </tr>
             </thead>
 
@@ -399,13 +401,13 @@ const MovieTable = () => {
                       className="group hover:bg-white/[0.02] transition-colors duration-200"
                     >
                       {/* Index */}
-                      <td className="px-6 py-4 text-sm text-gray-500 font-mono">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm text-gray-500 font-mono hidden sm:table-cell">
                         {(pagination.currentPage - 1) * pagination.limit + index + 1}
                       </td>
 
                       {/* Poster */}
-                      <td className="px-6 py-4">
-                        <div className="relative w-12 h-16 rounded overflow-hidden shadow-lg shadow-black/50 group-hover:scale-110 transition-transform duration-300">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">
+                        <div className="relative w-10 h-14 sm:w-12 sm:h-16 rounded overflow-hidden shadow-lg shadow-black/50 group-hover:scale-110 transition-transform duration-300">
                           <OptimizedImage
                             src={movie.poster || movie.poster_url || ""}
                             alt={movie.title}
@@ -416,31 +418,51 @@ const MovieTable = () => {
                       </td>
 
                       {/* Movie Info */}
-                      <td className="px-6 py-4 max-w-xs">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 max-w-[200px] sm:max-w-xs">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-start gap-2">
-                            <span className="text-white font-bold text-base line-clamp-1 flex-1 group-hover:text-primaryColor transition-colors">
+                          <div className="flex items-start gap-2 flex-wrap">
+                            <span className="text-white font-bold text-sm sm:text-base line-clamp-2 sm:line-clamp-1 flex-1 group-hover:text-primaryColor transition-colors">
                               {movie.title}
                             </span>
                             {movie.isFeatured && (
-                              <span className="flex-shrink-0 px-2 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-400 rounded-full border border-amber-500/30 whitespace-nowrap">
+                              <span className="flex-shrink-0 px-2 py-0.5 text-[10px] sm:text-xs font-semibold bg-amber-500/20 text-amber-400 rounded-full border border-amber-500/30 whitespace-nowrap">
                                 ⭐ Banner
                               </span>
                             )}
                             {movie.isHidden && (
-                              <span className="flex-shrink-0 px-2 py-0.5 text-xs font-semibold bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30 whitespace-nowrap">
+                              <span className="flex-shrink-0 px-2 py-0.5 text-[10px] sm:text-xs font-semibold bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30 whitespace-nowrap">
                                 Đã ẩn
                               </span>
                             )}
                           </div>
-                          <span className="text-sm text-gray-500 italic truncate">
+                          <span className="text-xs sm:text-sm text-gray-500 italic truncate">
                             {movie.englishTitle || "No English Title"}
                           </span>
+                          
+                          {/* Mobile Only Extra Info */}
+                          <div className="flex md:hidden flex-wrap items-center gap-1.5 mt-1 text-[10px] font-medium text-gray-400">
+                            <span className="bg-white/5 px-1.5 py-0.5 rounded-sm">{movie.year}</span>
+                            <span className={`px-1.5 py-0.5 rounded-sm border ${
+                              movie.type === 'single' || movie.type === 'movie' 
+                                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
+                                : movie.type === 'hoathinh' 
+                                  ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                  : 'bg-green-500/10 text-green-400 border-green-500/20'
+                            }`}>
+                              {movie.type === 'single' || movie.type === 'movie' ? 'Phim Lẻ' : movie.type === 'hoathinh' ? 'Hoạt Hình' : 'Phim Bộ'}
+                            </span>
+                            <span className="bg-white/10 text-white px-1.5 py-0.5 rounded-sm border border-white/5 sm:hidden">
+                              Tập: {movie.currentEpisode || "0"}/{movie.totalEpisodes || "?"}
+                            </span>
+                            <span className="flex items-center gap-1 sm:hidden">
+                              <i className="fa-solid fa-eye text-[9px]"></i> {movie.views?.toLocaleString() || 0}
+                            </span>
+                          </div>
                         </div>
                       </td>
 
                       {/* Year */}
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 text-gray-300 text-xs font-medium">
                           <FiCalendar size={12} />
                           {movie.year}
@@ -448,8 +470,8 @@ const MovieTable = () => {
                       </td>
 
                       {/* Type */}
-                      <td className="px-6 py-4 text-center">
-                        <div className={`inline-flex items-center justify-center px-2 py-1 rounded-md text-xs font-bold ${
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden lg:table-cell">
+                        <div className={`inline-flex items-center justify-center px-2 py-1 rounded-md text-[10px] sm:text-xs font-bold ${
                           movie.type === 'single' || movie.type === 'movie' 
                             ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
                             : movie.type === 'hoathinh' 
@@ -465,7 +487,7 @@ const MovieTable = () => {
                       </td>
 
                       {/* Episodes and Status */}
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden sm:table-cell">
                         <div className="flex flex-col items-center gap-1.5">
                           <span className="text-sm text-gray-300 font-medium">
                             {movie.currentEpisode || "0"}/{movie.totalEpisodes || "?"}
@@ -483,7 +505,7 @@ const MovieTable = () => {
                       </td>
 
                       {/* Rating */}
-                      {/* <td className="px-6 py-4 text-center">
+                      {/* <td className="px-4 py-3 sm:px-6 sm:py-4 text-center">
                         <div className="flex items-center justify-center gap-1 text-yellow-500 font-bold">
                           <FiStar className="fill-yellow-500" size={14} />
                           <span>{movie.rating ? movie.rating.toFixed(1) : "N/A"}</span>
@@ -491,7 +513,7 @@ const MovieTable = () => {
                       </td> */}
 
                       {/* Views */}
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 text-right hidden sm:table-cell">
                         <div className="flex items-center justify-end gap-2 text-sm text-gray-300">
                           <span className="font-mono">{movie.views?.toLocaleString() || 0}</span>
                           <FiEye className="text-gray-600" size={14} />
@@ -499,46 +521,46 @@ const MovieTable = () => {
                       </td>
 
                       {/* Actions */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-3 opacity-80 group-hover:opacity-100 transition-opacity">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4">
+                        <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 sm:gap-2 opacity-100 sm:opacity-80 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleEdit(movie)}
-                            className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all"
+                            className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all flex-1 sm:flex-none flex justify-center"
                             title="Chỉnh sửa"
                           >
-                            <FiEdit2 size={18} />
+                            <FiEdit2 size={16} />
                           </button>
                           <button
                             onClick={() => handleToggleFeatured(movie)}
-                            className={`p-2 rounded-lg transition-all ${
+                            className={`p-2 rounded-lg transition-all hidden sm:flex flex-1 sm:flex-none justify-center ${
                               movie.isFeatured
                                 ? "text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
                                 : "text-gray-500 hover:bg-gray-500/10 hover:text-gray-300"
                             }`}
                             title={movie.isFeatured ? "Gỡ khỏi banner" : "Đưa lên banner"}
                           >
-                            <FiAward size={18} />
+                            <FiAward size={16} />
                           </button>
                           <button
                             onClick={() => handleToggleHidden(movie)}
-                            className={`p-2 rounded-lg transition-all ${
+                            className={`p-2 rounded-lg transition-all hidden sm:flex flex-1 sm:flex-none justify-center ${
                               movie.isHidden
                                 ? "text-green-400 hover:bg-green-500/10 hover:text-green-300"
                                 : "text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
                             }`}
                             title={movie.isHidden ? "Hiện phim" : "Ẩn phim"}
                           >
-                            {movie.isHidden ? <FiEye size={18} /> : <FiEyeOff size={18} />}
+                            {movie.isHidden ? <FiEye size={16} /> : <FiEyeOff size={16} />}
                           </button>
                           <button
                             onClick={() => {
                               setSelectedMovie(movie);
                               setIsDeleteModalOpen(true);
                             }}
-                            className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
+                            className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all flex-1 sm:flex-none flex justify-center"
                             title="Xóa phim"
                           >
-                            <FiTrash2 size={18} />
+                            <FiTrash2 size={16} />
                           </button>
                         </div>
                       </td>

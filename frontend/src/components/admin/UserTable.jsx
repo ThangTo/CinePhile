@@ -208,16 +208,16 @@ const UserTable = () => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-black/20 text-gray-400 text-xs uppercase tracking-wider font-semibold">
               <tr>
-                <th className="px-6 py-4">#</th>
-                <th className="px-6 py-4">Avatar</th>
-                <th className="px-6 py-4">Tên</th>
-                <th className="px-6 py-4">Email</th>
-                <th className="px-6 py-4 text-center">Vai trò</th>
-                <th className="px-6 py-4 text-center">Streak</th>
-                <th className="px-6 py-4 text-center">Coin</th>
-                {/* <th className="px-6 py-4 text-center">Trạng thái</th> */}
-                <th className="px-6 py-4 text-right">Ngày tham gia</th>
-                <th className="px-6 py-4 text-center">Hành động</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">#</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">Avatar</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4">Người dùng</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 hidden lg:table-cell">Email</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">Vai trò</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">Streak</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">Coin</th>
+                {/* <th className="px-4 py-3 sm:px-6 sm:py-4 text-center">Trạng thái</th> */}
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-right hidden sm:table-cell">Ngày tham gia</th>
+                <th className="px-4 py-3 sm:px-6 sm:py-4 text-center">Hành động</th>
               </tr>
             </thead>
 
@@ -231,13 +231,13 @@ const UserTable = () => {
                         className="group hover:bg-white/[0.02] transition-colors duration-200"
                       >
                         {/* Index */}
-                        <td className="px-6 py-4 text-sm text-gray-500 font-mono">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm text-gray-500 font-mono hidden sm:table-cell">
                           {(pagination.currentPage - 1) * pagination.limit + index + 1}
                         </td>
 
                         {/* Avatar */}
-                        <td className="px-6 py-4">
-                          <div className="relative w-12 h-12 rounded-full overflow-hidden shadow-lg shadow-black/50 group-hover:scale-110 transition-transform duration-300 bg-gradient-to-br from-blue-500 to-purple-500">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">
+                          <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shadow-lg shadow-black/50 group-hover:scale-110 transition-transform duration-300 bg-gradient-to-br from-blue-500 to-purple-500">
                             {user.avatar ? (
                               <img
                                 src={user.avatar}
@@ -246,7 +246,7 @@ const UserTable = () => {
                                 onError={handleAvatarError}
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-white font-semibold text-lg">
+                              <div className="w-full h-full flex items-center justify-center text-white font-semibold text-sm sm:text-lg">
                                 {(user.name || user.username || "U").charAt(0).toUpperCase()}
                               </div>
                             )}
@@ -254,29 +254,64 @@ const UserTable = () => {
                         </td>
 
                         {/* User Info */}
-                        <td className="px-6 py-4 max-w-xs">
-                          <div className="flex flex-col">
-                            <span className="text-white font-bold text-base truncate pr-4 group-hover:text-primaryColor transition-colors">
-                              {user.name || user.username || "N/A"}
-                            </span>
-                            {/* Streak badge inline */}
-                            {user.watchStreak > 0 ? (
-                              <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-primaryColor bg-primaryColor/10 border border-primaryColor/20 px-1.5 py-0.5 rounded-md w-fit">
-                                <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
-                                  <path d="M12 2c0 0-5 6.5-5 11a5 5 0 0 0 10 0c0-4.5-5-11-5-11z" />
-                                </svg>
-                                {user.watchStreak} ngày
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 max-w-[200px] sm:max-w-xs">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              {/* Mobile Avatar */}
+                              <div className="sm:hidden relative w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-500 shrink-0">
+                                {user.avatar ? (
+                                  <img
+                                    src={user.avatar}
+                                    alt={user.name || "User"}
+                                    className="w-full h-full object-cover"
+                                    onError={handleAvatarError}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
+                                    {(user.name || user.username || "U").charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-white font-bold text-sm sm:text-base truncate group-hover:text-primaryColor transition-colors">
+                                {user.name || user.username || "N/A"}
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] text-gray-600 px-1.5 py-0.5 rounded-md w-fit">
-                                Chưa xem
+                            </div>
+                            
+                            <span className="text-xs text-gray-500 truncate lg:hidden">{user.email}</span>
+
+                            {/* Mobile Only Extras (Role, Streak, Coin) */}
+                            <div className="flex md:hidden flex-wrap items-center gap-1.5 mt-1 text-[10px]">
+                              <span className={`px-1.5 py-0.5 rounded-sm font-medium ${
+                                user.role === "admin" ? "bg-purple-500/20 text-purple-400" : user.role === "premium" ? "bg-yellow-500/20 text-yellow-400" : "bg-blue-500/20 text-blue-400"
+                              }`}>
+                                {user.role === "admin" ? "Admin" : user.role === "premium" ? "Premium" : "User"}
                               </span>
-                            )}
+                              <span className="bg-primaryColor/10 text-primaryColor px-1.5 py-0.5 rounded-sm font-bold border border-primaryColor/20">
+                                <i className="fa-solid fa-fire mr-1 text-[8px]"></i>{user.watchStreak || 0}
+                              </span>
+                              <span className="bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded-sm font-bold border border-yellow-500/20">
+                                <i className="fa-solid fa-coins mr-1 text-[8px]"></i>{user.coin || 0}
+                              </span>
+                            </div>
+
+                            {/* Desktop Streak badge inline */}
+                            <div className="hidden md:block mt-0.5">
+                              {user.watchStreak > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primaryColor bg-primaryColor/10 border border-primaryColor/20 px-1.5 py-0.5 rounded-md w-fit">
+                                  <i className="fa-solid fa-fire text-[8px]"></i>
+                                  {user.watchStreak} ngày
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-gray-600 px-1.5 py-0.5 rounded-md w-fit">
+                                  Chưa xem
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
 
                         {/* Email */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 hidden lg:table-cell">
                           <div className="flex items-center gap-2 text-sm text-gray-300">
                             <FiMail className="text-gray-600" size={14} />
                             <span className="truncate max-w-xs">{user.email}</span>
@@ -284,7 +319,7 @@ const UserTable = () => {
                         </td>
 
                         {/* Role */}
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
                               user.role === "admin"
@@ -304,7 +339,7 @@ const UserTable = () => {
                         </td>
 
                         {/* Streak */}
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">
                           {user.watchStreak > 0 ? (
                             <div className="flex flex-col items-center gap-0.5">
                               <span className="text-primaryColor font-black text-base leading-none">
@@ -318,7 +353,7 @@ const UserTable = () => {
                         </td>
 
                         {/* Coin */}
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">
                           <div className="flex flex-col items-center gap-0.5">
                             <span className="text-yellow-400 font-black text-base leading-none">
                               {user.coin ?? 0}
@@ -327,22 +362,8 @@ const UserTable = () => {
                           </div>
                         </td>
 
-                        {/* Status */}
-                        {/* <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => toggleStatus(user.id)}
-                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                            user.status === "active"
-                              ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                              : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                          }`}
-                        >
-                          {user.status === "active" ? "Hoạt động" : "Vô hiệu"}
-                        </button>
-                      </td> */}
-
                         {/* Join Date */}
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-right hidden sm:table-cell">
                           <div className="flex flex-col items-end gap-1 text-sm">
                             {user.createdAt ? (
                               <>
@@ -367,24 +388,24 @@ const UserTable = () => {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-3 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4 text-center">
+                          <div className="flex sm:flex-row flex-wrap justify-center gap-1.5 opacity-100 sm:opacity-80 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => handleEdit(user)}
-                              className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all"
-                              title="Chỉnh sửa"
+                              title="Chỉnh sửa thông tin"
+                              className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all flex-1 sm:flex-none flex justify-center"
                             >
-                              <FiEdit2 size={18} />
+                              <FiEdit2 size={16} />
                             </button>
                             <button
                               onClick={() => {
                                 setSelectedUser(user);
                                 setIsDeleteModalOpen(true);
                               }}
-                              className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
                               title="Xóa người dùng"
+                              className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all flex-1 sm:flex-none flex justify-center"
                             >
-                              <FiTrash2 size={18} />
+                              <FiTrash2 size={16} />
                             </button>
                           </div>
                         </td>

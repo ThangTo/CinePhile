@@ -218,23 +218,23 @@ const CommentTable = () => {
       )}
 
       {/* --- TABLE CONTENT --- */}
-      <div className="flex-1 overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+      <div className="flex-1 overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left border-collapse min-w-[500px] sm:min-w-full">
           <thead className="bg-white/[0.02] border-b border-white/5">
             <tr>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 sm:px-6 sm:py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                 Nội dung / Lý do
               </th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 sm:px-6 sm:py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                 Người dùng
               </th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 sm:px-6 sm:py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center hidden md:table-cell">
                 Trạng thái
               </th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 sm:px-6 sm:py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                 Thời gian
               </th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">
+              <th className="px-4 py-3 sm:px-6 sm:py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right w-[120px]">
                 Hành động
               </th>
             </tr>
@@ -260,31 +260,45 @@ const CommentTable = () => {
               comments.map((comment) => (
                 <tr key={comment.id} className="group hover:bg-white/[0.02] transition-colors">
                   {/* Cột Nội Dung */}
-                  <td className="px-6 py-4 max-w-sm">
+                  <td className="px-4 py-3 sm:px-6 sm:py-4 max-w-[200px] sm:max-w-sm">
                     <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2 sm:hidden mb-1">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border border-white/10 text-[9px] font-bold text-white shrink-0">
+                          {getInitials(comment.user.name)}
+                        </div>
+                        <span className="text-xs font-medium text-gray-300 truncate">{comment.user.name}</span>
+                      </div>
                       <p
-                        className="text-sm text-gray-200 line-clamp-2 leading-relaxed"
+                        className="text-sm text-gray-200 line-clamp-2 sm:line-clamp-3 leading-relaxed"
                         title={comment.fullContent}
                       >
                         {comment.content}
                       </p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         {comment.flag && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">
                             <FiAlertCircle className="w-3 h-3" /> Flag: {comment.flag}
                           </span>
                         )}
                         {comment.reason && (
-                          <span className="text-xs text-gray-500 italic flex items-center gap-1">
+                          <span className="text-[10px] sm:text-xs text-gray-500 italic flex items-center gap-1">
                             • Lý do: {comment.reason}
                           </span>
                         )}
+                        
+                        {/* Mobile only Status & Time */}
+                        <div className="flex md:hidden items-center gap-2 w-full mt-1">
+                          {getStatusBadge(comment.status)}
+                          <span className="text-[9px] text-gray-500 lg:hidden">
+                            {formatDateTime(comment.createdAt).date}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </td>
 
                   {/* Cột Người Dùng */}
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-3 sm:px-6 sm:py-4 hidden sm:table-cell">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border border-white/10 text-xs font-bold text-white">
                         {getInitials(comment.user.name)}
@@ -299,10 +313,12 @@ const CommentTable = () => {
                   </td>
 
                   {/* Cột Trạng Thái */}
-                  <td className="px-6 py-4">{getStatusBadge(comment.status)}</td>
+                  <td className="px-4 py-3 sm:px-6 sm:py-4 text-center hidden md:table-cell">
+                    {getStatusBadge(comment.status)}
+                  </td>
 
                   {/* Cột Thời Gian */}
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-3 sm:px-6 sm:py-4 hidden lg:table-cell">
                     <div className="flex flex-col text-xs text-gray-400">
                       <span className="text-gray-300 font-medium">
                         {formatDateTime(comment.createdAt).date}
@@ -314,12 +330,12 @@ const CommentTable = () => {
                   </td>
 
                   {/* Cột Hành Động (Icons) */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <td className="px-4 py-3 sm:px-6 sm:py-4 text-right">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-1 opacity-100 sm:opacity-80 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => handleStatusUpdate(comment.id, "allowed")}
                         title="Chấp nhận"
-                        className="p-2 rounded-lg text-green-500 hover:bg-green-500/10 hover:scale-110 transition-all"
+                        className="p-2 rounded-lg text-green-500 hover:bg-green-500/10 sm:hover:scale-110 transition-all flex-1 sm:flex-none flex justify-center"
                       >
                         <FiCheck size={18} />
                       </button>
@@ -327,17 +343,17 @@ const CommentTable = () => {
                       <button
                         onClick={() => handleStatusUpdate(comment.id, "dismissed")}
                         title="Ẩn bình luận"
-                        className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 hover:scale-110 transition-all"
+                        className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 sm:hover:scale-110 transition-all flex-1 sm:flex-none flex justify-center"
                       >
                         <FiEyeOff size={18} />
                       </button>
 
-                      <div className="w-px h-4 bg-white/10 mx-1"></div>
+                      <div className="w-px h-4 bg-white/10 mx-1 hidden sm:block"></div>
 
                       <button
                         onClick={() => handleDeleteClick(comment.id)}
                         title="Xóa vĩnh viễn"
-                        className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 hover:scale-110 transition-all"
+                        className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 sm:hover:scale-110 transition-all flex-1 sm:flex-none flex justify-center"
                       >
                         <FiTrash2 size={18} />
                       </button>
