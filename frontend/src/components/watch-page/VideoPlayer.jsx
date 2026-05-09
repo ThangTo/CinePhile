@@ -11,6 +11,7 @@ import PremiumRequiredModal from "../common/PremiumRequiredModal";
 import { isPremiumActive } from "utils/premiumUtils";
 import { getVideoSource, USE_SERVER_ADBLOCK } from "config/video.config";
 import { normalizePlaybackMeta, shouldShowNextEpisodePrompt as shouldShowNextEpisodePromptByTiming } from "utils/playbackTiming";
+import { addAutoplayToEmbedSource, shouldBlockPlaybackForAuth } from "utils/playbackAuth";
 
 const HYBRID_PROXY_STORAGE_KEY = "cinephine_proxy_sources";
 const PROXY_ESCALATION_THRESHOLD = 2;
@@ -121,13 +122,15 @@ const VideoPlayer = ({
   const [subtitleProgress, setSubtitleProgress] = useState(0);
   const [subtitleError, setSubtitleError] = useState(null);
   const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(null);
+  const [allowEmbedPlayback, setAllowEmbedPlayback] = useState(false);
+  const [shouldAutoplayEmbed, setShouldAutoplayEmbed] = useState(false);
 
   const [featurePermissions, setFeaturePermissions] = useState({
     download_movie: { requiresPremium: false },
     korean_subtitles: { requiresPremium: false }
   });
 
-  const { user, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
   const isPremium = isPremiumActive(user);
   const isAdmin = user?.role === "admin";
   const isRegularUser = !isPremium && !isAdmin;
@@ -163,6 +166,8 @@ const VideoPlayer = ({
   const blobUrlRef = useRef(null);
   const downloadAbortControllerRef = useRef(null);
   const firstPlayFiredRef = useRef(false);
+  const pendingPlaybackRef = useRef(false);
+  const authModalRequestedRef = useRef(false);
   const sourceDomainRef = useRef(null);
   const networkErrorCountRef = useRef(0);
   const lastPlaybackModeRef = useRef("direct");
@@ -228,6 +233,11 @@ const VideoPlayer = ({
   }, [episode]);
 
   const hasNativePlayer = Boolean(hlsSource || fileSource);
+  const playableEmbedSource = useMemo(() => {
+    if (!embedSource) return null;
+    if (!isAuthenticated && !allowEmbedPlayback) return null;
+    return shouldAutoplayEmbed ? addAutoplayToEmbedSource(embedSource) : embedSource;
+  }, [allowEmbedPlayback, embedSource, isAuthenticated, shouldAutoplayEmbed]);
   const playbackMeta = useMemo(() => normalizePlaybackMeta(episode?.playbackMeta), [episode?.playbackMeta]);
   const hasNextEpisode = useMemo(() => {
     const currentEpNumber = episode?.episode || episode?.episodeId || 1;
@@ -303,6 +313,106 @@ const VideoPlayer = ({
     }
   }, []);
 
+  const blockPlaybackForAuthGate = useCallback(() => {
+    pendingPlaybackRef.current = true;
+    clearPendingBuffering();
+    setIsBuffering(false);
+    setIsPlaying(false);
+    setShowControls(true);
+
+    const video = videoRef.current;
+    if (video && !video.paused) {
+      video.pause();
+    }
+
+    if (!isAuthLoading && !authModalRequestedRef.current) {
+      authModalRequestedRef.current = true;
+      openAuthModal("login");
+    }
+  }, [clearPendingBuffering, isAuthLoading, openAuthModal]);
+
+  const canStartPlayback = useCallback(() => {
+    if (
+      !shouldBlockPlaybackForAuth({
+        isAuthenticated,
+        isAuthLoading,
+      })
+    ) {
+      return true;
+    }
+
+    blockPlaybackForAuthGate();
+    return false;
+  }, [blockPlaybackForAuthGate, isAuthenticated, isAuthLoading]);
+
+  const requestNativePlayback = useCallback(async () => {
+    const video = videoRef.current;
+    authModalRequestedRef.current = false;
+
+    if (!video || !canStartPlayback()) return false;
+
+    try {
+      await video.play();
+      setIsPlaying(true);
+      setHasAutoPlayed(true);
+      pendingPlaybackRef.current = false;
+      authModalRequestedRef.current = false;
+      return true;
+    } catch (error) {
+      console.error("Playback failed:", error);
+      pendingPlaybackRef.current = false;
+      return false;
+    }
+  }, [canStartPlayback]);
+
+  const requestEmbedPlayback = useCallback(() => {
+    authModalRequestedRef.current = false;
+    if (!canStartPlayback()) return false;
+
+    pendingPlaybackRef.current = false;
+    authModalRequestedRef.current = false;
+    setAllowEmbedPlayback(true);
+    setShouldAutoplayEmbed(true);
+    return true;
+  }, [canStartPlayback]);
+
+  useEffect(() => {
+    if (isAuthenticated) return;
+    setAllowEmbedPlayback(false);
+    setShouldAutoplayEmbed(false);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!pendingPlaybackRef.current || isAuthLoading) return;
+
+    if (!isAuthenticated) {
+      if (!authModalRequestedRef.current) {
+        authModalRequestedRef.current = true;
+        openAuthModal("login");
+      }
+      return;
+    }
+
+    if (hasNativePlayer) {
+      requestNativePlayback();
+      return;
+    }
+
+    if (embedSource) {
+      pendingPlaybackRef.current = false;
+      authModalRequestedRef.current = false;
+      setAllowEmbedPlayback(true);
+      setShouldAutoplayEmbed(true);
+    }
+  }, [
+    embedSource,
+    hasNativePlayer,
+    isAuthenticated,
+    isAuthLoading,
+    openAuthModal,
+    requestNativePlayback,
+  ]);
+
   // --- Logic Video Event Listeners (Giữ nguyên) ---
   useEffect(() => {
     const video = videoRef.current;
@@ -359,9 +469,21 @@ const VideoPlayer = ({
     };
 
     const handlePlay = () => {
+      if (
+        shouldBlockPlaybackForAuth({
+          isAuthenticated,
+          isAuthLoading,
+        })
+      ) {
+        blockPlaybackForAuthGate();
+        return;
+      }
+
       clearPendingBuffering();
       setIsBuffering(false);
       setIsPlaying(true);
+      pendingPlaybackRef.current = false;
+      authModalRequestedRef.current = false;
       // Fire the first-play callback only once per component lifetime.
       if (!firstPlayFiredRef.current && onFirstPlay) {
         firstPlayFiredRef.current = true;
@@ -454,7 +576,16 @@ const VideoPlayer = ({
       video.removeEventListener("progress", handleProgress);
       video.removeEventListener("leavepictureinpicture", handleLeavePiP);
     };
-  }, [clearPendingBuffering, hasNativePlayer, episode, duration, onFirstPlay]);
+  }, [
+    blockPlaybackForAuthGate,
+    clearPendingBuffering,
+    duration,
+    episode,
+    hasNativePlayer,
+    isAuthenticated,
+    isAuthLoading,
+    onFirstPlay,
+  ]);
 
   const shouldEscalateToProxyMode = useCallback((data) => {
     const failedUrl = getHlsErrorUrl(data) || "";
@@ -626,16 +757,18 @@ const VideoPlayer = ({
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !hasNativePlayer || hasAutoPlayed) return;
+    if (
+      shouldBlockPlaybackForAuth({
+        isAuthenticated,
+        isAuthLoading,
+      })
+    ) {
+      return;
+    }
 
     const handleCanPlay = async () => {
       if (hasAutoPlayed) return;
-      try {
-        await video.play();
-        setIsPlaying(true);
-        setHasAutoPlayed(true);
-      } catch (error) {
-        console.error("Auto-play failed:", error);
-      }
+      await requestNativePlayback();
     };
 
     if (video.readyState >= 3) {
@@ -647,7 +780,7 @@ const VideoPlayer = ({
     return () => {
       video.removeEventListener("canplay", handleCanPlay);
     };
-  }, [hasNativePlayer, hasAutoPlayed]);
+  }, [hasNativePlayer, hasAutoPlayed, isAuthenticated, isAuthLoading, requestNativePlayback]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -670,9 +803,7 @@ const VideoPlayer = ({
     };
 
     setActionHandler("play", async () => {
-      try {
-        await video.play();
-      } catch {}
+      await requestNativePlayback();
     });
 
     setActionHandler("pause", () => {
@@ -728,6 +859,7 @@ const VideoPlayer = ({
     isPlaying,
     movie?.name,
     movie?.title,
+    requestNativePlayback,
   ]);
 
   // Save progress logic (Giữ nguyên)
@@ -1175,7 +1307,7 @@ const VideoPlayer = ({
   const handlePlayPause = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) video.play();
+    if (video.paused) requestNativePlayback();
     else video.pause();
   };
 
@@ -1917,7 +2049,7 @@ const VideoPlayer = ({
   useEffect(() => {
     const onPlay = () => {
       const video = videoRef.current;
-      if (video && video.paused) video.play().catch(() => {});
+      if (video && video.paused) requestNativePlayback();
     };
     const onPause = () => {
       const video = videoRef.current;
@@ -2037,7 +2169,7 @@ const VideoPlayer = ({
       window.removeEventListener("VOICE_CMD_CHANGE_AUDIO", onChangeAudio);
       window.removeEventListener("VOICE_CMD_MAX_VOLUME", onMaxVolume);
     };
-  }, [duration, volume, toggleFullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [duration, requestNativePlayback, toggleFullscreen, volume]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDownloadMovie = useCallback(async () => {
     if (!user) {
@@ -2248,7 +2380,8 @@ const VideoPlayer = ({
       switch (e.code) {
         case "Space":
         case "KeyK":
-          video.paused ? video.play() : video.pause();
+          if (video.paused) requestNativePlayback();
+          else video.pause();
           break;
         case "ArrowLeft":
           video.currentTime = Math.max(0, video.currentTime - 10);
@@ -2268,7 +2401,7 @@ const VideoPlayer = ({
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [duration, toggleFullscreen, toggleMute]);
+  }, [duration, requestNativePlayback, toggleFullscreen, toggleMute]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -2334,15 +2467,26 @@ const VideoPlayer = ({
             touchAction: "manipulation",
           }}
         />
-      ) : embedSource ? (
+      ) : playableEmbedSource ? (
         <iframe
-          src={embedSource}
+          src={playableEmbedSource}
           title="Movie player"
           allow="autoplay; fullscreen"
           allowFullScreen
           className="w-full h-full rounded-lg border-0"
           style={{ minHeight: 360 }}
         />
+      ) : embedSource ? (
+        <div className="w-full h-full min-h-[360px] flex items-center justify-center bg-black text-white rounded-lg">
+          <button
+            type="button"
+            onClick={requestEmbedPlayback}
+            className="flex items-center gap-3 px-5 py-3 bg-white/10 hover:bg-white/20 border border-white/15 hover:border-primaryColor/60 rounded-lg transition-colors"
+          >
+            <i className="fa-solid fa-play text-primaryColor" />
+            <span className="text-sm font-semibold">Đăng nhập để xem phim</span>
+          </button>
+        </div>
       ) : (
         <div className="w-full h-full flex items-center justify-center text-white text-sm text-center px-4">
           Chưa có nguồn phát cho tập phim này. Vui lòng thử tập khác hoặc quay lại sau.
