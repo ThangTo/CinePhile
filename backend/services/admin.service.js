@@ -15,6 +15,7 @@ const notificationService = require('./notification.service');
 const analyticsService = require('./analytics.service');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
 const { parseEpisodeNumber } = require('../utils/movieTransformer');
+const { extractEpisodeNumber } = require('../utils/episodeNumber.util');
 const { crawlMovieBySlug } = require('./crawler.service');
 const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
 
@@ -1038,10 +1039,6 @@ const axios = require('axios');
 const API_BASE_URL = 'https://phimapi.com';
 
 // Helpers
-const extractEpisodeNumber = (name = '') => {
-  const match = name.match(/\d+/);
-  return match ? parseInt(match[0], 10) : 0;
-};
 
 const detectAudioType = (serverName = '') => {
   const lower = serverName.toLowerCase();

@@ -8,6 +8,7 @@ const { ensureCastForNames } = require('../integrations/cast.service');
 const { slugify } = require('../utils/movieAdminUtils');
 const { createNotification } = require('../controllers/notification.controller');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
+const { extractEpisodeNumber } = require('../utils/episodeNumber.util');
 const redisService = require('./redis.service');
 
 const API_BASE_URL = 'https://phimapi.com';
@@ -366,14 +367,6 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
     console.error('❌ Lỗi Crawl System:', error.message);
     throw error;
   }
-};
-
-/**
- * Hàm phụ trợ: Lấy số tập từ chuỗi (vd: "Tập 1" -> 1)
- */
-const extractEpisodeNumber = (name = '') => {
-  const match = name.match(/\d+/);
-  return match ? parseInt(match[0], 10) : 0;
 };
 
 /**

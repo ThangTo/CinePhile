@@ -8,6 +8,7 @@ const normalizeAudioType = (audioType) =>
   typeof audioType === "string" ? audioType.trim().toLowerCase() : null;
 
 const DEFAULT_AUDIO_PRIORITY = ["vietsub", "thuyet-minh", "long-tieng"];
+const LEGACY_FULL_MOVIE_EPISODE = 0;
 
 const matchesAudioType = (episode, audioType) => {
   const requestedAudioType = normalizeAudioType(audioType);
@@ -15,14 +16,26 @@ const matchesAudioType = (episode, audioType) => {
   return normalizeAudioType(episode?.audioType) === requestedAudioType;
 };
 
+const findEpisodeVariantsByNumber = (episodes, episodeNumber) => {
+  const sameNumberEpisodes = episodes.filter(
+    (episode) => getEpisodeNumber(episode) === episodeNumber,
+  );
+
+  if (sameNumberEpisodes.length > 0 || episodeNumber !== 1) {
+    return sameNumberEpisodes;
+  }
+
+  return episodes.filter(
+    (episode) => getEpisodeNumber(episode) === LEGACY_FULL_MOVIE_EPISODE,
+  );
+};
+
 export const findEpisodeVariant = (episodes = [], episodeNumber = 1, audioType = null) => {
   if (!Array.isArray(episodes) || episodes.length === 0) return null;
 
   const requestedEpisodeNumber = Number.parseInt(episodeNumber, 10);
   const activeEpisodeNumber = Number.isFinite(requestedEpisodeNumber) ? requestedEpisodeNumber : 1;
-  const sameNumberEpisodes = episodes.filter(
-    (episode) => getEpisodeNumber(episode) === activeEpisodeNumber,
-  );
+  const sameNumberEpisodes = findEpisodeVariantsByNumber(episodes, activeEpisodeNumber);
 
   const matchingAudioEpisode = sameNumberEpisodes.find((episode) =>
     matchesAudioType(episode, audioType),
@@ -30,7 +43,7 @@ export const findEpisodeVariant = (episodes = [], episodeNumber = 1, audioType =
   if (matchingAudioEpisode) return matchingAudioEpisode;
   if (sameNumberEpisodes.length > 0) return sameNumberEpisodes[0];
 
-  const firstEpisodeVariants = episodes.filter((episode) => getEpisodeNumber(episode) === 1);
+  const firstEpisodeVariants = findEpisodeVariantsByNumber(episodes, 1);
   return (
     firstEpisodeVariants.find((episode) => matchesAudioType(episode, audioType)) ||
     firstEpisodeVariants[0] ||
