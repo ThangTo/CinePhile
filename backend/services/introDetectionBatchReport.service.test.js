@@ -48,6 +48,7 @@ test('normalizeBatchRun stores batch options and movie outcomes for history quer
   });
 
   assert.equal(batch.options.sampleSeconds, 600);
+  assert.equal(batch.options.excludeSuccessfulMovies, true);
   assert.equal(batch.durationMs, 5 * 60 * 1000);
   assert.equal(batch.movies[0].prioritySource, 'recent_views');
   assert.equal(batch.movies[0].detectedEpisodes, 4);

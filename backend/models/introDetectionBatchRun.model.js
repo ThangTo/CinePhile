@@ -254,6 +254,10 @@ const introDetectionBatchRunSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
+      excludeSuccessfulMovies: {
+        type: Boolean,
+        default: true,
+      },
       retryNoMatch: {
         type: Boolean,
         default: false,

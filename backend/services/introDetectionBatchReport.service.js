@@ -317,6 +317,7 @@ function normalizeOptions(options = {}) {
     maxMovies: normalizeNumber(options.maxMovies, 30),
     maxEpisodesPerMovie: normalizeNumber(options.maxEpisodesPerMovie, 120),
     includeHidden: options.includeHidden === true,
+    excludeSuccessfulMovies: options.excludeSuccessfulMovies !== false,
     retryNoMatch: options.retryNoMatch === true,
     sampleSize: normalizeNumber(detectionOptions.sampleSize ?? options.sampleSize, 5),
     sampleSeconds: normalizeNumber(detectionOptions.sampleSeconds ?? options.sampleSeconds, 600),

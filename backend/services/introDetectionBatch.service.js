@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const moment = require('moment-timezone');
 const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
+const IntroDetectionBatchRun = require('../models/introDetectionBatchRun.model');
 const ViewHistory = require('../models/view_history.model');
 const redisService = require('./redis.service');
 const batchReportService = require('./introDetectionBatchReport.service');
@@ -15,6 +16,8 @@ const BATCH_LOCK_KEY = 'intro-detection:batch:lock';
 const BATCH_LATEST_KEY = 'intro-detection:batch:latest';
 const DEFAULT_COMPLETED_STATUSES = ['detected', 'needs_review', 'approved', 'no_match'];
 const RETRY_NO_MATCH_COMPLETED_STATUSES = ['detected', 'needs_review', 'approved'];
+const DEFAULT_SUCCESSFUL_BATCH_RESULT_TYPES = ['detected', 'no_match', 'completed'];
+const RETRY_NO_MATCH_SUCCESSFUL_BATCH_RESULT_TYPES = ['detected', 'completed'];
 const DEFAULT_BATCH_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
 let localLockOwner = null;
@@ -54,6 +57,10 @@ function normalizeBatchOptions(options = {}) {
       5000,
     ),
     includeHidden: parseBool(options.includeHidden ?? process.env.INTRO_BATCH_INCLUDE_HIDDEN, false),
+    excludeSuccessfulMovies: parseBool(
+      options.excludeSuccessfulMovies ?? process.env.INTRO_BATCH_EXCLUDE_SUCCESSFUL_MOVIES,
+      true,
+    ),
     retryNoMatch,
     lockTtlSec: parseIntOption(
       options.lockTtlSec ?? process.env.INTRO_BATCH_LOCK_TTL_SEC,
@@ -100,6 +107,12 @@ function getCompletedStatuses(options = {}) {
   return options.retryNoMatch ? RETRY_NO_MATCH_COMPLETED_STATUSES : DEFAULT_COMPLETED_STATUSES;
 }
 
+function getSuccessfulBatchResultTypes(options = {}) {
+  return options.retryNoMatch
+    ? RETRY_NO_MATCH_SUCCESSFUL_BATCH_RESULT_TYPES
+    : DEFAULT_SUCCESSFUL_BATCH_RESULT_TYPES;
+}
+
 function buildValidIntroRangeExpression() {
   return {
     $and: [
@@ -127,6 +140,148 @@ function buildCompletedDetectionExpression(completedStatuses = DEFAULT_COMPLETED
   }
 
   return { $or: completedClauses };
+}
+
+function buildSuccessfulBatchMovieIdsPipeline(options = {}) {
+  const resultTypes = getSuccessfulBatchResultTypes(options);
+
+  return [
+    {
+      $match: {
+        state: { $in: ['completed', 'completed_with_errors'] },
+        movies: {
+          $elemMatch: {
+            state: 'completed',
+            resultType: { $in: resultTypes },
+            movieId: { $ne: null },
+          },
+        },
+      },
+    },
+    { $unwind: '$movies' },
+    {
+      $match: {
+        'movies.state': 'completed',
+        'movies.resultType': { $in: resultTypes },
+        'movies.movieId': { $ne: null },
+      },
+    },
+    { $group: { _id: '$movies.movieId' } },
+  ];
+}
+
+function buildEligibleIntroDetectionEpisodePipeline(rawOptions = {}) {
+  const options = normalizeBatchOptions(rawOptions);
+  const completedStatuses = getCompletedStatuses(options);
+  const statusExpression = { $ifNull: ['$playbackMeta.detection.status', 'none'] };
+  const completedDetectionExpression = buildCompletedDetectionExpression(completedStatuses);
+  const detectedWithIntroExpression = {
+    $and: [
+      { $in: [statusExpression, ['detected', 'needs_review', 'approved']] },
+      buildValidIntroRangeExpression(),
+    ],
+  };
+  const playableMatch = {
+    link_m3u8: { $type: 'string', $ne: '' },
+  };
+  const excludedMovieIds = Array.isArray(rawOptions.excludedMovieIds)
+    ? rawOptions.excludedMovieIds.filter(Boolean)
+    : [];
+
+  if (excludedMovieIds.length > 0) {
+    playableMatch.movieId = { $nin: excludedMovieIds };
+  }
+
+  return [
+    {
+      $match: playableMatch,
+    },
+    {
+      $group: {
+        _id: {
+          movieId: '$movieId',
+          audioType: { $ifNull: ['$audioType', { $ifNull: ['$serverName', 'unknown'] }] },
+        },
+        episodeIds: { $addToSet: '$episodeId' },
+        episodeCount: { $sum: 1 },
+        pendingCount: {
+          $sum: {
+            $cond: [completedDetectionExpression, 0, 1],
+          },
+        },
+        approvedCount: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: [statusExpression, 'approved'] },
+                  buildValidIntroRangeExpression(),
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        detectedCount: {
+          $sum: {
+            $cond: [detectedWithIntroExpression, 1, 0],
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        episodeIds: 1,
+        episodeCount: 1,
+        pendingCount: 1,
+        approvedCount: 1,
+        detectedCount: 1,
+        audioEpisodeCount: { $size: '$episodeIds' },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id.movieId',
+        episodeCount: { $sum: '$episodeCount' },
+        pendingCount: { $sum: '$pendingCount' },
+        approvedCount: { $sum: '$approvedCount' },
+        detectedCount: { $sum: '$detectedCount' },
+        maxAudioEpisodeCount: { $max: '$audioEpisodeCount' },
+        episodeIdSets: { $push: '$episodeIds' },
+      },
+    },
+    {
+      $addFields: {
+        uniqueEpisodeIds: {
+          $reduce: {
+            input: '$episodeIdSets',
+            initialValue: [],
+            in: { $setUnion: ['$$value', '$$this'] },
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        uniqueEpisodeCount: { $size: '$uniqueEpisodeIds' },
+      },
+    },
+    {
+      $match: {
+        uniqueEpisodeCount: { $gte: 2 },
+        maxAudioEpisodeCount: { $gte: 2, $lte: options.maxEpisodesPerMovie },
+        pendingCount: { $gt: 0 },
+      },
+    },
+    {
+      $project: {
+        episodeIdSets: 0,
+        uniqueEpisodeIds: 0,
+      },
+    },
+  ];
 }
 
 function compareObjectIdAsc(first, second) {
@@ -329,61 +484,22 @@ async function getRecentViewPriorities(options = {}) {
   }));
 }
 
+async function getSuccessfulIntroDetectionMovieIds(options = {}) {
+  if (options.excludeSuccessfulMovies === false) return [];
+
+  const rows = await IntroDetectionBatchRun.aggregate(buildSuccessfulBatchMovieIdsPipeline(options));
+  return rows.map((item) => item._id).filter(Boolean);
+}
+
 async function findEligibleIntroDetectionMovies(rawOptions = {}) {
   const options = normalizeBatchOptions(rawOptions);
-  const completedStatuses = getCompletedStatuses(options);
-  const statusExpression = { $ifNull: ['$playbackMeta.detection.status', 'none'] };
-  const completedDetectionExpression = buildCompletedDetectionExpression(completedStatuses);
-  const detectedWithIntroExpression = {
-    $and: [
-      { $in: [statusExpression, ['detected', 'needs_review', 'approved']] },
-      buildValidIntroRangeExpression(),
-    ],
-  };
-
-  const groupedEpisodes = await Episode.aggregate([
-    {
-      $match: {
-        link_m3u8: { $type: 'string', $ne: '' },
-      },
-    },
-    {
-      $group: {
-        _id: '$movieId',
-        episodeCount: { $sum: 1 },
-        pendingCount: {
-          $sum: {
-            $cond: [completedDetectionExpression, 0, 1],
-          },
-        },
-        approvedCount: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: [statusExpression, 'approved'] },
-                  buildValidIntroRangeExpression(),
-                ],
-              },
-              1,
-              0,
-            ],
-          },
-        },
-        detectedCount: {
-          $sum: {
-            $cond: [detectedWithIntroExpression, 1, 0],
-          },
-        },
-      },
-    },
-    {
-      $match: {
-        episodeCount: { $gte: 2, $lte: options.maxEpisodesPerMovie },
-        pendingCount: { $gt: 0 },
-      },
-    },
-  ]);
+  const excludedMovieIds = await getSuccessfulIntroDetectionMovieIds(options);
+  const groupedEpisodes = await Episode.aggregate(
+    buildEligibleIntroDetectionEpisodePipeline({
+      ...options,
+      excludedMovieIds,
+    }),
+  );
 
   if (groupedEpisodes.length === 0) return [];
 
@@ -473,6 +589,7 @@ function createBatchOptionsSnapshot(options = {}) {
     maxMovies: options.maxMovies,
     maxEpisodesPerMovie: options.maxEpisodesPerMovie,
     includeHidden: options.includeHidden,
+    excludeSuccessfulMovies: options.excludeSuccessfulMovies,
     retryNoMatch: options.retryNoMatch,
     lockTtlSec: options.lockTtlSec,
     jobTimeoutMs: options.jobTimeoutMs,
@@ -753,12 +870,15 @@ async function runIntroDetectionBatch(rawOptions = {}) {
 }
 
 module.exports = {
+  buildEligibleIntroDetectionEpisodePipeline,
   buildCompletedDetectionExpression,
+  buildSuccessfulBatchMovieIdsPipeline,
   findEligibleIntroDetectionMovies,
   getCompletedStatuses,
   getLatestIntroDetectionBatch,
   getPreviousLocalDayWindow,
   getQueueSkipReason,
+  getSuccessfulBatchResultTypes,
   rankIntroDetectionCandidates,
   normalizeBatchOptions,
   runIntroDetectionBatch,

@@ -2,7 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  buildEligibleIntroDetectionEpisodePipeline,
   buildCompletedDetectionExpression,
+  buildSuccessfulBatchMovieIdsPipeline,
+  getSuccessfulBatchResultTypes,
   getPreviousLocalDayWindow,
   getCompletedStatuses,
   getQueueSkipReason,
@@ -68,6 +71,67 @@ test('buildCompletedDetectionExpression requires a valid intro range for detecte
       { $eq: [{ $ifNull: ['$playbackMeta.detection.status', 'none'] }, 'no_match'] },
     ],
   });
+});
+
+test('buildEligibleIntroDetectionEpisodePipeline only accepts real series candidates', () => {
+  const pipeline = buildEligibleIntroDetectionEpisodePipeline({
+    maxEpisodesPerMovie: 120,
+    excludedMovieIds: ['already-successful'],
+  });
+
+  assert.deepEqual(pipeline[0], {
+    $match: {
+      link_m3u8: { $type: 'string', $ne: '' },
+      movieId: { $nin: ['already-successful'] },
+    },
+  });
+
+  const seriesMatch = pipeline.find(
+    (stage) => stage.$match?.uniqueEpisodeCount && stage.$match?.maxAudioEpisodeCount,
+  );
+  assert.deepEqual(seriesMatch, {
+    $match: {
+      uniqueEpisodeCount: { $gte: 2 },
+      maxAudioEpisodeCount: { $gte: 2, $lte: 120 },
+      pendingCount: { $gt: 0 },
+    },
+  });
+});
+
+test('buildSuccessfulBatchMovieIdsPipeline unwinds movies before excluding successful reruns', () => {
+  assert.deepEqual(getSuccessfulBatchResultTypes({ retryNoMatch: false }), [
+    'detected',
+    'no_match',
+    'completed',
+  ]);
+  assert.deepEqual(getSuccessfulBatchResultTypes({ retryNoMatch: true }), [
+    'detected',
+    'completed',
+  ]);
+
+  assert.deepEqual(buildSuccessfulBatchMovieIdsPipeline({ retryNoMatch: false }), [
+    {
+      $match: {
+        state: { $in: ['completed', 'completed_with_errors'] },
+        movies: {
+          $elemMatch: {
+            state: 'completed',
+            resultType: { $in: ['detected', 'no_match', 'completed'] },
+            movieId: { $ne: null },
+          },
+        },
+      },
+    },
+    { $unwind: '$movies' },
+    {
+      $match: {
+        'movies.state': 'completed',
+        'movies.resultType': { $in: ['detected', 'no_match', 'completed'] },
+        'movies.movieId': { $ne: null },
+      },
+    },
+    { $group: { _id: '$movies.movieId' } },
+  ]);
 });
 
 test('summarizeMovieDetectionResult categorizes batch outcomes', () => {
