@@ -8,6 +8,7 @@ const questService = require('./quest.service');
 const leaderboardService = require('./leaderboard.service');
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+const MAX_HEARTBEAT_SECONDS = 5 * 60;
 
 const isObjectId = (value) =>
   mongoose.Types.ObjectId.isValid(value) && /^[0-9a-fA-F]{24}$/.test(value);
@@ -101,19 +102,25 @@ const ensureViewHistoryRecord = async (
   { viewHistoryId, episodeId = null, userId = null, ipAddress = '0.0.0.0', userAgent = 'Unknown' } = {},
 ) => {
   const normalizedEpisodeId = normalizeEpisodeId(episodeId);
+  let existingRecord = null;
 
   if (viewHistoryId) {
-    const existingRecord = await ViewHistory.findById(viewHistoryId).lean();
-    if (existingRecord) {
-      if (!normalizedEpisodeId || normalizeEpisodeId(existingRecord.episodeId) === normalizedEpisodeId) {
-        return claimAnonymousViewRecord(existingRecord, userId);
-      }
+    existingRecord = await ViewHistory.findById(viewHistoryId).lean();
+    if (
+      isObjectId(identifier) &&
+      matchesPlaybackTarget(existingRecord, { movieId: identifier, episodeId: normalizedEpisodeId })
+    ) {
+      return claimAnonymousViewRecord(existingRecord, userId);
     }
   }
 
   const movieDoc = await findMovie(identifier);
   if (!movieDoc) {
     throw new Error('Movie not found');
+  }
+
+  if (matchesPlaybackTarget(existingRecord, { movieId: movieDoc._id, episodeId: normalizedEpisodeId })) {
+    return claimAnonymousViewRecord(existingRecord, userId);
   }
 
   const recentRecord = await findRecentViewRecord({
@@ -149,7 +156,7 @@ const recordPlaybackHeartbeat = async (
     userAgent = 'Unknown',
   } = {},
 ) => {
-  const safeSecs = Math.min(Math.max(Number(seconds) || 0, 0), 60);
+  const safeSecs = Math.min(Math.max(Math.floor(Number(seconds) || 0), 0), MAX_HEARTBEAT_SECONDS);
   if (!safeSecs) {
     return { success: false, message: 'Missing watched seconds' };
   }

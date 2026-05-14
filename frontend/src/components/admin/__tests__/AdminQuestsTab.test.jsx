@@ -121,7 +121,7 @@ describe("AdminQuestsTab", () => {
   it("renders current snapshot and next preview data", async () => {
     render(<AdminQuestsTab />);
 
-    expect(await screen.findByText(/Quan ly nhiem vu/i)).not.toBeNull();
+    expect(await screen.findByText(/Quản lý nhiệm vụ/i)).not.toBeNull();
     expect(screen.getAllByText(/Watch 10 minutes/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Period key: 2026-04-07/i)).not.toBeNull();
   });
@@ -134,9 +134,9 @@ describe("AdminQuestsTab", () => {
 
     fireEvent.click(within(dailySection).getByRole("button", { name: "Random" }));
 
-    expect(within(dailySection).getByText(/Pool random ky sau/i)).not.toBeNull();
+    expect(within(dailySection).getByText(/Pool random kỳ sau/i)).not.toBeNull();
 
-    fireEvent.click(within(dailySection).getByRole("button", { name: /Luu nhap/i }));
+    fireEvent.click(within(dailySection).getByRole("button", { name: /Lưu nháp/i }));
 
     await waitFor(() =>
       expect(questAdminAPI.updateConfig).toHaveBeenCalledWith(

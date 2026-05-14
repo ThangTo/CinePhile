@@ -38,6 +38,11 @@ const WatchPage = () => {
   const viewHistoryIdRef = useRef(null);
 
   useEffect(() => {
+    viewCountedRef.current = false;
+    viewHistoryIdRef.current = null;
+  }, [id, episodeParam, audioType]);
+
+  useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {

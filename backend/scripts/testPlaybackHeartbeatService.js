@@ -6,6 +6,7 @@ const movieModelPath = path.resolve(__dirname, '../models/movie.model.js');
 const episodeModelPath = path.resolve(__dirname, '../models/episode.model.js');
 const viewHistoryPath = path.resolve(__dirname, '../models/view_history.model.js');
 const streakServicePath = path.resolve(__dirname, '../services/watchStreak.service.js');
+const questServicePath = path.resolve(__dirname, '../services/quest.service.js');
 const leaderboardServicePath = path.resolve(__dirname, '../services/leaderboard.service.js');
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -20,6 +21,7 @@ const installMocks = (state) => {
   delete require.cache[episodeModelPath];
   delete require.cache[viewHistoryPath];
   delete require.cache[streakServicePath];
+  delete require.cache[questServicePath];
   delete require.cache[leaderboardServicePath];
 
   require.cache[movieModelPath] = {
@@ -28,9 +30,11 @@ const installMocks = (state) => {
     loaded: true,
     exports: {
       findById(id) {
+        state.movieFindByIdCalls += 1;
         return makeLeanResult(state.moviesById?.[id] || null);
       },
       findOne(query) {
+        state.movieFindOneCalls += 1;
         return makeLeanResult(state.moviesBySlug?.[query.slug] || null);
       },
       findByIdAndUpdate(id, update) {
@@ -121,6 +125,18 @@ const installMocks = (state) => {
     },
   };
 
+  require.cache[questServicePath] = {
+    id: questServicePath,
+    filename: questServicePath,
+    loaded: true,
+    exports: {
+      checkAndUpdateProgress(userId, payload) {
+        state.questCalls.push({ userId, payload: clone(payload) });
+        return Promise.resolve(null);
+      },
+    },
+  };
+
   return require(servicePath);
 };
 
@@ -134,7 +150,10 @@ const makeState = () => ({
   episodeUpdates: [],
   viewUpdates: [],
   streakCalls: [],
+  questCalls: [],
   leaderboardInvalidations: 0,
+  movieFindByIdCalls: 0,
+  movieFindOneCalls: 0,
 });
 
 const run = async (name, fn) => {
@@ -188,6 +207,7 @@ const run = async (name, fn) => {
       userId: 'user-2',
       ipAddress: '8.8.8.8',
     };
+    state.moviesBySlug['movie-slug'] = { _id: 'movie-99', slug: 'movie-slug' };
 
     const service = installMocks(state);
     const result = await service.recordPlaybackHeartbeat('movie-slug', {
@@ -205,6 +225,37 @@ const run = async (name, fn) => {
       { id: 'vh-99', update: { $inc: { watchDuration: 60 } } },
     ]);
     assert.strictEqual(state.leaderboardInvalidations, 0);
+  });
+
+  await run('reuses a matching object id heartbeat without an extra movie lookup', async () => {
+    const state = makeState();
+    const movieId = '507f1f77bcf86cd799439011';
+    state.viewRecordsById['vh-fast-path'] = {
+      _id: 'vh-fast-path',
+      movieId,
+      episodeId: null,
+      userId: null,
+      ipAddress: '8.8.4.4',
+    };
+
+    const service = installMocks(state);
+    const result = await service.recordPlaybackHeartbeat(movieId, {
+      viewHistoryId: 'vh-fast-path',
+      seconds: 60,
+      ipAddress: '8.8.4.4',
+    });
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.viewHistoryId, 'vh-fast-path');
+    assert.strictEqual(state.createdRecords.length, 0);
+    assert.strictEqual(state.movieFindByIdCalls, 0);
+    assert.strictEqual(state.movieFindOneCalls, 0);
+    assert.deepStrictEqual(state.viewUpdates, [
+      { id: 'vh-fast-path', update: { $inc: { watchDuration: 60 } } },
+    ]);
+    assert.deepStrictEqual(state.movieUpdates, [
+      { id: movieId, update: { $inc: { totalWatchTime: 60 } } },
+    ]);
   });
 
   await run('falls back to a recent matching record when the supplied id points to another episode', async () => {
@@ -244,6 +295,101 @@ const run = async (name, fn) => {
     assert.strictEqual(state.leaderboardInvalidations, 1);
   });
 
+  await run('does not reuse a supplied view history id from another movie', async () => {
+    const state = makeState();
+    state.viewRecordsById['vh-old-movie'] = {
+      _id: 'vh-old-movie',
+      movieId: 'movie-old',
+      episodeId: null,
+      userId: 'user-4',
+      ipAddress: '7.7.7.7',
+    };
+    state.moviesBySlug['movie-slug'] = { _id: 'movie-new', slug: 'movie-slug' };
+
+    const service = installMocks(state);
+    const result = await service.recordPlaybackHeartbeat('movie-slug', {
+      viewHistoryId: 'vh-old-movie',
+      seconds: 30,
+      userId: 'user-4',
+      ipAddress: '7.7.7.7',
+    });
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.viewHistoryId, 'vh-1');
+    assert.strictEqual(state.createdRecords.length, 1);
+    assert.strictEqual(state.createdRecords[0].movieId, 'movie-new');
+    assert.deepStrictEqual(state.viewUpdates, [
+      { id: 'vh-1', update: { $inc: { watchDuration: 30 } } },
+    ]);
+    assert.deepStrictEqual(state.movieUpdates, [
+      { id: 'movie-new', update: { $inc: { totalWatchTime: 30 } } },
+    ]);
+  });
+
+  await run('accepts a delayed heartbeat up to five minutes', async () => {
+    const state = makeState();
+    state.viewRecordsById['vh-delayed'] = {
+      _id: 'vh-delayed',
+      movieId: 'movie-delayed',
+      episodeId: null,
+      userId: 'user-delayed',
+      ipAddress: '6.6.6.6',
+    };
+    state.moviesBySlug['movie-slug'] = { _id: 'movie-delayed', slug: 'movie-slug' };
+
+    const service = installMocks(state);
+    const result = await service.recordPlaybackHeartbeat('movie-slug', {
+      viewHistoryId: 'vh-delayed',
+      seconds: 900,
+      userId: 'user-delayed',
+      ipAddress: '6.6.6.6',
+    });
+
+    assert.strictEqual(result.success, true);
+    assert.deepStrictEqual(state.viewUpdates, [
+      { id: 'vh-delayed', update: { $inc: { watchDuration: 300 } } },
+    ]);
+    assert.deepStrictEqual(state.streakCalls, [{ userId: 'user-delayed', secondsWatched: 300 }]);
+    assert.strictEqual(state.questCalls.length, 1);
+    assert.strictEqual(state.questCalls[0].payload.seconds, 300);
+  });
+
+  await run('records a two hour series episode session without undercounting', async () => {
+    const state = makeState();
+    state.moviesBySlug['series-slug'] = { _id: 'movie-series', slug: 'series-slug' };
+
+    const service = installMocks(state);
+    let viewHistoryId = null;
+    const chunks = [60, 92, 180, 300, 75, 244, 60, 299, 121, 300];
+    let totalSeconds = 0;
+
+    while (totalSeconds < 7200) {
+      const nextSeconds = Math.min(chunks[state.viewUpdates.length % chunks.length], 7200 - totalSeconds);
+      const result = await service.recordPlaybackHeartbeat('series-slug', {
+        viewHistoryId,
+        episodeId: 'episode-series-1',
+        seconds: nextSeconds,
+        ipAddress: '10.0.0.8',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      });
+
+      assert.strictEqual(result.success, true);
+      viewHistoryId = result.viewHistoryId;
+      totalSeconds += nextSeconds;
+    }
+
+    const sumInc = (updates, fieldName) =>
+      updates.reduce((total, item) => total + (Number(item.update?.$inc?.[fieldName]) || 0), 0);
+
+    assert.strictEqual(state.createdRecords.length, 1);
+    assert.strictEqual(state.createdRecords[0].movieId, 'movie-series');
+    assert.strictEqual(state.createdRecords[0].episodeId, 'episode-series-1');
+    assert.strictEqual(sumInc(state.viewUpdates, 'watchDuration'), 7200);
+    assert.strictEqual(sumInc(state.movieUpdates, 'totalWatchTime'), 7200);
+    assert.strictEqual(sumInc(state.movieUpdates, 'totalEpisodeWatchTime'), 7200);
+    assert.strictEqual(sumInc(state.episodeUpdates, 'totalWatchTime'), 7200);
+  });
+
   await run('claims an anonymous view record for the authenticated user before adding watch time', async () => {
     const state = makeState();
     state.viewRecordsById['vh-guest'] = {
@@ -253,6 +399,7 @@ const run = async (name, fn) => {
       userId: null,
       ipAddress: '5.5.5.5',
     };
+    state.moviesBySlug['movie-slug'] = { _id: 'movie-guest', slug: 'movie-slug' };
 
     const service = installMocks(state);
     const result = await service.recordPlaybackHeartbeat('movie-slug', {

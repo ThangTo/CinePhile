@@ -12,6 +12,7 @@ import { isPremiumActive } from "utils/premiumUtils";
 import { getVideoSource, USE_SERVER_ADBLOCK } from "config/video.config";
 import { normalizePlaybackMeta, shouldShowNextEpisodePrompt as shouldShowNextEpisodePromptByTiming } from "utils/playbackTiming";
 import { addAutoplayToEmbedSource, shouldBlockPlaybackForAuth } from "utils/playbackAuth";
+import { createPlaybackHeartbeatAccumulator } from "utils/playbackHeartbeat";
 
 const HYBRID_PROXY_STORAGE_KEY = "cinephine_proxy_sources";
 const PROXY_ESCALATION_THRESHOLD = 2;
@@ -642,6 +643,7 @@ const VideoPlayer = ({
 
     let isBufferingNow = false;
     let pendingSeconds = 0;
+    const heartbeatAccumulator = createPlaybackHeartbeatAccumulator();
 
     const flushPlaybackHeartbeat = (seconds) => {
       const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -673,11 +675,21 @@ const VideoPlayer = ({
       }
     };
 
+    const resetHeartbeatBaseline = () => {
+      heartbeatAccumulator.reset(videoRef.current);
+    };
+
+    const collectPlaybackDelta = () => {
+      return heartbeatAccumulator.collect(videoRef.current);
+    };
+
     const handleWaiting = () => {
       isBufferingNow = true;
+      resetHeartbeatBaseline();
     };
     const handleCanPlay = () => {
       isBufferingNow = false;
+      resetHeartbeatBaseline();
     };
 
     const video = videoRef.current;
@@ -688,12 +700,16 @@ const VideoPlayer = ({
       video.addEventListener("canplay", handleCanPlay);
       video.addEventListener("playing", handleCanPlay);
       video.addEventListener("seeked", handleCanPlay);
+      resetHeartbeatBaseline();
     }
 
     const heartbeatInterval = setInterval(() => {
-      if (!video || video.paused || video.ended || isBufferingNow) return;
+      if (!video || video.paused || video.ended || isBufferingNow) {
+        resetHeartbeatBaseline();
+        return;
+      }
 
-      pendingSeconds += 1;
+      pendingSeconds += collectPlaybackDelta();
 
       if (pendingSeconds >= 60) {
         flushPlaybackHeartbeat(pendingSeconds);
@@ -710,6 +726,10 @@ const VideoPlayer = ({
         video.removeEventListener("canplay", handleCanPlay);
         video.removeEventListener("playing", handleCanPlay);
         video.removeEventListener("seeked", handleCanPlay);
+      }
+
+      if (video && !video.paused && !video.ended && !isBufferingNow) {
+        pendingSeconds += collectPlaybackDelta();
       }
 
       if (pendingSeconds > 0) {
