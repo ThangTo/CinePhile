@@ -31,6 +31,7 @@ router.post('/playback/detect-intro', playbackController.detectIntro);
 router.get('/playback/intro-batches', playbackController.listIntroDetectionBatches);
 router.get('/playback/intro-batches/latest', playbackController.getLatestIntroDetectionBatch);
 router.get('/playback/intro-batches/stats', playbackController.getIntroDetectionBatchStats);
+router.get('/playback/intro-batches/preview', playbackController.getIntroDetectionBatchPreview);
 router.get('/playback/intro-batches/:batchId/movies', playbackController.listIntroDetectionBatchMovies);
 router.get('/playback/intro-batches/:batchId', playbackController.getIntroDetectionBatch);
 router.get('/playback/detect-intro/:jobId', playbackController.getIntroDetectionStatus);

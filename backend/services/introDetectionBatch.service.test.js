@@ -1,11 +1,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const mongoose = require('mongoose');
 
 const {
   buildEligibleIntroDetectionEpisodePipeline,
   buildCompletedDetectionExpression,
+  buildSeriesMovieQuery,
+  buildSuccessfulEpisodeMovieIdsPipeline,
   buildSuccessfulBatchMovieIdsPipeline,
   getSuccessfulBatchResultTypes,
+  getNextIntroDetectionBatchWindow,
   getPreviousLocalDayWindow,
   getCompletedStatuses,
   getQueueSkipReason,
@@ -74,17 +78,16 @@ test('buildCompletedDetectionExpression requires a valid intro range for detecte
 });
 
 test('buildEligibleIntroDetectionEpisodePipeline only accepts real series candidates', () => {
+  const successfulMovieId = new mongoose.Types.ObjectId('507f1f77bcf86cd799439011');
   const pipeline = buildEligibleIntroDetectionEpisodePipeline({
     maxEpisodesPerMovie: 120,
-    excludedMovieIds: ['already-successful'],
+    excludedMovieIds: [successfulMovieId.toString()],
   });
 
-  assert.deepEqual(pipeline[0], {
-    $match: {
-      link_m3u8: { $type: 'string', $ne: '' },
-      movieId: { $nin: ['already-successful'] },
-    },
-  });
+  assert.equal(pipeline[0].$match.link_m3u8.$type, 'string');
+  assert.equal(pipeline[0].$match.link_m3u8.$ne, '');
+  assert.equal(pipeline[0].$match.movieId.$nin.length, 1);
+  assert.equal(String(pipeline[0].$match.movieId.$nin[0]), successfulMovieId.toString());
 
   const seriesMatch = pipeline.find(
     (stage) => stage.$match?.uniqueEpisodeCount && stage.$match?.maxAudioEpisodeCount,
@@ -95,6 +98,20 @@ test('buildEligibleIntroDetectionEpisodePipeline only accepts real series candid
       maxAudioEpisodeCount: { $gte: 2, $lte: 120 },
       pendingCount: { $gt: 0 },
     },
+  });
+});
+
+test('buildSeriesMovieQuery rejects explicit single movies even when episode docs are malformed', () => {
+  const movieIds = [new mongoose.Types.ObjectId('507f1f77bcf86cd799439011')];
+  const query = buildSeriesMovieQuery(movieIds, { includeHidden: false });
+
+  assert.deepEqual(query, {
+    _id: { $in: movieIds },
+    isHidden: { $ne: true },
+    $or: [
+      { totalEpisodes: { $gt: 1 } },
+      { type: { $in: ['series', 'tvshows'] } },
+    ],
   });
 });
 
@@ -134,6 +151,31 @@ test('buildSuccessfulBatchMovieIdsPipeline unwinds movies before excluding succe
   ]);
 });
 
+test('buildSuccessfulEpisodeMovieIdsPipeline excludes movies with any completed intro detection', () => {
+  assert.deepEqual(buildSuccessfulEpisodeMovieIdsPipeline({ retryNoMatch: false }), [
+    {
+      $match: {
+        movieId: { $ne: null },
+        $or: [
+          {
+            $and: [
+              { 'playbackMeta.detection.status': { $in: ['detected', 'needs_review', 'approved'] } },
+              { 'playbackMeta.intro.enabled': true },
+              { 'playbackMeta.intro.startSec': { $gte: 0 } },
+              { $expr: { $gt: ['$playbackMeta.intro.endSec', '$playbackMeta.intro.startSec'] } },
+            ],
+          },
+          { 'playbackMeta.detection.status': 'no_match' },
+        ],
+      },
+    },
+    { $group: { _id: '$movieId' } },
+  ]);
+
+  const retryNoMatchMatch = buildSuccessfulEpisodeMovieIdsPipeline({ retryNoMatch: true })[0].$match;
+  assert.equal(retryNoMatchMatch.$or.length, 1);
+});
+
 test('summarizeMovieDetectionResult categorizes batch outcomes', () => {
   assert.equal(summarizeMovieDetectionResult({ detectedEpisodes: 2 }), 'detected');
   assert.equal(summarizeMovieDetectionResult({ inferredEpisodes: 8 }), 'detected');
@@ -160,6 +202,24 @@ test('getQueueSkipReason skips batch when persistent queue is required but unava
     }),
     null,
   );
+});
+
+test('getNextIntroDetectionBatchWindow previews the next 4AM cron view window', () => {
+  const beforeCron = getNextIntroDetectionBatchWindow({
+    timezone: 'Asia/Ho_Chi_Minh',
+    now: new Date('2026-05-14T02:00:00+07:00'),
+    cronExpression: '0 4 * * *',
+  });
+  assert.equal(beforeCron.nextRunAt.toISOString(), '2026-05-13T21:00:00.000Z');
+  assert.equal(beforeCron.viewWindow.localDate, '2026-05-13');
+
+  const afterCron = getNextIntroDetectionBatchWindow({
+    timezone: 'Asia/Ho_Chi_Minh',
+    now: new Date('2026-05-14T10:00:00+07:00'),
+    cronExpression: '0 4 * * *',
+  });
+  assert.equal(afterCron.nextRunAt.toISOString(), '2026-05-14T21:00:00.000Z');
+  assert.equal(afterCron.viewWindow.localDate, '2026-05-14');
 });
 
 test('getPreviousLocalDayWindow uses the previous calendar day in Vietnam time', () => {

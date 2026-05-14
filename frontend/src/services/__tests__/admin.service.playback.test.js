@@ -42,4 +42,24 @@ describe("playbackAPI", () => {
     });
     expect(result.batch.batchId).toBe("intro-batch-1");
   });
+
+  it("requests the upcoming intro batch preview from the admin playback API", async () => {
+    apiRequest.mockResolvedValue({
+      data: {
+        success: true,
+        preview: {
+          nextRunAt: "2026-05-15T04:00:00.000+07:00",
+          movies: [{ movieId: "movie-1", movieName: "Series" }],
+        },
+      },
+    });
+
+    const result = await playbackAPI.getIntroBatchPreview({ limit: 30 });
+
+    expect(apiRequest).toHaveBeenCalledWith("/admin/playback/intro-batches/preview", {
+      params: { limit: 30 },
+      requiresAuth: true,
+    });
+    expect(result.preview.movies).toHaveLength(1);
+  });
 });

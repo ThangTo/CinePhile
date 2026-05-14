@@ -89,6 +89,16 @@ const getPriorityLabel = (prioritySource) => {
   }
 };
 
+const formatWatchMinutes = (seconds) => {
+  const minutes = Math.round((Number(seconds) || 0) / 60);
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainMinutes = minutes % 60;
+    return remainMinutes ? `${hours}h ${remainMinutes}m` : `${hours}h`;
+  }
+  return `${minutes}m`;
+};
+
 const getBatchId = (batch) => batch?.batchId || batch?._id || batch?.id;
 const getMovieKey = (movie) => movie?.movieId || movie?._id || movie?.id || `${movie?.order || ""}-${movie?.movieName || ""}`;
 
@@ -98,6 +108,9 @@ const AdminBatchAnalytics = () => {
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState("");
 
   // History State
   const [batches, setBatches] = useState([]);
@@ -122,6 +135,19 @@ const AdminBatchAnalytics = () => {
       setLoadingStats(false);
     }
   }, [period]);
+
+  const loadPreview = useCallback(async () => {
+    setLoadingPreview(true);
+    setPreviewError("");
+    try {
+      const result = await playbackAPI.getIntroBatchPreview({ limit: 30 });
+      setPreview(result.preview || null);
+    } catch (err) {
+      setPreviewError(err.message || "Không tải được preview batch");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, []);
 
   const loadHistory = useCallback(async (page = 1) => {
     setLoadingHistory(true);
@@ -157,8 +183,9 @@ const AdminBatchAnalytics = () => {
 
   useEffect(() => {
     loadStats();
+    loadPreview();
     loadHistory(1);
-  }, [loadStats, loadHistory]);
+  }, [loadStats, loadPreview, loadHistory]);
 
   const handleSelectBatch = (batch) => {
     const batchId = getBatchId(batch);
@@ -265,6 +292,101 @@ const AdminBatchAnalytics = () => {
               </ResponsiveContainer>
             </div>
           </>
+        )}
+      </div>
+
+      {/* Upcoming Batch Preview */}
+      <div className="rounded-xl border border-primaryColor/10 bg-[#1a1a1a] shadow-lg overflow-hidden">
+        <div className="border-b border-white/5 bg-white/5 px-6 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="font-bold text-white flex items-center gap-2">
+              <i className="fa-solid fa-list-check text-primaryColor"></i>
+              Review batch kế tiếp
+            </h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Danh sách dự kiến có thể thay đổi khi user xem thêm phim trong cửa sổ dữ liệu.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+            <span className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+              Chạy: {formatBatchDateTime(preview?.nextRunAt)}
+            </span>
+            <span className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+              Ngày xem: {preview?.viewWindow?.localDate || "Đang tải"}
+            </span>
+            <button
+              onClick={loadPreview}
+              disabled={loadingPreview}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-gray-400 hover:bg-white/10 hover:text-white transition-all disabled:opacity-60"
+              title="Tải lại preview batch"
+            >
+              <i className={`fa-solid fa-rotate-right ${loadingPreview ? "fa-spin" : ""}`}></i>
+            </button>
+          </div>
+        </div>
+
+        {previewError ? (
+          <div className="m-6 rounded-lg border border-red-400/20 bg-red-400/10 p-4 text-sm text-red-300">
+            {previewError}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-white/5 bg-black/40 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <tr>
+                  <th className="px-6 py-4">#</th>
+                  <th className="px-6 py-4">Tên phim</th>
+                  <th className="px-6 py-4">Lý do vào batch</th>
+                  <th className="px-6 py-4 text-center">Tập</th>
+                  <th className="px-6 py-4 text-center">Chưa detect</th>
+                  <th className="px-6 py-4 text-center">View window</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {loadingPreview ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                      <i className="fa-solid fa-circle-notch fa-spin text-xl mb-2 text-primaryColor"></i>
+                      <p>Đang tính danh sách preview...</p>
+                    </td>
+                  </tr>
+                ) : !preview?.movies?.length ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                      Không có phim đủ điều kiện cho batch kế tiếp.
+                    </td>
+                  </tr>
+                ) : (
+                  preview.movies.map((movie) => (
+                    <tr key={getMovieKey(movie)} className="hover:bg-white/[0.02]">
+                      <td className="px-6 py-3 text-gray-500 font-bold">{movie.priorityRank || "-"}</td>
+                      <td className="px-6 py-3">
+                        <div className="font-semibold text-white">{movie.movieName || "Không rõ tên"}</div>
+                        <div className="text-xs text-gray-500">
+                          {movie.slug || "no-slug"} · {movie.type || "unknown"} · tổng {movie.totalEpisodes || 0} tập
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-gray-300">
+                        <div>{getPriorityLabel(movie.prioritySource)}</div>
+                        <div className="text-xs text-gray-500">
+                          {movie.priorityViews || 0} lượt · {formatWatchMinutes(movie.priorityWatchTime)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-center text-gray-300">
+                        {movie.maxAudioEpisodeCount || 0}/{movie.uniqueEpisodeCount || 0}
+                      </td>
+                      <td className="px-6 py-3 text-center font-bold text-yellow-300">
+                        {movie.pendingCount || 0}
+                      </td>
+                      <td className="px-6 py-3 text-center text-gray-400">
+                        {movie.prioritySource === "recent_views" ? "Có xem" : "Không có"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

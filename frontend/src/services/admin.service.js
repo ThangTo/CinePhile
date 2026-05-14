@@ -1228,6 +1228,14 @@ export const playbackAPI = {
     });
     return response.data || response;
   },
+
+  getIntroBatchPreview: async (params = {}) => {
+    const response = await apiRequest("/admin/playback/intro-batches/preview", {
+      params,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
 };
 
 /**

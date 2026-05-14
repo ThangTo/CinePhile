@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const moment = require('moment-timezone');
 const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
@@ -19,6 +20,8 @@ const RETRY_NO_MATCH_COMPLETED_STATUSES = ['detected', 'needs_review', 'approved
 const DEFAULT_SUCCESSFUL_BATCH_RESULT_TYPES = ['detected', 'no_match', 'completed'];
 const RETRY_NO_MATCH_SUCCESSFUL_BATCH_RESULT_TYPES = ['detected', 'completed'];
 const DEFAULT_BATCH_TIMEZONE = 'Asia/Ho_Chi_Minh';
+const DEFAULT_BATCH_CRON = '0 4 * * *';
+const SERIES_MOVIE_TYPES = ['series', 'tvshows'];
 
 let localLockOwner = null;
 let latestBatchSummary = null;
@@ -142,6 +145,29 @@ function buildCompletedDetectionExpression(completedStatuses = DEFAULT_COMPLETED
   return { $or: completedClauses };
 }
 
+function toMongoObjectId(value) {
+  if (!value) return null;
+  const stringValue = value.toString ? value.toString() : String(value);
+  if (!mongoose.Types.ObjectId.isValid(stringValue)) return null;
+  return new mongoose.Types.ObjectId(stringValue);
+}
+
+function normalizeMovieIdsForMongo(values = []) {
+  const ids = [];
+  const seen = new Set();
+
+  values.forEach((value) => {
+    const objectId = toMongoObjectId(value);
+    if (!objectId) return;
+    const key = objectId.toString();
+    if (seen.has(key)) return;
+    seen.add(key);
+    ids.push(objectId);
+  });
+
+  return ids;
+}
+
 function buildSuccessfulBatchMovieIdsPipeline(options = {}) {
   const resultTypes = getSuccessfulBatchResultTypes(options);
 
@@ -170,6 +196,49 @@ function buildSuccessfulBatchMovieIdsPipeline(options = {}) {
   ];
 }
 
+function buildSuccessfulEpisodeMovieIdsPipeline(options = {}) {
+  const completedClauses = [
+    {
+      $and: [
+        { 'playbackMeta.detection.status': { $in: ['detected', 'needs_review', 'approved'] } },
+        { 'playbackMeta.intro.enabled': true },
+        { 'playbackMeta.intro.startSec': { $gte: 0 } },
+        { $expr: { $gt: ['$playbackMeta.intro.endSec', '$playbackMeta.intro.startSec'] } },
+      ],
+    },
+  ];
+
+  if (!options.retryNoMatch) {
+    completedClauses.push({ 'playbackMeta.detection.status': 'no_match' });
+  }
+
+  return [
+    {
+      $match: {
+        movieId: { $ne: null },
+        $or: completedClauses,
+      },
+    },
+    { $group: { _id: '$movieId' } },
+  ];
+}
+
+function buildSeriesMovieQuery(movieIds = [], options = {}) {
+  const query = {
+    _id: { $in: movieIds },
+    $or: [
+      { totalEpisodes: { $gt: 1 } },
+      { type: { $in: SERIES_MOVIE_TYPES } },
+    ],
+  };
+
+  if (!options.includeHidden) {
+    query.isHidden = { $ne: true };
+  }
+
+  return query;
+}
+
 function buildEligibleIntroDetectionEpisodePipeline(rawOptions = {}) {
   const options = normalizeBatchOptions(rawOptions);
   const completedStatuses = getCompletedStatuses(options);
@@ -184,9 +253,7 @@ function buildEligibleIntroDetectionEpisodePipeline(rawOptions = {}) {
   const playableMatch = {
     link_m3u8: { $type: 'string', $ne: '' },
   };
-  const excludedMovieIds = Array.isArray(rawOptions.excludedMovieIds)
-    ? rawOptions.excludedMovieIds.filter(Boolean)
-    : [];
+  const excludedMovieIds = normalizeMovieIdsForMongo(rawOptions.excludedMovieIds);
 
   if (excludedMovieIds.length > 0) {
     playableMatch.movieId = { $nin: excludedMovieIds };
@@ -442,6 +509,49 @@ async function saveLatestBatchSummary(summary) {
   }
 }
 
+function parseDailyCronExpression(cronExpression = DEFAULT_BATCH_CRON) {
+  const [minuteValue, hourValue] = String(cronExpression || DEFAULT_BATCH_CRON).trim().split(/\s+/);
+  const minute = Number.parseInt(minuteValue, 10);
+  const hour = Number.parseInt(hourValue, 10);
+
+  return {
+    minute: Number.isInteger(minute) && minute >= 0 && minute <= 59 ? minute : 0,
+    hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 4,
+  };
+}
+
+function getNextIntroDetectionBatchWindow({
+  timezone = DEFAULT_BATCH_TIMEZONE,
+  now = new Date(),
+  cronExpression = process.env.INTRO_BATCH_CRON || DEFAULT_BATCH_CRON,
+} = {}) {
+  const schedule = parseDailyCronExpression(cronExpression);
+  const localNow = moment(now).tz(timezone);
+  const nextRun = localNow
+    .clone()
+    .hour(schedule.hour)
+    .minute(schedule.minute)
+    .second(0)
+    .millisecond(0);
+
+  if (!localNow.isBefore(nextRun)) {
+    nextRun.add(1, 'day');
+  }
+
+  const viewDay = nextRun.clone().subtract(1, 'day');
+  return {
+    cronExpression,
+    timezone,
+    nextRunAt: nextRun.toDate(),
+    viewWindow: {
+      start: viewDay.clone().startOf('day').toDate(),
+      end: viewDay.clone().endOf('day').toDate(),
+      timezone,
+      localDate: viewDay.format('YYYY-MM-DD'),
+    },
+  };
+}
+
 async function getLatestIntroDetectionBatch() {
   return (await redisService.get(BATCH_LATEST_KEY)) || latestBatchSummary;
 }
@@ -487,8 +597,15 @@ async function getRecentViewPriorities(options = {}) {
 async function getSuccessfulIntroDetectionMovieIds(options = {}) {
   if (options.excludeSuccessfulMovies === false) return [];
 
-  const rows = await IntroDetectionBatchRun.aggregate(buildSuccessfulBatchMovieIdsPipeline(options));
-  return rows.map((item) => item._id).filter(Boolean);
+  const [batchRows, episodeRows] = await Promise.all([
+    IntroDetectionBatchRun.aggregate(buildSuccessfulBatchMovieIdsPipeline(options)),
+    Episode.aggregate(buildSuccessfulEpisodeMovieIdsPipeline(options)),
+  ]);
+
+  return normalizeMovieIdsForMongo([
+    ...batchRows.map((item) => item._id),
+    ...episodeRows.map((item) => item._id),
+  ]);
 }
 
 async function findEligibleIntroDetectionMovies(rawOptions = {}) {
@@ -503,14 +620,11 @@ async function findEligibleIntroDetectionMovies(rawOptions = {}) {
 
   if (groupedEpisodes.length === 0) return [];
 
-  const movieIds = groupedEpisodes.map((item) => item._id).filter(Boolean);
-  const movieQuery = { _id: { $in: movieIds } };
-  if (!options.includeHidden) {
-    movieQuery.isHidden = { $ne: true };
-  }
+  const movieIds = normalizeMovieIdsForMongo(groupedEpisodes.map((item) => item._id));
+  const movieQuery = buildSeriesMovieQuery(movieIds, options);
 
   const movies = await Movie.find(movieQuery)
-    .select('_id name original_name slug isHidden isFeatured viewCount updatedAt')
+    .select('_id name original_name slug type totalEpisodes currentEpisode isHidden isFeatured viewCount updatedAt')
     .lean();
   const movieById = new Map(movies.map((movie) => [movie._id.toString(), movie]));
 
@@ -523,6 +637,9 @@ async function findEligibleIntroDetectionMovies(rawOptions = {}) {
         movieId: movie._id.toString(),
         movieName: movie.name,
         slug: movie.slug,
+        type: movie.type || '',
+        totalEpisodes: Number(movie.totalEpisodes) || 0,
+        currentEpisode: movie.currentEpisode || '',
         isFeatured: movie.isFeatured === true,
         viewCount: Number(movie.viewCount) || 0,
         updatedAt: movie.updatedAt || null,
@@ -530,6 +647,8 @@ async function findEligibleIntroDetectionMovies(rawOptions = {}) {
         pendingCount: item.pendingCount,
         approvedCount: item.approvedCount,
         detectedCount: item.detectedCount,
+        uniqueEpisodeCount: item.uniqueEpisodeCount,
+        maxAudioEpisodeCount: item.maxAudioEpisodeCount,
       };
     })
     .filter(Boolean);
@@ -580,6 +699,33 @@ function summarizeMovieDetectionResult(result = {}) {
   }
 
   return 'completed';
+}
+
+async function getIntroDetectionBatchPreview(rawOptions = {}) {
+  const timezone = rawOptions.timezone || process.env.INTRO_BATCH_TIMEZONE || DEFAULT_BATCH_TIMEZONE;
+  const schedule = getNextIntroDetectionBatchWindow({
+    timezone,
+    now: rawOptions.now || new Date(),
+    cronExpression: rawOptions.cronExpression || process.env.INTRO_BATCH_CRON || DEFAULT_BATCH_CRON,
+  });
+  const options = normalizeBatchOptions({
+    ...rawOptions,
+    timezone,
+    viewWindow: schedule.viewWindow,
+    maxMovies: rawOptions.limit || rawOptions.maxMovies,
+  });
+  const movies = await findEligibleIntroDetectionMovies(options);
+
+  return {
+    generatedAt: new Date(),
+    cronExpression: schedule.cronExpression,
+    timezone,
+    nextRunAt: schedule.nextRunAt,
+    viewWindow: schedule.viewWindow,
+    options: createBatchOptionsSnapshot(options),
+    totalMovies: movies.length,
+    movies,
+  };
 }
 
 function createBatchOptionsSnapshot(options = {}) {
@@ -872,10 +1018,14 @@ async function runIntroDetectionBatch(rawOptions = {}) {
 module.exports = {
   buildEligibleIntroDetectionEpisodePipeline,
   buildCompletedDetectionExpression,
+  buildSeriesMovieQuery,
+  buildSuccessfulEpisodeMovieIdsPipeline,
   buildSuccessfulBatchMovieIdsPipeline,
   findEligibleIntroDetectionMovies,
+  getIntroDetectionBatchPreview,
   getCompletedStatuses,
   getLatestIntroDetectionBatch,
+  getNextIntroDetectionBatchWindow,
   getPreviousLocalDayWindow,
   getQueueSkipReason,
   getSuccessfulBatchResultTypes,

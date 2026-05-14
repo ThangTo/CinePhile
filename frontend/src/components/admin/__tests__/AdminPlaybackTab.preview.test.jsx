@@ -37,6 +37,7 @@ jest.mock("services/admin.service", () => ({
     detectIntro: jest.fn(),
     getDetectionStatus: jest.fn(),
     getIntroBatchLatest: jest.fn(),
+    getIntroBatchPreview: jest.fn(),
   },
 }));
 
@@ -44,6 +45,7 @@ describe("AdminPlaybackTab preview helpers", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     playbackAPI.getIntroBatchLatest.mockResolvedValue({ batch: null });
+    playbackAPI.getIntroBatchPreview.mockResolvedValue({ preview: null });
   });
 
   it("builds preview source through backend proxy using direct segment mode", () => {

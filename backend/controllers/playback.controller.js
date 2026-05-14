@@ -1,5 +1,6 @@
 const playbackMetadataService = require('../services/playbackMetadata.service');
 const batchReportService = require('../services/introDetectionBatchReport.service');
+const introDetectionBatchService = require('../services/introDetectionBatch.service');
 const {
   addIntroDetectionJob,
   getIntroDetectionJobStatus,
@@ -80,6 +81,15 @@ const getIntroDetectionBatchStats = async (req, res) => {
   }
 };
 
+const getIntroDetectionBatchPreview = async (req, res) => {
+  try {
+    const preview = await introDetectionBatchService.getIntroDetectionBatchPreview(req.query);
+    res.json({ success: true, preview });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
 const getLatestIntroDetectionBatch = async (_req, res) => {
   try {
     const batch = await batchReportService.getLatestIntroDetectionBatchRun();
@@ -121,6 +131,7 @@ const listIntroDetectionBatchMovies = async (req, res) => {
 module.exports = {
   detectIntro,
   getIntroDetectionBatch,
+  getIntroDetectionBatchPreview,
   getIntroDetectionBatchStats,
   getLatestIntroDetectionBatch,
   getIntroDetectionStatus,
