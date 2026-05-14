@@ -2,7 +2,7 @@
  * Leaderboard Service
  * Computes and caches the public top users leaderboard.
  *
- * Cache: leaderboard:topUsers:v3:<yyyy-mm-dd> (TTL: 3600s)
+ * Cache: leaderboard:topUsers:v4:<yyyy-mm-dd> (TTL: 3600s)
  * Score formula: totalWatchTime * adjustedMaxStreak * adjustedCurrentStreak
  */
 
@@ -10,8 +10,9 @@ const mongoose = require('mongoose');
 const redisService = require('./redis.service');
 const watchStreakService = require('./watchStreak.service');
 const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
+const { isPremiumActive } = require('../utils/premiumUtils');
 
-const CACHE_KEY_PREFIX = 'leaderboard:topUsers:v3';
+const CACHE_KEY_PREFIX = 'leaderboard:topUsers:v4';
 const CACHE_TTL = 3600; // 1 hour
 const LEADERBOARD_LIMIT = 10;
 const PUBLIC_USER_ROLES = ['user', 'premium'];
@@ -43,7 +44,7 @@ const getTopUsers = async (referenceDate = new Date()) => {
     User.find({
       role: { $in: PUBLIC_USER_ROLES },
     })
-      .select('username avatar watchStreak longestStreak lastQualifiedWatchDate lastWatchDate')
+      .select('username avatar role premiumPlan premiumExpiresAt watchStreak longestStreak lastQualifiedWatchDate lastWatchDate')
       .lean(),
     ViewHistory.aggregate([
       {
@@ -77,6 +78,10 @@ const getTopUsers = async (referenceDate = new Date()) => {
         id: user._id.toString(),
         username: user.username,
         avatar: user.avatar,
+        role: user.role || 'user',
+        isPremium: isPremiumActive(user),
+        premiumPlan: user.premiumPlan || null,
+        premiumExpiresAt: user.premiumExpiresAt || null,
         totalWatchTime,
         currentStreak,
         maxStreak,

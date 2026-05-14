@@ -50,6 +50,8 @@ async function main() {
           watchStreak: 4,
           longestStreak: 6,
           role: 'premium',
+          premiumPlan: 'monthly',
+          premiumExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         },
       ],
       watchStats: [
@@ -132,11 +134,15 @@ async function main() {
     assert.equal(rows[0].currentStreak, 4);
     assert.equal(rows[0].maxStreak, 6);
     assert.equal(rows[0].avatar, 'avatar:active');
+    assert.equal(rows[0].role, 'premium');
+    assert.equal(rows[0].isPremium, true);
+    assert.equal(rows[0].premiumPlan, 'monthly');
     assert.equal(rows[1].id, 'user-stale');
     assert.equal(rows[1].currentStreak, 0);
     assert.equal(rows[1].maxStreak, 9);
+    assert.equal(rows[1].isPremium, false);
     assert.equal(state.redisGets.length, 1);
-    assert.match(state.redisGets[0], /^leaderboard:topUsers:v3:\d{4}-\d{2}-\d{2}$/);
+    assert.match(state.redisGets[0], /^leaderboard:topUsers:v4:\d{4}-\d{2}-\d{2}$/);
     assert.equal(state.redisSets.length, 1);
     assert.equal(state.redisSets[0].ttl, 3600);
 

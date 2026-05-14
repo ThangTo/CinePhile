@@ -17,7 +17,8 @@ import CursorEffectShop from "components/account/CursorEffectShop";
 import QuestPage from "components/account/QuestPage";
 import CoinHistoryTab from "components/account/CoinHistoryTab";
 import PremiumAvatar from "components/common/PremiumAvatar";
-import { getPremiumStatusText, isPremiumActive } from "utils/premiumUtils";
+import { getPremiumStatusText } from "utils/premiumUtils";
+import useCurrentUserPrestige from "hooks/useCurrentUserPrestige";
 
 const DEFAULT_TAB = "profile";
 
@@ -65,6 +66,12 @@ const AccountPage = () => {
   const location = useLocation();
   const { user, isLoading, updateUser, logout } = useAuth();
   const { setActiveNotificationId } = useNotifications();
+  const {
+    leaderboardRank,
+    displayUser: prestigeUser,
+    prestige: userPrestige,
+    isPremium: displayPremiumActive,
+  } = useCurrentUserPrestige(user);
   const searchParams = new URLSearchParams(location.search);
   const queryTab = searchParams.get("tabs");
   const activeTab = queryTab || DEFAULT_TAB;
@@ -117,11 +124,10 @@ const AccountPage = () => {
     );
   }
 
-  const premiumActive = isPremiumActive(user);
   const pageTitle = TAB_TITLES[activeTab] || TAB_TITLES[DEFAULT_TAB];
   const activeMobileItem =
     MOBILE_ACCOUNT_NAV_ITEMS.find((item) => item.tab === activeTab) || MOBILE_ACCOUNT_NAV_ITEMS[0];
-  const mobileStatusText = premiumActive ? getPremiumStatusText(user) : "Thành viên thường";
+  const mobileStatusText = displayPremiumActive ? getPremiumStatusText(user) : "Thành viên thường";
 
   const getMobileTabLabel = (item) => (item?.tab === "coin-history" ? "Lịch sử coin" : item?.label);
 
@@ -160,7 +166,7 @@ const AccountPage = () => {
 
     return (
       <>
-        <ProfileCard user={user} onUpdate={handleUpdateProfile} />
+        <ProfileCard user={prestigeUser} onUpdate={handleUpdateProfile} prestigeRank={leaderboardRank} />
         <AccountInfoCard user={user} onUpdate={handleUpdateProfile} />
         <SecurityCard user={user} onUpdate={handleUpdateProfile} />
       </>
@@ -173,7 +179,7 @@ const AccountPage = () => {
     <div className="min-h-screen bg-account-bg-primary text-account-text-primary">
       <div className="min-h-screen mx-auto md:flex md:py-[50px]">
         <div className="hidden md:block">
-          <AccountSidebar user={user} onLogout={handleLogout} />
+          <AccountSidebar user={prestigeUser} onLogout={handleLogout} prestigeRank={leaderboardRank} />
         </div>
 
         <main className="flex-1 px-4 pb-10 pt-[72px] md:mt-[40px] md:p-10 md:pt-2 box-border">
@@ -187,7 +193,8 @@ const AccountPage = () => {
                   src={user.avatar}
                   alt={user.username}
                   size="w-16 h-16"
-                  isPremium={premiumActive}
+                  isPremium={displayPremiumActive}
+                  rank={leaderboardRank}
                 />
 
                 <div className="min-w-0 flex-1">
@@ -195,10 +202,18 @@ const AccountPage = () => {
                     <h1 className="truncate text-xl font-semibold text-account-text-primary">
                       {user.username}
                     </h1>
-                    {premiumActive && (
+                    {displayPremiumActive && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-primaryColor/15 px-2 py-1 text-[11px] font-semibold text-primaryColor">
                         <i className="fa-solid fa-crown text-[10px]" />
                         Premium
+                      </span>
+                    )}
+                    {userPrestige.isTopRank && (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${userPrestige.topRankTier.badgeClassName}`}
+                      >
+                        <i className={`fa-solid ${userPrestige.topRankTier.icon} text-[10px]`} />
+                        {userPrestige.topRankTier.shortTitle}
                       </span>
                     )}
                   </div>
@@ -211,7 +226,7 @@ const AccountPage = () => {
                     <span className="inline-flex items-center gap-2 rounded-full bg-account-bg-primary/70 px-3 py-1.5 text-xs font-medium text-account-text-secondary ring-1 ring-account-border/80">
                       <i
                         className={`fa-solid ${
-                          premiumActive ? "fa-bolt" : "fa-user"
+                          displayPremiumActive ? "fa-bolt" : "fa-user"
                         } text-primaryColor`}
                       />
                       {mobileStatusText}
@@ -239,13 +254,13 @@ const AccountPage = () => {
                 <Link
                   to="/premium"
                   className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
-                    premiumActive
+                    displayPremiumActive
                       ? "bg-primaryColor text-black"
                       : "bg-primaryColor/15 text-primaryColor ring-1 ring-primaryColor/40"
                   }`}
                 >
-                  <i className={`fa-solid ${premiumActive ? "fa-crown" : "fa-star"}`} />
-                  {premiumActive ? "Premium" : "Mở Premium"}
+                  <i className={`fa-solid ${displayPremiumActive ? "fa-crown" : "fa-star"}`} />
+                  {displayPremiumActive ? "Premium" : "Mở Premium"}
                 </Link>
               </div>
             </section>

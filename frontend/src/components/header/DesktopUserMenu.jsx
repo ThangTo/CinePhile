@@ -5,12 +5,35 @@ import { useNotifications } from "contexts/NotificationContext";
 import NotificationPanel from "components/notifications/NotificationPanel";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
+import {
+  getPrestigeContainerClassName,
+  getUserPrestige,
+  isUserPremiumDisplay,
+} from "utils/userPrestige";
+
+const PrestigeBanner = ({ prestige }) => {
+  if (!prestige?.isTopRank) {
+    return null;
+  }
+
+  return (
+    <div
+      className={`mb-2 rounded-lg border p-2.5 ${prestige.topRankTier.surfaceClassName}`}
+    >
+      <div className={`flex items-center gap-2 text-sm font-bold ${prestige.topRankTier.textClassName}`}>
+        <i className={`fa-solid ${prestige.topRankTier.icon}`} />
+        <span>{prestige.topRankTier.title}</span>
+      </div>
+      <p className="mt-1 text-xs text-gray-300">Danh hiệu top {prestige.topRankTier.rank} hôm nay</p>
+    </div>
+  );
+};
 
 const PremiumBanner = ({ username, user }) => {
-  const isPremium = isPremiumActive(user);
+  const isPremium = isUserPremiumDisplay(user);
 
   if (isPremium) {
-    const statusText = getPremiumStatusText(user);
+    const statusText = getPremiumStatusText(user) || "Premium đang hoạt động";
     return (
       <div className="bg-gradient-to-r from-primaryColor/20 to-hoverPrimaryColor/20 border border-primaryColor/30 rounded-lg p-2.5">
         <div className="flex items-center justify-between mb-1.5">
@@ -61,10 +84,21 @@ const UserStats = ({ coins }) => (
   </div>
 );
 
-const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) => {
+const DesktopUserMenu = ({
+  user,
+  showUserMenu,
+  onToggle,
+  onLogout,
+  menuRef,
+  prestigeRank,
+  prestige: providedPrestige,
+}) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const { unreadCount } = useNotifications();
   const bellButtonRef = React.useRef(null);
+  const prestige = providedPrestige || getUserPrestige(user, prestigeRank);
+  const isPremium = prestige.isPremium || isPremiumActive(user);
+  const prestigeContainerClassName = getPrestigeContainerClassName(user, prestigeRank);
 
   return (
     <div className="hidden sm:hidden md:hidden lg:flex items-center gap-3 relative" ref={menuRef}>
@@ -96,14 +130,25 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
       <div className="relative">
         <button
           onClick={onToggle}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          className={`relative flex items-center gap-2 rounded-full px-1 py-1 transition-opacity hover:opacity-90 ${
+            prestige.hasPrestige ? `border border-white/10 ${prestigeContainerClassName}` : ""
+          }`}
         >
           <PremiumAvatar
             src={user.avatar}
             alt={user.username}
             size="w-10 h-10"
-            isPremium={isPremiumActive(user)}
+            isPremium={isPremium}
+            rank={prestigeRank}
           />
+          {prestige.isTopRank && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${prestige.topRankTier.badgeClassName}`}
+            >
+              <i className={`fa-solid ${prestige.topRankTier.icon}`} />
+              {prestige.topRankTier.shortTitle}
+            </span>
+          )}
           <i
             className={`fa-solid fa-chevron-down text-gray-300 text-sm transition-transform ${
               showUserMenu ? "rotate-180" : ""
@@ -113,7 +158,9 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
 
         {/* Dropdown Menu */}
         {showUserMenu && (
-          <div className="dropdown-menu absolute right-0 top-full mt-2 w-64 bg-[#1e293b] rounded-lg shadow-xl border border-white/10 overflow-hidden z-50">
+          <div
+            className={`dropdown-menu absolute right-0 top-full mt-2 max-h-[calc(100vh-88px)] w-72 overflow-x-hidden overflow-y-auto rounded-lg border border-white/10 bg-[#1e293b] shadow-xl z-50 ${prestigeContainerClassName}`}
+          >
             {/* User Info Header */}
             <div className="p-4 border-b border-white/10 bg-gradient-to-br from-[#2d3b52] to-[#1e293b]">
               <div className="flex items-center gap-3 mb-3">
@@ -121,18 +168,34 @@ const DesktopUserMenu = ({ user, showUserMenu, onToggle, onLogout, menuRef }) =>
                   src={user.avatar}
                   alt={user.username}
                   size="w-12 h-12"
-                  isPremium={isPremiumActive(user)}
+                  isPremium={isPremium}
+                  rank={prestigeRank}
                 />
                 <div>
-                  <div
-                    className={`font-semibold ${isPremiumActive(user) ? "text-primaryColor" : "text-white"}`}
-                  >
+                  <div className={`font-semibold ${isPremium ? "text-primaryColor" : "text-white"}`}>
                     {user.username}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {prestige.isTopRank && (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${prestige.topRankTier.badgeClassName}`}
+                      >
+                        <i className={`fa-solid ${prestige.topRankTier.icon}`} />
+                        {prestige.topRankTier.shortTitle}
+                      </span>
+                    )}
+                    {isPremium && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-primaryColor/40 bg-primaryColor/15 px-2 py-0.5 text-[10px] font-bold text-primaryColor">
+                        <i className="fa-solid fa-crown" />
+                        Premium
+                      </span>
+                    )}
                   </div>
                   <div className="text-gray-400 text-xs">{user.email}</div>
                 </div>
               </div>
 
+              <PrestigeBanner prestige={prestige} />
               <PremiumBanner username={user.username} user={user} />
               <UserStats coins={user.coin} />
             </div>

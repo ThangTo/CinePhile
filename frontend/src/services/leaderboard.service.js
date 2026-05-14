@@ -8,7 +8,7 @@ import apiRequest from './utils/apiRequest';
 const leaderboardService = {
   /**
    * Get top users leaderboard (public endpoint, no auth required)
-   * @returns {Promise<Array>} Array of { id, username, avatar, totalWatchTime, currentStreak, maxStreak, score }
+   * @returns {Promise<Array>} Array of { id, username, avatar, isPremium, premiumPlan, totalWatchTime, currentStreak, maxStreak, score }
    */
   getTopUsersLeaderboard: () =>
     apiRequest('/users/leaderboard').then((res) => {

@@ -5,6 +5,7 @@ import EmptyState from "components/common/EmptyState";
 import leaderboardService from "services/leaderboard.service";
 import formatWatchDuration from "utils/formatWatchDuration";
 import { getAvatarUrlByKey, handleAvatarError } from "utils/avatarUtils";
+import { getUserPrestige } from "utils/userPrestige";
 
 // --- COMPONENT HIỆU ỨNG PHÉP THUẬT DÒNG CHẢY KIM TUYẾN ---
 const MagicFlowBackground = () => {
@@ -148,18 +149,70 @@ const buildLeaderboardEntries = (users) =>
     rank: index + 1,
   }));
 
-const UserAvatar = ({ src, username, className = "h-14 w-14" }) => (
-  <div
-    className={`relative overflow-hidden rounded-2xl ring-1 ring-white/10 bg-white/5 ${className}`}
-  >
-    <img
-      src={src || getAvatarUrlByKey(username)}
-      alt={username}
-      className="h-full w-full object-cover"
-      onError={handleAvatarError}
-    />
-  </div>
-);
+const UserAvatar = ({ src, username, rank, isPremium = false, className = "h-14 w-14" }) => {
+  const prestige = getUserPrestige({ isPremium }, rank);
+  const ringClassName =
+    prestige.topRankTier?.ringClassName ||
+    (prestige.isPremium
+      ? "ring-primaryColor/60 shadow-[0_0_22px_rgba(243,191,26,0.25)]"
+      : "ring-white/10");
+
+  return (
+    <div className={`relative shrink-0 overflow-visible ${className}`}>
+      <div className={`h-full w-full overflow-hidden rounded-2xl bg-white/5 ring-2 ${ringClassName}`}>
+        <img
+          src={src || getAvatarUrlByKey(username)}
+          alt={username}
+          className="h-full w-full object-cover"
+          onError={handleAvatarError}
+        />
+      </div>
+
+      {prestige.topRankTier && (
+        <div
+          className={`absolute -left-2 -top-2 flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-black ${prestige.topRankTier.badgeClassName}`}
+        >
+          #{prestige.topRankTier.rank}
+        </div>
+      )}
+
+      {prestige.isPremium && (
+        <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-[#ffd875]/60 bg-gradient-to-br from-[#fde68a] to-[#f59e0b] text-[11px] text-yellow-950 shadow-[0_0_12px_rgba(255,216,117,0.45)]">
+          <i className="fa-solid fa-crown" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PrestigeBadges = ({ user, rank, compact = false, className = "" }) => {
+  const prestige = getUserPrestige(user, rank);
+
+  if (!prestige.hasPrestige) {
+    return null;
+  }
+
+  return (
+    <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+      {prestige.topRankTier && (
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-bold ${compact ? "text-[10px]" : "text-[11px]"} ${prestige.topRankTier.badgeClassName}`}
+        >
+          <i className={`fa-solid ${prestige.topRankTier.icon}`} />
+          {prestige.topRankTier.shortTitle}
+        </span>
+      )}
+      {prestige.isPremium && (
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border border-primaryColor/40 bg-primaryColor/15 px-2 py-1 font-bold text-primaryColor ${compact ? "text-[10px]" : "text-[11px]"}`}
+        >
+          <i className="fa-solid fa-crown" />
+          Premium
+        </span>
+      )}
+    </div>
+  );
+};
 
 const HeaderStat = ({ label, value, iconClassName, compact = false }) => (
   <div
@@ -407,10 +460,13 @@ const PodiumCard = ({ user, rank }) => {
           <UserAvatar
             src={user.avatar}
             username={user.username}
+            rank={rank}
+            isPremium={user.isPremium}
             className="h-16 w-16 rounded-[22px] ring-2 ring-white/10"
           />
           <div className="min-w-0">
             <h3 className="truncate text-xl font-bold text-white">{user.username}</h3>
+            <PrestigeBadges user={user} rank={rank} className="mt-2" />
             <p className="mt-1 text-sm text-gray-400">Điểm xếp hạng {formatScore(user.score)}</p>
           </div>
         </div>
@@ -452,10 +508,16 @@ const LeaderboardRow = ({ user, rank, maxScore }) => {
             {rank}
           </div>
 
-          <UserAvatar src={user.avatar} username={user.username} />
+          <UserAvatar
+            src={user.avatar}
+            username={user.username}
+            rank={rank}
+            isPremium={user.isPremium}
+          />
 
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-white">{user.username}</h3>
+            <PrestigeBadges user={user} rank={rank} compact className="mt-1" />
             <p className="mt-1 text-sm text-gray-400">
               Đã xem {formatWatchDuration(user.totalWatchTime)}
             </p>
@@ -526,10 +588,13 @@ const HorizontalHeroCard = ({ user }) => {
           <UserAvatar
             src={user.avatar}
             username={user.username}
+            rank={1}
+            isPremium={user.isPremium}
             className="h-14 w-14 rounded-[20px] ring-2 ring-[#ffd875]/20 sm:h-16 sm:w-16 sm:rounded-[22px]"
           />
           <div className="min-w-0">
             <h3 className="truncate text-xl font-black text-white sm:text-2xl">{user.username}</h3>
+            <PrestigeBadges user={user} rank={1} className="mt-2" />
             <p className="mt-1 text-sm text-gray-300">
               Đã xem {formatWatchDuration(user.totalWatchTime)}
             </p>
@@ -595,6 +660,8 @@ const HorizontalRankCard = ({ user, rank, maxScore }) => {
         <UserAvatar
           src={user.avatar}
           username={user.username}
+          rank={rank}
+          isPremium={user.isPremium}
           className="h-12 w-12 rounded-[18px]"
         />
       </div>
@@ -607,6 +674,7 @@ const HorizontalRankCard = ({ user, rank, maxScore }) => {
           value={formatWatchDuration(user.totalWatchTime)}
           tone="accent"
         />
+        <PrestigeBadges user={user} rank={rank} compact className="mt-2" />
 
         <MobileDetailsButton
           expanded={expanded}

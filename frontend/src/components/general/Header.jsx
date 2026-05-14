@@ -12,6 +12,7 @@ import useAuth from "hooks/useAuth";
 import ThemeSelector from "components/common/ThemeSelector";
 import TimiToggle from "components/common/TimiToggle";
 import WatchStreak from "components/common/WatchStreak";
+import useCurrentUserPrestige from "hooks/useCurrentUserPrestige";
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -24,6 +25,11 @@ const Header = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading, openAuthModal, logout } = useAuth();
   const { unreadCount } = useNotifications();
+  const {
+    leaderboardRank,
+    displayUser: prestigeUser,
+    prestige: userPrestige,
+  } = useCurrentUserPrestige(isAuthenticated ? user : null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -68,12 +74,19 @@ const Header = () => {
               setShowMobileMenu(!showMobileMenu);
               setShowMobileSearch(false);
             }}
-            className="lg:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="relative rounded-lg p-2 text-white transition-colors hover:bg-white/10 lg:hidden"
             aria-label="Toggle menu"
           >
             <i
               className={`fa-solid ${showMobileMenu ? "fa-times text-red-400" : "fa-bars"} text-xl`}
             />
+            {userPrestige?.isTopRank && (
+              <span
+                className={`absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[9px] font-black ring-2 ring-black ${userPrestige.topRankTier.badgeClassName}`}
+              >
+                #{userPrestige.topRankTier.rank}
+              </span>
+            )}
           </button>
 
           {/* Left: Logo */}
@@ -158,7 +171,9 @@ const Header = () => {
             <SearchBar className="hidden lg:block laptop-sm:w-60 laptop-xs:w-44 xl:w-80" />
             {isAuthenticated ? (
               <DesktopUserMenu
-                user={isAuthenticated ? user : null}
+                user={prestigeUser || user}
+                prestigeRank={leaderboardRank}
+                prestige={userPrestige}
                 showUserMenu={showUserMenu}
                 onToggle={() => setShowUserMenu(!showUserMenu)}
                 onLogout={handleLogout}
@@ -191,10 +206,12 @@ const Header = () => {
             className="fixed inset-0 bg-black/50 z-30 md:hidden"
             onClick={() => setShowMobileMenu(false)}
           />
-          <div className="fixed top-[62px] left-0 min-w-[360px] z-40 lg:hidden bg-[rgba(59,73,135,1)] rounded-2xl mx-2 md:mx-4">
-            <div className="w-full bg-transparent px-4 py-4">
+          <div className="fixed left-2 right-2 top-[62px] z-40 max-h-[calc(100vh-76px)] overflow-y-auto overscroll-contain rounded-2xl bg-[rgba(59,73,135,0.98)] shadow-[0_24px_70px_rgba(0,0,0,0.32)] lg:hidden sm:right-auto sm:w-[390px] md:mx-4">
+            <div className="w-full bg-transparent px-3 py-3 sm:px-4 sm:py-4">
               <MobileUserMenu
-                user={isAuthenticated ? user : null}
+                user={isAuthenticated ? prestigeUser || user : null}
+                prestigeRank={leaderboardRank}
+                prestige={userPrestige}
                 onLogout={handleLogout}
                 onOpenAuth={openAuthModal}
                 onClose={() => setShowMobileMenu(false)}

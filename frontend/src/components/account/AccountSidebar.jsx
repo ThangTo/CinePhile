@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
+import { getPrestigeContainerClassName, getUserPrestige } from "utils/userPrestige";
 
 const DEFAULT_TAB = "profile";
 
@@ -53,14 +54,20 @@ const navItems = [
   },
 ];
 
-const AccountSidebar = ({ user, onLogout }) => {
+const AccountSidebar = ({ user, onLogout, prestigeRank }) => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const queryTab = searchParams.get("tabs");
   const activeTab = queryTab || DEFAULT_TAB;
+  const prestige = getUserPrestige(user, prestigeRank);
+  const isPremium = prestige.isPremium || isPremiumActive(user);
 
   return (
-    <nav className="w-[90%] md:w-[250px] mt-[50px] md:ml-[20px] mx-auto rounded-2xl bg-account-bg-secondary min-h-auto md:min-h-screen p-6 flex flex-col border-r-0 md:border-r border-b md:border-b-0 border-account-border md:sticky md:top-0 md:h-screen">
+    <nav
+      className={`w-[90%] md:w-[250px] mt-[50px] md:ml-[20px] mx-auto rounded-2xl bg-account-bg-secondary min-h-auto md:min-h-screen p-6 flex flex-col border-r-0 md:border-r border-b md:border-b-0 border-account-border md:sticky md:top-0 md:h-screen ${
+        prestige.hasPrestige ? "shadow-[0_24px_70px_rgba(243,191,26,0.12)]" : ""
+      } ${getPrestigeContainerClassName(user, prestigeRank)}`}
+    >
       <div className="flex-1">
         {navItems.map((item) => {
           const isActive = activeTab === item.tab;
@@ -85,20 +92,20 @@ const AccountSidebar = ({ user, onLogout }) => {
       <Link
         to="/premium"
         className={`flex flex-col px-4 py-3 rounded-lg mb-2 font-medium no-underline transition-all ${
-          isPremiumActive(user)
+          isPremium
             ? "bg-gradient-to-r from-primaryColor to-hoverPrimaryColor text-black"
             : "bg-primaryColor/20 text-primaryColor hover:bg-primaryColor/30 border border-primaryColor/50"
         }`}
       >
         <div className="flex items-center">
           <i
-            className={`fas ${isPremiumActive(user) ? "fa-crown" : "fa-star"} w-5 text-center`}
+            className={`fas ${isPremium ? "fa-crown" : "fa-star"} w-5 text-center`}
           ></i>
-          <span className={`ml-1 ${isPremiumActive(user) ? "font-bold" : ""}`}>
-            {isPremiumActive(user) ? "Premium" : "Nâng cấp Premium"}
+          <span className={`ml-1 ${isPremium ? "font-bold" : ""}`}>
+            {isPremium ? "Premium" : "Nâng cấp Premium"}
           </span>
         </div>
-        {isPremiumActive(user) && (
+        {isPremium && (
           <span className="text-xs mt-1 opacity-90">{getPremiumStatusText(user)}</span>
         )}
       </Link>
@@ -109,25 +116,34 @@ const AccountSidebar = ({ user, onLogout }) => {
             src={user.avatar}
             alt={user.username}
             size="w-10 h-10"
-            isPremium={isPremiumActive(user)}
+            isPremium={isPremium}
+            rank={prestigeRank}
             className="mr-3"
           />
           <div className="overflow-hidden">
             <div className="flex items-center gap-2">
               <span
                 className={`font-semibold whitespace-nowrap overflow-hidden text-ellipsis ${
-                  isPremiumActive(user) ? "text-primaryColor" : "text-account-text-primary"
+                  isPremium ? "text-primaryColor" : "text-account-text-primary"
                 }`}
               >
                 {user.username}
               </span>
-              {isPremiumActive(user) && (
+              {isPremium && (
                 <i
                   className="fa-solid fa-crown text-primaryColor text-xs"
                   style={{ filter: "drop-shadow(0 0 3px rgba(255,216,117,0.6))" }}
                 />
               )}
             </div>
+            {prestige.isTopRank && (
+              <div
+                className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${prestige.topRankTier.badgeClassName}`}
+              >
+                <i className={`fa-solid ${prestige.topRankTier.icon}`} />
+                {prestige.topRankTier.shortTitle}
+              </div>
+            )}
             <div className="text-xs text-account-text-secondary whitespace-nowrap overflow-hidden text-ellipsis">
               {user.email.length > 15 ? user.email.substring(0, 15) + "..." : user.email}
             </div>
