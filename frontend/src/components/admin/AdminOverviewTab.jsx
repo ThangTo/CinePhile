@@ -1,12 +1,6 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useState, useRef } from "react";
 import { BarSpinner } from "components/common/LoadingState";
 import { statsAPI } from "services/admin.service";
-import { Bar, Doughnut, Line } from "react-chartjs-2";
-import { Chart, registerables } from "chart.js";
-import AnalyticsMap from "./AnalyticsMap";
-import TrendingRanking from "./TrendingRanking";
-import AnalyticsHistoryChart from "./AnalyticsHistoryChart";
-import AnalyticsUniqueChart from "./AnalyticsUniqueChart";
 import { getOptimizedImageUrl } from "constants/imageSizes";
 import {
   FiActivity,
@@ -23,7 +17,65 @@ import {
   FiTarget
 } from "react-icons/fi";
 
-Chart.register(...registerables);
+const AdminChart = lazy(() => import("./AdminChart"));
+const AnalyticsMap = lazy(() => import("./AnalyticsMap"));
+const TrendingRanking = lazy(() => import("./TrendingRanking"));
+const AnalyticsHistoryChart = lazy(() => import("./AnalyticsHistoryChart"));
+const AnalyticsUniqueChart = lazy(() => import("./AnalyticsUniqueChart"));
+
+function ChartFallback() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <BarSpinner />
+    </div>
+  );
+}
+
+function ChartSlot({ type, ...props }) {
+  return (
+    <Suspense fallback={<ChartFallback />}>
+      <AdminChart type={type} {...props} />
+    </Suspense>
+  );
+}
+
+function useDeferredMount(timeout = 1800) {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setIsReady(true);
+      return undefined;
+    }
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(() => setIsReady(true), { timeout });
+      return () => {
+        if ("cancelIdleCallback" in window) {
+          window.cancelIdleCallback(idleId);
+        }
+      };
+    }
+
+    const timerId = window.setTimeout(() => setIsReady(true), Math.min(timeout, 1200));
+    return () => window.clearTimeout(timerId);
+  }, [timeout]);
+
+  return isReady;
+}
+
+function DeferredAdminSection({ children, minHeight = "min-h-[320px]" }) {
+  const isReady = useDeferredMount();
+  const fallback = (
+    <div className={`${minHeight} flex items-center justify-center`}>
+      <BarSpinner />
+    </div>
+  );
+
+  if (!isReady) return fallback;
+
+  return <Suspense fallback={fallback}>{children}</Suspense>;
+}
 
 const DashboardCard = ({ title, value, icon: Icon, color, weekly, suffix }) => (
   <div className="relative overflow-hidden rounded-2xl bg-[#ffffff05] border border-white/5 p-6 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#ffffff08] group">
@@ -729,7 +781,7 @@ const AdminOverviewTab = () => {
             </div>
           </div>
           <div className="h-[250px] w-full z-10 mt-2">
-            <Line data={realtimeLineData} options={realtimeLineOptions} />
+            <ChartSlot type="line" data={realtimeLineData} options={realtimeLineOptions} />
           </div>
         </div>
 
@@ -779,14 +831,20 @@ const AdminOverviewTab = () => {
 
       {/* Historical Analytics Chart */}
       <div className="w-full">
-        <AnalyticsHistoryChart />
+        <DeferredAdminSection minHeight="min-h-[420px]">
+          <AnalyticsHistoryChart />
+        </DeferredAdminSection>
       </div>
 
       <div className="w-full">
-        <AnalyticsUniqueChart />
+        <DeferredAdminSection minHeight="min-h-[420px]">
+          <AnalyticsUniqueChart />
+        </DeferredAdminSection>
       </div>
 
-      <TrendingRanking />
+      <DeferredAdminSection minHeight="min-h-[420px]">
+        <TrendingRanking />
+      </DeferredAdminSection>
 
       {/* 2.5 Watch Time Trend */}
       <div className="bg-[#ffffff05] rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col relative overflow-hidden group w-full">
@@ -814,7 +872,7 @@ const AdminOverviewTab = () => {
               <span>Chưa có dữ liệu thống kê tuần này</span>
             </div>
           ) : (
-            <Line data={watchTimeLineData} options={watchTimeLineOptions} />
+               <ChartSlot type="line" data={watchTimeLineData} options={watchTimeLineOptions} />
           )}
         </div>
       </div>
@@ -839,7 +897,7 @@ const AdminOverviewTab = () => {
             ) : peakHoursChart?.labels?.length === 0 ? (
                <div className="h-full flex items-center justify-center text-gray-500 opacity-50">Không có dữ liệu 24h</div>
             ) : (
-               <Line data={peakHoursLineData} options={peakHoursLineOptions} />
+               <ChartSlot type="line" data={peakHoursLineData} options={peakHoursLineOptions} />
             )}
           </div>
         </div>
@@ -858,7 +916,7 @@ const AdminOverviewTab = () => {
             ) : devicesChart?.labels?.length === 0 ? (
               <span className="text-gray-500">Chưa có dữ liệu nền tảng</span>
             ) : (
-              <Doughnut data={devicesDoughnutData} options={doughnutChartOptions} />
+              <ChartSlot type="doughnut" data={devicesDoughnutData} options={doughnutChartOptions} />
             )}
           </div>
         </div>
@@ -889,7 +947,9 @@ const AdminOverviewTab = () => {
 
       {/* 2.8 Map Section */}
       <div className="w-full">
-        <AnalyticsMap />
+        <DeferredAdminSection minHeight="min-h-[460px]">
+          <AnalyticsMap />
+        </DeferredAdminSection>
       </div>
 
       {/* 3. Charts Section */}
@@ -922,7 +982,7 @@ const AdminOverviewTab = () => {
                 <span>Chưa có dữ liệu thống kê</span>
               </div>
             ) : (
-              <Bar data={barChartData} options={barChartOptions} plugins={[barPosterPlugin]} />
+              <ChartSlot type="bar" data={barChartData} options={barChartOptions} plugins={[barPosterPlugin]} />
             )}
           </div>
         </div>
@@ -959,7 +1019,7 @@ const AdminOverviewTab = () => {
                 <p>Chưa có dữ liệu</p>
               </div>
             ) : (
-              <Doughnut data={doughnutChartData} options={doughnutChartOptions} />
+              <ChartSlot type="doughnut" data={doughnutChartData} options={doughnutChartOptions} />
             )}
           </div>
         </div>

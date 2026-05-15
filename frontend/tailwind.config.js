@@ -143,6 +143,7 @@ module.exports = {
         },
       },
       screens: {
+        "3xl": "1920px",
         "laptop-sm": { min: "1024px", max: "1207px" },
         "laptop-xs": { min: "1024px", max: "1081px" },
       },

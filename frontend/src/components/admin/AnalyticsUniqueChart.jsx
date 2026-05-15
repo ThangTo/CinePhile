@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Line } from "react-chartjs-2";
+import React, { Suspense, lazy, useState, useEffect, useCallback, useMemo } from "react";
 import { statsAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
 import {
@@ -9,6 +8,8 @@ import {
   FiRefreshCw,
   FiUserCheck,
 } from "react-icons/fi";
+
+const AdminChart = lazy(() => import("./AdminChart"));
 
 const GRANULARITIES = [
   { key: "day",   label: "Theo Ngày" },
@@ -431,7 +432,9 @@ const AnalyticsUniqueChart = () => {
         ) : (
           <>
             <div className="h-[300px] w-full">
-              <Line data={lineChartData} options={lineChartOptions} />
+              <Suspense fallback={<div className="h-full flex items-center justify-center"><BarSpinner /></div>}>
+                <AdminChart type="line" data={lineChartData} options={lineChartOptions} />
+              </Suspense>
             </div>
 
             {/* Data table for small count */}
