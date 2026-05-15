@@ -194,8 +194,8 @@ const BannerHome = ({ movie }) => {
   }
 
   return (
-    <section 
-      className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[350px] sm:h-[450px] md:h-[600px] lg:h-[700px] cursor-pointer"
+    <section
+      className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[350px] sm:h-[450px] md:h-[600px] lg:h-[700px] xl:h-[950px] cursor-pointer"
       onClick={handleBannerClick}
     >
       {/* Background with gradients */}
@@ -267,7 +267,9 @@ const BannerHome = ({ movie }) => {
                   handleSelectMovie(index);
                 }}
                 className={`relative w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full overflow-hidden transition-all duration-200 bg-black/50 ${
-                  isActive ? "scale-110 ring-2 ring-primaryColor shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]" : "opacity-60 hover:opacity-100"
+                  isActive
+                    ? "scale-110 ring-2 ring-primaryColor shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
+                    : "opacity-60 hover:opacity-100"
                 }`}
               >
                 <OptimizedImage
@@ -281,7 +283,9 @@ const BannerHome = ({ movie }) => {
                   size="40"
                   quality="80"
                 />
-                {isActive && <div className="absolute inset-0 bg-black/10 pointer-events-none rounded-full" />}
+                {isActive && (
+                  <div className="absolute inset-0 bg-black/10 pointer-events-none rounded-full" />
+                )}
               </button>
             );
           })}

@@ -17,7 +17,7 @@ const MovieTitle = ({ title, englishTitle, logo }) => (
         <img
           src={logo}
           alt={title}
-          className="max-h-40 w-auto object-cover"
+          className="max-h-40 xl:max-h-72 w-auto object-cover"
           onError={(e) => {
             // If logo fails to load, hide it and show text title instead
             e.target.style.display = "none";
