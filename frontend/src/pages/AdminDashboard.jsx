@@ -1,21 +1,40 @@
-import React, { useState, useEffect } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import MovieTable from "components/admin/MovieTable";
-import UserTable from "components/admin/UserTable";
-import CommentTable from "components/admin/CommentTable";
-import CastTable from "components/admin/CastTable";
 import AdminSidebar from "components/admin/AdminSidebar";
-import AdminOverviewTab from "components/admin/AdminOverviewTab";
-import AdminNotificationTab from "components/admin/AdminNotificationTab";
-import AdminSettingsTab from "components/admin/AdminSettingsTab";
-import AdminViralClipsTab from "components/admin/AdminViralClipsTab";
-import AdminMailboxTab from "components/admin/AdminMailboxTab";
-import AdminTikTokTab from "components/admin/AdminTikTokTab";
-import SettingsPricingTab from "components/admin/SettingsPricingTab";
-import AdminQuestsTab from "components/admin/AdminQuestsTab";
-import AdminSubtitlesTab from "components/admin/AdminSubtitlesTab";
-import AdminPlaybackTab from "components/admin/AdminPlaybackTab";
 import { ADMIN_TABS, ADMIN_MENU_ITEMS } from "constants/admin";
+
+const MovieTable = lazy(() => import("components/admin/MovieTable"));
+const UserTable = lazy(() => import("components/admin/UserTable"));
+const CommentTable = lazy(() => import("components/admin/CommentTable"));
+const CastTable = lazy(() => import("components/admin/CastTable"));
+const AdminOverviewTab = lazy(() => import("components/admin/AdminOverviewTab"));
+const AdminNotificationTab = lazy(() => import("components/admin/AdminNotificationTab"));
+const AdminSettingsTab = lazy(() => import("components/admin/AdminSettingsTab"));
+const AdminViralClipsTab = lazy(() => import("components/admin/AdminViralClipsTab"));
+const AdminMailboxTab = lazy(() => import("components/admin/AdminMailboxTab"));
+const AdminTikTokTab = lazy(() => import("components/admin/AdminTikTokTab"));
+const SettingsPricingTab = lazy(() => import("components/admin/SettingsPricingTab"));
+const AdminQuestsTab = lazy(() => import("components/admin/AdminQuestsTab"));
+const AdminSubtitlesTab = lazy(() => import("components/admin/AdminSubtitlesTab"));
+const AdminPlaybackTab = lazy(() => import("components/admin/AdminPlaybackTab"));
+
+function AdminTabLoading() {
+  return (
+    <div className="min-h-[360px] flex items-center justify-center">
+      <div className="flex items-center justify-center gap-1.5 h-8" aria-label="Loading">
+        <div className="w-1.5 h-6 bg-primaryColor rounded-full animate-bounce" />
+        <div
+          className="w-1.5 h-8 bg-primaryColor rounded-full animate-bounce"
+          style={{ animationDelay: "-0.2s" }}
+        />
+        <div
+          className="w-1.5 h-6 bg-primaryColor rounded-full animate-bounce"
+          style={{ animationDelay: "-0.4s" }}
+        />
+      </div>
+    </div>
+  );
+}
 
 const AdminDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -157,7 +176,7 @@ const AdminDashboard = () => {
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#0a0a0c]">
           <div className="max-w-[1600px] mx-auto">
-            {renderContent()}
+            <Suspense fallback={<AdminTabLoading />}>{renderContent()}</Suspense>
           </div>
         </main>
       </div>

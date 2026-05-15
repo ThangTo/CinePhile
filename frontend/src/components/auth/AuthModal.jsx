@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "contexts/AuthContext";
-import bgFormLogin from "assets/images/bg-form-login.png";
+import bgFormLogin from "assets/images/bg-form-login.webp";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
 const GOOGLE_AUTH_URL = `${API_BASE_URL}/auth/google`;
