@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import { Link } from "react-router-dom";
 import { DESKTOP_MENU_ITEMS, DESKTOP_MENU_ITEM_CLASS } from "./constants";
 import { useNotifications } from "contexts/NotificationContext";
-import NotificationPanel from "components/notifications/NotificationPanel";
 import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
 import {
@@ -10,6 +9,8 @@ import {
   getUserPrestige,
   isUserPremiumDisplay,
 } from "utils/userPrestige";
+
+const NotificationPanel = lazy(() => import("components/notifications/NotificationPanel"));
 
 const PrestigeBanner = ({ prestige }) => {
   if (!prestige?.isTopRank) {
@@ -119,10 +120,12 @@ const DesktopUserMenu = ({
           )}
         </button>
         {showNotifications && (
-          <NotificationPanel
-            onClose={() => setShowNotifications(false)}
-            triggerRef={bellButtonRef}
-          />
+          <Suspense fallback={null}>
+            <NotificationPanel
+              onClose={() => setShowNotifications(false)}
+              triggerRef={bellButtonRef}
+            />
+          </Suspense>
         )}
       </div>
 

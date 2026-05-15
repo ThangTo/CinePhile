@@ -19,6 +19,8 @@ const SiteFooter = () => {
                   src={logo3}
                   alt="CinePhine"
                   className="w-16 h-16 object-cover object-center rounded-full"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
               <div>

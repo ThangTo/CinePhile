@@ -39,6 +39,8 @@ const STEPS = [
   },
 ];
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+
 const TimiOnboarding = () => {
   const { showOnboarding, dismissOnboarding } = useVoice();
   const [step, setStep] = useState(0);
@@ -58,7 +60,7 @@ const TimiOnboarding = () => {
     let isActive = true; // Chống race condition khi bấm chuyển bước liên tục
 
     // Gọi API TTS (Tự động Cache trên R2 nhờ Backend)
-    fetch('http://localhost:5000/api/v1/ai/tts', {
+    fetch(`${API_BASE_URL}/ai/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: currentText })

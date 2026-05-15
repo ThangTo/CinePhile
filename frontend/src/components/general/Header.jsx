@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { Suspense, lazy, useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   MobileUserMenu,
@@ -7,12 +7,13 @@ import {
   SearchBar,
 } from "components/header/index";
 import { useNotifications } from "contexts/NotificationContext";
-import NotificationPanel from "components/notifications/NotificationPanel";
 import useAuth from "hooks/useAuth";
 import ThemeSelector from "components/common/ThemeSelector";
 import TimiToggle from "components/common/TimiToggle";
 import WatchStreak from "components/common/WatchStreak";
 import useCurrentUserPrestige from "hooks/useCurrentUserPrestige";
+
+const NotificationPanel = lazy(() => import("components/notifications/NotificationPanel"));
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -143,10 +144,12 @@ const Header = () => {
                       onClick={() => setShowMobileNotifications(false)}
                     />
                     <div className="fixed px-2 py-2 md:absolute inset-0 md:inset-auto right-0 md:right-0 top-[56px] md:top-full mt-0 md:mt-2 z-[100002] md:z-50">
-                      <NotificationPanel
-                        onClose={() => setShowMobileNotifications(false)}
-                        triggerRef={mobileBellButtonRef}
-                      />
+                      <Suspense fallback={null}>
+                        <NotificationPanel
+                          onClose={() => setShowMobileNotifications(false)}
+                          triggerRef={mobileBellButtonRef}
+                        />
+                      </Suspense>
                     </div>
                   </>
                 )}

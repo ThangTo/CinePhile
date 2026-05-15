@@ -3,11 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "contexts/AuthContext";
 import { NotificationProvider } from "contexts/NotificationContext";
 import { ThemeProvider } from "contexts/ThemeContext";
-import { VoiceProvider } from "contexts/VoiceContext";
+import { VoiceProvider, useVoice } from "contexts/VoiceContext";
 import ErrorBoundary from "components/common/ErrorBoundary";
-import VoiceIndicator from "components/common/VoiceIndicator";
-import TimiOnboarding from "components/common/TimiOnboarding";
-import CursorEffects from "components/common/CursorEffects";
 import { initUserInteractionListener } from "utils/userInteraction";
 import "styles/themes.css";
 import ProtectedRoute from "./components/general/ProtectedRoute";
@@ -32,6 +29,9 @@ const GoogleAuthHandler = lazy(() => import("pages/GoogleAuthHandler"));
 const GoogleAuthHandlerWrapper = lazy(() =>
   import("components/common/GoogleAuthHandlerWrapper")
 );
+const CursorEffects = lazy(() => import("components/common/CursorEffects"));
+const VoiceIndicator = lazy(() => import("components/common/VoiceIndicator"));
+const TimiOnboarding = lazy(() => import("components/common/TimiOnboarding"));
 
 function RouteLoading() {
   return (
@@ -51,12 +51,35 @@ function RouteLoading() {
   );
 }
 
+function CursorEffectsSlot({ activeEffectId }) {
+  if (!activeEffectId || activeEffectId === "none") return null;
+
+  return (
+    <Suspense fallback={null}>
+      <CursorEffects activeEffectId={activeEffectId} />
+    </Suspense>
+  );
+}
+
+function VoiceWidgets() {
+  const { isEnabled, showOnboarding } = useVoice();
+
+  if (!isEnabled && !showOnboarding) return null;
+
+  return (
+    <Suspense fallback={null}>
+      {isEnabled && <VoiceIndicator />}
+      {showOnboarding && <TimiOnboarding />}
+    </Suspense>
+  );
+}
+
 function AppInner() {
   const { user } = useAuth();
 
   return (
     <>
-      <CursorEffects activeEffectId={user?.cursorEffectId || "none"} />
+      <CursorEffectsSlot activeEffectId={user?.cursorEffectId || "none"} />
       <Router>
         <ScrollToTop />
         <Suspense fallback={<RouteLoading />}>
@@ -95,8 +118,7 @@ function AppInner() {
           </Routes>
         </Suspense>
       </Router>
-      <VoiceIndicator />
-      <TimiOnboarding />
+      <VoiceWidgets />
     </>
   );
 }

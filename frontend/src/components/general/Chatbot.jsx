@@ -2,6 +2,34 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSystemInstruction } from "constants/chatbotKnowledge";
 
+const EMOJI_MART_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/emoji-mart@latest/dist/browser.js";
+let emojiMartLoadPromise = null;
+
+function loadEmojiMart() {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.EmojiMart) return Promise.resolve();
+  if (emojiMartLoadPromise) return emojiMartLoadPromise;
+
+  emojiMartLoadPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${EMOJI_MART_SCRIPT_URL}"]`);
+
+    if (existingScript) {
+      existingScript.addEventListener("load", resolve, { once: true });
+      existingScript.addEventListener("error", reject, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = EMOJI_MART_SCRIPT_URL;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+
+  return emojiMartLoadPromise;
+}
+
 const Chatbot = () => {
   const navigate = useNavigate();
   const chatBodyRef = useRef(null);
@@ -268,6 +296,10 @@ const Chatbot = () => {
   // Emoji Picker logic (Giữ nguyên)
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!showChatbot || !showEmojiPicker) return;
+
+    let isCancelled = false;
+
     const initEmojiPicker = () => {
       if (!window.EmojiMart || !chatFormRef.current) return;
       try {
@@ -303,19 +335,18 @@ const Chatbot = () => {
       }
     };
 
-    if (window.EmojiMart && chatFormRef.current) {
-      initEmojiPicker();
-    } else {
-      const checkInterval = setInterval(() => {
-        if (window.EmojiMart && chatFormRef.current) {
-          clearInterval(checkInterval);
-          initEmojiPicker();
-        }
-      }, 100);
-      setTimeout(() => clearInterval(checkInterval), 10000);
-    }
-    return () => {};
-  }, [showChatbot]);
+    loadEmojiMart()
+      .then(() => {
+        if (!isCancelled) initEmojiPicker();
+      })
+      .catch((error) => {
+        console.error("Error loading emoji picker:", error);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [showChatbot, showEmojiPicker]);
 
   useEffect(() => {
     return () => {

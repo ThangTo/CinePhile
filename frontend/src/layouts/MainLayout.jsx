@@ -1,12 +1,53 @@
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { useTheme } from "contexts/ThemeContext";
 import Header from "components/general/Header";
 import SiteFooter from "components/general/SiteFooter";
-import Chatbot from "components/general/Chatbot";
 // import GuestNotification from "components/general/GuestNotification";
-import ThemeDecorations from "components/common/ThemeDecorations";
-import MailboxFAB from "components/general/MailboxFAB";
 import { hexToRgbChannels } from "utils/colorUtils";
+
+const Chatbot = lazy(() => import("components/general/Chatbot"));
+const ThemeDecorations = lazy(() => import("components/common/ThemeDecorations"));
+const MailboxFAB = lazy(() => import("components/general/MailboxFAB"));
+
+function useDeferredMount(timeout = 2500) {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setIsReady(true);
+      return undefined;
+    }
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(() => setIsReady(true), { timeout });
+      return () => {
+        if ("cancelIdleCallback" in window) {
+          window.cancelIdleCallback(idleId);
+        }
+      };
+    }
+
+    const timerId = window.setTimeout(() => setIsReady(true), 1200);
+    return () => window.clearTimeout(timerId);
+  }, [timeout]);
+
+  return isReady;
+}
+
+function DeferredLayoutWidgets({ theme, currentTheme }) {
+  const isReady = useDeferredMount();
+
+  if (!isReady) return null;
+
+  return (
+    <Suspense fallback={null}>
+      {theme.decorations.enabled && <ThemeDecorations theme={currentTheme} />}
+      <Chatbot />
+      <MailboxFAB />
+    </Suspense>
+  );
+}
 
 const MainLayout = () => {
   const { theme, currentTheme } = useTheme();
@@ -38,14 +79,12 @@ const MainLayout = () => {
         "--theme-accent-rgb": accentRgb,
       }}
     >
-      {theme.decorations.enabled && <ThemeDecorations theme={currentTheme} />}
       <Header />
       <main className="flex-grow">
         <Outlet />
       </main>
       <SiteFooter />
-      <Chatbot />
-      <MailboxFAB />
+      <DeferredLayoutWidgets theme={theme} currentTheme={currentTheme} />
       {/* <GuestNotification /> */}
     </div>
   );
