@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Movie = require('../models/movie.model');
 const Episode = require('../models/episode.model');
 const ViewHistory = require('../models/view_history.model');
+const UserHistory = require('../models/user_history.model');
 const watchStreakService = require('./watchStreak.service');
 const questService = require('./quest.service');
 const leaderboardService = require('./leaderboard.service');
@@ -28,6 +29,13 @@ const detectDeviceType = (userAgent = 'Unknown') => {
   if (/tablet|ipad/i.test(userAgent)) return 'Tablet';
   if (userAgent === 'Unknown') return 'Unknown';
   return 'Desktop';
+};
+
+const toNonNegativeInteger = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue < 0) return null;
+  return Math.floor(numberValue);
 };
 
 const findMovie = async (identifier) => {
@@ -145,12 +153,60 @@ const ensureViewHistoryRecord = async (
   });
 };
 
+const buildUserHistoryUpdate = (viewRecord, { safeSecs, watchTime, duration }) => {
+  const explicitWatchTime = toNonNegativeInteger(watchTime);
+  const durationSeconds = toNonNegativeInteger(duration);
+  const previousWatchDuration = Math.max(0, Math.floor(Number(viewRecord?.watchDuration) || 0));
+
+  let nextWatchTime = explicitWatchTime !== null
+    ? explicitWatchTime
+    : previousWatchDuration + safeSecs;
+
+  const update = {
+    episodeId: viewRecord.episodeId || null,
+    watchTime: nextWatchTime,
+    lastWatchedAt: new Date(),
+  };
+
+  if (durationSeconds && durationSeconds > 0) {
+    nextWatchTime = Math.min(nextWatchTime, durationSeconds);
+    const progressPercent = (nextWatchTime / durationSeconds) * 100;
+
+    update.watchTime = nextWatchTime;
+    update.duration = durationSeconds;
+    update.progress = progressPercent > 95
+      ? 100
+      : Math.min(100, Math.max(0, progressPercent));
+  }
+
+  return update;
+};
+
+const syncUserHistoryFromHeartbeat = (userId, viewRecord, { safeSecs, watchTime, duration }) => {
+  if (!userId || !viewRecord?.movieId) return Promise.resolve(null);
+
+  return UserHistory.findOneAndUpdate(
+    {
+      userId,
+      movieId: viewRecord.movieId,
+    },
+    buildUserHistoryUpdate(viewRecord, { safeSecs, watchTime, duration }),
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    },
+  );
+};
+
 const recordPlaybackHeartbeat = async (
   identifier,
   {
     viewHistoryId,
     episodeId = null,
     seconds = 30,
+    watchTime = null,
+    duration = null,
     userId = null,
     ipAddress = '0.0.0.0',
     userAgent = 'Unknown',
@@ -177,6 +233,10 @@ const recordPlaybackHeartbeat = async (
   if (viewRecord.episodeId) {
     updates.push(Episode.findByIdAndUpdate(viewRecord.episodeId, { $inc: { totalWatchTime: safeSecs } }));
     updates.push(Movie.findByIdAndUpdate(viewRecord.movieId, { $inc: { totalEpisodeWatchTime: safeSecs } }));
+  }
+
+  if (userId) {
+    updates.push(syncUserHistoryFromHeartbeat(userId, viewRecord, { safeSecs, watchTime, duration }));
   }
 
   await Promise.all(updates);

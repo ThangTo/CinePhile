@@ -652,10 +652,16 @@ const VideoPlayer = ({
       const movieId = movie.id || movie._id || movie.slug;
       const vhId = viewHistoryIdRef?.current;
       const episodeId = episode?._id || episode?.id || null;
+      const video = videoRef.current;
+      const watchTime = video?.currentTime;
+      const totalDuration = video?.duration;
 
       if (movieId) {
         movieService
-          .recordWatchTime(movieId, vhId, safeSeconds, episodeId)
+          .recordWatchTime(movieId, vhId, safeSeconds, episodeId, {
+            watchTime,
+            duration: totalDuration,
+          })
           .then((heartbeatData) => {
             if (heartbeatData?.viewHistoryId && viewHistoryIdRef) {
               viewHistoryIdRef.current = heartbeatData.viewHistoryId;

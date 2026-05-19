@@ -220,12 +220,21 @@ const movieService = {
    * @param {string|null} episodeId - Episode ID hiện tại để gắn heartbeat đúng tập
    * @returns {Promise<Object>} { success: true, viewHistoryId, streak? }
    */
-  recordWatchTime: (id, viewHistoryId, seconds = 30, episodeId = null) =>
-    apiRequest(`/movies/${id}/watch-time`, {
+  recordWatchTime: (id, viewHistoryId, seconds = 30, episodeId = null, playback = {}) => {
+    const data = { viewHistoryId, seconds, episodeId };
+    if (Number.isFinite(playback.watchTime)) {
+      data.watchTime = Math.floor(playback.watchTime);
+    }
+    if (Number.isFinite(playback.duration)) {
+      data.duration = Math.floor(playback.duration);
+    }
+
+    return apiRequest(`/movies/${id}/watch-time`, {
       method: "POST",
-      data: { viewHistoryId, seconds, episodeId },
+      data,
       requiresAuth: true,
-    }),
+    });
+  },
 
   /**
    * Đánh giá movie (yêu cầu auth)

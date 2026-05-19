@@ -1,5 +1,8 @@
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const { callOpenRouterWithFallback, DEFAULT_FALLBACK_MODELS } = require('../utils/llmUtils');
+const {
+  callOpenRouterWithFallback,
+  DEFAULT_FREE_FALLBACK_MODELS,
+  resolveModelsToTry,
+} = require('../utils/llmUtils');
 const Movie = require('../models/movie.model');
 const UserFavorite = require('../models/user_favorite.model');
 const Comment = require('../models/comment.model');
@@ -7,8 +10,17 @@ const mongoose = require('mongoose');
 const { generateTtsAudio } = require('../utils/ttsUtils');
 const movieService = require('../services/movie.service');
 
-const LLM_MODEL = 'google/gemini-2.5-flash';
-const REQUEST_TIMEOUT = 10000; // Tăng lên 10s vì có thể gọi DB
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const LLM_MODEL = process.env.TIMI_LLM_MODEL || 'google/gemini-2.5-flash';
+const LLM_MODELS = resolveModelsToTry({
+  model: LLM_MODEL,
+  models: process.env.TIMI_LLM_FALLBACK_MODELS || DEFAULT_FREE_FALLBACK_MODELS,
+});
+const REQUEST_TIMEOUT = parsePositiveInt(process.env.TIMI_LLM_TIMEOUT_MS, 10000); // Tăng lên 10s vì có thể gọi DB
 
 // ====================================================================
 // TOOLS DEFINITION
@@ -295,8 +307,7 @@ const processVoiceCommand = async (req, res) => {
     messages.push({ role: 'user', content: transcript.trim() });
 
     const data = await callOpenRouterWithFallback({
-      model: LLM_MODEL,
-      models: [LLM_MODEL, ...DEFAULT_FALLBACK_MODELS],
+      models: LLM_MODELS,
       timeoutMs: REQUEST_TIMEOUT,
       messages,
       tools: TOOLS,
@@ -349,5 +360,6 @@ module.exports = {
   getSystemPrompt,
   TOOLS,
   LLM_MODEL,
+  LLM_MODELS,
   REQUEST_TIMEOUT,
 };
