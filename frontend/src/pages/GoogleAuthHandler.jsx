@@ -18,7 +18,7 @@ const isMobileDevice = () => {
 const GoogleAuthHandler = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { getCurrentUser } = useAuth();
+  const { getCurrentUser, updateUser } = useAuth();
   const hasProcessedRef = useRef(false);
   const lastProcessedSearchRef = useRef(null); // Lưu location.search đã xử lý
   const isMountedRef = useRef(true); // Track if component is mounted
@@ -168,6 +168,8 @@ const GoogleAuthHandler = () => {
                 await new Promise((resolve) => setTimeout(resolve, 100));
               }
 
+              updateUser(user);
+
               // Check if still mounted before navigating
               if (!isMountedRef.current) return;
 
@@ -234,7 +236,7 @@ const GoogleAuthHandler = () => {
     };
 
     handleCallback();
-  }, [location.search, navigate, getCurrentUser]);
+  }, [location.search, navigate, getCurrentUser, updateUser]);
 
   return (
     <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">

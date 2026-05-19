@@ -556,11 +556,19 @@ const incrementView = async (req, res) => {
  */
 const recordWatchTime = async (req, res) => {
   try {
-    const { viewHistoryId, episodeId = null, seconds = 30 } = req.body || {};
+    const {
+      viewHistoryId,
+      episodeId = null,
+      seconds = 30,
+      watchTime = null,
+      duration = null,
+    } = req.body || {};
     const result = await playbackHeartbeatService.recordPlaybackHeartbeat(req.params.id, {
       viewHistoryId,
       episodeId,
       seconds,
+      watchTime,
+      duration,
       userId: getOptionalUserId(req),
       ipAddress: getRequestIpAddress(req),
       userAgent: req.headers['user-agent'] || 'Unknown',

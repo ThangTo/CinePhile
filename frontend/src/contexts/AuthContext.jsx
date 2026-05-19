@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import authService from "services/auth.service";
@@ -18,9 +19,11 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState("login");
+  const manualAuthUpdateAtRef = useRef(0);
 
   useEffect(() => {
     const loadUser = async () => {
+      const loadStartedAt = Date.now();
       setIsLoading(true);
 
       try {
@@ -36,6 +39,10 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (apiError) {
         const status = apiError?.status;
+
+        if (manualAuthUpdateAtRef.current > loadStartedAt) {
+          return;
+        }
 
         if (status === 401) {
           console.warn("Auth expired (401 from server), clearing auth data");
@@ -173,6 +180,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateUser = (userData) => {
+    manualAuthUpdateAtRef.current = Date.now();
     setUser(userData);
     authService.setAuthData(null, userData);
   };
@@ -182,6 +190,7 @@ export const AuthProvider = ({ children }) => {
     const userData = data?.data || data;
 
     if (userData) {
+      manualAuthUpdateAtRef.current = Date.now();
       setUser(userData);
       authService.setAuthData(null, userData);
       return userData;

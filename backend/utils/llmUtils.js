@@ -19,6 +19,11 @@ function isRateLimitError(error) {
 
 // Danh sách các mô hình ưu tiên sử dụng
 const DEFAULT_FALLBACK_MODELS = [
+  'deepseek/deepseek-v4-flash:free',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+  'minimax/minimax-m2.5:free',
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
   // 'qwen/qwen3-4b:free',
   // 'qwen/qwen3-next-80b-a3b-instruct:free',
   // 'qwen/qwen3-coder:free',
@@ -51,6 +56,33 @@ const DEFAULT_FALLBACK_MODELS = [
   // 'openai/gpt-3.5-turbo', // Fallback
 ];
 
+const DEFAULT_FREE_FALLBACK_MODELS = DEFAULT_FALLBACK_MODELS.filter((model) => model.endsWith(':free'));
+
+function normalizeModelList(models) {
+  if (!models) return [];
+  const rawModels = Array.isArray(models) ? models : String(models).split(',');
+  return rawModels
+    .map((model) => String(model || '').trim())
+    .filter(Boolean);
+}
+
+function uniqueModelList(models) {
+  return [...new Set(normalizeModelList(models))];
+}
+
+function resolveModelsToTry(options = {}) {
+  const configuredModels = normalizeModelList(options.models);
+  if (configuredModels.length > 0) {
+    return uniqueModelList([options.model, ...configuredModels]);
+  }
+
+  if (options.model) {
+    return [options.model];
+  }
+
+  return DEFAULT_FALLBACK_MODELS;
+}
+
 /**
  * Gọi API OpenRouter với cơ chế thử lại (fallback) tự động qua các model khác nhau nếu bị lỗi hoặc rate limit.
  * @param {Object} options 
@@ -65,9 +97,7 @@ async function callOpenRouterWithFallback(options) {
     throw new Error('OPENROUTER_API_KEY chưa được cấu hình');
   }
 
-  const modelsToTry = options.model
-    ? [options.model]
-    : options.models || DEFAULT_FALLBACK_MODELS;
+  const modelsToTry = resolveModelsToTry(options);
 
   const { model, models, timeoutMs, ...bodyPayload } = options;
 
@@ -144,4 +174,7 @@ module.exports = {
   isRateLimitError,
   callOpenRouterWithFallback,
   DEFAULT_FALLBACK_MODELS,
+  DEFAULT_FREE_FALLBACK_MODELS,
+  normalizeModelList,
+  resolveModelsToTry,
 };

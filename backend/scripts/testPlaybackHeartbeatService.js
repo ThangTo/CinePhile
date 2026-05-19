@@ -5,6 +5,7 @@ const servicePath = path.resolve(__dirname, '../services/playbackHeartbeat.servi
 const movieModelPath = path.resolve(__dirname, '../models/movie.model.js');
 const episodeModelPath = path.resolve(__dirname, '../models/episode.model.js');
 const viewHistoryPath = path.resolve(__dirname, '../models/view_history.model.js');
+const userHistoryPath = path.resolve(__dirname, '../models/user_history.model.js');
 const streakServicePath = path.resolve(__dirname, '../services/watchStreak.service.js');
 const questServicePath = path.resolve(__dirname, '../services/quest.service.js');
 const leaderboardServicePath = path.resolve(__dirname, '../services/leaderboard.service.js');
@@ -20,6 +21,7 @@ const installMocks = (state) => {
   delete require.cache[movieModelPath];
   delete require.cache[episodeModelPath];
   delete require.cache[viewHistoryPath];
+  delete require.cache[userHistoryPath];
   delete require.cache[streakServicePath];
   delete require.cache[questServicePath];
   delete require.cache[leaderboardServicePath];
@@ -97,6 +99,22 @@ const installMocks = (state) => {
     },
   };
 
+  require.cache[userHistoryPath] = {
+    id: userHistoryPath,
+    filename: userHistoryPath,
+    loaded: true,
+    exports: {
+      findOneAndUpdate(query, update, options) {
+        state.userHistoryUpdates.push({
+          query: clone(query),
+          update: clone(update),
+          options: clone(options),
+        });
+        return Promise.resolve({ _id: 'history-1', ...clone(query), ...clone(update) });
+      },
+    },
+  };
+
   require.cache[streakServicePath] = {
     id: streakServicePath,
     filename: streakServicePath,
@@ -149,6 +167,7 @@ const makeState = () => ({
   movieUpdates: [],
   episodeUpdates: [],
   viewUpdates: [],
+  userHistoryUpdates: [],
   streakCalls: [],
   questCalls: [],
   leaderboardInvalidations: 0,
@@ -193,9 +212,53 @@ const run = async (name, fn) => {
     assert.deepStrictEqual(state.viewUpdates, [
       { id: 'vh-1', update: { $inc: { watchDuration: 25 } } },
     ]);
+    assert.strictEqual(state.userHistoryUpdates.length, 1);
+    assert.deepStrictEqual(state.userHistoryUpdates[0].query, {
+      userId: 'user-1',
+      movieId: 'movie-1',
+    });
+    assert.strictEqual(state.userHistoryUpdates[0].update.episodeId, 'episode-1');
+    assert.strictEqual(state.userHistoryUpdates[0].update.watchTime, 25);
+    assert.strictEqual(state.userHistoryUpdates[0].options.upsert, true);
     assert.strictEqual(state.movieUpdates.length, 2);
     assert.strictEqual(state.episodeUpdates.length, 1);
     assert.strictEqual(state.leaderboardInvalidations, 1);
+  });
+
+  await run('uses explicit playback position and duration when syncing user history', async () => {
+    const state = makeState();
+    state.moviesBySlug['movie-slug'] = { _id: 'movie-progress', slug: 'movie-slug' };
+    state.viewRecordsById['vh-progress'] = {
+      _id: 'vh-progress',
+      movieId: 'movie-progress',
+      episodeId: 'episode-progress',
+      userId: 'user-progress',
+      ipAddress: '3.3.3.3',
+      watchDuration: 120,
+    };
+
+    const service = installMocks(state);
+    const result = await service.recordPlaybackHeartbeat('movie-slug', {
+      viewHistoryId: 'vh-progress',
+      episodeId: 'episode-progress',
+      seconds: 30,
+      userId: 'user-progress',
+      watchTime: 600,
+      duration: 2400,
+      ipAddress: '3.3.3.3',
+    });
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(state.userHistoryUpdates.length, 1);
+    assert.deepStrictEqual(state.userHistoryUpdates[0].query, {
+      userId: 'user-progress',
+      movieId: 'movie-progress',
+    });
+    assert.strictEqual(state.userHistoryUpdates[0].update.episodeId, 'episode-progress');
+    assert.strictEqual(state.userHistoryUpdates[0].update.watchTime, 600);
+    assert.strictEqual(state.userHistoryUpdates[0].update.duration, 2400);
+    assert.strictEqual(state.userHistoryUpdates[0].update.progress, 25);
+    assert.ok(state.userHistoryUpdates[0].update.lastWatchedAt);
   });
 
   await run('reuses a matching view history id without creating duplicates', async () => {
