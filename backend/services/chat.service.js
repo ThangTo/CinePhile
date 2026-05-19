@@ -4,11 +4,7 @@ const UserFavorite = require('../models/user_favorite.model');
 const Chat = require('../models/chat.model');
 const mongoose = require('mongoose');
 
-// ============================================
-// ENVIRONMENT VARIABLES - API Keys
-// ============================================
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const { callOpenRouterWithFallback, isRateLimitError } = require('../utils/llmUtils');
+const { callLlmWithFallback, isRateLimitError } = require('../utils/llmUtils');
 
 const SYSTEM_PROMPT =
   process.env.CHATBOT_SYSTEM_PROMPT ||
@@ -52,6 +48,24 @@ async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function resolveProviderName(...values) {
+  return String(values.find((value) => value !== undefined && value !== null && String(value).trim() !== '') || 'openrouter')
+    .trim()
+    .toLowerCase();
+}
+
+function getDefaultChatModel(provider) {
+  if (provider === 'gemini') return 'gemini-2.5-flash';
+  if (provider === 'openai') return 'gpt-4o-mini';
+  return undefined;
+}
+
+function getDefaultIntentModel(provider) {
+  if (provider === 'gemini') return 'gemini-2.5-flash';
+  if (provider === 'openai') return 'gpt-4o-mini';
+  return 'openai/gpt-4o-mini';
+}
+
 function detectIntentByKeyword(message = '') {
   const msg = message.toLowerCase();
   if (
@@ -81,13 +95,9 @@ function detectIntentByKeyword(message = '') {
 
 
 // ============================================
-// INTENT CLASSIFIER - OpenRouter
+// INTENT CLASSIFIER
 // ============================================
-async function classifyIntentWithOpenRouter(message) {
-  if (!OPENROUTER_API_KEY) {
-    throw new Error('OPENROUTER_API_KEY chưa được cấu hình');
-  }
-
+async function classifyIntentWithLlm(message) {
   const classifierPrompt = `Bạn là bộ phân loại truy vấn cho trợ lý phim CinePhile.
     Người dùng sẽ gửi câu hỏi bằng tiếng Việt hoặc tiếng Anh. Nhiệm vụ của bạn:
     - Phân loại xem câu hỏi có liên quan tới phim trong hệ thống hay không (intent).
@@ -126,8 +136,16 @@ async function classifyIntentWithOpenRouter(message) {
     ${message}`;
 
   try {
-    const data = await callOpenRouterWithFallback({
-      model: 'openai/gpt-4o-mini', // Intent model
+    const provider = resolveProviderName(
+      process.env.CHATBOT_INTENT_LLM_PROVIDER,
+      process.env.CHATBOT_LLM_PROVIDER,
+      process.env.LLM_PROVIDER,
+      'openrouter',
+    );
+    const data = await callLlmWithFallback({
+      scope: 'CHATBOT_INTENT',
+      provider,
+      model: process.env.CHATBOT_INTENT_LLM_MODEL || getDefaultIntentModel(provider),
       messages: [
         {
           role: 'user',
@@ -142,7 +160,7 @@ async function classifyIntentWithOpenRouter(message) {
     const parsed = JSON.parse(rawText);
 
     if (!parsed || (parsed.intent !== 'movie_info' && parsed.intent !== 'general')) {
-      throw new Error('Invalid intent from OpenRouter');
+      throw new Error('Invalid intent from LLM provider');
     }
 
     return {
@@ -154,14 +172,14 @@ async function classifyIntentWithOpenRouter(message) {
     };
   } catch (error) {
     if (isRateLimitError(error)) {
-      throw new Error(`OpenRouter rate limit: ${error.message}`);
+      throw new Error(`LLM rate limit: ${error.message}`);
     }
     throw error;
   }
 }
 
 // ============================================
-// MAIN LLM CALLER - OpenRouter with fallback
+// MAIN LLM CALLER
 // ============================================
 async function callLLMWithFallback({ userQuery, dbContext, history = [], model = null }) {
   const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
@@ -182,8 +200,16 @@ async function callLLMWithFallback({ userQuery, dbContext, history = [], model =
     content: `[USER_QUERY]\n${userQuery}\n\n[DB_CONTEXT]\n${JSON.stringify(dbContext, null, 2)}`,
   });
 
-  const data = await callOpenRouterWithFallback({
-    ...(model ? { model } : {}), // fallback models inside util if not specified
+  const provider = resolveProviderName(
+    process.env.CHATBOT_LLM_PROVIDER,
+    process.env.LLM_PROVIDER,
+    'openrouter',
+  );
+  const data = await callLlmWithFallback({
+    scope: 'CHATBOT',
+    provider,
+    ...(model ? { model } : {}),
+    ...(!model && getDefaultChatModel(provider) ? { defaultModel: getDefaultChatModel(provider) } : {}),
     messages,
     temperature: 0.7,
   });
@@ -602,10 +628,10 @@ async function handleChat({ userId, message, history, metadata, sessionId }) {
 
   if (needsClassifier) {
     try {
-      classifier = await classifyIntentWithOpenRouter(message);
+      classifier = await classifyIntentWithLlm(message);
       intent = classifier.intent || keywordIntent;
-  } catch (e) {
-      console.warn('⚠️ OpenRouter classifier failed, using keyword detection:', e.message);
+    } catch (e) {
+      console.warn('⚠️ LLM classifier failed, using keyword detection:', e.message);
       intent = keywordIntent;
       classifier = {
         intent: keywordIntent,

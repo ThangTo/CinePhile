@@ -1,5 +1,5 @@
 const {
-  callOpenRouterWithFallback,
+  callLlmWithFallback,
   DEFAULT_FREE_FALLBACK_MODELS,
   resolveModelsToTry,
 } = require('../utils/llmUtils');
@@ -15,10 +15,23 @@ function parsePositiveInt(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-const LLM_MODEL = process.env.TIMI_LLM_MODEL || 'google/gemini-2.5-flash';
+function resolveProviderName(...values) {
+  return String(values.find((value) => value !== undefined && value !== null && String(value).trim() !== '') || 'openrouter')
+    .trim()
+    .toLowerCase();
+}
+
+function getDefaultTimiModel(provider) {
+  if (provider === 'gemini') return 'gemini-2.5-flash';
+  if (provider === 'openai') return 'gpt-4o-mini';
+  return 'google/gemini-2.5-flash';
+}
+
+const LLM_PROVIDER = resolveProviderName(process.env.TIMI_LLM_PROVIDER, process.env.LLM_PROVIDER, 'openrouter');
+const LLM_MODEL = process.env.TIMI_LLM_MODEL || getDefaultTimiModel(LLM_PROVIDER);
 const LLM_MODELS = resolveModelsToTry({
   model: LLM_MODEL,
-  models: process.env.TIMI_LLM_FALLBACK_MODELS || DEFAULT_FREE_FALLBACK_MODELS,
+  models: process.env.TIMI_LLM_FALLBACK_MODELS || (LLM_PROVIDER === 'openrouter' ? DEFAULT_FREE_FALLBACK_MODELS : []),
 });
 const REQUEST_TIMEOUT = parsePositiveInt(process.env.TIMI_LLM_TIMEOUT_MS, 10000); // Tăng lên 10s vì có thể gọi DB
 
@@ -801,7 +814,9 @@ const processVoiceCommand = async (req, res) => {
     }
     messages.push({ role: 'user', content: transcript.trim() });
 
-    const data = await callOpenRouterWithFallback({
+    const data = await callLlmWithFallback({
+      scope: 'TIMI',
+      provider: LLM_PROVIDER,
       models: LLM_MODELS,
       timeoutMs: REQUEST_TIMEOUT,
       messages,
@@ -864,6 +879,7 @@ module.exports = {
   buildDeterministicVoiceToolCalls,
   getSystemPrompt,
   TOOLS,
+  LLM_PROVIDER,
   LLM_MODEL,
   LLM_MODELS,
   REQUEST_TIMEOUT,

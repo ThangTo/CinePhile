@@ -1,8 +1,5 @@
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const { createChatCompletion } = require('../services/llmProvider.service');
 
-/**
- * Kiểm tra xem lỗi có phải do rate limit không.
- */
 function isRateLimitError(error) {
   const errorMsg = error?.message?.toLowerCase() || '';
   const errorStr = JSON.stringify(error).toLowerCase();
@@ -17,7 +14,6 @@ function isRateLimitError(error) {
   );
 }
 
-// Danh sách các mô hình ưu tiên sử dụng
 const DEFAULT_FALLBACK_MODELS = [
   'deepseek/deepseek-v4-flash:free',
   'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
@@ -48,12 +44,12 @@ const DEFAULT_FALLBACK_MODELS = [
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'mistralai/mistral-small-3.1-24b-instruct:free',
   'nousresearch/hermes-3-llama-3.1-405b:free',
-  // 'openai/gpt-4o-mini', // Fast and cheap
-  // 'anthropic/claude-3.5-sonnet', // High quality
-  'google/gemini-2.0-flash-exp', // Fast
-  'meta-llama/llama-3.1-70b-instruct', // Open source
-  'mistralai/mistral-large', // Good balance
-  // 'openai/gpt-3.5-turbo', // Fallback
+  // 'openai/gpt-4o-mini',
+  // 'anthropic/claude-3.5-sonnet',
+  'google/gemini-2.0-flash-exp',
+  'meta-llama/llama-3.1-70b-instruct',
+  'mistralai/mistral-large',
+  // 'openai/gpt-3.5-turbo',
 ];
 
 const DEFAULT_FREE_FALLBACK_MODELS = DEFAULT_FALLBACK_MODELS.filter((model) => model.endsWith(':free'));
@@ -83,95 +79,80 @@ function resolveModelsToTry(options = {}) {
   return DEFAULT_FALLBACK_MODELS;
 }
 
-/**
- * Gọi API OpenRouter với cơ chế thử lại (fallback) tự động qua các model khác nhau nếu bị lỗi hoặc rate limit.
- * @param {Object} options 
- * @param {string} [options.model] - Model duy nhất nếu muốn ép cứng.
- * @param {string[]} [options.models] - Danh sách model tuỳ chọn (fallback). Nếu không chèn sẽ dùng DEFAULT_FALLBACK_MODELS.
- * @param {number} [options.timeoutMs] - Khung thời gian timeout của request.
- * @param {Array} options.messages - Messages gửi tới LLM.
- * @returns {Promise<Object>} Toàn bộ response body (JSON) được phân giải từ LLM.
- */
-async function callOpenRouterWithFallback(options) {
-  if (!OPENROUTER_API_KEY) {
-    throw new Error('OPENROUTER_API_KEY chưa được cấu hình');
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'string' && value.trim() === '') continue;
+    return value;
   }
 
-  const modelsToTry = resolveModelsToTry(options);
-
-  const { model, models, timeoutMs, ...bodyPayload } = options;
-
-  let lastError = null;
-
-  for (const modelName of modelsToTry) {
-    try {
-      const controller = new AbortController();
-      let timeoutId = null;
-
-      if (timeoutMs) {
-        timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      }
-
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': process.env.CLIENT_URL || 'http://localhost:5001',
-          'X-Title': 'CinePhine Platform',
-        },
-        body: JSON.stringify({
-          model: modelName,
-          ...bodyPayload,
-        }),
-        signal: controller.signal,
-      });
-
-      if (timeoutId) clearTimeout(timeoutId);
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (isRateLimitError({ message: data.error?.message, status: res.status })) {
-          console.log(`[LLM] ⚠️ ${modelName} rate limited, trying next model...`);
-          lastError = new Error(`Rate limit: ${data.error?.message}`);
-          continue;
-        }
-        throw new Error(data.error?.message || 'OpenRouter API error');
-      }
-
-      console.log(`[LLM] ✅ OpenRouter succeeded with model: ${modelName}`);
-      return data;
-    } catch (error) {
-      lastError = error;
-
-      if (error.name === 'AbortError') {
-        console.log(`[LLM] ⚠️ ${modelName} timed out, trying next model...`);
-        if (modelsToTry.indexOf(modelName) < modelsToTry.length - 1) continue;
-        throw error;
-      }
-
-      if (isRateLimitError(error) && modelsToTry.indexOf(modelName) < modelsToTry.length - 1) {
-        console.log(`[LLM] ⚠️ ${modelName} rate limit / failed, trying next model...`);
-        continue;
-      }
-
-      // Retry other generic failures if there are more models
-      if (modelsToTry.indexOf(modelName) < modelsToTry.length - 1) {
-        console.log(`[LLM] ⚠️ ${modelName} failed (${error.message}), trying next...`);
-        continue;
-      }
-      
-      // Last model failed
-      throw error;
-    }
-  }
-
-  throw lastError || new Error('All OpenRouter models failed');
+  return undefined;
 }
+
+function scopedEnv(scope, key) {
+  const scopePrefix = scope ? `${String(scope).trim().toUpperCase()}_` : '';
+  return firstNonEmpty(
+    scopePrefix ? process.env[`${scopePrefix}${key}`] : undefined,
+    process.env[key],
+  );
+}
+
+function hasConfiguredModels(scope) {
+  return Boolean(
+    scopedEnv(scope, 'LLM_MODEL') ||
+    scopedEnv(scope, 'LLM_FALLBACK_MODELS'),
+  );
+}
+
+function resolveRequestedProvider(options = {}) {
+  return String(firstNonEmpty(
+    options.provider,
+    scopedEnv(options.scope, 'LLM_PROVIDER'),
+    'openrouter',
+  )).trim().toLowerCase();
+}
+
+async function callLlmWithFallback(options = {}) {
+  const {
+    model,
+    models,
+    timeoutMs,
+    transport,
+    provider,
+    scope,
+    defaultModel,
+    fallbackModels,
+    ...bodyPayload
+  } = options;
+
+  const requestedProvider = resolveRequestedProvider(options);
+  const explicitModels = normalizeModelList(models);
+  const modelsToTry = explicitModels.length > 0 || model
+    ? resolveModelsToTry({ model, models: explicitModels })
+    : requestedProvider === 'openrouter' && !hasConfiguredModels(scope)
+      ? DEFAULT_FALLBACK_MODELS
+      : [];
+
+  const response = await createChatCompletion(bodyPayload, {
+    provider,
+    scope,
+    ...(modelsToTry.length > 0 ? { models: modelsToTry } : {}),
+    ...(model ? { model } : {}),
+    ...(defaultModel ? { defaultModel } : {}),
+    ...(fallbackModels ? { fallbackModels } : {}),
+    ...(timeoutMs ? { timeoutMs } : {}),
+    ...(transport ? { transport } : {}),
+  });
+
+  console.log(`[LLM] succeeded with provider=${response.provider} model=${response.model}`);
+  return response.data;
+}
+
+const callOpenRouterWithFallback = callLlmWithFallback;
 
 module.exports = {
   isRateLimitError,
+  callLlmWithFallback,
   callOpenRouterWithFallback,
   DEFAULT_FALLBACK_MODELS,
   DEFAULT_FREE_FALLBACK_MODELS,

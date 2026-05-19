@@ -32,6 +32,7 @@
     "test:increment-view": "node scripts/testIncrementViewService.js",
     "test:optional-auth": "node scripts/testOptionalAuthMiddleware.js",
     "test:timi-ai": "node --test controllers/ai.controller.test.js",
+    "test:llm-provider": "node --test services/llmProvider.service.test.js",
     "test:llm-utils": "node --test utils/llmUtils.test.js",
     "test:view-history-backfill": "node scripts/testViewHistoryBackfillService.js",
     "test:watch-streak": "node scripts/testWatchStreakLogic.js",

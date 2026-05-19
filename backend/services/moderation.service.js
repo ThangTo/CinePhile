@@ -1,7 +1,19 @@
-// ============================================
-// ENVIRONMENT VARIABLES
-// ============================================
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const {
+  createChatCompletion,
+  extractChatMessageContent,
+} = require('./llmProvider.service');
+
+function resolveProviderName(...values) {
+  return String(values.find((value) => value !== undefined && value !== null && String(value).trim() !== '') || 'openrouter')
+    .trim()
+    .toLowerCase();
+}
+
+function getDefaultModerationModel(provider) {
+  if (provider === 'gemini') return 'gemini-2.5-flash';
+  if (provider === 'openai') return 'gpt-4o-mini';
+  return 'openai/gpt-4o-mini';
+}
 
 const SYSTEM_PROMPT = `You are a Content Moderation AI for CinePhile.
 Your task is to analyze user comments and detect violations.
@@ -25,38 +37,31 @@ Output: { "flag": "toxic", "reason": "Ngôn từ xúc phạm, thô tục" }
 `;
 
 async function checkComment(content) {
-  if (!OPENROUTER_API_KEY) {
-    console.warn('OPENROUTER_API_KEY not configured, skipping AI moderation');
-    return { flag: null, reason: null };
-  }
-
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': process.env.CLIENT_URL || 'https://cinephile.app',
-        'X-Title': 'CinePhile Moderator',
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-4o-mini', // Fast and cheap model
+    const provider = resolveProviderName(
+      process.env.MODERATION_LLM_PROVIDER,
+      process.env.LLM_PROVIDER,
+      'openrouter',
+    );
+    const response = await createChatCompletion(
+      {
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: content }
         ],
-        temperature: 0.1, // Low temperature for consistent classification
+        temperature: 0.1,
         response_format: { type: 'json_object' },
-      }),
-    });
+      },
+      {
+        scope: 'MODERATION',
+        provider,
+        defaultModel: getDefaultModerationModel(provider),
+        title: 'CinePhile Moderator',
+        timeoutMs: 15000,
+      },
+    );
 
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error?.message || 'OpenRouter API error');
-    }
-
-    const data = await res.json();
-    const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
+    const rawText = extractChatMessageContent(response.data)?.trim() || '{}';
     
     // Clean up if AI returns markdown code block despite instructions
     const jsonStr = rawText.replace(/^```json\s*/, '').replace(/\s*```$/, '');

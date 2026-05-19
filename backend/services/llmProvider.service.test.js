@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   buildChatCompletionUrl,
+  buildGeminiGenerateContentUrl,
   createChatCompletion,
   extractChatMessageContent,
   formatLlmError,
@@ -53,6 +54,21 @@ test('resolveChatProviderConfig supports scoped provider/model/base URL override
   assert.equal(config.timeoutMs, 45000);
 });
 
+test('resolveChatProviderConfig supports native Gemini provider', () => {
+  const config = resolveChatProviderConfig({
+    env: {
+      LLM_PROVIDER: 'gemini',
+      GEMINI_API_KEY: 'gemini-key',
+      LLM_MODEL: 'gemini-2.5-flash',
+    },
+  });
+
+  assert.equal(config.provider, 'gemini');
+  assert.equal(config.baseUrl, 'https://generativelanguage.googleapis.com/v1beta');
+  assert.equal(config.apiKey, 'gemini-key');
+  assert.equal(config.model, 'gemini-2.5-flash');
+});
+
 test('buildChatCompletionUrl joins base URL and endpoint path safely', () => {
   assert.equal(
     buildChatCompletionUrl('https://api.example.com/v1/', '/chat/completions'),
@@ -61,6 +77,17 @@ test('buildChatCompletionUrl joins base URL and endpoint path safely', () => {
   assert.equal(
     buildChatCompletionUrl('https://api.example.com/v1', 'chat/completions'),
     'https://api.example.com/v1/chat/completions',
+  );
+});
+
+test('buildGeminiGenerateContentUrl targets the selected model', () => {
+  assert.equal(
+    buildGeminiGenerateContentUrl('https://generativelanguage.googleapis.com/v1beta/', 'gemini-2.5-flash'),
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+  );
+  assert.equal(
+    buildGeminiGenerateContentUrl('https://generativelanguage.googleapis.com/v1beta/', 'google/gemini-2.0-flash-001'),
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent',
   );
 });
 
@@ -142,6 +169,134 @@ test('createChatCompletion tries fallback models on retryable errors', async () 
 
   assert.deepEqual(triedModels, ['model-a', 'model-b']);
   assert.equal(result.model, 'model-b');
+});
+
+test('createChatCompletion sends a native Gemini generateContent request', async () => {
+  const calls = [];
+  const transport = {
+    post: async (url, body, options) => {
+      calls.push({ url, body, options });
+      return {
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: '{"ok":true}' }],
+              },
+            },
+          ],
+        },
+      };
+    },
+  };
+
+  const result = await createChatCompletion(
+    {
+      messages: [
+        { role: 'system', content: 'You are concise.' },
+        { role: 'user', content: 'hello' },
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 32,
+      temperature: 0.2,
+    },
+    {
+      env: {
+        LLM_PROVIDER: 'gemini',
+        GEMINI_API_KEY: 'key',
+        LLM_MODEL: 'gemini-2.5-flash',
+      },
+      transport,
+    },
+  );
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
+  assert.equal(calls[0].options.headers['x-goog-api-key'], 'key');
+  assert.equal(calls[0].options.headers.Authorization, undefined);
+  assert.deepEqual(calls[0].body.systemInstruction, {
+    parts: [{ text: 'You are concise.' }],
+  });
+  assert.deepEqual(calls[0].body.contents, [
+    { role: 'user', parts: [{ text: 'hello' }] },
+  ]);
+  assert.equal(calls[0].body.generationConfig.responseMimeType, 'application/json');
+  assert.equal(calls[0].body.generationConfig.maxOutputTokens, 32);
+  assert.equal(calls[0].body.generationConfig.temperature, 0.2);
+  assert.equal(result.provider, 'gemini');
+  assert.equal(result.model, 'gemini-2.5-flash');
+  assert.equal(extractChatMessageContent(result.data), '{"ok":true}');
+});
+
+test('createChatCompletion maps Gemini function calls to OpenAI-compatible tool calls', async () => {
+  const calls = [];
+  const transport = {
+    post: async (url, body, options) => {
+      calls.push({ url, body, options });
+      return {
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'navigate',
+                      args: { destination: 'HOME' },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      };
+    },
+  };
+
+  const result = await createChatCompletion(
+    {
+      messages: [{ role: 'user', content: 'home' }],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'navigate',
+            description: 'Navigate',
+            parameters: {
+              type: 'object',
+              properties: {
+                destination: { type: 'string' },
+              },
+              required: ['destination'],
+            },
+          },
+        },
+      ],
+      tool_choice: 'auto',
+    },
+    {
+      env: {
+        LLM_PROVIDER: 'gemini',
+        GEMINI_API_KEY: 'key',
+        LLM_MODEL: 'gemini-2.5-flash',
+      },
+      transport,
+    },
+  );
+
+  assert.equal(calls[0].body.tools[0].functionDeclarations[0].name, 'navigate');
+  assert.equal(calls[0].body.toolConfig.functionCallingConfig.mode, 'AUTO');
+  assert.deepEqual(result.data.choices[0].message.tool_calls, [
+    {
+      id: 'gemini_call_0',
+      type: 'function',
+      function: {
+        name: 'navigate',
+        arguments: '{"destination":"HOME"}',
+      },
+    },
+  ]);
 });
 
 test('createChatCompletion does not retry billing or auth errors', async () => {

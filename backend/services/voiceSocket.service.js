@@ -1,13 +1,14 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const { createClient, LiveTranscriptionEvents } = require('@deepgram/sdk');
-const { callOpenRouterWithFallback } = require('../utils/llmUtils');
+const { callLlmWithFallback } = require('../utils/llmUtils');
 const { generateTtsAudio } = require('../utils/ttsUtils');
 const {
   executeToolCalls,
   executeDeterministicVoiceFallback,
   getSystemPrompt,
   TOOLS,
+  LLM_PROVIDER,
   LLM_MODELS,
   REQUEST_TIMEOUT,
 } = require('../controllers/ai.controller');
@@ -234,7 +235,9 @@ function initVoiceSocket(httpServer) {
         }
         messages.push({ role: 'user', content: transcript });
 
-        const data = await callOpenRouterWithFallback({
+        const data = await callLlmWithFallback({
+          scope: 'TIMI',
+          provider: LLM_PROVIDER,
           models: LLM_MODELS,
           timeoutMs: REQUEST_TIMEOUT,
           messages,

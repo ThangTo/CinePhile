@@ -10,6 +10,10 @@ const MovieModel = require('../models/movie.model');
 const TrendingMovieModel = require('../models/trending_movie.model');
 const crawlerService = require('./crawler.service');
 const { slugify } = require('../utils/movieAdminUtils');
+const {
+  createChatCompletion,
+  extractChatMessageContent,
+} = require('./llmProvider.service');
 
 const execAsync = promisify(exec);
 
@@ -22,10 +26,8 @@ const rssParser = new Parser({
 });
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const TIKTOK_ENABLED = (process.env.TIKTOK_ENABLED || 'true').toLowerCase() !== 'false';
 const TIKTOK_WORKER_URL = (process.env.TIKTOK_WORKER_URL || '').trim();
 const TIKTOK_WORKER_CMD = (process.env.TIKTOK_WORKER_CMD || '').trim();
@@ -34,6 +36,18 @@ const TIKTOK_FETCH_RETRIES = Math.max(1, Number(process.env.TIKTOK_FETCH_RETRIES
 const TIKTOK_TRENDING_COUNT = Math.max(1, Number(process.env.TIKTOK_TRENDING_COUNT || 30));
 const TIKTOK_TMDB_SEARCH_LIMIT = Math.max(1, Number(process.env.TIKTOK_TMDB_SEARCH_LIMIT || 10));
 const AUTO_CRAWL_LIMIT = Math.max(0, Number(process.env.TRENDING_AUTO_CRAWL_LIMIT || 6));
+
+function resolveProviderName(...values) {
+  return String(values.find((value) => value !== undefined && value !== null && String(value).trim() !== '') || 'openrouter')
+    .trim()
+    .toLowerCase();
+}
+
+function getDefaultTrendingModel(provider) {
+  if (provider === 'gemini') return 'gemini-2.5-flash';
+  if (provider === 'openai') return 'gpt-4o-mini';
+  return 'google/gemini-2.0-flash-001';
+}
 
 const GENERIC_TRENDING_TERMS = new Set([
   'phim',
@@ -1047,11 +1061,6 @@ function fallbackScoring(matchedMovies) {
 async function generateAIAssessment(matchedMovies) {
   console.log(`${LOG_ICONS.llm} [TRENDING] Step 4: asking LLM to rank the final candidate set...`);
 
-  if (!OPENROUTER_API_KEY) {
-    console.warn(`${LOG_ICONS.fallback} [TRENDING] OPENROUTER_API_KEY missing. Falling back to heuristic scoring.`);
-    return fallbackScoring(matchedMovies);
-  }
-
   if (!matchedMovies.length) {
     console.warn(`${LOG_ICONS.warn} [TRENDING] No matched movies available for AI assessment.`);
     return [];
@@ -1126,10 +1135,13 @@ Yeu cau ai_quote:
   const userPrompt = `Danh sach ung vien phim:\n${JSON.stringify(movieListForAI, null, 2)}`;
 
   try {
-    const { data } = await axios.post(
-      OPENROUTER_URL,
+    const provider = resolveProviderName(
+      process.env.TRENDING_LLM_PROVIDER,
+      process.env.LLM_PROVIDER,
+      'openrouter',
+    );
+    const response = await createChatCompletion(
       {
-        model: 'google/gemini-2.0-flash-001',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -1139,17 +1151,16 @@ Yeu cau ai_quote:
         response_format: { type: 'json_object' },
       },
       {
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://cinephine.io.vn',
-          'X-Title': 'CinePhine Trending Pipeline',
-        },
-        timeout: 30000,
+        scope: 'TRENDING',
+        provider,
+        defaultModel: getDefaultTrendingModel(provider),
+        referer: 'https://cinephine.io.vn',
+        title: 'CinePhine Trending Pipeline',
+        timeoutMs: 30000,
       },
     );
 
-    const content = data?.choices?.[0]?.message?.content || '';
+    const content = extractChatMessageContent(response.data) || '';
     let parsed;
 
     try {

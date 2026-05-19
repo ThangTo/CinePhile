@@ -15,6 +15,11 @@ const PROVIDER_PRESETS = {
     apiKeyEnvNames: ['OPENAI_API_KEY'],
     endpointPath: CHAT_COMPLETIONS_PATH,
   },
+  gemini: {
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    apiKeyEnvNames: ['GEMINI_API_KEY', 'GOOGLE_AI_API_KEY'],
+    endpointPath: '',
+  },
   compatible: {
     baseUrl: '',
     apiKeyEnvNames: [],
@@ -111,6 +116,12 @@ function buildChatCompletionUrl(baseUrl, endpointPath = CHAT_COMPLETIONS_PATH) {
   return `${normalizedBase}/${normalizedPath}`;
 }
 
+function buildGeminiGenerateContentUrl(baseUrl, model) {
+  const normalizedBase = String(baseUrl || '').replace(/\/+$/, '');
+  const normalizedModel = String(model || '').replace(/^models\//, '').replace(/^google\//, '');
+  return `${normalizedBase}/models/${normalizedModel}:generateContent`;
+}
+
 function parseJsonObject(value, label) {
   if (!value) return {};
   if (typeof value === 'object' && !Array.isArray(value)) return value;
@@ -171,7 +182,9 @@ function resolveChatProviderConfig(options = {}) {
     preset.endpointPath,
     CHAT_COMPLETIONS_PATH,
   );
+  const explicitModels = uniqueList(parseModelList(options.models));
   const model = firstNonEmpty(
+    explicitModels[0],
     options.model,
     scopedEnv(env, scope, 'LLM_MODEL'),
     options.defaultModel,
@@ -184,7 +197,9 @@ function resolveChatProviderConfig(options = {}) {
     options.fallbackModels,
     scopedEnv(env, scope, 'LLM_FALLBACK_MODELS'),
   )));
-  const models = uniqueList([model, ...fallbackModels]);
+  const models = explicitModels.length > 0
+    ? explicitModels
+    : uniqueList([model, ...fallbackModels]);
   const timeoutMs = parsePositiveInteger(
     firstNonEmpty(options.timeoutMs, scopedEnv(env, scope, 'LLM_TIMEOUT_MS')),
     DEFAULT_TIMEOUT_MS,
@@ -286,36 +301,196 @@ function extractChatMessageContent(data) {
   return content;
 }
 
+function normalizeContentParts(content) {
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === 'string') return { text: part };
+        if (part?.type === 'text') return { text: String(part.text || '') };
+        if (part?.text) return { text: String(part.text) };
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  return [{ text: String(content || '') }];
+}
+
+function mapMessagesToGemini(messages = []) {
+  const systemParts = [];
+  const contents = [];
+
+  for (const message of messages) {
+    const role = message?.role;
+    const parts = normalizeContentParts(message?.content);
+    if (parts.length === 0) continue;
+
+    if (role === 'system') {
+      systemParts.push(...parts);
+      continue;
+    }
+
+    if (role === 'assistant') {
+      contents.push({ role: 'model', parts });
+      continue;
+    }
+
+    if (role === 'tool') {
+      contents.push({ role: 'user', parts });
+      continue;
+    }
+
+    contents.push({ role: 'user', parts });
+  }
+
+  return {
+    ...(systemParts.length > 0 ? { systemInstruction: { parts: systemParts } } : {}),
+    contents,
+  };
+}
+
+function mapToolsToGemini(tools = []) {
+  const functionDeclarations = tools
+    .filter((tool) => tool?.type === 'function' && tool.function?.name)
+    .map((tool) => ({
+      name: tool.function.name,
+      ...(tool.function.description ? { description: tool.function.description } : {}),
+      ...(tool.function.parameters ? { parameters: tool.function.parameters } : {}),
+    }));
+
+  return functionDeclarations.length > 0 ? [{ functionDeclarations }] : undefined;
+}
+
+function mapToolChoiceToGemini(toolChoice) {
+  if (!toolChoice || toolChoice === 'auto') {
+    return { functionCallingConfig: { mode: 'AUTO' } };
+  }
+
+  if (toolChoice === 'none') {
+    return { functionCallingConfig: { mode: 'NONE' } };
+  }
+
+  if (toolChoice === 'required') {
+    return { functionCallingConfig: { mode: 'ANY' } };
+  }
+
+  const functionName = toolChoice?.function?.name;
+  if (functionName) {
+    return {
+      functionCallingConfig: {
+        mode: 'ANY',
+        allowedFunctionNames: [functionName],
+      },
+    };
+  }
+
+  return { functionCallingConfig: { mode: 'AUTO' } };
+}
+
+function buildGeminiGenerationConfig(payload = {}) {
+  const generationConfig = {};
+  if (payload.temperature !== undefined) generationConfig.temperature = payload.temperature;
+  if (payload.top_p !== undefined) generationConfig.topP = payload.top_p;
+  if (payload.max_tokens !== undefined) generationConfig.maxOutputTokens = payload.max_tokens;
+  if (payload.max_completion_tokens !== undefined) generationConfig.maxOutputTokens = payload.max_completion_tokens;
+  if (payload.response_format?.type === 'json_object') {
+    generationConfig.responseMimeType = 'application/json';
+  }
+
+  return generationConfig;
+}
+
+function buildGeminiRequestBody(payload = {}) {
+  const messagePayload = mapMessagesToGemini(payload.messages || []);
+  const tools = mapToolsToGemini(payload.tools || []);
+  const generationConfig = buildGeminiGenerationConfig(payload);
+
+  return {
+    ...messagePayload,
+    ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {}),
+    ...(tools ? { tools } : {}),
+    ...(tools && payload.tool_choice !== undefined ? { toolConfig: mapToolChoiceToGemini(payload.tool_choice) } : {}),
+  };
+}
+
+function mapGeminiResponseToChatCompletion(data) {
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const content = parts
+    .map((part) => part?.text || '')
+    .join('');
+  const toolCalls = parts
+    .map((part, index) => {
+      if (!part?.functionCall?.name) return null;
+      return {
+        id: part.functionCall.id || `gemini_call_${index}`,
+        type: 'function',
+        function: {
+          name: part.functionCall.name,
+          arguments: JSON.stringify(part.functionCall.args || {}),
+        },
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    choices: [
+      {
+        message: {
+          role: 'assistant',
+          content,
+          ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+        },
+      },
+    ],
+    ...(data?.usageMetadata ? { usage: data.usageMetadata } : {}),
+    provider_response: data,
+  };
+}
+
 async function createChatCompletion(payload, options = {}) {
   const transport = options.transport || axios;
   const config = resolveChatProviderConfig(options);
-  const url = buildChatCompletionUrl(config.baseUrl, config.endpointPath);
   const { model: _payloadModel, ...bodyPayload } = payload || {};
 
   let lastError = null;
   for (const model of config.models) {
     const requestConfig = { ...config, model };
     const startedAt = Date.now();
+    const isGemini = config.provider === 'gemini';
+    const url = isGemini
+      ? buildGeminiGenerateContentUrl(config.baseUrl, model)
+      : buildChatCompletionUrl(config.baseUrl, config.endpointPath);
+    const requestBody = isGemini
+      ? buildGeminiRequestBody(bodyPayload)
+      : {
+          model,
+          ...bodyPayload,
+        };
+    const headers = isGemini
+      ? {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': config.apiKey,
+          ...config.headers,
+        }
+      : {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`,
+          ...config.headers,
+        };
 
     try {
       const response = await transport.post(
         url,
+        requestBody,
         {
-          model,
-          ...bodyPayload,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.apiKey}`,
-            ...config.headers,
-          },
+          headers,
           timeout: config.timeoutMs,
         },
       );
 
       return {
-        data: response.data,
+        data: isGemini ? mapGeminiResponseToChatCompletion(response.data) : response.data,
+        rawData: response.data,
         provider: config.provider,
         model,
         durationMs: Date.now() - startedAt,
@@ -339,6 +514,7 @@ async function createChatCompletion(payload, options = {}) {
 
 module.exports = {
   buildChatCompletionUrl,
+  buildGeminiGenerateContentUrl,
   createChatCompletion,
   extractChatMessageContent,
   formatLlmError,
