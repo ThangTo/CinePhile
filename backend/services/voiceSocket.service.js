@@ -5,6 +5,7 @@ const { callOpenRouterWithFallback } = require('../utils/llmUtils');
 const { generateTtsAudio } = require('../utils/ttsUtils');
 const {
   executeToolCalls,
+  executeDeterministicVoiceFallback,
   getSystemPrompt,
   TOOLS,
   LLM_MODELS,
@@ -251,7 +252,14 @@ function initVoiceSocket(httpServer) {
         }
 
         const toolCalls = choice.message?.tool_calls || [];
-        const { commands, directReply } = await executeToolCalls(toolCalls, sock.user, context);
+        let { commands, directReply } = await executeToolCalls(toolCalls, sock.user, context);
+        if (commands.length === 0 && !directReply) {
+          const fallbackResult = await executeDeterministicVoiceFallback(transcript, sock.user, context);
+          if (fallbackResult) {
+            commands = fallbackResult.commands;
+            directReply = fallbackResult.directReply;
+          }
+        }
         const reply = directReply || choice.message?.content || (commands.length > 0 ? 'Dạ xong rồi ạ!' : 'Mình không hiểu ý bạn!');
 
         const audioUrl = await generateTtsAudio(reply);
