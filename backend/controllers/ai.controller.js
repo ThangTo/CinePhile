@@ -147,6 +147,172 @@ LUÔN GỌI TOOL để thao tác. Có thể gọi NỀU context phù hợp.
 7. KHI MỞ PHIM KÈM TẬP: Nếu người dùng nói "mở tập 10 lồng tiếng phim X", gọi play_specific_movie với movie_name, episode_number=10, audio_type="long-tieng".
 `;
 
+function normalizeVoiceText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getVoiceTokens(transcript) {
+  const originalTokens = String(transcript || '').trim().split(/\s+/).filter(Boolean);
+  const normalizedTokens = originalTokens.map((token) =>
+    normalizeVoiceText(token).replace(/^[^\w-]+|[^\w-]+$/g, ''),
+  );
+  return { originalTokens, normalizedTokens };
+}
+
+function startsWithTokens(tokens, pattern) {
+  if (tokens.length < pattern.length) return false;
+  return pattern.every((token, index) => tokens[index] === token);
+}
+
+function cleanMovieQueryFromTokens(tokens) {
+  let end = tokens.length;
+  const trailingFillers = new Set(['di', 'nhe', 'nha', 'voi', 'a']);
+
+  while (end > 0) {
+    const normalized = normalizeVoiceText(tokens[end - 1]).replace(/^[^\w-]+|[^\w-]+$/g, '');
+    if (!trailingFillers.has(normalized)) break;
+    end -= 1;
+  }
+
+  return tokens
+    .slice(0, end)
+    .join(' ')
+    .replace(/^["'“”]+|["'“”]+$/g, '')
+    .replace(/[.!?]+$/g, '')
+    .trim()
+    .slice(0, 120);
+}
+
+function createDeterministicToolCall(name, args) {
+  return {
+    type: 'function',
+    function: {
+      name,
+      arguments: JSON.stringify(args),
+    },
+  };
+}
+
+function parseAudioHint(tokens, index) {
+  if (tokens[index] === 'long' && tokens[index + 1] === 'tieng') {
+    return { audioType: 'long-tieng', nextIndex: index + 2 };
+  }
+
+  if (tokens[index] === 'thuyet' && tokens[index + 1] === 'minh') {
+    return { audioType: 'thuyet-minh', nextIndex: index + 2 };
+  }
+
+  if (tokens[index] === 'vietsub') {
+    return { audioType: 'vietsub', nextIndex: index + 1 };
+  }
+
+  if (tokens[index] === 'phu' && tokens[index + 1] === 'de') {
+    return { audioType: 'vietsub', nextIndex: index + 2 };
+  }
+
+  return { audioType: null, nextIndex: index };
+}
+
+function parseOpenMovieCommand(originalTokens, normalizedTokens, startIndex) {
+  let index = startIndex;
+  const args = {};
+
+  if (normalizedTokens[index] === 'tap' && /^\d+$/.test(normalizedTokens[index + 1] || '')) {
+    args.episode_number = Number(normalizedTokens[index + 1]);
+    index += 2;
+  }
+
+  const audioHint = parseAudioHint(normalizedTokens, index);
+  if (audioHint.audioType) {
+    args.audio_type = audioHint.audioType;
+    index = audioHint.nextIndex;
+  }
+
+  if (normalizedTokens[index] === 'phim') {
+    index += 1;
+  }
+
+  const movieName = cleanMovieQueryFromTokens(originalTokens.slice(index));
+  if (!movieName) return null;
+
+  return { movie_name: movieName, ...args };
+}
+
+function findCommandStart(normalizedTokens, patterns) {
+  for (const pattern of patterns) {
+    if (startsWithTokens(normalizedTokens, pattern)) {
+      return pattern.length;
+    }
+  }
+  return -1;
+}
+
+function buildDeterministicVoiceToolCalls(transcript) {
+  const { originalTokens, normalizedTokens } = getVoiceTokens(transcript);
+  if (normalizedTokens.length === 0) return [];
+
+  const searchStart = findCommandStart(normalizedTokens, [
+    ['tim', 'kiem', 'phim'],
+    ['tim', 'phim'],
+    ['tim', 'kiem'],
+    ['search', 'phim'],
+    ['search'],
+    ['tim'],
+  ]);
+
+  if (searchStart !== -1) {
+    const searchQuery = cleanMovieQueryFromTokens(originalTokens.slice(searchStart));
+    if (!searchQuery) return [];
+    return [createDeterministicToolCall('navigate', {
+      destination: 'SEARCH',
+      search_query: searchQuery,
+    })];
+  }
+
+  const openStart = findCommandStart(normalizedTokens, [
+    ['mo', 'phim'],
+    ['phat', 'phim'],
+    ['xem', 'phim'],
+    ['coi', 'phim'],
+    ['bat', 'phim'],
+    ['mo'],
+    ['phat'],
+    ['xem'],
+    ['coi'],
+    ['bat'],
+  ]);
+
+  if (openStart === -1) return [];
+
+  const args = parseOpenMovieCommand(originalTokens, normalizedTokens, openStart);
+  if (!args) return [];
+
+  return [createDeterministicToolCall('play_specific_movie', args)];
+}
+
+async function executeDeterministicVoiceFallback(transcript, user, context) {
+  const toolCalls = buildDeterministicVoiceToolCalls(transcript);
+  if (toolCalls.length === 0) return null;
+
+  const result = await executeToolCalls(toolCalls, user, context);
+  const firstCall = toolCalls[0];
+  const firstArgs = JSON.parse(firstCall.function.arguments || '{}');
+
+  if (!result.directReply && result.commands.length > 0 && firstCall.function.name === 'navigate' && firstArgs.destination === 'SEARCH') {
+    result.directReply = `Dạ em tìm ${firstArgs.search_query} ngay đây!`;
+  }
+
+  if (result.commands.length === 0 && !result.directReply) return null;
+  return result;
+}
+
 // ====================================================================
 // MAP & EXECUTE tool_calls
 // ====================================================================
@@ -320,7 +486,15 @@ const processVoiceCommand = async (req, res) => {
     if (!choice) return res.json({ success: false, commands: [], reply: 'Timi không kết nối được AI.' });
 
     const toolCalls = choice.message?.tool_calls || [];
-    const { commands, directReply } = await executeToolCalls(toolCalls, user, context);
+    let { commands, directReply } = await executeToolCalls(toolCalls, user, context);
+
+    if (commands.length === 0 && !directReply) {
+      const fallbackResult = await executeDeterministicVoiceFallback(transcript.trim(), user, context);
+      if (fallbackResult) {
+        commands = fallbackResult.commands;
+        directReply = fallbackResult.directReply;
+      }
+    }
 
     const reply = directReply || choice.message?.content || (commands.length > 0 ? 'Dạ xong rồi ạ!' : 'Mình không hiểu ý bạn!');
 
@@ -357,6 +531,8 @@ module.exports = {
   generateVoiceAudio,
   // Shared exports for WebSocket service
   executeToolCalls,
+  executeDeterministicVoiceFallback,
+  buildDeterministicVoiceToolCalls,
   getSystemPrompt,
   TOOLS,
   LLM_MODEL,
