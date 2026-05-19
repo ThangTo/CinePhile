@@ -6,6 +6,11 @@ const { runPipeline: runTrendingPipeline } = require('./trending.service');
 const analyticsService = require('./analytics.service');
 const questService = require('./quest.service');
 const { runIntroDetectionBatch } = require('./introDetectionBatch.service');
+const {
+  DEFAULT_BACKUP_CRON,
+  DEFAULT_BACKUP_TIMEZONE,
+  runMongoBackup,
+} = require('./mongoBackup.service');
 
 function isEnvEnabled(name, defaultValue = true) {
   const rawValue = process.env[name];
@@ -230,6 +235,29 @@ const scheduleIntroDetectionBatch = () => {
   console.log(`[IntroBatch] Scheduled: nightly intro detection at "${cronExpression}" (${timezone})`);
 };
 
+const scheduleMongoBackup = () => {
+  const cronExpression = process.env.MONGO_BACKUP_CRON || DEFAULT_BACKUP_CRON;
+  const timezone = process.env.MONGO_BACKUP_TIMEZONE || DEFAULT_BACKUP_TIMEZONE;
+
+  cron.schedule(
+    cronExpression,
+    async () => {
+      console.log('\n[MongoBackup] Daily MongoDB backup cron started...');
+      try {
+        await runMongoBackup({ trigger: 'cron' });
+      } catch (error) {
+        console.error(`[MongoBackup] Backup failed: ${error.message}`);
+      }
+    },
+    {
+      scheduled: true,
+      timezone,
+    },
+  );
+
+  console.log(`[MongoBackup] Scheduled: MongoDB backup at "${cronExpression}" (${timezone})`);
+};
+
 const runAnalyticsBackfill = () => {
   // Defer slightly to ensure DB connection is ready
   setTimeout(async () => {
@@ -263,6 +291,7 @@ const initCronJobs = () => {
   if (isEnvEnabled('CRON_TRENDING_UPDATE_ENABLED', true)) scheduleTrendingUpdate();
   if (isEnvEnabled('CRON_ANALYTICS_SNAPSHOT_ENABLED', true)) scheduleDailyAnalyticsSnapshot();
   if (isEnvEnabled('CRON_QUEST_AUTO_CLAIM_ENABLED', true)) scheduleQuestAutoClaim();
+  if (isEnvEnabled('CRON_MONGO_BACKUP_ENABLED', true)) scheduleMongoBackup();
   if (
     isEnvEnabled('INTRO_BATCH_ENABLED', true) &&
     isEnvEnabled('CRON_INTRO_BATCH_ENABLED', true)
@@ -284,5 +313,6 @@ module.exports = {
   scheduleDailyAnalyticsSnapshot,
   scheduleQuestAutoClaim,
   scheduleIntroDetectionBatch,
+  scheduleMongoBackup,
   runAnalyticsBackfill,
 };

@@ -6,6 +6,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "scheduler": "node scheduler.js",
+    "backup:mongo": "node scripts/runMongoBackup.js",
     "worker:analysis": "node workers/analysisWorker.js",
     "worker:render": "node workers/renderWorker.js",
     "worker:intro": "node workers/introDetectionWorker.js",

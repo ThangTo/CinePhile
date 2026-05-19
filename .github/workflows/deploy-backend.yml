@@ -24,4 +24,5 @@ jobs:
             git reset --hard HEAD
             git pull origin dev
             npm install
-            pm2 restart cinephine-api
+            pm2 restart cinephine-api --update-env
+            pm2 restart cinephine-scheduler --update-env || pm2 start ecosystem.config.js --only cinephine-scheduler --env production
