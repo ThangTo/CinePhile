@@ -37,7 +37,7 @@ const TOOLS = [
               action: {
                 type: 'string',
                 description: 'Hành động điều khiển: Mở phim/Tạm dừng/Phát lại/Qua tập...',
-                enum: ['PLAY', 'PAUSE', 'NEXT_EPISODE', 'PREV_EPISODE', 'MUTE', 'UNMUTE', 'VOLUME_UP', 'VOLUME_DOWN', 'MAX_VOLUME', 'CHANGE_EPISODE', 'CHANGE_AUDIO']
+                enum: ['PLAY', 'PAUSE', 'NEXT_EPISODE', 'PREV_EPISODE', 'MUTE', 'UNMUTE', 'VOLUME_UP', 'VOLUME_DOWN', 'MAX_VOLUME', 'FULLSCREEN', 'CHANGE_EPISODE', 'CHANGE_AUDIO']
               },
               episode_number: {
                 type: 'number',
@@ -163,12 +163,46 @@ function getVoiceTokens(transcript) {
   const normalizedTokens = originalTokens.map((token) =>
     normalizeVoiceText(token).replace(/^[^\w-]+|[^\w-]+$/g, ''),
   );
-  return { originalTokens, normalizedTokens };
+
+  const leadingFillers = new Set(['timi', 'hey', 'oi', 'lam', 'on', 'giup', 'minh', 'hay', 'cho', 'toi', 'em']);
+  let startIndex = 0;
+  while (startIndex < normalizedTokens.length && leadingFillers.has(normalizedTokens[startIndex])) {
+    startIndex += 1;
+  }
+
+  return {
+    originalTokens: originalTokens.slice(startIndex),
+    normalizedTokens: normalizedTokens.slice(startIndex),
+  };
 }
 
 function startsWithTokens(tokens, pattern) {
   if (tokens.length < pattern.length) return false;
   return pattern.every((token, index) => tokens[index] === token);
+}
+
+function findPhraseIndex(tokens, pattern, startIndex = 0) {
+  if (!pattern || pattern.length === 0 || tokens.length < pattern.length) return -1;
+
+  for (let index = startIndex; index <= tokens.length - pattern.length; index += 1) {
+    if (pattern.every((token, offset) => tokens[index + offset] === token)) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function hasPhrase(tokens, pattern) {
+  return findPhraseIndex(tokens, pattern) !== -1;
+}
+
+function hasAnyPhrase(tokens, patterns) {
+  return patterns.some((pattern) => hasPhrase(tokens, pattern));
+}
+
+function createControlToolCall(action, payload = {}) {
+  return createDeterministicToolCall('control_player', { action, ...payload });
 }
 
 function cleanMovieQueryFromTokens(tokens) {
@@ -220,6 +254,15 @@ function parseAudioHint(tokens, index) {
   return { audioType: null, nextIndex: index };
 }
 
+function findAudioHint(tokens) {
+  for (let index = 0; index < tokens.length; index += 1) {
+    const audioHint = parseAudioHint(tokens, index);
+    if (audioHint.audioType) return audioHint.audioType;
+  }
+
+  return null;
+}
+
 function parseOpenMovieCommand(originalTokens, normalizedTokens, startIndex) {
   let index = startIndex;
   const args = {};
@@ -242,6 +285,9 @@ function parseOpenMovieCommand(originalTokens, normalizedTokens, startIndex) {
   const movieName = cleanMovieQueryFromTokens(originalTokens.slice(index));
   if (!movieName) return null;
 
+  const normalizedMovieName = normalizeVoiceText(movieName);
+  if (['tiep', 'len', 'di', 'nhe', 'nha', 'tieng', 'video'].includes(normalizedMovieName)) return null;
+
   return { movie_name: movieName, ...args };
 }
 
@@ -252,6 +298,101 @@ function findCommandStart(normalizedTokens, patterns) {
     }
   }
   return -1;
+}
+
+function parseNumberAt(tokens, index) {
+  const token = tokens[index];
+  if (!token) return null;
+  if (/^\d+$/.test(token)) return Number(token);
+
+  const simpleNumbers = {
+    mot: 1,
+    hai: 2,
+    ba: 3,
+    bon: 4,
+    tu: 4,
+    nam: 5,
+    lam: 5,
+    sau: 6,
+    bay: 7,
+    tam: 8,
+    chin: 9,
+    muoi: 10,
+  };
+
+  return simpleNumbers[token] || null;
+}
+
+function findEpisodeNumber(tokens) {
+  for (let index = 0; index < tokens.length - 1; index += 1) {
+    if (tokens[index] === 'tap') {
+      const number = parseNumberAt(tokens, index + 1);
+      if (number) return number;
+    }
+  }
+
+  return null;
+}
+
+function parseDurationSeconds(tokens) {
+  let total = 0;
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const number = parseNumberAt(tokens, index);
+    if (!number) continue;
+
+    const unit = tokens[index + 1];
+    if (unit === 'phut' || unit === 'minute' || unit === 'minutes') {
+      total += number * 60;
+    } else if (unit === 'giay' || unit === 'second' || unit === 'seconds') {
+      total += number;
+    } else if (total === 0) {
+      total += number;
+    }
+  }
+
+  return total > 0 ? total : null;
+}
+
+function buildSeekToolCall(normalizedTokens) {
+  const hasSeekIntent = hasAnyPhrase(normalizedTokens, [
+    ['tua'],
+    ['lui'],
+    ['quay', 'lai'],
+    ['ve', 'dau'],
+    ['den', 'giua'],
+    ['toi', 'giua'],
+    ['den', 'cuoi'],
+    ['toi', 'cuoi'],
+  ]);
+
+  if (!hasSeekIntent) return null;
+
+  if (hasPhrase(normalizedTokens, ['giua', 'phim']) || hasPhrase(normalizedTokens, ['toi', 'giua']) || hasPhrase(normalizedTokens, ['den', 'giua'])) {
+    return createDeterministicToolCall('seek_video', { position: 'MIDDLE' });
+  }
+
+  if (hasPhrase(normalizedTokens, ['cuoi', 'phim']) || hasPhrase(normalizedTokens, ['toi', 'cuoi']) || hasPhrase(normalizedTokens, ['den', 'cuoi'])) {
+    return createDeterministicToolCall('seek_video', { position: 'END' });
+  }
+
+  if (hasPhrase(normalizedTokens, ['dau', 'phim']) || hasPhrase(normalizedTokens, ['ve', 'dau']) || hasPhrase(normalizedTokens, ['tu', 'dau'])) {
+    return createDeterministicToolCall('seek_video', { position: 'BEGINNING' });
+  }
+
+  const durationSeconds = parseDurationSeconds(normalizedTokens);
+  if (!durationSeconds) return null;
+
+  const isBackward = hasAnyPhrase(normalizedTokens, [
+    ['lui'],
+    ['quay', 'lai'],
+    ['tua', 'lai'],
+    ['nguoc'],
+  ]);
+
+  return createDeterministicToolCall('seek_video', {
+    seconds: isBackward ? -durationSeconds : durationSeconds,
+  });
 }
 
 function buildDeterministicVoiceToolCalls(transcript) {
@@ -276,6 +417,32 @@ function buildDeterministicVoiceToolCalls(transcript) {
     })];
   }
 
+  if (hasAnyPhrase(normalizedTokens, [
+    ['trang', 'chu'],
+    ['ve', 'nha'],
+    ['home'],
+  ])) {
+    return [createDeterministicToolCall('navigate', { destination: 'HOME' })];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['tai', 'khoan'],
+    ['profile'],
+    ['ho', 'so'],
+    ['trang', 'ca', 'nhan'],
+    ['ca', 'nhan'],
+  ])) {
+    return [createDeterministicToolCall('navigate', { destination: 'PROFILE' })];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['trang', 'tim', 'kiem'],
+    ['mo', 'tim', 'kiem'],
+    ['vao', 'tim', 'kiem'],
+  ])) {
+    return [createDeterministicToolCall('navigate', { destination: 'SEARCH', search_query: '' })];
+  }
+
   const openStart = findCommandStart(normalizedTokens, [
     ['mo', 'phim'],
     ['phat', 'phim'],
@@ -289,12 +456,172 @@ function buildDeterministicVoiceToolCalls(transcript) {
     ['bat'],
   ]);
 
-  if (openStart === -1) return [];
+  if (openStart !== -1) {
+    const args = parseOpenMovieCommand(originalTokens, normalizedTokens, openStart);
+    if (args) {
+      return [createDeterministicToolCall('play_specific_movie', args)];
+    }
+  }
 
-  const args = parseOpenMovieCommand(originalTokens, normalizedTokens, openStart);
-  if (!args) return [];
+  if (hasAnyPhrase(normalizedTokens, [
+    ['thich', 'phim'],
+    ['luu', 'phim'],
+    ['yeu', 'thich', 'phim'],
+    ['them', 'yeu', 'thich'],
+    ['them', 'vao', 'yeu', 'thich'],
+  ])) {
+    return [createDeterministicToolCall('interact_current_movie', { action: 'FAVORITE' })];
+  }
 
-  return [createDeterministicToolCall('play_specific_movie', args)];
+  const commentStart = findCommandStart(normalizedTokens, [
+    ['binh', 'luan'],
+    ['comment'],
+  ]);
+
+  if (commentStart !== -1) {
+    const commentText = cleanMovieQueryFromTokens(originalTokens.slice(commentStart));
+    return [createDeterministicToolCall('interact_current_movie', {
+      action: 'COMMENT',
+      ...(commentText ? { comment_text: commentText } : {}),
+    })];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['tap', 'tiep'],
+    ['tap', 'sau'],
+    ['tap', 'ke'],
+    ['tap', 'ke', 'tiep'],
+    ['next', 'tap'],
+    ['qua', 'tap'],
+  ])) {
+    return [createControlToolCall('NEXT_EPISODE')];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['tap', 'truoc'],
+    ['previous', 'tap'],
+    ['prev', 'tap'],
+    ['quay', 'lai', 'tap'],
+  ])) {
+    return [createControlToolCall('PREV_EPISODE')];
+  }
+
+  const episodeNumber = findEpisodeNumber(normalizedTokens);
+  if (episodeNumber) {
+    return [createControlToolCall('CHANGE_EPISODE', { episode_number: episodeNumber })];
+  }
+
+  const audioType = findAudioHint(normalizedTokens);
+  if (audioType && hasAnyPhrase(normalizedTokens, [
+    ['doi'],
+    ['chuyen'],
+    ['sang'],
+    ['bat'],
+    ['mo'],
+  ])) {
+    return [createControlToolCall('CHANGE_AUDIO', { audio_type: audioType })];
+  }
+
+  const seekToolCall = buildSeekToolCall(normalizedTokens);
+  if (seekToolCall) return [seekToolCall];
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['cuon', 'xuong'],
+    ['luot', 'xuong'],
+    ['truot', 'xuong'],
+    ['keo', 'xuong'],
+    ['scroll', 'down'],
+    ['xuong', 'duoi'],
+  ])) {
+    return [createDeterministicToolCall('scroll_page', { direction: 'DOWN' })];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['cuon', 'len'],
+    ['luot', 'len'],
+    ['truot', 'len'],
+    ['keo', 'len'],
+    ['scroll', 'up'],
+    ['len', 'tren'],
+  ])) {
+    return [createDeterministicToolCall('scroll_page', { direction: 'UP' })];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['tat', 'tieng'],
+    ['mute'],
+    ['im', 'lang'],
+  ])) {
+    return [createControlToolCall('MUTE')];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['bat', 'tieng'],
+    ['mo', 'tieng'],
+    ['unmute'],
+  ])) {
+    return [createControlToolCall('UNMUTE')];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['am', 'luong', 'toi', 'da'],
+    ['max', 'volume'],
+    ['het', 'co'],
+    ['to', 'nhat'],
+  ])) {
+    return [createControlToolCall('MAX_VOLUME')];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['tang', 'am', 'luong'],
+    ['tang', 'tieng'],
+    ['to', 'len'],
+    ['volume', 'up'],
+  ])) {
+    return [createControlToolCall('VOLUME_UP')];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['giam', 'am', 'luong'],
+    ['giam', 'tieng'],
+    ['nho', 'lai'],
+    ['volume', 'down'],
+  ])) {
+    return [createControlToolCall('VOLUME_DOWN')];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['toan', 'man', 'hinh'],
+    ['full', 'man', 'hinh'],
+    ['fullscreen'],
+    ['phong', 'to'],
+  ])) {
+    return [createControlToolCall('FULLSCREEN')];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['tam', 'dung'],
+    ['dung', 'phim'],
+    ['dung', 'lai'],
+    ['ngung'],
+    ['pause'],
+    ['tat', 'phim'],
+  ])) {
+    return [createControlToolCall('PAUSE')];
+  }
+
+  if (hasAnyPhrase(normalizedTokens, [
+    ['phat', 'tiep'],
+    ['tiep', 'tuc'],
+    ['chay', 'tiep'],
+    ['play'],
+    ['bat', 'phim'],
+    ['mo', 'video'],
+  ])) {
+    return [createControlToolCall('PLAY')];
+  }
+
+  return [];
 }
 
 async function executeDeterministicVoiceFallback(transcript, user, context) {
@@ -306,7 +633,9 @@ async function executeDeterministicVoiceFallback(transcript, user, context) {
   const firstArgs = JSON.parse(firstCall.function.arguments || '{}');
 
   if (!result.directReply && result.commands.length > 0 && firstCall.function.name === 'navigate' && firstArgs.destination === 'SEARCH') {
-    result.directReply = `Dạ em tìm ${firstArgs.search_query} ngay đây!`;
+    result.directReply = firstArgs.search_query
+      ? `Dạ em tìm ${firstArgs.search_query} ngay đây!`
+      : 'Dạ em mở tìm kiếm ngay đây!';
   }
 
   if (result.commands.length === 0 && !result.directReply) return null;
