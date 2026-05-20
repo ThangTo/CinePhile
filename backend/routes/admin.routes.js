@@ -6,6 +6,7 @@ const thumbnailController = require('../controllers/thumbnail.controller');
 const castController = require('../controllers/cast.controller');
 const tiktokController = require('../controllers/tiktok.controller');
 const playbackController = require('../controllers/playback.controller');
+const hlsLabController = require('../controllers/hlsLab.controller');
 
 const authMiddleware = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/admin.middleware');
@@ -35,6 +36,11 @@ router.get('/playback/intro-batches/preview', playbackController.getIntroDetecti
 router.get('/playback/intro-batches/:batchId/movies', playbackController.listIntroDetectionBatchMovies);
 router.get('/playback/intro-batches/:batchId', playbackController.getIntroDetectionBatch);
 router.get('/playback/detect-intro/:jobId', playbackController.getIntroDetectionStatus);
+
+// ===== ADMIN HLS LAB =====
+router.get('/hls-lab/inspect', hlsLabController.inspectPlaylist);
+router.get('/hls-lab/playlist', hlsLabController.previewPlaylist);
+router.post('/hls-lab/snippet', hlsLabController.processSnippet);
 
 // ===== ADMIN MOVIES =====
 // GET /api/v1/admin/movies - Get all movies

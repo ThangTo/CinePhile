@@ -1,4 +1,5 @@
 import apiRequest from "./utils/apiRequest";
+import http from "lib/axios";
 
 // ============================================================================
 // Admin Service - API calls for admin dashboard
@@ -1235,6 +1236,51 @@ export const playbackAPI = {
       requiresAuth: true,
     });
     return response.data || response;
+  },
+};
+
+/**
+ * HLS Lab API
+ */
+export const hlsLabAPI = {
+  inspect: async ({ url, patterns, variantUrl } = {}) => {
+    const response = await apiRequest("/admin/hls-lab/inspect", {
+      params: { url, patterns, variantUrl },
+      requiresAuth: true,
+      timeout: 30000,
+    });
+    return response.data || response;
+  },
+
+  processSnippet: async ({ content, baseUrl, patterns, segmentMode = "direct" } = {}) => {
+    const response = await apiRequest("/admin/hls-lab/snippet", {
+      method: "POST",
+      data: { content, baseUrl, patterns, segmentMode },
+      requiresAuth: true,
+      timeout: 30000,
+    });
+    return response.data || response;
+  },
+
+  buildPlaylistUrl: ({ url, variant = "raw", segmentMode = "direct", patterns = "", variantUrl = "" } = {}) => {
+    const apiBaseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+    const previewUrl = new URL(`${apiBaseUrl.replace(/\/$/, "")}/admin/hls-lab/playlist`);
+    previewUrl.searchParams.set("url", url);
+    previewUrl.searchParams.set("variant", variant);
+    previewUrl.searchParams.set("segmentMode", segmentMode);
+    if (patterns) previewUrl.searchParams.set("patterns", patterns);
+    if (variantUrl) previewUrl.searchParams.set("variantUrl", variantUrl);
+    return previewUrl.toString();
+  },
+
+  getPlaylistText: async ({ url, variant = "raw", segmentMode = "direct", patterns = "", variantUrl = "" } = {}) => {
+    const response = await http.get("/admin/hls-lab/playlist", {
+      params: { url, variant, segmentMode, patterns, variantUrl },
+      responseType: "text",
+      timeout: 30000,
+      meta: { requiresAuth: true },
+    });
+    return response.data;
   },
 };
 

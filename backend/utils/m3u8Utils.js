@@ -1,9 +1,19 @@
 const { buildSourceHeaders, fetchWithIpv4 } = require('./httpFetch');
 
-const AD_KEYWORDS = ['/v7/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+const AD_KEYWORDS = ['/v7/', '/v8/', '/adjump/', 'google', 'ads', 'doubleclick', 'facebook'];
+const OVERLAY_SEGMENT_PREFIXES = ['convertv7/', 'convertv8/'];
+
+function stripOverlaySegmentPrefixes(segmentUrl) {
+  return OVERLAY_SEGMENT_PREFIXES.reduce(
+    (nextUrl, prefix) => nextUrl.replace(prefix, ''),
+    String(segmentUrl || ''),
+  );
+}
 
 function appendQueryParams(baseUrl, params = {}) {
-  const entries = Object.entries(params).filter(([, value]) => value !== undefined && value !== null);
+  const entries = Object.entries(params).filter(
+    ([, value]) => value !== undefined && value !== null,
+  );
 
   try {
     const nextUrl = new URL(baseUrl);
@@ -28,11 +38,11 @@ async function processM3u8StreamDirect(url, proxyBase = null) {
   const response = await fetchWithIpv4(url, {
     headers: buildSourceHeaders(url),
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
   }
-  
+
   const content = await response.text();
   const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
   const isMasterPlaylist = content.includes('#EXT-X-STREAM-INF');
@@ -86,9 +96,7 @@ async function processM3u8StreamDirect(url, proxyBase = null) {
         if (!line.startsWith('http')) {
           line = new URL(line, baseUrl).toString();
         }
-        if (line.includes('convertv7/')) {
-          line = line.replace('convertv7/', '');
-        }
+        line = stripOverlaySegmentPrefixes(line);
       }
       cleanLines.push(line);
     }
@@ -106,11 +114,11 @@ async function processM3u8StreamWithProxy(url, proxyBase, tsProxyBase) {
   const response = await fetchWithIpv4(url, {
     headers: buildSourceHeaders(url),
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch M3U8: ${response.statusText}`);
   }
-  
+
   const content = await response.text();
   const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
   const isMasterPlaylist = content.includes('#EXT-X-STREAM-INF');
@@ -160,9 +168,7 @@ async function processM3u8StreamWithProxy(url, proxyBase, tsProxyBase) {
         if (!segmentUrl.startsWith('http')) {
           segmentUrl = new URL(segmentUrl, baseUrl).toString();
         }
-        if (segmentUrl.includes('convertv7/')) {
-          segmentUrl = segmentUrl.replace('convertv7/', '');
-        }
+        segmentUrl = stripOverlaySegmentPrefixes(segmentUrl);
         line = appendQueryParams(tsProxyBase, { url: segmentUrl });
       }
       cleanLines.push(line);
@@ -189,5 +195,7 @@ module.exports = {
   processM3u8StreamDirect,
   processM3u8StreamWithProxy,
   appendQueryParams,
-  AD_KEYWORDS
+  stripOverlaySegmentPrefixes,
+  OVERLAY_SEGMENT_PREFIXES,
+  AD_KEYWORDS,
 };

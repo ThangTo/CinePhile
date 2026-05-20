@@ -34,6 +34,7 @@
     "test:timi-ai": "node --test controllers/ai.controller.test.js",
     "test:llm-provider": "node --test services/llmProvider.service.test.js",
     "test:llm-utils": "node --test utils/llmUtils.test.js",
+    "test:hls-lab": "node --test services/hlsLab.service.test.js",
     "test:view-history-backfill": "node scripts/testViewHistoryBackfillService.js",
     "test:watch-streak": "node scripts/testWatchStreakLogic.js",
     "test:playback-heartbeat": "node scripts/testPlaybackHeartbeatService.js",

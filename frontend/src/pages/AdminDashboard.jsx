@@ -17,6 +17,7 @@ const SettingsPricingTab = lazy(() => import("components/admin/SettingsPricingTa
 const AdminQuestsTab = lazy(() => import("components/admin/AdminQuestsTab"));
 const AdminSubtitlesTab = lazy(() => import("components/admin/AdminSubtitlesTab"));
 const AdminPlaybackTab = lazy(() => import("components/admin/AdminPlaybackTab"));
+const AdminHlsLabTab = lazy(() => import("components/admin/AdminHlsLabTab"));
 
 function AdminTabLoading() {
   return (
@@ -130,6 +131,8 @@ const AdminDashboard = () => {
         return <AdminSubtitlesTab />;
       case ADMIN_TABS.PLAYBACK:
         return <AdminPlaybackTab />;
+      case ADMIN_TABS.HLS_LAB:
+        return <AdminHlsLabTab />;
       case ADMIN_TABS.SETTINGS:
         return <AdminSettingsTab />;
       case ADMIN_TABS.PRICING:
