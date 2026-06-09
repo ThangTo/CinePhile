@@ -175,7 +175,10 @@ const WatchStreak = ({ compact = false }) => {
 
         {/* Card renders directly below button via absolute, above header content */}
         {showCard && (
-          <div data-streak-card className="fixed right-50% top-[60px] z-[9999]">
+          <div
+            data-streak-card
+            className="fixed right-50% top-[calc(var(--app-header-total-height)+0.5rem)] z-[9999]"
+          >
             <StreakCard
               streak={streak}
               currentStreak={currentStreak}

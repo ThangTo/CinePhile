@@ -59,7 +59,7 @@ const MailboxFAB = () => {
   return (
     <>
       <div
-        className="fixed z-[100005]"
+        className="hidden md:fixed z-[100005]"
         style={{
           bottom: "calc(var(--safe-bottom) + 1rem)",
           left: "calc(var(--safe-left) + 1.25rem)",

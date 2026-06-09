@@ -19,7 +19,7 @@ const showToast = (message, type = "success") => {
   const id = `quest-toast-${Date.now()}`;
   const el = document.createElement("div");
   el.id = id;
-  el.className = `fixed top-[70px] right-4 z-[99999] px-5 py-3 rounded-xl text-sm font-medium shadow-xl transition-all duration-300 ${
+  el.className = `fixed top-[calc(var(--app-header-total-height)+0.75rem)] right-4 z-[99999] px-5 py-3 rounded-xl text-sm font-medium shadow-xl transition-all duration-300 ${
     type === "success"
       ? "bg-green-600 text-white"
       : type === "error"

@@ -147,7 +147,7 @@ const MobileMovieBanner = ({ movie, audioType }) => {
   };
 
   return (
-    <div className="relative mt-[60px]">
+    <div className="relative mt-[var(--app-header-total-height)]">
       {/* Background Image */}
       <BannerBackground
         backgroundImage={movie.bgImage || movie.backgroundImage || movie.poster}

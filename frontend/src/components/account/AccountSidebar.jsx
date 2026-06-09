@@ -64,7 +64,7 @@ const AccountSidebar = ({ user, onLogout, prestigeRank }) => {
 
   return (
     <nav
-      className={`w-[90%] md:w-[250px] mt-[50px] md:ml-[20px] mx-auto rounded-2xl bg-account-bg-secondary min-h-auto md:min-h-dvh p-6 flex flex-col border-r-0 md:border-r border-b md:border-b-0 border-account-border md:sticky md:top-0 md:h-dvh ${
+      className={`w-[90%] md:w-[250px] mt-[50px] md:ml-[20px] mx-auto rounded-2xl bg-account-bg-secondary min-h-auto md:min-h-[calc(100dvh-var(--app-header-total-height))] p-6 flex flex-col border-r-0 md:border-r border-b md:border-b-0 border-account-border md:sticky md:top-[var(--app-header-total-height)] md:h-[calc(100dvh-var(--app-header-total-height))] ${
         prestige.hasPrestige ? "shadow-[0_24px_70px_rgba(243,191,26,0.12)]" : ""
       } ${getPrestigeContainerClassName(user, prestigeRank)}`}
     >

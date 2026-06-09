@@ -87,14 +87,14 @@ const CastDetailPage = () => {
   );
 
   return (
-    <div className="min-h-dvh bg-bgColor text-white pt-20 pb-12">
+    <div className="min-h-dvh bg-bgColor text-white pb-12 pt-[calc(var(--app-header-total-height)+1rem)] lg:pt-20">
       {/* Background decoration (optional gradient glow) */}
       <div className="fixed top-0 left-0 w-full h-96 bg-gradient-to-b from-primaryColor/10 to-transparent pointer-events-none z-0" />
 
       <div className="container mx-auto px-4 relative z-10">
         <button
           onClick={() => navigate(-1)}
-          className="group fixed top-20 left-4 lg:left-4 lg:top-16 z-50 flex items-center gap-2 px-4 py-2.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:border-primaryColor/50 hover:bg-white/15 transition-all duration-300 shadow-lg hover:shadow-primaryColor/20"
+          className="group fixed top-[calc(var(--app-header-total-height)+0.75rem)] left-4 lg:left-4 lg:top-16 z-50 flex items-center gap-2 px-4 py-2.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:border-primaryColor/50 hover:bg-white/15 transition-all duration-300 shadow-lg hover:shadow-primaryColor/20"
           aria-label="Quay lại"
         >
           <i className="fa-solid fa-arrow-left text-white group-hover:text-primaryColor transition-colors duration-300 text-sm"></i>

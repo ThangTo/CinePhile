@@ -361,7 +361,7 @@ const FilteredMovies = ({ pageType = "genre" }) => {
 
   return (
     <div className="bg-bgColor">
-      <main className="w-full mx-auto px-4 py-20">
+      <main className="w-full mx-auto px-4 pb-20 pt-[calc(var(--app-header-total-height)+1rem)]">
         <h1 className="text-fluid-2xl leading-fluid-tight font-bold text-white mb-6 pl-4">
           {(() => {
             if (pageType === "type") {

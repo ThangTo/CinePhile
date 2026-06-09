@@ -182,7 +182,7 @@ const AccountPage = () => {
           <AccountSidebar user={prestigeUser} onLogout={handleLogout} prestigeRank={leaderboardRank} />
         </div>
 
-        <main className="flex-1 px-4 pb-10 pt-[72px] md:mt-[40px] md:p-10 md:pt-2 box-border">
+        <main className="flex-1 px-4 pb-10 pt-[calc(var(--app-header-total-height)+1rem)] md:mt-[40px] md:p-10 md:pt-2 box-border">
           <div className="md:hidden space-y-4">
             <section className="relative overflow-hidden rounded-[28px] border border-account-border/80 bg-account-bg-secondary px-4 py-5 shadow-[0_24px_60px_rgba(0,0,0,0.22)]">
               <div className="pointer-events-none absolute inset-x-8 top-0 h-20 rounded-full bg-primaryColor/12 blur-3xl" />
@@ -265,7 +265,7 @@ const AccountPage = () => {
               </div>
             </section>
 
-            <section className="sticky top-[70px] z-20">
+            <section className="sticky top-[calc(var(--app-header-total-height)+0.5rem)] z-20">
               <div className="rounded-[24px] border border-account-border/80 bg-account-bg-secondary/95 p-2 shadow-[0_20px_45px_rgba(0,0,0,0.18)] backdrop-blur">
                 <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
                   {MOBILE_ACCOUNT_NAV_ITEMS.map((item) => {

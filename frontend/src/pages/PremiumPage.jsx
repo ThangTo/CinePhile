@@ -116,7 +116,7 @@ const PremiumPage = () => {
   const remainingDays = getRemainingDays(user);
 
   return (
-    <div className="min-h-dvh pt-12 md:pt-0 bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
+    <div className="min-h-dvh pt-[var(--app-header-total-height)] md:pt-0 bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
       {/* --- Background Effects (Glow nền) --- */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[500px] bg-primaryColor/20 blur-[120px] rounded-full pointer-events-none mix-blend-screen" />
       <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-600/10 blur-[100px] rounded-full pointer-events-none" />
@@ -140,7 +140,7 @@ const PremiumPage = () => {
         </div>
 
         {/* --- Coin Dashboard Widget --- */}
-        <div className="flex justify-center mb-16 sticky top-4 z-40 md:static">
+        <div className="flex justify-center mb-16 sticky top-[calc(var(--app-header-total-height)+0.5rem)] z-40 md:static">
           <div className="bg-[#1a1a1a]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-2 pr-2 md:pr-4 flex items-center gap-2 md:gap-4 shadow-2xl ring-1 ring-white/5">
             <div className="bg-black/40 rounded-xl px-4 py-2 flex items-center gap-3 border border-white/5">
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-yellow-500/20">
