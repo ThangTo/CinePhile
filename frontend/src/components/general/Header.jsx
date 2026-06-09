@@ -13,6 +13,7 @@ import TimiToggle from "components/common/TimiToggle";
 import WatchStreak from "components/common/WatchStreak";
 import PwaInstallButton from "components/pwa/PwaInstallButton";
 import useCurrentUserPrestige from "hooks/useCurrentUserPrestige";
+import logo2Trans from "assets/images/logo2_trans.png";
 
 const NotificationPanel = lazy(() => import("components/notifications/NotificationPanel"));
 
@@ -100,11 +101,16 @@ const Header = () => {
           {/* Left: Logo */}
           <Link
             to="/"
-            className="shrink-0 text-xl lg:text-2xl font-extrabold tracking-tight"
+            className="relative h-9 w-32 shrink-0 overflow-hidden rounded-sm sm:w-36 lg:h-10 lg:w-40"
             data-theme-glow="true"
+            aria-label="CinePhine"
           >
-            <span className="text-white">Cine</span>
-            <span className="text-cyan-400">Phine</span>
+            <img
+              src={logo2Trans}
+              alt="CinePhine"
+              className="absolute left-1/2 top-1/2 h-[255%] w-auto max-w-none -translate-x-1/2 -translate-y-1/2 select-none"
+              draggable={false}
+            />
           </Link>
 
           {/* Middle: Nav links (desktop) */}

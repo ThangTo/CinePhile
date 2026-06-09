@@ -1,5 +1,5 @@
 import React from "react";
-import logo3 from "assets/images/logo3.png";
+import logoMainTrans from "assets/images/logo_main_trans.png";
 
 // const menuLinks = ["Hỏi-Đáp", "Chính sách bảo mật", "Điều khoản sử dụng", "Giới thiệu", "Liên hệ"];
 // const topicTags = ["Dongphim", "Ghienphim", "Motphim", "Subnhanh"];
@@ -16,9 +16,9 @@ const SiteFooter = () => {
             <div className="flex items-start gap-4 mb-6">
               <div className="flex-shrink-0">
                 <img
-                  src={logo3}
+                  src={logoMainTrans}
                   alt="CinePhine"
-                  className="w-16 h-16 object-cover object-center rounded-full"
+                  className="w-16 h-16 object-cover object-center"
                   loading="lazy"
                   decoding="async"
                 />

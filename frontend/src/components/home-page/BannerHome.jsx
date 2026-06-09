@@ -187,7 +187,7 @@ const BannerHome = ({ movie }) => {
   // Show loading state if no movie data
   if (loading || !currentMovie) {
     return (
-      <section className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[400px] md:h-[600px] flex items-center justify-center">
+      <section className="relative w-full overflow-hidden z-0 mt-[var(--app-header-total-height)] md:mt-0 h-[400px] md:h-[600px] flex items-center justify-center">
         <BarSpinner />
       </section>
     );
@@ -195,7 +195,7 @@ const BannerHome = ({ movie }) => {
 
   return (
     <section
-      className="relative w-full overflow-hidden z-0 mt-[60px] md:mt-0 h-[350px] sm:h-[450px] md:h-[600px] lg:h-[700px] 3xl:h-[950px] cursor-pointer"
+      className="relative w-full overflow-hidden z-0 mt-[var(--app-header-total-height)] md:mt-0 h-[350px] sm:h-[450px] md:h-[600px] lg:h-[700px] 3xl:h-[950px] cursor-pointer"
       onClick={handleBannerClick}
     >
       {/* Background with gradients */}
