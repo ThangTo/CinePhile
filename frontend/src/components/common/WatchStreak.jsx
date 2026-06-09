@@ -21,6 +21,31 @@ const MILESTONE_ICONS = {
   365: "fa-crown",
 };
 
+const startOfCalendarDay = (date) => {
+  const normalizedDate = new Date(date);
+  normalizedDate.setHours(0, 0, 0, 0);
+  return normalizedDate;
+};
+
+const getCalendarDateKey = (date) => {
+  const normalizedDate = startOfCalendarDay(date);
+  return `${normalizedDate.getFullYear()}-${normalizedDate.getMonth() + 1}-${normalizedDate.getDate()}`;
+};
+
+export const buildCurrentStreakDateKeys = (lastQualifiedWatchDate, currentStreak) => {
+  const streakDateKeys = new Set();
+  if (!lastQualifiedWatchDate || currentStreak <= 0) return streakDateKeys;
+
+  const streakEndDate = startOfCalendarDay(lastQualifiedWatchDate);
+  for (let dayOffset = 0; dayOffset < currentStreak; dayOffset += 1) {
+    const streakDate = new Date(streakEndDate);
+    streakDate.setDate(streakEndDate.getDate() - dayOffset);
+    streakDateKeys.add(getCalendarDateKey(streakDate));
+  }
+
+  return streakDateKeys;
+};
+
 const WatchStreak = ({ compact = false }) => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -112,7 +137,7 @@ const WatchStreak = ({ compact = false }) => {
   const daysToNext = nextMilestone - currentStreak;
 
   // Build week calendar (7 cells: 3 past + today + 3 future)
-  const today = new Date();
+  const today = startOfCalendarDay(new Date());
   const dayOfWeek = (today.getDay() + 6) % 7; // Mon=0, Sun=6
 
   const weekDays = [];
@@ -123,10 +148,10 @@ const WatchStreak = ({ compact = false }) => {
     weekDays.push({ date: d, dayName: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"][i + dayOfWeek] });
   }
 
-  const lastQualifiedDate = streak?.lastQualifiedWatchDate
-    ? new Date(streak.lastQualifiedWatchDate)
-    : null;
-  if (lastQualifiedDate) lastQualifiedDate.setHours(0, 0, 0, 0);
+  const streakDateKeys = buildCurrentStreakDateKeys(
+    streak?.lastQualifiedWatchDate,
+    currentStreak,
+  );
 
   // Compact version — used in header
   if (compact) {
@@ -189,7 +214,7 @@ const WatchStreak = ({ compact = false }) => {
               nextMilestone={nextMilestone}
               daysToNext={daysToNext}
               weekDays={weekDays}
-              lastQualifiedDate={lastQualifiedDate}
+              streakDateKeys={streakDateKeys}
               today={today}
               onClose={() => setShowCard(false)}
               onNavigate={() => {
@@ -216,7 +241,7 @@ const WatchStreak = ({ compact = false }) => {
       nextMilestone={nextMilestone}
       daysToNext={daysToNext}
       weekDays={weekDays}
-      lastQualifiedDate={lastQualifiedDate}
+      streakDateKeys={streakDateKeys}
       today={today}
       onClose={() => {}}
       onNavigate={() => {}}
@@ -236,7 +261,7 @@ const StreakCard = ({
   nextMilestone,
   daysToNext,
   weekDays,
-  lastQualifiedDate,
+  streakDateKeys,
   today,
   onClose,
   onNavigate,
@@ -364,11 +389,14 @@ const StreakCard = ({
             {weekDays.map((day, i) => {
               const isToday = day.date.getTime() === today.getTime();
               const isPast = day.date < today;
-              const isWatched =
-                lastQualifiedDate && day.date.getTime() === lastQualifiedDate.getTime();
+              const isStreakDay = streakDateKeys.has(getCalendarDateKey(day.date));
 
               return (
-                <div key={i} className="flex flex-col items-center gap-1">
+                <div
+                  key={i}
+                  className="flex flex-col items-center gap-1"
+                  data-streak-qualified={isStreakDay}
+                >
                   <span
                     className={`text-[9px] font-semibold ${isToday ? "text-primaryColor" : "text-gray-500"}`}
                   >
@@ -379,7 +407,7 @@ const StreakCard = ({
                       w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold
                       transition-all duration-300
                       ${
-                        isWatched
+                        isStreakDay
                           ? "bg-primaryColor text-black shadow-[0_0_10px_rgba(255,216,117,0.5)]"
                           : isToday && isActiveToday
                             ? "bg-primaryColor/30 border border-primaryColor/40 text-primaryColor"
@@ -393,8 +421,8 @@ const StreakCard = ({
                   >
                     {day.date.getDate()}
                   </div>
-                  {isWatched && <i className="fa-solid fa-check text-[6px] text-primaryColor" />}
-                  {isToday && !isWatched && (
+                  {isStreakDay && <i className="fa-solid fa-check text-[6px] text-primaryColor" />}
+                  {isToday && !isStreakDay && (
                     <div className="w-1.5 h-1.5 rounded-full bg-primaryColor animate-pulse" />
                   )}
                 </div>

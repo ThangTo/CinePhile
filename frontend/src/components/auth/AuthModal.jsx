@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "contexts/AuthContext";
 import bgFormLogin from "assets/images/bg-form-login.webp";
+import { isValidEmail, normalizeEmail } from "utils/emailUtils";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
 const GOOGLE_AUTH_URL = `${API_BASE_URL}/auth/google`;
@@ -119,8 +120,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
     });
   };
 
-  const validateEmail = (email) => /\S+@\S+\.\S+/.test(email);
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrors({});
@@ -142,9 +141,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
   const handleRequestRegistrationOTP = async (e) => {
     e.preventDefault();
     const newErrors = {};
+    const normalizedEmail = normalizeEmail(formData.email);
     if (!formData.username) newErrors.username = "Vui lòng nhập tên hiển thị";
-    if (!formData.email) newErrors.email = "Vui lòng nhập email";
-    else if (!validateEmail(formData.email)) newErrors.email = "Email không hợp lệ";
+    if (!normalizedEmail) newErrors.email = "Vui lòng nhập email";
+    else if (!isValidEmail(normalizedEmail)) newErrors.email = "Email không hợp lệ";
     if (!formData.password) newErrors.password = "Vui lòng nhập mật khẩu";
     else if (formData.password.length < 6) newErrors.password = "Mật khẩu phải ít nhất 6 ký tự";
     if (formData.password !== formData.confirmPassword)
@@ -157,7 +157,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
 
     setIsLoading(true);
     try {
-      await requestRegistrationOTP({ username: formData.username, email: formData.email });
+      await requestRegistrationOTP({ username: formData.username, email: normalizedEmail });
+      setFormData((prev) => ({ ...prev, email: normalizedEmail }));
       switchMode("verify-otp-register");
       setResendTimer(60);
     } catch (error) {
@@ -169,13 +170,15 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
-    if (!formData.email || !validateEmail(formData.email)) {
+    const normalizedEmail = normalizeEmail(formData.email);
+    if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
       setErrors({ email: "Vui lòng nhập email hợp lệ" });
       return;
     }
     setIsLoading(true);
     try {
-      await forgotPassword(formData.email);
+      await forgotPassword(normalizedEmail);
+      setFormData((prev) => ({ ...prev, email: normalizedEmail }));
       switchMode("verify-otp-forgot-password");
       setResendTimer(60);
     } catch (error) {
@@ -467,15 +470,21 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                   className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner"
                 />
 
-                <input
-                  required
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="Email xác thực"
-                  className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner"
-                />
+                <div className="space-y-1">
+                  <input
+                    required
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Email xác thực"
+                    aria-invalid={Boolean(errors.email)}
+                    className={`w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner ${
+                      errors.email ? "border-red-400/70" : "border-white/10"
+                    }`}
+                  />
+                  {errors.email && <p className="text-red-400 text-sm">{errors.email}</p>}
+                </div>
 
                 <div className="grid grid-cols-1 gap-4">
                   <div className="relative">
@@ -541,15 +550,21 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }) => {
                 <p className="text-sm text-gray-400">
                   Nhập email của bạn, chúng tôi sẽ gửi mã OTP để đặt lại mật khẩu.
                 </p>
-                <input
-                  required
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="Email đã đăng ký"
-                  className="w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner"
-                />
+                <div className="space-y-1">
+                  <input
+                    required
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Email đã đăng ký"
+                    aria-invalid={Boolean(errors.email)}
+                    className={`w-full px-5 py-3.5 bg-white/5 hover:bg-white/10 border focus:border-primaryColor rounded-xl text-white placeholder-gray-500 transition-all outline-none backdrop-blur-sm shadow-inner ${
+                      errors.email ? "border-red-400/70" : "border-white/10"
+                    }`}
+                  />
+                  {errors.email && <p className="text-red-400 text-sm">{errors.email}</p>}
+                </div>
 
                 <button
                   disabled={isLoading}

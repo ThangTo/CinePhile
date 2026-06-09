@@ -42,4 +42,19 @@ describe("WatchStreak", () => {
 
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  it("highlights every qualified streak day visible in the current week", async () => {
+    const { container } = render(<WatchStreak />);
+
+    await waitFor(() => {
+      expect(userService.getStreak).toHaveBeenCalledTimes(1);
+    });
+
+    const currentWeekDay = (new Date().getDay() + 6) % 7;
+    const visibleStreakDays = Math.min(3, currentWeekDay + 1);
+
+    expect(container.querySelectorAll('[data-streak-qualified="true"]')).toHaveLength(
+      visibleStreakDays,
+    );
+  });
 });

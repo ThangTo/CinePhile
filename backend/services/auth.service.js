@@ -7,6 +7,7 @@ const { isPremiumActive } = require('../utils/premiumUtils');
 const cursorEffectService = require('./cursorEffect.service');
 const emailService = require('./email.service');
 const otpService = require('./otp.service');
+const { isValidEmail, normalizeEmail } = require('../utils/emailUtils');
 
 // Helper to generate tokens
 const generateTokens = (userId) => {
@@ -35,10 +36,15 @@ const generateAuthPayload = (user) => {
  * @param {Object} userData - { username, email }
  */
 const requestRegistrationOTP = async (userData) => {
-  const { username, email } = userData;
+  const { username, email: rawEmail } = userData || {};
+  const email = normalizeEmail(rawEmail);
 
   if (!username || !email) {
     throw new Error('Username and email are required');
+  }
+
+  if (!isValidEmail(email)) {
+    throw new Error('Email không hợp lệ');
   }
 
   const existingEmail = await User.findOne({ email });
@@ -65,10 +71,15 @@ const requestRegistrationOTP = async (userData) => {
  * @param {Object} userData - { username, email, password, otp }
  */
 const register = async (userData) => {
-  const { username, email, password, otp } = userData;
+  const { username, email: rawEmail, password, otp } = userData || {};
+  const email = normalizeEmail(rawEmail);
 
   if (!username || !email || !password || !otp) {
     throw new Error('Vui lòng điền đầy đủ thông tin và mã xác thực');
+  }
+
+  if (!isValidEmail(email)) {
+    throw new Error('Email không hợp lệ');
   }
 
   // Verify OTP
