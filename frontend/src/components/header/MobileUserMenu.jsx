@@ -184,6 +184,7 @@ const MobileUserMenu = ({ user, onLogout, onOpenAuth, onClose, prestigeRank, pre
             <i className="fa-solid fa-user text-[#3b4d6f] text-xl" />
             <span className="text-[#3b4d6f] font-semibold">Đăng nhập</span>
           </button>
+          <PwaInstallButton variant="menu" className="mt-3" />
         </div>
       )}
     </>

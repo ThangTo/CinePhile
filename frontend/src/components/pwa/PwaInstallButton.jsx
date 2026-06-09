@@ -9,7 +9,7 @@ const IconTile = ({ children }) => (
   </span>
 );
 
-const IosInstallGuide = ({ onClose }) => {
+const InstallGuide = ({ onClose }) => {
   return createPortal(
     <div className="fixed inset-0 z-[10000020] flex items-end justify-center safe-modal-padding sm:items-center">
       <button
@@ -49,7 +49,8 @@ const IosInstallGuide = ({ onClose }) => {
           </div>
 
           <p className="text-sm leading-relaxed text-gray-300">
-            Safari trên iPhone/iPad cần thêm app thủ công từ menu Chia sẻ.
+            Trình duyệt chưa mở hộp thoại cài đặt tự động. Bạn vẫn có thể cài CinePhine từ
+            menu của trình duyệt.
           </p>
 
           <div className="mt-5 grid gap-3">
@@ -58,8 +59,8 @@ const IosInstallGuide = ({ onClose }) => {
                 <Share2 size={18} strokeWidth={2.1} />
               </IconTile>
               <div>
-                <p className="text-sm font-semibold">Bấm Chia sẻ trong Safari</p>
-                <p className="text-xs text-gray-400">Biểu tượng mũi tên đi lên.</p>
+                <p className="text-sm font-semibold">Mở menu trình duyệt</p>
+                <p className="text-xs text-gray-400">Dùng menu ba chấm hoặc nút Chia sẻ.</p>
               </div>
             </div>
 
@@ -68,8 +69,10 @@ const IosInstallGuide = ({ onClose }) => {
                 <PlusSquare size={18} strokeWidth={2.1} />
               </IconTile>
               <div>
-                <p className="text-sm font-semibold">Chọn Thêm vào Màn hình chính</p>
-                <p className="text-xs text-gray-400">Sau đó mở CinePhine như một app riêng.</p>
+                <p className="text-sm font-semibold">Chọn Cài app</p>
+                <p className="text-xs text-gray-400">
+                  Hoặc chọn Thêm vào Màn hình chính nếu trình duyệt hiển thị tùy chọn đó.
+                </p>
               </div>
             </div>
           </div>
@@ -81,18 +84,21 @@ const IosInstallGuide = ({ onClose }) => {
 };
 
 const PwaInstallButton = ({ variant = "desktop", className = "" }) => {
-  const { canPrompt, isIos, promptInstall, shouldShowInstall } = usePwaInstallPrompt();
-  const [showIosGuide, setShowIosGuide] = useState(false);
+  const { canPrompt, promptInstall, shouldShowInstall } = usePwaInstallPrompt();
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   if (!shouldShowInstall) return null;
 
   const handleInstall = async () => {
-    if (!canPrompt && isIos) {
-      setShowIosGuide(true);
+    if (!canPrompt) {
+      setShowInstallGuide(true);
       return;
     }
 
-    await promptInstall();
+    const choice = await promptInstall();
+    if (choice?.outcome === "manual") {
+      setShowInstallGuide(true);
+    }
   };
 
   if (variant === "menu") {
@@ -117,7 +123,7 @@ const PwaInstallButton = ({ variant = "desktop", className = "" }) => {
             className="shrink-0 text-primaryColor/80 transition-transform group-hover:rotate-12"
           />
         </button>
-        {showIosGuide && <IosInstallGuide onClose={() => setShowIosGuide(false)} />}
+        {showInstallGuide && <InstallGuide onClose={() => setShowInstallGuide(false)} />}
       </>
     );
   }
@@ -137,7 +143,7 @@ const PwaInstallButton = ({ variant = "desktop", className = "" }) => {
         </span>
         <span className="hidden xl:inline">Cài app</span>
       </button>
-      {showIosGuide && <IosInstallGuide onClose={() => setShowIosGuide(false)} />}
+      {showInstallGuide && <InstallGuide onClose={() => setShowInstallGuide(false)} />}
     </>
   );
 };
