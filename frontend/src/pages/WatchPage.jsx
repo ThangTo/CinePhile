@@ -112,7 +112,7 @@ const WatchPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor text-white flex items-center justify-center">
         <BarSpinner />
       </div>
     );
@@ -120,7 +120,7 @@ const WatchPage = () => {
 
   if (!movie) {
     return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor text-white flex items-center justify-center">
         <div className="text-xl">Không tìm thấy phim</div>
       </div>
     );
@@ -149,9 +149,12 @@ const WatchPage = () => {
   });
 
   return (
-    <div className="min-h-screen bg-bgColor">
+    <div className="min-h-dvh bg-bgColor">
       {/* Top Bar */}
-      <div className="w-full pt-16 md:pt-20 px-2">
+      <div
+        className="w-full px-2"
+        style={{ paddingTop: "calc(var(--app-header-total-height) + 0.75rem)" }}
+      >
         <div className="container mx-auto flex items-center gap-3 text-white">
           <button
             onClick={() => navigate(-1)}

@@ -83,7 +83,10 @@ const VideoControls = ({
   }
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none opacity-100 touch-none">
+    <div
+      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none opacity-100 touch-none"
+      style={{ paddingBottom: "calc(0.5rem + var(--safe-bottom))" }}
+    >
       {/* Progress Bar */}
       <ProgressBar
         currentTime={currentTime}

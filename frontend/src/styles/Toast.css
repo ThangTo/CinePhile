@@ -1,8 +1,8 @@
 /* Toast Component Styles */
 .toast {
   position: fixed;
-  top: 80px;
-  right: 30px;
+  top: calc(80px + var(--safe-top, 0px));
+  right: calc(30px + var(--safe-right, 0px));
   display: flex;
   align-items: center;
   gap: 12px;
@@ -70,9 +70,9 @@
 /* Responsive */
 @media (max-width: 768px) {
   .toast {
-    top: 70px;
-    right: 20px;
-    left: 20px;
+    top: calc(70px + var(--safe-top, 0px));
+    right: calc(20px + var(--safe-right, 0px));
+    left: calc(20px + var(--safe-left, 0px));
     max-width: none;
     transform: translateY(-20px);
   }

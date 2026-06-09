@@ -5,6 +5,7 @@ import { NotificationProvider } from "contexts/NotificationContext";
 import { ThemeProvider } from "contexts/ThemeContext";
 import { VoiceProvider, useVoice } from "contexts/VoiceContext";
 import ErrorBoundary from "components/common/ErrorBoundary";
+import PwaUpdateToast from "components/pwa/PwaUpdateToast";
 import { initUserInteractionListener } from "utils/userInteraction";
 import "styles/themes.css";
 import ProtectedRoute from "./components/general/ProtectedRoute";
@@ -35,7 +36,7 @@ const TimiOnboarding = lazy(() => import("components/common/TimiOnboarding"));
 
 function RouteLoading() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
+    <div className="min-h-dvh bg-[#0a0a0c] flex items-center justify-center">
       <div className="flex items-center justify-center gap-1.5 h-8" aria-label="Loading">
         <div className="w-1.5 h-6 bg-primaryColor rounded-full animate-bounce" />
         <div
@@ -119,6 +120,7 @@ function AppInner() {
         </Suspense>
       </Router>
       <VoiceWidgets />
+      <PwaUpdateToast />
     </>
   );
 }

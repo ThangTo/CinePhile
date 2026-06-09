@@ -86,7 +86,13 @@ const GuestNotification = () => {
   ];
 
   return (
-    <div className="fixed bottom-6 left-6 z-[100000] max-h-[80vh] flex flex-col items-start gap-4">
+    <div
+      className="fixed z-[100000] max-h-[80dvh] flex flex-col items-start gap-4"
+      style={{
+        bottom: "calc(var(--safe-bottom) + 1.5rem)",
+        left: "calc(var(--safe-left) + 1.5rem)",
+      }}
+    >
       {/* ====== POPUP PANEL ====== */}
       {isOpen && (
         <div

@@ -58,7 +58,13 @@ const MailboxFAB = () => {
 
   return (
     <>
-      <div className="fixed bottom-4 left-5 z-[100005] md:bottom-6 md:left-8">
+      <div
+        className="fixed z-[100005]"
+        style={{
+          bottom: "calc(var(--safe-bottom) + 1rem)",
+          left: "calc(var(--safe-left) + 1.25rem)",
+        }}
+      >
         <div className="relative">
           <div
             className="pointer-events-none absolute -inset-4 rounded-[32px] blur-2xl opacity-80"

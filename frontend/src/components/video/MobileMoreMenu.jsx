@@ -62,8 +62,11 @@ const MobileMoreMenu = ({
           
           {/* Bottom Sheet */}
           <div 
-            className="relative w-full max-w-md bg-[#18181b] rounded-t-2xl overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col max-h-[85vh] sm:max-h-[80vh] sm:rounded-2xl sm:mb-4"
-            style={{ animation: 'slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+            className="relative w-full max-w-md bg-[#18181b] rounded-t-2xl overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col sm:rounded-2xl sm:mb-4"
+            style={{
+              animation: 'slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              maxHeight: "calc(85dvh - var(--safe-top))",
+            }}
             onClick={(e) => e.stopPropagation()} // Prevent clicks inside from closing
           >
             {/* Grabber indicator */}
@@ -83,7 +86,7 @@ const MobileMoreMenu = ({
             </div>
             
             {/* Scrollable Content */}
-            <div className="overflow-y-auto overflow-x-hidden custom-scrollbar flex-1 pb-6 overscroll-contain">
+            <div className="overflow-y-auto overflow-x-hidden custom-scrollbar flex-1 safe-scroll-bottom overscroll-contain">
               
               {/* Audio Selection */}
               {audioOptions && audioOptions.length > 0 && (

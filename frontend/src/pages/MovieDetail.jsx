@@ -24,7 +24,7 @@ const MovieDetail = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor text-white flex items-center justify-center">
         <BarSpinner />
       </div>
     );
@@ -45,7 +45,7 @@ const MovieDetail = () => {
   };
 
   return (
-    <div className="min-h-screen bg-bgColor overflow-x-hidden">
+    <div className="min-h-dvh bg-bgColor overflow-x-hidden">
       {/* Mobile Layout */}
       <MobileLayout {...layoutProps} />
 

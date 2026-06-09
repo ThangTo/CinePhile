@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { USER_MENU_ITEMS, MOBILE_MENU_ITEM_CLASS } from "./constants";
 import { isPremiumActive } from "utils/premiumUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
+import PwaInstallButton from "components/pwa/PwaInstallButton";
 import {
   getPrestigeContainerClassName,
   getUserPrestige,
@@ -33,7 +34,7 @@ const MobilePrestigeBanner = ({ prestige }) => {
   );
 };
 
-const UserInfoCard = ({ user, prestigeRank, prestige: providedPrestige }) => {
+const UserInfoCard = ({ user, prestigeRank, prestige: providedPrestige, onClose }) => {
   const prestige = providedPrestige || getUserPrestige(user, prestigeRank);
   const isPremium = prestige.isPremium || isPremiumActive(user) || isUserPremiumDisplay(user);
 
@@ -44,7 +45,11 @@ const UserInfoCard = ({ user, prestigeRank, prestige: providedPrestige }) => {
         prestigeRank
       )}`}
     >
-      <div className="flex items-center gap-3 mb-3">
+      <Link
+        to="/account?tabs=profile"
+        onClick={onClose}
+        className="-m-2 mb-1 flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-white/10"
+      >
         <PremiumAvatar
           src={user.avatar}
           alt={user.username}
@@ -80,7 +85,7 @@ const UserInfoCard = ({ user, prestigeRank, prestige: providedPrestige }) => {
               : "Nâng cấp tài khoản để có trải nghiệm đẳng cấp hơn."}
           </p>
         </div>
-      </div>
+      </Link>
       <MobilePrestigeBanner prestige={prestige} />
       {!isPremium && (
         <Link
@@ -119,7 +124,12 @@ const MobileUserMenu = ({ user, onLogout, onOpenAuth, onClose, prestigeRank, pre
     <>
       {user ? (
         <div className="mb-4">
-          <UserInfoCard user={user} prestigeRank={prestigeRank} prestige={prestige} />
+          <UserInfoCard
+            user={user}
+            prestigeRank={prestigeRank}
+            prestige={prestige}
+            onClose={onClose}
+          />
           <UserStats coins={user.coin} />
 
           {/* Admin Panel (Only for admin) */}
@@ -152,6 +162,7 @@ const MobileUserMenu = ({ user, onLogout, onOpenAuth, onClose, prestigeRank, pre
                 <span>{item.label}</span>
               </Link>
             ))}
+            <PwaInstallButton variant="menu" />
             <button
               onClick={onLogout}
               className="flex items-center !border-red-500/40 gap-3 px-3 py-2.5 text-red-400 hover:!bg-red-500/10 rounded-lg transition-colors"

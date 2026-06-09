@@ -127,7 +127,7 @@ const SearchResults = () => {
 
   if (!query) {
     return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor text-white flex items-center justify-center">
         <p className="text-gray-300 text-sm md:text-base">
           Vui lòng nhập từ khóa tìm kiếm ở thanh tìm kiếm phía trên.
         </p>
@@ -137,7 +137,7 @@ const SearchResults = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor text-white flex items-center justify-center">
         <BarSpinner />
       </div>
     );

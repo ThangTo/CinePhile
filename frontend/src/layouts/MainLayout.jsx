@@ -57,7 +57,7 @@ const MainLayout = () => {
 
   return (
     <div
-      className={`flex flex-col min-h-screen theme-transition ${
+      className={`flex flex-col min-h-dvh theme-transition ${
         theme.decorations.enabled && theme.decorations.backgroundPattern
           ? theme.decorations.backgroundPattern
           : ""

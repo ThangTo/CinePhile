@@ -150,7 +150,7 @@ const AdminMailboxTab = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-120px)] gap-4">
+    <div className="flex h-[calc(100dvh-120px-var(--safe-bottom))] gap-4">
       {/* Left: Inbox list */}
       <div className="w-80 shrink-0 flex flex-col">
         {/* Filters */}

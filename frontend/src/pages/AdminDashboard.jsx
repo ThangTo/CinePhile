@@ -145,7 +145,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-bgColor text-white font-sans flex overflow-hidden">
+    <div className="min-h-dvh bg-bgColor text-white font-sans flex overflow-hidden">
       <AdminSidebar
         activeTab={activeTab}
         setActiveTab={handleTabChange}

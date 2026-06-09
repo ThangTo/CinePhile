@@ -64,7 +64,7 @@ const CastDetailPage = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor text-white flex items-center justify-center">
         <BarSpinner />
       </div>
     );
@@ -87,7 +87,7 @@ const CastDetailPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-bgColor text-white pt-20 pb-12">
+    <div className="min-h-dvh bg-bgColor text-white pt-20 pb-12">
       {/* Background decoration (optional gradient glow) */}
       <div className="fixed top-0 left-0 w-full h-96 bg-gradient-to-b from-primaryColor/10 to-transparent pointer-events-none z-0" />
 

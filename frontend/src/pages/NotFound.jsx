@@ -67,7 +67,7 @@ const NotFoundPage = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="min-h-screen bg-bgColor pt-16">
+    <section className="min-h-dvh bg-bgColor pt-16">
       <div className="mx-auto px-4 sm:px-6 lg:px-8">
         {/* --- Main Error Content --- */}
         <div className="w-full flex-col justify-start items-center lg:gap-16 gap-10 inline-flex lg:pt-8 pt-12 lg:pb-4 pb-12">

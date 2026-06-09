@@ -684,7 +684,7 @@ const MailboxModal = ({ isOpen, onClose }) => {
   /* ─── Modal content ─── */
   const modalContent = (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center safe-modal-padding"
       style={{ backdropFilter: "blur(8px)" }}
     >
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
@@ -830,7 +830,7 @@ const MailboxModal = ({ isOpen, onClose }) => {
 
       {/* ── Mobile: full-screen with tab bar + chat ── */}
       <div
-        className="relative flex flex-col w-full h-[80vh] max-h-[100dvh] overflow-hidden rounded-3xl md:hidden"
+        className="relative flex flex-col w-full h-[80dvh] max-h-[calc(100dvh-var(--safe-top)-var(--safe-bottom)-2rem)] overflow-hidden rounded-3xl md:hidden"
         style={frameStyle}
       >
         {/* Premium glow */}
@@ -975,6 +975,8 @@ const MailboxModal = ({ isOpen, onClose }) => {
                 border: `1px solid ${isPremiumUser ? PREMIUM_THEME.borderStrong : "rgba(255,255,255,0.08)"}`,
                 borderLeft: "none",
                 boxShadow: "20px 0 60px rgba(0,0,0,0.5)",
+                paddingTop: "var(--safe-top)",
+                paddingBottom: "var(--safe-bottom)",
               }}
             >
               {/* Drawer Header */}

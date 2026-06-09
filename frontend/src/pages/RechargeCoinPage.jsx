@@ -120,7 +120,7 @@ const RechargeCoinPage = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#111] flex items-center justify-center">
+      <div className="min-h-dvh bg-[#111] flex items-center justify-center">
         <BarSpinner />
       </div>
     );
@@ -130,7 +130,7 @@ const RechargeCoinPage = () => {
   const finalAmount = selectedAmount || parseInt(customAmount) || 0;
   const selectedPackage = coinPackages.find((pkg) => pkg.amount === selectedAmount);
   return (
-    <div className="min-h-screen pt-12 md:pt-0 bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
+    <div className="min-h-dvh pt-12 md:pt-0 bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
       {/* --- Background Effects --- */}
       <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primaryColor/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />

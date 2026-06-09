@@ -17,7 +17,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-[#111] p-4 font-sans">
+        <div className="min-h-dvh flex items-center justify-center bg-[#111] p-4 font-sans">
           {/* Main Card */}
           <div className="max-w-md w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 md:p-10 text-center shadow-2xl">
             {/* Icon Animation Container */}

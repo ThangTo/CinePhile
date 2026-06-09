@@ -118,7 +118,7 @@ const AccountPage = () => {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor text-white flex items-center justify-center">
         <BarSpinner />
       </div>
     );
@@ -176,8 +176,8 @@ const AccountPage = () => {
   const mainContent = renderMainContent();
 
   return (
-    <div className="min-h-screen bg-account-bg-primary text-account-text-primary">
-      <div className="min-h-screen mx-auto md:flex md:py-[50px]">
+    <div className="min-h-dvh bg-account-bg-primary text-account-text-primary">
+      <div className="min-h-dvh mx-auto md:flex md:py-[50px]">
         <div className="hidden md:block">
           <AccountSidebar user={prestigeUser} onLogout={handleLogout} prestigeRank={leaderboardRank} />
         </div>

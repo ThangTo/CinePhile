@@ -27,7 +27,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   // Kiểm tra role nếu được yêu cầu
   if (requiredRole && user?.role !== requiredRole) {
     return (
-      <div className="min-h-screen bg-bgColor flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/20 flex items-center justify-center">
             <i className="fa-solid fa-ban text-4xl text-red-500"></i>

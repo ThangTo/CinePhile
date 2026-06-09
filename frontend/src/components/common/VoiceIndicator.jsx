@@ -19,6 +19,10 @@ const VoiceIndicator = () => {
   } = useVoice();
 
   const [showTooltip, setShowTooltip] = useState(true);
+  const safeFloatingStyle = {
+    bottom: "calc(var(--safe-bottom) + 5.75rem)",
+    left: "calc(var(--safe-left) + 1.25rem)",
+  };
 
   // Không hiện gì nếu Timi đã tắt
   if (!isEnabled) return null;
@@ -26,7 +30,10 @@ const VoiceIndicator = () => {
   // 1. Trạng thái: Đang tải model
   if (!isModelLoaded && !voiceError) {
     return (
-      <div className="fixed bottom-6 left-6 z-[10000001] flex items-center gap-3 bg-bgColor2/80 backdrop-blur-xl text-primaryColor/70 text-xs px-5 py-3 rounded-full border border-primaryColor/20 shadow-lg animate-pulse">
+      <div
+        style={safeFloatingStyle}
+        className="fixed z-[10000001] flex items-center gap-3 bg-bgColor2/80 backdrop-blur-xl text-primaryColor/70 text-xs px-5 py-3 rounded-full border border-primaryColor/20 shadow-lg animate-pulse"
+      >
         <i className="fa-solid fa-robot text-sm drop-shadow-md" />
         <span className="font-medium">Timi đang khởi động...</span>
       </div>
@@ -36,7 +43,10 @@ const VoiceIndicator = () => {
   // 2. Trạng thái: Có lỗi
   if (voiceError) {
     return (
-      <div className="fixed bottom-6 left-6 z-[10000001] flex items-center gap-3 bg-red-950/60 backdrop-blur-xl text-red-400 text-xs px-5 py-3 rounded-full border border-red-500/20 shadow-lg">
+      <div
+        style={safeFloatingStyle}
+        className="fixed z-[10000001] flex items-center gap-3 bg-red-950/60 backdrop-blur-xl text-red-400 text-xs px-5 py-3 rounded-full border border-red-500/20 shadow-lg"
+      >
         <i className="fa-solid fa-triangle-exclamation text-sm drop-shadow-md" />
         <span className="font-medium">{voiceError}</span>
       </div>
@@ -46,7 +56,10 @@ const VoiceIndicator = () => {
   // 3. Trạng thái: Đang lắng nghe lệnh trực tiếp
   if (isListeningCommand) {
     return (
-      <div className="fixed bottom-6 left-6 z-[10000001] flex items-center gap-4 bg-bgColor2/90 backdrop-blur-xl text-gray-100 text-sm px-6 py-3.5 rounded-full border border-primaryColor/40 shadow-[0_0_25px_rgba(var(--primary-color-rgb),0.2)] animate-[scaleIn_0.3s_ease-out]">
+      <div
+        style={safeFloatingStyle}
+        className="fixed z-[10000001] flex items-center gap-4 bg-bgColor2/90 backdrop-blur-xl text-gray-100 text-sm px-6 py-3.5 rounded-full border border-primaryColor/40 shadow-[0_0_25px_rgba(var(--primary-color-rgb),0.2)] animate-[scaleIn_0.3s_ease-out]"
+      >
         {/* Khối icon mic phát sáng */}
         <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-primaryColor/15 border border-primaryColor/30">
           <i className="fa-solid fa-microphone text-primaryColor text-sm animate-pulse drop-shadow-sm" />
@@ -72,7 +85,10 @@ const VoiceIndicator = () => {
   // 4. Trạng thái: AI đang suy nghĩ (gọi LLM)
   if (isThinking) {
     return (
-      <div className="fixed bottom-6 left-6 z-[10000001] flex items-center gap-4 bg-bgColor2/90 backdrop-blur-xl text-gray-100 text-sm px-6 py-3.5 rounded-full border border-primaryColor/40 shadow-[0_0_25px_rgba(var(--primary-color-rgb),0.2)] animate-[scaleIn_0.3s_ease-out]">
+      <div
+        style={safeFloatingStyle}
+        className="fixed z-[10000001] flex items-center gap-4 bg-bgColor2/90 backdrop-blur-xl text-gray-100 text-sm px-6 py-3.5 rounded-full border border-primaryColor/40 shadow-[0_0_25px_rgba(var(--primary-color-rgb),0.2)] animate-[scaleIn_0.3s_ease-out]"
+      >
         <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-primaryColor/15 border border-primaryColor/30">
           <i className="fa-solid fa-brain text-primaryColor text-sm animate-pulse drop-shadow-sm" />
         </div>
@@ -91,7 +107,7 @@ const VoiceIndicator = () => {
   // 5. Trạng thái: Bình thường (lắng nghe Wake Word)
   if (isListeningWake) {
     return (
-      <div className="fixed bottom-6 left-6 z-[10000001] flex items-center gap-3">
+      <div style={safeFloatingStyle} className="fixed z-[10000001] flex items-center gap-3">
         {/* Indicator chính */}
         <div className="flex items-center gap-3 bg-bgColor2/80 backdrop-blur-xl text-gray-400 text-xs px-5 py-3 rounded-full border border-white/10 shadow-lg hover:bg-bgColor/90 hover:text-gray-200 hover:border-primaryColor/30 transition-all duration-300 cursor-default group">
           <i className="fa-solid fa-robot text-sm group-hover:text-primaryColor transition-colors drop-shadow-sm" />

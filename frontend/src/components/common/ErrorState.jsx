@@ -8,7 +8,7 @@ import React from "react";
  */
 const ErrorState = ({
   message = "Không tìm thấy nội dung",
-  className = "min-h-screen bg-bgColor text-white",
+  className = "min-h-dvh bg-bgColor text-white",
   onRetry,
 }) => {
   return (

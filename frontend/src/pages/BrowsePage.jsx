@@ -182,7 +182,7 @@ const BrowsePage = () => {
 
   if (loading && movies.length === 0) {
     return (
-      <div className="min-h-screen bg-bgColor text-white flex items-center justify-center">
+      <div className="min-h-dvh bg-bgColor text-white flex items-center justify-center">
         <BarSpinner />
       </div>
     );

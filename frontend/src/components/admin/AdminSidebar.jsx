@@ -20,7 +20,7 @@ const AdminSidebar = ({
       )}
       
       <aside
-        className={`fixed left-0 top-0 h-screen bg-[#141414] border-r border-white/5 transition-all duration-300 z-40 shadow-2xl md:shadow-none ${
+        className={`fixed left-0 top-0 h-dvh bg-[#141414] border-r border-white/5 transition-all duration-300 z-40 shadow-2xl md:shadow-none ${
           isOpen ? "translate-x-0 w-64" : "-translate-x-full md:translate-x-0 md:w-20"
         }`}
       >
@@ -47,7 +47,7 @@ const AdminSidebar = ({
         </div>
 
         {/* Menu Items */}
-        <nav className="p-3 space-y-1.5 h-[calc(100vh-4rem)] overflow-y-auto overflow-x-hidden custom-scrollbar pb-8">
+        <nav className="p-3 space-y-1.5 h-[calc(100dvh-4rem-var(--safe-bottom))] overflow-y-auto overflow-x-hidden custom-scrollbar pb-8">
           {menuItems.map((item) => (
             <button
               key={item.id}

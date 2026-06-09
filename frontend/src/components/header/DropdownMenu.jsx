@@ -65,7 +65,7 @@ const DropdownMenu = ({ label, items, isMobile = false, className = "" }) => {
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="fixed top-[60px] left-0 right-0 mx-2 sm:mx-4 bg-bgColor4 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 p-4 max-h-[calc(100vh-80px)] overflow-y-auto pretty-scroll animate-slideDown"
+            className="fixed top-[var(--app-header-total-height)] left-0 right-0 mx-2 sm:mx-4 bg-bgColor4 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 p-4 max-h-[calc(100dvh-var(--app-header-total-height)-var(--safe-bottom)-1rem)] overflow-y-auto pretty-scroll animate-slideDown"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/10">

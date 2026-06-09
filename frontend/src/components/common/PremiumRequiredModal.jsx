@@ -17,7 +17,7 @@ const PremiumRequiredModal = ({ isOpen, onClose }) => {
   };
 
   const modalContent = (
-    <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+    <div className="fixed inset-0 flex items-center justify-center z-[9999] safe-modal-padding">
       {/* Backdrop with blur and darken effect */}
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"

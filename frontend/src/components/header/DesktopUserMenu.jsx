@@ -162,11 +162,15 @@ const DesktopUserMenu = ({
         {/* Dropdown Menu */}
         {showUserMenu && (
           <div
-            className={`dropdown-menu absolute right-0 top-full mt-2 max-h-[calc(100vh-88px)] w-72 overflow-x-hidden overflow-y-auto rounded-lg border border-white/10 bg-[#1e293b] shadow-xl z-50 ${prestigeContainerClassName}`}
+            className={`dropdown-menu absolute right-0 top-full mt-2 max-h-[calc(100dvh-var(--app-header-total-height)-var(--safe-bottom)-1rem)] w-72 overflow-x-hidden overflow-y-auto rounded-lg border border-white/10 bg-[#1e293b] shadow-xl z-50 ${prestigeContainerClassName}`}
           >
             {/* User Info Header */}
             <div className="p-4 border-b border-white/10 bg-gradient-to-br from-[#2d3b52] to-[#1e293b]">
-              <div className="flex items-center gap-3 mb-3">
+              <Link
+                to="/account?tabs=profile"
+                onClick={onToggle}
+                className="-m-2 mb-1 flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-white/5"
+              >
                 <PremiumAvatar
                   src={user.avatar}
                   alt={user.username}
@@ -196,7 +200,7 @@ const DesktopUserMenu = ({
                   </div>
                   <div className="text-gray-400 text-xs">{user.email}</div>
                 </div>
-              </div>
+              </Link>
 
               <PrestigeBanner prestige={prestige} />
               <PremiumBanner username={user.username} user={user} />

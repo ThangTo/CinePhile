@@ -2686,7 +2686,7 @@ const VideoPlayer = ({
       )}
 
       {showSkipIntro && (
-        <div className={`pointer-events-auto absolute left-4 z-40 animate-fade-in-up md:left-8 transition-all duration-300 ${showControls ? "bottom-[4.5rem] md:bottom-28" : "bottom-6 md:bottom-8"}`}>
+        <div className={`pointer-events-auto absolute left-4 z-40 animate-fade-in-up md:left-8 transition-all duration-300 ${showControls ? "video-floating-action-controls" : "video-floating-action"}`}>
           <button
             type="button"
             onClick={handleSkipIntro}
@@ -2705,7 +2705,7 @@ const VideoPlayer = ({
       )}
 
       {showNextEpisodePrompt && (
-        <div className={`pointer-events-auto absolute right-4 z-40 animate-fade-in-up md:right-8 transition-all duration-300 ${showControls ? "bottom-[4.5rem] md:bottom-28" : "bottom-6 md:bottom-8"}`}>
+        <div className={`pointer-events-auto absolute right-4 z-40 animate-fade-in-up md:right-8 transition-all duration-300 ${showControls ? "video-floating-action-controls" : "video-floating-action"}`}>
           <div className="flex flex-col items-end gap-1.5 md:gap-2">
             <button
               type="button"

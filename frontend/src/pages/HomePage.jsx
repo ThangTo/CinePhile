@@ -15,7 +15,7 @@ import LazySection from "components/common/LazySection";
  */
 const HomePage = () => {
   return (
-    <div className="min-h-screen bg-bgColor overflow-visible">
+    <div className="min-h-dvh bg-bgColor overflow-visible">
       <Banner />
       <div className=" sm:py-12 bg-bgColor overflow-visible">
         <CategoryChips />

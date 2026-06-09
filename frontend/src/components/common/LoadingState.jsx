@@ -7,7 +7,7 @@ import React from "react";
  */
 const LoadingState = ({
   message = "Đang tải...",
-  className = "min-h-screen bg-account-bg-primary text-account-text-primary",
+  className = "min-h-dvh bg-account-bg-primary text-account-text-primary",
 }) => {
   return (
     <div className={`flex flex-col items-center justify-center gap-3 ${className}`}>

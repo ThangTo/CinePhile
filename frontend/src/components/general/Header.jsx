@@ -11,6 +11,7 @@ import useAuth from "hooks/useAuth";
 import ThemeSelector from "components/common/ThemeSelector";
 import TimiToggle from "components/common/TimiToggle";
 import WatchStreak from "components/common/WatchStreak";
+import PwaInstallButton from "components/pwa/PwaInstallButton";
 import useCurrentUserPrestige from "hooks/useCurrentUserPrestige";
 
 const NotificationPanel = lazy(() => import("components/notifications/NotificationPanel"));
@@ -64,11 +65,17 @@ const Header = () => {
   return (
     <>
       <header
-        className={`fixed inset-x-0 top-0 z-[100001] transition-colors duration-300 bg-black ${
+        className={`fixed inset-x-0 top-0 z-[100001] bg-black pt-safe transition-colors duration-300 ${
           scrolled ? "md:bg-black/80 md:backdrop-blur" : "md:bg-transparent"
         }`}
       >
-        <nav className="w-full px-2 xl:px-4 py-2 lg:py-3 flex items-center gap-3">
+        <nav
+          className="w-full py-2 lg:py-3 flex items-center gap-3"
+          style={{
+            paddingLeft: "calc(0.5rem + var(--safe-left))",
+            paddingRight: "calc(0.5rem + var(--safe-right))",
+          }}
+        >
           {/* Mobile Menu Button */}
           <button
             onClick={() => {
@@ -117,6 +124,9 @@ const Header = () => {
             <div className="hidden lg:block">
               <ThemeSelector />
             </div>
+            <div className="hidden lg:block">
+              <PwaInstallButton />
+            </div>
             {!isLoading && isAuthenticated ? (
               <div className="lg:hidden relative">
                 <button
@@ -143,7 +153,7 @@ const Header = () => {
                       className="fixed inset-0 bg-black/50 z-[100001] md:hidden"
                       onClick={() => setShowMobileNotifications(false)}
                     />
-                    <div className="fixed px-2 py-2 md:absolute inset-0 md:inset-auto right-0 md:right-0 top-[56px] md:top-full mt-0 md:mt-2 z-[100002] md:z-50">
+                    <div className="fixed inset-0 top-[var(--app-header-total-height)] z-[100002] px-2 py-2 md:absolute md:inset-auto md:right-0 md:top-full md:z-50 md:mt-2">
                       <Suspense fallback={null}>
                         <NotificationPanel
                           onClose={() => setShowMobileNotifications(false)}
@@ -197,7 +207,7 @@ const Header = () => {
 
       {/* Mobile Search Overlay */}
       {showMobileSearch && (
-        <div className="fixed top-[56px] left-0 right-0 z-40 lg:hidden bg-transparent px-4 py-2">
+        <div className="fixed left-0 right-0 top-[var(--app-header-total-height)] z-40 bg-transparent px-4 py-2 lg:hidden">
           <SearchBar placeholder="Tìm kiếm phim, diễn viên" />
         </div>
       )}
@@ -209,7 +219,7 @@ const Header = () => {
             className="fixed inset-0 bg-black/50 z-30 md:hidden"
             onClick={() => setShowMobileMenu(false)}
           />
-          <div className="fixed left-2 right-2 top-[62px] z-40 max-h-[calc(100vh-76px)] overflow-y-auto overscroll-contain rounded-2xl bg-[rgba(59,73,135,0.98)] shadow-[0_24px_70px_rgba(0,0,0,0.32)] lg:hidden sm:right-auto sm:w-[390px] md:mx-4">
+          <div className="fixed left-2 right-2 top-[calc(var(--app-header-total-height)+0.375rem)] z-40 max-h-[calc(100dvh-var(--app-header-total-height)-var(--safe-bottom)-1rem)] overflow-y-auto overscroll-contain rounded-2xl bg-[rgba(59,73,135,0.98)] shadow-[0_24px_70px_rgba(0,0,0,0.32)] lg:hidden sm:right-auto sm:w-[390px] md:mx-4">
             <div className="w-full bg-transparent px-3 py-3 sm:px-4 sm:py-4">
               <MobileUserMenu
                 user={isAuthenticated ? prestigeUser || user : null}
