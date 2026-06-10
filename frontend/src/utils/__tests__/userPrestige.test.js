@@ -31,8 +31,11 @@ describe("userPrestige", () => {
     expect(prestige.isPremium).toBe(true);
     expect(prestige.isTopRank).toBe(true);
     expect(prestige.displayTitle).toBe("Quán quân rạp");
-    expect(getPrestigeContainerClassName({ isPremium: true }, 1)).toContain("border-primaryColor");
-    expect(getPrestigeContainerClassName({ isPremium: true }, 1)).toContain("border-[#ffd875]");
+    const containerClassName = getPrestigeContainerClassName({ isPremium: true }, 1);
+
+    expect(containerClassName).toContain("border-primaryColor");
+    expect(containerClassName).toContain("border-[#ffd875]");
+    expect(containerClassName).not.toContain("bg-primaryColor");
   });
 
   it("allows admin-only prestige preview from query params", () => {

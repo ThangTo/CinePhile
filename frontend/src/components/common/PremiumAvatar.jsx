@@ -26,45 +26,40 @@ const PremiumAvatar = ({
 
   if (hasPrestige) {
     return (
-      <div className={`relative inline-flex shrink-0 ${className}`}>
-        <div
-          className={`absolute inset-0 ${size} rounded-full`}
-          style={{
-            background: topRankTier ? RANK_RING_BY_TIER[topRankTier.rank] : PREMIUM_RING,
-            padding: "2px",
-            animation: "premiumGlow 2.5s ease-in-out infinite",
-          }}
-        />
-        <div
-          className={`relative ${size} rounded-full overflow-hidden`}
-          style={{ background: "#111" }}
-        >
+      <div
+        className={`relative inline-flex shrink-0 overflow-visible rounded-full p-[2px] ${size} ${className}`}
+        style={{
+          background: topRankTier ? RANK_RING_BY_TIER[topRankTier.rank] : PREMIUM_RING,
+          animation: "premiumGlow 2.5s ease-in-out infinite",
+        }}
+      >
+        <div className="relative z-10 h-full w-full overflow-hidden rounded-full bg-[#111]">
           <img
             src={resolvedSrc}
             alt={alt}
             className={`w-full h-full object-cover ${imgClass}`}
             onError={handleAvatarError}
           />
+        </div>
 
-          {isPremium && (
+        {isPremium && (
+          <div
+            className="pointer-events-none absolute bottom-0 right-0 z-20 flex translate-x-1/4 translate-y-1/4 items-center justify-center animate-crown-float"
+            style={{
+              filter: "drop-shadow(0 0 4px rgba(255,216,117,0.8))",
+            }}
+          >
             <div
-              className="absolute -bottom-1 -right-1 flex items-center justify-center animate-crown-float"
+              className="flex h-5 w-5 items-center justify-center rounded-full text-[8px] ring-2 ring-[#111]"
               style={{
-                filter: "drop-shadow(0 0 4px rgba(255,216,117,0.8))",
+                background: "linear-gradient(135deg, #fde68a, #f59e0b)",
+                border: "1.5px solid rgba(255,216,117,0.8)",
               }}
             >
-              <div
-                className="w-5 h-5 rounded-full flex items-center justify-center text-[8px]"
-                style={{
-                  background: "linear-gradient(135deg, #fde68a, #f59e0b)",
-                  border: "1.5px solid rgba(255,216,117,0.8)",
-                }}
-              >
-                <i className="fa-solid fa-crown text-yellow-900" />
-              </div>
+              <i className="fa-solid fa-crown text-yellow-900" />
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {topRankTier && (
           <div
@@ -79,11 +74,11 @@ const PremiumAvatar = ({
   }
 
   return (
-    <div className={`relative inline-flex shrink-0 ${className}`}>
+    <div className={`relative inline-flex shrink-0 overflow-visible rounded-full bg-[#111] ${size} ${className}`}>
       <img
         src={resolvedSrc}
         alt={alt}
-        className={`${size} rounded-full object-cover ring-2 ring-white/10 ${imgClass}`}
+        className={`h-full w-full rounded-full object-cover ring-2 ring-white/10 ${imgClass}`}
         onError={handleAvatarError}
       />
     </div>

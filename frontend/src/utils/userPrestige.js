@@ -36,6 +36,12 @@ export const TOP_RANK_TIERS = {
   },
 };
 
+const TOP_RANK_CONTAINER_CLASSES = {
+  1: "border-[#ffd875]/35 ring-1 ring-[#ffd875]/20 shadow-[0_0_28px_rgba(255,216,117,0.18)]",
+  2: "border-slate-200/25 ring-1 ring-slate-200/20 shadow-[0_0_24px_rgba(203,213,225,0.14)]",
+  3: "border-amber-600/25 ring-1 ring-amber-600/20 shadow-[0_0_24px_rgba(217,119,6,0.16)]",
+};
+
 export const isUserPremiumDisplay = (user) => user?.isPremium === true || isPremiumActive(user);
 
 export const getTopRankTier = (rank) => TOP_RANK_TIERS[Number(rank)] || null;
@@ -60,11 +66,13 @@ export const getPrestigeContainerClassName = (user, rank) => {
   const classes = [];
 
   if (prestige.topRankTier) {
-    classes.push(prestige.topRankTier.surfaceClassName);
+    classes.push(TOP_RANK_CONTAINER_CLASSES[prestige.topRankTier.rank]);
   }
 
   if (prestige.isPremium) {
-    classes.push("border-primaryColor/35 bg-primaryColor/10");
+    classes.push(
+      "border-primaryColor/35 ring-1 ring-primaryColor/20 shadow-[0_0_24px_rgba(255,216,117,0.12)]",
+    );
   }
 
   return classes.join(" ");
