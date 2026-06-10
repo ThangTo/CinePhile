@@ -17,7 +17,7 @@ import CursorEffectShop from "components/account/CursorEffectShop";
 import QuestPage from "components/account/QuestPage";
 import CoinHistoryTab from "components/account/CoinHistoryTab";
 import PremiumAvatar from "components/common/PremiumAvatar";
-import { getPremiumStatusText } from "utils/premiumUtils";
+import { getPremiumSummary } from "utils/premiumUtils";
 import useCurrentUserPrestige from "hooks/useCurrentUserPrestige";
 
 const DEFAULT_TAB = "profile";
@@ -127,7 +127,12 @@ const AccountPage = () => {
   const pageTitle = TAB_TITLES[activeTab] || TAB_TITLES[DEFAULT_TAB];
   const activeMobileItem =
     MOBILE_ACCOUNT_NAV_ITEMS.find((item) => item.tab === activeTab) || MOBILE_ACCOUNT_NAV_ITEMS[0];
-  const mobileStatusText = displayPremiumActive ? getPremiumStatusText(user) : "Thành viên thường";
+  const premiumSummary = getPremiumSummary(user);
+  const mobileStatusText = premiumSummary.isActive
+    ? premiumSummary.compactText
+    : displayPremiumActive
+      ? "Premium"
+      : "Thành viên thường";
 
   const getMobileTabLabel = (item) => (item?.tab === "coin-history" ? "Lịch sử coin" : item?.label);
 
@@ -242,6 +247,25 @@ const AccountPage = () => {
                   <i className="fas fa-sign-out-alt" />
                 </button>
               </div>
+
+              {premiumSummary.isActive && (
+                <div className="relative mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-primaryColor/25 bg-primaryColor/10 p-3 text-xs">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-account-text-secondary">
+                      Gói hiện tại
+                    </p>
+                    <p className="mt-1 font-semibold text-primaryColor">{premiumSummary.title}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-account-text-secondary">
+                      Hết hạn
+                    </p>
+                    <p className="mt-1 font-semibold text-account-text-primary">
+                      {premiumSummary.expiresAtLabel}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="relative mt-4 grid grid-cols-2 gap-2">
                 <Link

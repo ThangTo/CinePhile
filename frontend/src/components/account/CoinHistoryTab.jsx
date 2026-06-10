@@ -14,6 +14,7 @@ const REASON_LABELS = {
   premium_upgrade: "Nâng cấp Premium",
   cursor_purchase: "Mua hiệu ứng con trỏ",
   admin_add_coin: "Cộng coin thủ công",
+  admin_adjustment: "Điều chỉnh coin thủ công",
 };
 
 const formatDelta = (value) => {

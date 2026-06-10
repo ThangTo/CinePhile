@@ -11,7 +11,7 @@ import { FaCoins } from "react-icons/fa";
 
 const RechargeCoinPage = () => {
   const navigate = useNavigate();
-  const { user, updateUser, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [loading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -93,16 +93,10 @@ const RechargeCoinPage = () => {
 
       // Call Backend to Create Payment Link using secure axios instance
       const response = await http.post("/payment/create-payment-link", {
-        userId: user._id,
         packageId: selectedPackage.id,
       });
 
       const result = response.data;
-
-      // Demo: Update coin immediately in UI (Backend already updated DB)
-      if (result.updatedCoin !== undefined) {
-        updateUser({ ...user, coin: result.updatedCoin });
-      }
 
       // REDIRECT to Gateway
       if (result.checkoutUrl) {

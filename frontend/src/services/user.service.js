@@ -182,18 +182,6 @@ const userService = {
     }),
 
   /**
-   * Thêm coin vào tài khoản (for testing/admin)
-   * @param {number} amount - Số coin cần thêm
-   * @returns {Promise<Object>} { message, user, totalCoins }
-   */
-  addCoins: (amount) =>
-    apiRequest(`/users/add-coins`, {
-      method: "POST",
-      data: { amount },
-      requiresAuth: true,
-    }),
-
-  /**
    * Lấy streak hiện tại
    * @returns {Promise<Object>} { currentStreak, longestStreak, lastWatchDate, isActiveToday }
    */

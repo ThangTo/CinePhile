@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { isPremiumActive, getPremiumStatusText } from "utils/premiumUtils";
+import { getPremiumSummary, isPremiumActive } from "utils/premiumUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
 import { getPrestigeContainerClassName, getUserPrestige } from "utils/userPrestige";
 
@@ -61,6 +61,7 @@ const AccountSidebar = ({ user, onLogout, prestigeRank }) => {
   const activeTab = queryTab || DEFAULT_TAB;
   const prestige = getUserPrestige(user, prestigeRank);
   const isPremium = prestige.isPremium || isPremiumActive(user);
+  const premiumSummary = getPremiumSummary(user);
 
   return (
     <nav
@@ -106,7 +107,10 @@ const AccountSidebar = ({ user, onLogout, prestigeRank }) => {
           </span>
         </div>
         {isPremium && (
-          <span className="text-xs mt-1 opacity-90">{getPremiumStatusText(user)}</span>
+          <span className="text-xs mt-1 opacity-90">
+            {premiumSummary.isActive ? premiumSummary.compactText : "Premium"}
+            {premiumSummary.expiresAtLabel ? ` • ${premiumSummary.expiresAtLabel}` : ""}
+          </span>
         )}
       </Link>
 

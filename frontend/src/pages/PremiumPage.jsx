@@ -4,7 +4,8 @@ import useAuth from "hooks/useAuth";
 import userService from "services/user.service";
 import { settingsAPI } from "services/admin.service";
 import { BarSpinner } from "components/common/LoadingState";
-import { isPremiumActive, getRemainingDays } from "utils/premiumUtils";
+import PremiumStatusSummary from "components/account/PremiumStatusSummary";
+import { getPremiumSummary, isPremiumActive } from "utils/premiumUtils";
 
 // Import Icons
 import {
@@ -113,7 +114,8 @@ const PremiumPage = () => {
   const isPremium = isPremiumActive(user);
   const userCoins = user.coin || 0;
   const currentPlan = user.premiumPlan;
-  const remainingDays = getRemainingDays(user);
+  const premiumSummary = getPremiumSummary(user);
+  const remainingDays = premiumSummary.remainingDays;
 
   return (
     <div className="min-h-dvh pt-[var(--app-header-total-height)] md:pt-0 bg-[#111] relative overflow-hidden font-sans text-gray-200 selection:bg-primaryColor/30">
@@ -137,6 +139,10 @@ const PremiumPage = () => {
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
             Mở khóa kho phim khổng lồ chất lượng 4K, không quảng cáo và tải xuống không giới hạn.
           </p>
+        </div>
+
+        <div className="mx-auto mb-10 max-w-4xl">
+          <PremiumStatusSummary user={user} showAction={false} />
         </div>
 
         {/* --- Coin Dashboard Widget --- */}

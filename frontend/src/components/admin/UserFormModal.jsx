@@ -177,6 +177,11 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
       newErrors.email = "Email không hợp lệ";
     }
 
+    const normalizedCoin = Number(formData.coin);
+    if (!Number.isInteger(normalizedCoin) || normalizedCoin < 0) {
+      newErrors.coin = "Coin must be a non-negative integer";
+    }
+
     // Validate password chỉ khi tạo mới hoặc user nhập password
     if (!user || formData.password) {
       if (!formData.password) {
@@ -213,8 +218,8 @@ const UserFormModal = ({ isOpen, onClose, user = null, onSave }) => {
         premiumExpiresAt: formData.role === 'premium'
           ? formData.premiumExpiresAt
             ? new Date(formData.premiumExpiresAt).toISOString()
-            : new Date('2099-12-31T23:59:59.999Z').toISOString() // vĩnh viễn
-          : null, // user/admin: xóa expiry
+            : null
+          : null,
       };
 
       // Chỉ gửi password nếu có thay đổi

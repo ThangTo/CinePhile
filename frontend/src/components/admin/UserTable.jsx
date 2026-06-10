@@ -124,7 +124,22 @@ const UserTable = () => {
       if (selectedUser) {
         // Update
         const userId = selectedUser._id || selectedUser.id;
-        const updatedUser = await userAPI.update(userId, userData);
+        const previousCoin = Number(selectedUser.coin) || 0;
+        const requestedCoin = Number(userData.coin) || 0;
+        const coinDelta = requestedCoin - previousCoin;
+        const { coin: _coin, ...profileData } = userData;
+        let updatedUser = await userAPI.update(userId, profileData);
+
+        if (coinDelta !== 0) {
+          const coinResult = await userAPI.adjustCoins(userId, {
+            amount: coinDelta,
+            note: "Admin user modal coin adjustment",
+          });
+          updatedUser = coinResult.user || {
+            ...updatedUser,
+            coin: coinResult.totalCoins,
+          };
+        }
         // Update local state instead of reloading all
         setUsers((prev) =>
           prev.map((user) => ((user._id || user.id) === userId ? updatedUser : user))

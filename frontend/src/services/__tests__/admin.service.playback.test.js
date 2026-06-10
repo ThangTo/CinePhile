@@ -2,6 +2,13 @@ import apiRequest from "services/utils/apiRequest";
 import { playbackAPI } from "services/admin.service";
 
 jest.mock("services/utils/apiRequest", () => jest.fn());
+jest.mock("lib/axios", () => ({
+  __esModule: true,
+  default: {
+    defaults: { baseURL: "http://localhost:5000/api/v1" },
+    get: jest.fn(),
+  },
+}));
 
 describe("playbackAPI", () => {
   beforeEach(() => {

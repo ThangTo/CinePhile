@@ -774,6 +774,21 @@ export const userAPI = {
   },
 
   /**
+   * Adjust user coins through the ledger-backed admin endpoint.
+   * @param {string|number} id - User ID
+   * @param {Object} payload - { amount, note? }
+   * @returns {Promise<Object>} { message, user, entry, totalCoins }
+   */
+  adjustCoins: async (id, payload) => {
+    const response = await apiRequest(`/admin/users/${id}/coins`, {
+      method: "POST",
+      data: payload,
+      requiresAuth: true,
+    });
+    return response.data || response;
+  },
+
+  /**
    * Delete user
    * @param {string|number} id - User ID
    * @returns {Promise<Object>} { success: true }

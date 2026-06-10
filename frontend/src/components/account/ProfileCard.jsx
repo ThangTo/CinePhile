@@ -4,6 +4,7 @@ import ToastContainer from "components/common/ToastContainer";
 import { cardStyles, buttonStyles } from "./shared-styles";
 import { isPremiumActive } from "utils/premiumUtils";
 import PremiumAvatar from "components/common/PremiumAvatar";
+import PremiumStatusSummary from "components/account/PremiumStatusSummary";
 import { normalizeAvatarFile } from "utils/avatarUtils";
 import { getPrestigeContainerClassName, getUserPrestige } from "utils/userPrestige";
 
@@ -113,6 +114,7 @@ const ProfileCard = ({ user, onUpdate, prestigeRank }) => {
             <p className="m-0 text-base text-account-text-secondary">{user.email}</p>
           </div>
         </div>
+        <PremiumStatusSummary user={user} className="mt-6" />
       </div>
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
