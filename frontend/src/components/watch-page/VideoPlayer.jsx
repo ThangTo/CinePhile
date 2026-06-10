@@ -30,12 +30,20 @@ function getProxySources() {
 }
 
 function setProxySource(sourceDomain, needsProxy) {
+  if (!sourceDomain) return;
+
   const sources = getProxySources();
-  sources[sourceDomain] = needsProxy;
+  if (needsProxy) {
+    sources[sourceDomain] = true;
+  } else {
+    delete sources[sourceDomain];
+  }
   sessionStorage.setItem(HYBRID_PROXY_STORAGE_KEY, JSON.stringify(sources));
 }
 
 function needsProxyForSource(sourceDomain) {
+  if (!sourceDomain) return false;
+
   const sources = getProxySources();
   return sources[sourceDomain] === true;
 }
@@ -115,6 +123,7 @@ const VideoPlayer = ({
   const [downloadTotalSegments, setDownloadTotalSegments] = useState(0);
   const [downloadCompletedSegments, setDownloadCompletedSegments] = useState(0);
   const [useProxyMode, setUseProxyMode] = useState(false);
+  const [directOnlySourceDomains, setDirectOnlySourceDomains] = useState(() => new Set());
   const [doubleTapInfo, setDoubleTapInfo] = useState(null); // { side, totalSeconds, id }
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const [currentSubtitle, setCurrentSubtitle] = useState(null);
@@ -170,6 +179,7 @@ const VideoPlayer = ({
   const pendingPlaybackRef = useRef(false);
   const authModalRequestedRef = useRef(false);
   const sourceDomainRef = useRef(null);
+  const directOnlySourceDomainsRef = useRef(new Set());
   const networkErrorCountRef = useRef(0);
   const lastPlaybackModeRef = useRef("direct");
   const lastPlaybackProgressRef = useRef(0);
@@ -194,6 +204,10 @@ const VideoPlayer = ({
     activeSubtitleRequestKeyRef.current = `${subtitleMovieId || ""}:${subtitleEpisodeId || ""}`;
   }, [subtitleEpisodeId, subtitleMovieId]);
 
+  useEffect(() => {
+    directOnlySourceDomainsRef.current = directOnlySourceDomains;
+  }, [directOnlySourceDomains]);
+
   // Hybrid Proxy: Check if source needs proxy mode
   const hlsSource = useMemo(() => {
     let rawM3u8 = null;
@@ -210,14 +224,15 @@ const VideoPlayer = ({
       const domain = extractDomain(rawM3u8);
       sourceDomainRef.current = domain;
 
-      const needsProxy = needsProxyForSource(domain) || useProxyMode;
+      const isDirectOnlySource = domain && directOnlySourceDomains.has(domain);
+      const needsProxy = !isDirectOnlySource && (needsProxyForSource(domain) || useProxyMode);
       lastPlaybackModeRef.current = needsProxy ? "proxy" : "direct";
 
       return buildPlaybackSource(rawM3u8, `${apiUrl}/movies/proxy-m3u8`, needsProxy);
     }
 
     return null;
-  }, [episode, videoUrl, useProxyMode]);
+  }, [directOnlySourceDomains, episode, videoUrl, useProxyMode]);
 
   const fileSource = useMemo(() => {
     const candidate = videoUrl || episode?.videoUrl;
@@ -306,6 +321,40 @@ const VideoPlayer = ({
   const resetNetworkRecoveryState = useCallback(() => {
     networkErrorCountRef.current = 0;
   }, []);
+
+  const applyProxyTsPolicyFromXhr = useCallback((xhr) => {
+    try {
+      const policy = String(xhr.getResponseHeader("X-Proxy-TS-Policy") || "").toLowerCase();
+      if (policy !== "direct-only" && policy !== "blocked") {
+        return;
+      }
+
+      const domain = sourceDomainRef.current;
+      const wasDirectOnly = domain ? directOnlySourceDomainsRef.current.has(domain) : false;
+      const wasUsingProxy = lastPlaybackModeRef.current === "proxy";
+
+      if (domain) {
+        setDirectOnlySourceDomains((currentDomains) => {
+          if (currentDomains.has(domain)) {
+            return currentDomains;
+          }
+
+          const nextDomains = new Set(currentDomains);
+          nextDomains.add(domain);
+          directOnlySourceDomainsRef.current = nextDomains;
+          return nextDomains;
+        });
+        setProxySource(domain, false);
+      }
+
+      resetNetworkRecoveryState();
+      setUseProxyMode(false);
+
+      if (domain && wasDirectOnly && wasUsingProxy) {
+        setDirectOnlySourceDomains((currentDomains) => new Set(currentDomains));
+      }
+    } catch (_error) {}
+  }, [resetNetworkRecoveryState]);
 
   const clearPendingBuffering = useCallback(() => {
     if (bufferingTimeoutRef.current) {
@@ -1045,6 +1094,12 @@ const VideoPlayer = ({
           manifestLoadingMaxRetry: 3,
           fragLoadingMaxRetry: 3,
           levelLoadingMaxRetry: 3,
+          xhrSetup: (xhr, requestUrl) => {
+            const url = String(requestUrl || "");
+            if (url.includes("/proxy-m3u8") || url.includes("/proxy-ts")) {
+              xhr.addEventListener("loadend", () => applyProxyTsPolicyFromXhr(xhr));
+            }
+          },
         });
 
         try {
@@ -1220,8 +1275,13 @@ const VideoPlayer = ({
             code: data?.response?.code ?? data?.response?.status ?? null,
           });
 
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && shouldEscalateToProxyMode(data)) {
-            const domain = sourceDomainRef.current;
+          const domain = sourceDomainRef.current;
+          const isDirectOnlySource = domain && directOnlySourceDomainsRef.current.has(domain);
+          if (
+            data.type === Hls.ErrorTypes.NETWORK_ERROR
+            && !isDirectOnlySource
+            && shouldEscalateToProxyMode(data)
+          ) {
             if (domain && !needsProxyForSource(domain) && lastPlaybackModeRef.current !== "proxy") {
               console.log(
                 "[VideoPlayer] Escalating this source to proxy-ts mode after repeated blocked segment errors"
@@ -1277,6 +1337,7 @@ const VideoPlayer = ({
       }
     };
   }, [
+    applyProxyTsPolicyFromXhr,
     episode?._id,
     episode?.id,
     fileSource,

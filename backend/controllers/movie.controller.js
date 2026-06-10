@@ -11,6 +11,11 @@ const os = require('os');
 const path = require('path');
 const { processM3u8StreamDirect, processM3u8StreamWithProxy } = require('../utils/m3u8Utils');
 const { buildSourceHeaders, fetchWithIpv4 } = require('../utils/httpFetch');
+const {
+  buildProxyTsPolicyHeaders,
+  getClientIp,
+  getProxyTsPolicy,
+} = require('../utils/proxyTsPolicy');
 
 let activeDownloads = 0;
 const MAX_CONCURRENT_DOWNLOADS = Math.max(
@@ -32,6 +37,22 @@ const PROXY_TS_SESSION_TTL_MS = Math.max(
 );
 const PROXY_TS_SESSION_ID_MAX_LENGTH = 120;
 const proxyTsSessions = new Map();
+const PROXY_TS_EXPOSED_HEADERS = [
+  'X-Proxy-TS-Policy',
+  'X-Proxy-TS-Country',
+  'X-Proxy-TS-Reason',
+  'X-Proxy-TS-Session',
+  'X-Proxy-TS-Active-Sessions',
+  'X-Proxy-TS-Max-Sessions',
+].join(', ');
+const PROXY_TS_VARY_HEADERS = [
+  'CF-IPCountry',
+  'X-Vercel-IP-Country',
+  'X-Country-Code',
+  'CF-Connecting-IP',
+  'X-Real-IP',
+  'X-Forwarded-For',
+];
 /**
  * Helper: Parse array query parameters (genres, countries)
  * @param {string|string[]} param - Query parameter value
@@ -42,10 +63,26 @@ const parseArrayParam = (param) => {
   return Array.isArray(param) ? param : param.split(',').filter(Boolean);
 };
 
-const getRequestIpAddress = (req) =>
-  req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-  || req.socket?.remoteAddress
-  || '0.0.0.0';
+const getRequestIpAddress = (req) => getClientIp(req) || '0.0.0.0';
+
+function appendVaryHeader(res, values) {
+  const existingValues = String(res.getHeader('Vary') || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const merged = new Set([...existingValues, ...values]);
+  res.setHeader('Vary', Array.from(merged).join(', '));
+}
+
+function setProxyTsPolicyHeaders(res, policyDecision) {
+  const headers = buildProxyTsPolicyHeaders(policyDecision);
+  Object.entries(headers).forEach(([name, value]) => {
+    res.setHeader(name, value);
+  });
+  res.setHeader('Access-Control-Expose-Headers', PROXY_TS_EXPOSED_HEADERS);
+  appendVaryHeader(res, PROXY_TS_VARY_HEADERS);
+}
 
 function normalizeProxyTsSessionId(value) {
   const rawValue = Array.isArray(value) ? value[0] : value;
@@ -745,7 +782,7 @@ const getForYou = async (req, res) => {
  * GET /movies/proxy-m3u8
  * Proxy M3U8 stream to filter out advertisements
  * @param {string} req.query.url - Target M3U8 URL
- * @param {string} req.query.mode - 'proxy' (default) or 'direct'
+ * @param {string} req.query.mode - 'direct' (default) or 'proxy'
  */
 const proxyM3u8 = async (req, res) => {
   try {
@@ -753,6 +790,10 @@ const proxyM3u8 = async (req, res) => {
     if (!url) {
       return res.status(400).send('Missing url parameter');
     }
+
+    const requestedMode = mode === 'proxy' ? 'proxy' : 'direct';
+    const proxyTsPolicy = getProxyTsPolicy(req);
+    setProxyTsPolicyHeaders(res, proxyTsPolicy);
 
     // Build proxy base URLs from request
     const forwardedProto = req.headers['x-forwarded-proto'];
@@ -767,20 +808,20 @@ const proxyM3u8 = async (req, res) => {
     const tsProxyBase = `${protocol}://${host}${req.baseUrl || ''}/proxy-ts`;
 
     let cleanContent;
-    if (mode === 'direct') {
-      cleanContent = await processM3u8StreamDirect(url, proxyBase);
-    } else {
+    if (requestedMode === 'proxy' && proxyTsPolicy.allowed) {
       const proxyTsSessionId = createProxyTsSessionId(req.query.sid);
       const proxyBaseWithSession = addQueryParam(proxyBase, 'sid', proxyTsSessionId);
       const tsProxyBaseWithSession = addQueryParam(tsProxyBase, 'sid', proxyTsSessionId);
       cleanContent = await processM3u8StreamWithProxy(url, proxyBaseWithSession, tsProxyBaseWithSession);
       res.setHeader('X-Proxy-TS-Session', proxyTsSessionId);
+    } else {
+      cleanContent = await processM3u8StreamDirect(url, proxyBase);
     }
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('X-Accel-Buffering', 'no');
-    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('Cache-Control', 'private, no-store');
     res.send(cleanContent);
   } catch (error) {
     console.error('[proxyM3u8] Error:', error.message);
@@ -808,6 +849,14 @@ const proxyTs = async (req, res) => {
     }
 
     // Do NOT forward Range headers from client — TS segments are complete files
+    const proxyTsPolicy = getProxyTsPolicy(req);
+    setProxyTsPolicyHeaders(res, proxyTsPolicy);
+    if (!proxyTsPolicy.allowed) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(403).send('proxy-ts is not available for this location.');
+    }
+
     proxyTsSession = acquireProxyTsSession(req);
     if (!proxyTsSession.allowed) {
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -837,7 +886,7 @@ const proxyTs = async (req, res) => {
     
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('X-Accel-Buffering', 'no');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('X-Proxy-TS-Active-Sessions', String(proxyTsSession.activeSessions));
     res.setHeader('X-Proxy-TS-Max-Sessions', String(proxyTsSession.maxSessions));
     res.setHeader('X-Proxy-TS-Session', proxyTsSession.id);
@@ -1001,7 +1050,7 @@ const downloadMovieMobile = async (req, res) => {
 
     const localPort = req.socket.localPort || process.env.PORT || 5000;
     const protocol = req.protocol === 'https' ? 'https' : 'http';
-    const proxyUrl = `${protocol}://127.0.0.1:${localPort}/api/v1/movies/proxy-m3u8?url=${encodeURIComponent(url)}`;
+    const proxyUrl = `${protocol}://127.0.0.1:${localPort}/api/v1/movies/proxy-m3u8?url=${encodeURIComponent(url)}&mode=proxy`;
 
     const finalFilename = filename ? `${filename}.mp4` : `CinePhine_Movie_${Date.now()}.mp4`;
 
