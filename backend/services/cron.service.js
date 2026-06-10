@@ -5,6 +5,7 @@ const { runPageRange } = require('./crawler.service');
 const { runPipeline: runTrendingPipeline } = require('./trending.service');
 const analyticsService = require('./analytics.service');
 const questService = require('./quest.service');
+const premiumService = require('./premium.service');
 const { runIntroDetectionBatch } = require('./introDetectionBatch.service');
 const {
   DEFAULT_BACKUP_CRON,
@@ -204,6 +205,39 @@ const scheduleQuestAutoClaim = () => {
   console.log('âœ… Scheduled: Quest auto-claim every day at 00:05 (Vietnam Time)');
 };
 
+const runPremiumExpiryCleanup = async ({ trigger = 'manual', now = new Date() } = {}) => {
+  try {
+    const result = await premiumService.expirePremiumUsers(now);
+    if (result.matched > 0) {
+      console.log(
+        `[PremiumExpiry] ${trigger}: expired=${result.modified}/${result.matched}, cursorReset=${result.cursorReset}`,
+      );
+    }
+    return result;
+  } catch (error) {
+    console.error(`[PremiumExpiry] ${trigger} failed: ${error.message}`);
+    throw error;
+  }
+};
+
+const schedulePremiumExpiryCleanup = () => {
+  const cronExpression = process.env.PREMIUM_EXPIRY_CRON || '0 7 * * *';
+  const timezone = process.env.PREMIUM_EXPIRY_TIMEZONE || 'Asia/Ho_Chi_Minh';
+
+  cron.schedule(
+    cronExpression,
+    async () => {
+      await runPremiumExpiryCleanup({ trigger: 'cron' }).catch(() => {});
+    },
+    {
+      scheduled: true,
+      timezone,
+    },
+  );
+
+  console.log(`[PremiumExpiry] Scheduled: "${cronExpression}" (${timezone})`);
+};
+
 const scheduleIntroDetectionBatch = () => {
   const cronExpression = process.env.INTRO_BATCH_CRON || '0 4 * * *';
   const timezone = process.env.INTRO_BATCH_TIMEZONE || 'Asia/Ho_Chi_Minh';
@@ -291,6 +325,7 @@ const initCronJobs = () => {
   if (isEnvEnabled('CRON_TRENDING_UPDATE_ENABLED', true)) scheduleTrendingUpdate();
   if (isEnvEnabled('CRON_ANALYTICS_SNAPSHOT_ENABLED', true)) scheduleDailyAnalyticsSnapshot();
   if (isEnvEnabled('CRON_QUEST_AUTO_CLAIM_ENABLED', true)) scheduleQuestAutoClaim();
+  if (isEnvEnabled('CRON_PREMIUM_EXPIRY_ENABLED', true)) schedulePremiumExpiryCleanup();
   if (isEnvEnabled('CRON_MONGO_BACKUP_ENABLED', true)) scheduleMongoBackup();
   if (
     isEnvEnabled('INTRO_BATCH_ENABLED', true) &&
@@ -312,7 +347,9 @@ module.exports = {
   scheduleTrendingUpdate,
   scheduleDailyAnalyticsSnapshot,
   scheduleQuestAutoClaim,
+  schedulePremiumExpiryCleanup,
   scheduleIntroDetectionBatch,
   scheduleMongoBackup,
+  runPremiumExpiryCleanup,
   runAnalyticsBackfill,
 };

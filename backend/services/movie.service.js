@@ -16,6 +16,7 @@ const {
 } = require('../utils/movieTransformer');
 const { isLatinName } = require('../utils/castUtils');
 const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
+const { isPremiumActive } = require('./premium.service');
 
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value) && /^[0-9a-fA-F]{24}$/.test(value);
 const LOGO_FETCH_CONCURRENCY = Math.max(1, Number(process.env.TMDB_LOGO_FETCH_CONCURRENCY || 3));
@@ -253,8 +254,7 @@ const mapEpisode = (episode) => ({
  */
 const mapComment = (comment) => {
   const user = comment.userId;
-  const isPremium = user?.role === 'premium' &&
-    (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
+  const isPremium = isPremiumActive(user);
   return {
     id: comment._id?.toString() || comment.id,
     userId: user?._id?.toString() || user?.toString() || comment.userId,
@@ -1733,8 +1733,7 @@ const getRatings = async (identifier, filters = {}) => {
 
   const ratings = rows.map((rating) => {
     const user = rating.userId;
-    const isPremium = user?.role === 'premium' &&
-      (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
+    const isPremium = isPremiumActive(user);
     return {
       id: rating._id.toString(),
       userId: user?._id?.toString() || user?.toString() || rating.userId,

@@ -13,6 +13,8 @@ const { transformMovies } = require('../utils/movieTransformer');
 const movieService = require('./movie.service');
 const notificationService = require('./notification.service');
 const analyticsService = require('./analytics.service');
+const coinLedgerService = require('./coinLedger.service');
+const premiumService = require('./premium.service');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
 const { parseEpisodeNumber } = require('../utils/movieTransformer');
 const { extractEpisodeNumber } = require('../utils/episodeNumber.util');
@@ -538,8 +540,9 @@ const getAllUsers = async (options = {}) => {
   // Attach streak info to each user (already in User document)
   const usersWithStreak = users.map(u => {
     const obj = u.toObject ? u.toObject() : u;
+    const premiumUser = premiumService.normalizePremiumSnapshot(obj);
     return {
-      ...obj,
+      ...premiumUser,
       watchStreak: watchStreakService.getCurrentStreakValue(obj),
       longestStreak: obj.longestStreak || 0,
       lastWatchDate: obj.lastWatchDate || null,
@@ -563,8 +566,8 @@ const getAllUsers = async (options = {}) => {
  * @returns {Promise<Object|null>} User object or null
  */
 const getUserById = async (id) => {
-  // TODO: Implement - Get user from database by ID
-  return await UserModel.findById(id).select('-password');
+  const user = await UserModel.findById(id).select('-password');
+  return user ? premiumService.normalizePremiumSnapshot(user) : null;
 };
 
 /**
@@ -573,10 +576,7 @@ const getUserById = async (id) => {
  * @returns {Promise<Object>} Created user object
  */
 const createUser = async (userData) => {
-  // TODO: Implement - Create user in database
-  // Lưu ý: Controller cần đảm bảo hash password trước khi truyền vào đây
-  // Hoặc Model User đã có middleware pre-save để hash password
-  return await UserModel.create(userData);
+  return await UserModel.create(premiumService.buildAdminPremiumUpdate(userData));
 };
 
 /**
@@ -586,8 +586,43 @@ const createUser = async (userData) => {
  * @returns {Promise<Object|null>} Updated user object or null
  */
 const updateUser = async (id, userData) => {
-  // TODO: Implement - Update user in database
-  return await UserModel.findByIdAndUpdate(id, userData, { new: true }).select('-password');
+  const { coin: _coin, ...editableUserData } = userData;
+  const currentUser = await UserModel.findById(id).select('role');
+  if (!currentUser) return null;
+
+  const updateData = premiumService.buildAdminPremiumUpdate(editableUserData, new Date(), {
+    defaultMissingPremiumFields: currentUser.role !== 'premium',
+  });
+  const user = await UserModel.findByIdAndUpdate(id, updateData, {
+    new: true,
+    runValidators: true,
+  }).select('-password');
+  return user ? premiumService.normalizePremiumSnapshot(user) : null;
+};
+
+const adjustUserCoins = async (id, { amount, note = '' } = {}) => {
+  const delta = Number(amount);
+  if (!Number.isInteger(delta) || delta === 0) {
+    throw new Error('Coin adjustment must be a non-zero integer');
+  }
+
+  const coinChange = await coinLedgerService.applyCoinChange({
+    userId: id,
+    delta,
+    reason: 'admin_adjustment',
+    sourceType: 'admin_user',
+    sourceId: `admin-adjust:${id}:${Date.now()}`,
+    note: note || `Admin dieu chinh coin: ${delta}`,
+    metadata: { amount: delta },
+  });
+
+  const user = await UserModel.findById(id).select('-password');
+  return {
+    message: `Adjusted ${delta} coin`,
+    user: user ? premiumService.normalizePremiumSnapshot(user) : null,
+    entry: coinChange.entry,
+    totalCoins: coinChange.balanceAfter,
+  };
 };
 
 /**
@@ -1002,6 +1037,10 @@ const getPremiumPlans = async () => {
  * Upsert a premium plan by id.
  */
 const upsertPremiumPlan = async (plan) => {
+  if (!premiumService.VALID_PREMIUM_PLAN_KEYS.includes(plan.planKey)) {
+    throw new Error('Premium plan only supports weekly, monthly or yearly');
+  }
+
   const plans = await getPremiumPlans();
   const idx = plans.findIndex((p) => p.id === plan.id);
   if (idx >= 0) {
@@ -1911,6 +1950,7 @@ module.exports = {
   getUserAnalytics,
   createUser,
   updateUser,
+  adjustUserCoins,
   deleteUser,
   toggleUserStatus,
   // Stats

@@ -412,6 +412,20 @@ const updateUser = async (req, res) => {
 };
 
 /**
+ * POST /admin/users/:id/coins
+ * Adjust user coins manually (admin only)
+ */
+const adjustUserCoins = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await adminService.adjustUserCoins(id, req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(error.statusCode || 400).json({ message: error.message });
+  }
+};
+
+/**
  * DELETE /admin/users/:id
  * Delete user
  */
@@ -1094,6 +1108,7 @@ getAllMovies,
   getUserAnalytics,
   createUser,
   updateUser,
+  adjustUserCoins,
   deleteUser,
   toggleUserStatus,
 

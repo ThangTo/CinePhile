@@ -1,6 +1,6 @@
 const CursorEffect = require('../models/cursorEffect.model');
 const User = require('../models/user.model');
-const { isPremiumActive } = require('../utils/premiumUtils');
+const { isPremiumActive } = require('./premium.service');
 const coinLedgerService = require('./coinLedger.service');
 
 const createCursorEffectError = (message, statusCode = 400) => {

@@ -2,12 +2,11 @@ const paymentService = require("../services/payment.service");
 
 const createPaymentLink = async (req, res) => {
   try {
-    const { userId, packageId, amount, bonus = 0 } = req.body;
+    const userId = req.user?._id || req.user?.id;
+    const { packageId } = req.body;
     const result = await paymentService.createPaymentLink({
       userId,
       packageId,
-      amount,
-      bonus,
     });
     res.json(result);
   } catch (error) {
@@ -29,7 +28,6 @@ const createPaymentLink = async (req, res) => {
 };
 
 const handleWebhook = async (req, res) => {
-  console.log("[Webhook] Received webhook data");
   try {
     const webhookData = req.body;
     const result = await paymentService.handleWebhook(webhookData);

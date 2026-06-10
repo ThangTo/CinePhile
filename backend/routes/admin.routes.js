@@ -122,6 +122,9 @@ router.post('/users', adminController.createUser);
 // PUT /api/v1/admin/users/:id - Update user
 router.put('/users/:id', adminController.updateUser);
 
+// POST /api/v1/admin/users/:id/coins - Adjust user coins
+router.post('/users/:id/coins', adminController.adjustUserCoins);
+
 // DELETE /api/v1/admin/users/:id - Delete user
 router.delete('/users/:id', adminController.deleteUser);
 

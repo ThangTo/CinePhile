@@ -42,30 +42,15 @@ const findPackageByPrice = (packages, money, bonusCoin = 0) => {
   );
 };
 
-const resolveCoinPackageSelection = async ({ packageId, amount, bonus = 0 }) => {
+const resolveCoinPackageSelection = async ({ packageId }) => {
   const packages = await adminService.getCoinPackages();
-  const parsedMoney = parsePositiveInteger(amount);
-  const parsedBonus = parseNonNegativeInteger(bonus);
 
-  if (packageId) {
-    const selectedPackage = packages.find((pkg) => pkg.id === packageId);
-    if (!selectedPackage) {
-      throw new Error('Coin package not found');
-    }
-
-    return normalizeCoinPackage(selectedPackage);
-  }
-
-  if (!parsedMoney) {
-    throw new Error('Missing payment amount');
-  }
-
-  const matchedPackage = findPackageByPrice(packages, parsedMoney, parsedBonus);
-  if (!matchedPackage) {
+  const selectedPackage = packages.find((pkg) => pkg.id === packageId);
+  if (!selectedPackage) {
     throw new Error('Coin package not found');
   }
 
-  return normalizeCoinPackage(matchedPackage);
+  return normalizeCoinPackage(selectedPackage);
 };
 
 const resolveTransactionAward = async (transaction) => {
@@ -91,17 +76,17 @@ const resolveTransactionAward = async (transaction) => {
   throw new Error('Unable to resolve coin package for transaction');
 };
 
-const createPaymentLink = async ({ userId, packageId, amount, bonus = 0 }) => {
+const createPaymentLink = async ({ userId, packageId }) => {
   const YOUR_DOMAIN =
     process.env.CLIENT_URL_LOCAL ||
     process.env.CLIENT_URL ||
     'https://decent-normally-bedbug.ngrok-free.app';
 
-  if (!userId || (!packageId && !amount)) {
+  if (!userId || !packageId) {
     throw new Error('Missing userId or payment package');
   }
 
-  const selectedPackage = await resolveCoinPackageSelection({ packageId, amount, bonus });
+  const selectedPackage = await resolveCoinPackageSelection({ packageId });
 
   // PayOS only accepts a numeric orderCode.
   const timestamp = Date.now().toString();
@@ -141,54 +126,72 @@ const createPaymentLink = async ({ userId, packageId, amount, bonus = 0 }) => {
   };
 };
 
-const handleWebhook = async (webhookData) => {
-  console.log('webhookData', webhookData);
+const handleWebhook = async (webhook) => {
+  const verifiedData = await payOS.webhooks.verify(webhook);
+  const orderCode = verifiedData.orderCode?.toString();
 
-  if (webhookData.code === '00' && webhookData.success === true) {
-    const { orderCode } = webhookData.data;
+  if (!orderCode) {
+    throw new Error('Missing PayOS orderCode');
+  }
 
-    const transaction = await Transaction.findOne({
-      orderCode: orderCode.toString(),
-      status: 'PENDING',
+  if (webhook.code !== '00' || webhook.success !== true) {
+    await Transaction.findOneAndUpdate(
+      { orderCode, status: 'PENDING' },
+      { $set: { status: 'FAILED', webhookData: webhook } },
+    );
+    return { success: true, message: 'Webhook ignored because payment was not successful' };
+  }
+
+  const transaction = await Transaction.findOneAndUpdate(
+    { orderCode, status: 'PENDING' },
+    { $set: { status: 'PROCESSING', webhookData: webhook } },
+    { new: true },
+  );
+
+  if (!transaction) {
+    console.warn(`[Webhook] Order ${orderCode} already processed or not found.`);
+    return { success: true, message: 'Webhook already processed' };
+  }
+
+  try {
+    console.log(`[Webhook] Processing success payment for Order ${orderCode}`);
+
+    const resolvedAward = await resolveTransactionAward(transaction);
+    if (!resolvedAward.amount || !resolvedAward.coinAmount) {
+      throw new Error(`Invalid coin package resolution for order ${orderCode}`);
+    }
+
+    const totalCoins =
+      parseNonNegativeInteger(resolvedAward.coinAmount) +
+      parseNonNegativeInteger(resolvedAward.bonusCoin);
+
+    await coinLedgerService.applyCoinChange({
+      userId: transaction.user,
+      delta: totalCoins,
+      reason: 'payment_success',
+      sourceType: 'payment',
+      sourceId: transaction._id,
+      note: `Nap coin thanh cong tu don hang ${transaction.orderCode}`,
+      metadata: {
+        orderCode: transaction.orderCode,
+        packageId: resolvedAward.packageId || transaction.packageId || null,
+        coinAmount: parseNonNegativeInteger(resolvedAward.coinAmount),
+        bonusCoin: parseNonNegativeInteger(resolvedAward.bonusCoin),
+        provider: transaction.provider,
+      },
     });
 
-    if (transaction) {
-      console.log(`[Webhook] Processing success payment for Order ${orderCode}`);
-
-      const resolvedAward = await resolveTransactionAward(transaction);
-      if (!resolvedAward.amount || !resolvedAward.coinAmount) {
-        throw new Error(`Invalid coin package resolution for order ${orderCode}`);
-      }
-
-      const totalCoins =
-        parseNonNegativeInteger(resolvedAward.coinAmount) +
-        parseNonNegativeInteger(resolvedAward.bonusCoin);
-
-      await coinLedgerService.applyCoinChange({
-        userId: transaction.user,
-        delta: totalCoins,
-        reason: 'payment_success',
-        sourceType: 'payment',
-        sourceId: transaction._id || transaction.orderCode,
-        note: `Nap coin thanh cong tu don hang ${transaction.orderCode}`,
-        metadata: {
-          orderCode: transaction.orderCode,
-          packageId: resolvedAward.packageId || transaction.packageId || null,
-          coinAmount: parseNonNegativeInteger(resolvedAward.coinAmount),
-          bonusCoin: parseNonNegativeInteger(resolvedAward.bonusCoin),
-          provider: transaction.provider,
-        },
-      });
-
-      transaction.coinAmount = parseNonNegativeInteger(resolvedAward.coinAmount);
-      transaction.bonusCoin = parseNonNegativeInteger(resolvedAward.bonusCoin);
-      transaction.packageId = resolvedAward.packageId || transaction.packageId || null;
-      transaction.status = 'SUCCESS';
-      transaction.webhookData = webhookData;
-      await transaction.save();
-    } else {
-      console.warn(`[Webhook] Order ${orderCode} not found in PENDING transactions.`);
-    }
+    transaction.coinAmount = parseNonNegativeInteger(resolvedAward.coinAmount);
+    transaction.bonusCoin = parseNonNegativeInteger(resolvedAward.bonusCoin);
+    transaction.packageId = resolvedAward.packageId || transaction.packageId || null;
+    transaction.status = 'SUCCESS';
+    transaction.webhookData = webhook;
+    await transaction.save();
+  } catch (error) {
+    transaction.status = 'FAILED';
+    transaction.webhookData = webhook;
+    await transaction.save();
+    throw error;
   }
 
   return { success: true, message: 'Webhook processed' };

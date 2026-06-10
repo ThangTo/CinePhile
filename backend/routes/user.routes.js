@@ -50,9 +50,6 @@ router.delete('/progress/:movieId', authMiddleware, userController.deleteProgres
 // POST /api/v1/users/upgrade-premium - Upgrade to premium using coins
 router.post('/upgrade-premium', authMiddleware, userController.upgradePremium);
 
-// POST /api/v1/users/add-coins - Add coins to user account (for testing)
-router.post('/add-coins', authMiddleware, userController.addCoins);
-
 // GET /api/v1/users/streak - Get watch streak
 router.get('/streak', authMiddleware, watchStreakController.getStreak);
 

@@ -9,6 +9,7 @@ const adminService = require('../services/admin.service');
 const cursorEffectService = require('../services/cursorEffect.service');
 const questService = require('../services/quest.service');
 const coinLedgerService = require('../services/coinLedger.service');
+const premiumService = require('../services/premium.service');
 const { PLANS } = require('../config/premium.config');
 // Helper to get user ID from authenticated request (via auth middleware)
 const getUserId = (req) => {
@@ -405,6 +406,10 @@ const upgradePremium = async (req, res) => {
     const userId = await getUserId(req);
     const { plan = 'monthly' } = req.body;
 
+    if (!premiumService.VALID_PREMIUM_PLAN_KEYS.includes(plan)) {
+      return res.status(400).json({ message: 'Invalid plan. Use "weekly", "monthly" or "yearly"' });
+    }
+
     // Read price from Settings DB first; fall back to config file
     const dbPlan = await adminService.getPremiumPlanPrice(plan);
     const planConfig = dbPlan
@@ -426,7 +431,7 @@ const upgradePremium = async (req, res) => {
 
     // Check if already premium and still valid
     const now = new Date();
-    if (user.role === 'premium' && user.premiumExpiresAt && user.premiumExpiresAt > now) {
+    if (premiumService.isPremiumActive(user, now)) {
       return res.status(400).json({
         message: `Bạn đã là thành viên Premium ${
           user.premiumPlan || ''
@@ -482,50 +487,6 @@ const upgradePremium = async (req, res) => {
   }
 };
 
-/**
- * POST /users/add-coins
- * Add coins to user account (for testing/admin)
- * @param {Object} req.user - User object from auth middleware
- * @param {Object} req.body - { amount: number }
- * @returns {Object} Updated user object
- */
-const addCoins = async (req, res) => {
-  try {
-    const userId = await getUserId(req);
-    const { amount } = req.body;
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Số coin phải lớn hơn 0' });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const coinChange = await coinLedgerService.applyCoinChange({
-      userId,
-      delta: amount,
-      reason: 'admin_add_coin',
-      sourceType: 'manual_adjustment',
-      sourceId: `admin-add:${userId}:${Date.now()}`,
-      note: `Cong coin thu cong: ${amount}`,
-      metadata: { amount },
-    });
-
-    user.coin = coinChange.balanceAfter;
-    await user.save();
-
-    res.status(200).json({
-      message: `Đã thêm ${amount} coin vào tài khoản`,
-      user: user,
-      totalCoins: coinChange.balanceAfter,
-    });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message });
-  }
-};
-
 module.exports = {
   getProfile,
   updateProfile,
@@ -542,5 +503,4 @@ module.exports = {
   saveProgress,
   deleteProgress,
   upgradePremium,
-  addCoins,
 };

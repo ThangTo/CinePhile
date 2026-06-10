@@ -3,7 +3,7 @@ const User = require('../models/user.model');
 const { getRandomAvatar } = require('../utils/avatarUtils');
 const redisService = require('./redis.service');
 const avatarService = require('./avatar.service');
-const { isPremiumActive } = require('../utils/premiumUtils');
+const premiumService = require('./premium.service');
 const cursorEffectService = require('./cursorEffect.service');
 const emailService = require('./email.service');
 const otpService = require('./otp.service');
@@ -143,6 +143,7 @@ const login = async (credentials) => {
       }
 
       try {
+        await premiumService.normalizePremiumUser(user);
         await avatarService.migrateStoredAvatarToR2(user);
         // Generate tokens and return auth payload
         const authPayload = generateAuthPayload(user);
@@ -226,7 +227,9 @@ const getCurrentUser = async (token) => {
     await avatarService.migrateStoredAvatarToR2(user);
 
     // Premium: mặc định bật glitter nếu chưa có effect
-    if (isPremiumActive(user) && (!user.cursorEffectId || user.cursorEffectId === 'none')) {
+    await premiumService.normalizePremiumUser(user);
+
+    if (premiumService.isPremiumActive(user) && (!user.cursorEffectId || user.cursorEffectId === 'none')) {
       user.cursorEffectId = 'glitter';
       await user.save(); // Lưu vào DB để không phải gán lại mỗi lần login
     }
@@ -282,6 +285,7 @@ const loginWithGoogleProfile = async (profile) => {
     }
   }
 
+  await premiumService.normalizePremiumUser(user);
   await user.save();
   await avatarService.migrateStoredAvatarToR2(user);
   // Ensure avatar is included in the returned user object

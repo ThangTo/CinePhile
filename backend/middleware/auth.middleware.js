@@ -4,6 +4,7 @@ const authService = require('../services/auth.service');
 const avatarService = require('../services/avatar.service');
 const { attachAuthCookies } = require('../utils/authUtils');
 const redisService = require('../services/redis.service');
+const premiumService = require('../services/premium.service');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -23,25 +24,6 @@ const ensureUserAvatarReady = async (user) => {
   return user;
 };
 
-const normalizeActiveUser = async (user) => {
-  if (!user) {
-    return null;
-  }
-
-  if (user.role === 'premium' && user.premiumExpiresAt) {
-    const now = new Date();
-    const expiresAt = new Date(user.premiumExpiresAt);
-    if (expiresAt <= now) {
-      user.role = 'user';
-      user.premiumPlan = null;
-      user.premiumExpiresAt = null;
-      await user.save();
-    }
-  }
-
-  return user;
-};
-
 const getAccessTokenFromRequest = (req) => {
   const authHeader = req.headers.authorization;
 
@@ -55,7 +37,7 @@ const getAccessTokenFromRequest = (req) => {
 const getUserFromAccessToken = async (token) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET);
   const user = await ensureUserAvatarReady(await User.findById(decoded.userId));
-  return normalizeActiveUser(user);
+  return premiumService.normalizePremiumUser(user);
 };
 
 const tryRefreshUserFromCookie = async (req, res) => {

@@ -10,7 +10,7 @@ const mongoose = require('mongoose');
 const redisService = require('./redis.service');
 const watchStreakService = require('./watchStreak.service');
 const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
-const { isPremiumActive } = require('../utils/premiumUtils');
+const premiumService = require('./premium.service');
 
 const CACHE_KEY_PREFIX = 'leaderboard:topUsers:v4';
 const CACHE_TTL = 3600; // 1 hour
@@ -74,14 +74,16 @@ const getTopUsers = async (referenceDate = new Date()) => {
       const adjustedCurrentStreak = currentStreak > 0 ? currentStreak : 1;
       const score = totalWatchTime * adjustedMaxStreak * adjustedCurrentStreak;
 
+      const premiumUser = premiumService.normalizePremiumSnapshot(user, referenceDate);
+
       return {
         id: user._id.toString(),
         username: user.username,
         avatar: user.avatar,
-        role: user.role || 'user',
-        isPremium: isPremiumActive(user),
-        premiumPlan: user.premiumPlan || null,
-        premiumExpiresAt: user.premiumExpiresAt || null,
+        role: premiumUser.role || 'user',
+        isPremium: premiumUser.isPremium,
+        premiumPlan: premiumUser.premiumPlan || null,
+        premiumExpiresAt: premiumUser.premiumExpiresAt || null,
         totalWatchTime,
         currentStreak,
         maxStreak,

@@ -120,6 +120,8 @@ userSchema.set('toObject', {
   transform: transformAvatarForOutput,
 });
 
+userSchema.index({ role: 1, premiumExpiresAt: 1 });
+
 
 // 2. Kích hoạt Plugin (QUAN TRỌNG)
 // Dòng này sẽ tự động thêm các hàm: authenticate(), serializeUser(), ... vào User model
