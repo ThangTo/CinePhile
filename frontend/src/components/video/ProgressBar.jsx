@@ -36,6 +36,7 @@ const ProgressBar = ({
   // Khởi tạo null để tránh lỗi undefined ban đầu
 
   const progressBarRef = useRef(null);
+  const lastDragClientXRef = useRef(null);
 
   // Reset seekingTime khi currentTime thay đổi (video đã seek xong)
 
@@ -163,6 +164,10 @@ const ProgressBar = ({
 
       // 🛡️ LỚP BẢO VỆ 2: Kiểm tra Duration
 
+      if (!Number.isFinite(clientX)) {
+        return null;
+      }
+
       if (!duration || isNaN(duration) || duration === 0) {
         return { time: 0, percent: 0 };
       }
@@ -185,10 +190,24 @@ const ProgressBar = ({
 
   // --- HANDLERS ---
 
+  const preventTouchScroll = useCallback((e) => {
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+  }, []);
+
+  const getEventClientX = useCallback((e, fallback = null) => {
+    if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
+    if (e.changedTouches && e.changedTouches.length > 0) return e.changedTouches[0].clientX;
+    if (Number.isFinite(e.clientX)) return e.clientX;
+    return fallback;
+  }, []);
+
   const handleDragStart = (e) => {
     // Chặn sự kiện lan truyền để tránh conflict
 
     e.stopPropagation();
+    preventTouchScroll(e);
 
     // 🛡️ Kiểm tra ref trước khi bắt đầu drag
 
@@ -210,7 +229,8 @@ const ProgressBar = ({
       onDragStateChange(true);
     }
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientX = getEventClientX(e);
+    lastDragClientXRef.current = clientX;
 
     const result = calculateProgress(clientX);
 
@@ -227,7 +247,10 @@ const ProgressBar = ({
     const handleDragMove = (e) => {
       if (!isDragging) return;
 
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      preventTouchScroll(e);
+
+      const clientX = getEventClientX(e, lastDragClientXRef.current);
+      lastDragClientXRef.current = clientX;
 
       const result = calculateProgress(clientX);
 
@@ -243,13 +266,9 @@ const ProgressBar = ({
     const handleDragEnd = (e) => {
       if (!isDragging) return;
 
-      let clientX;
+      preventTouchScroll(e);
 
-      if (e.changedTouches && e.changedTouches.length > 0) {
-        clientX = e.changedTouches[0].clientX;
-      } else {
-        clientX = e.clientX;
-      }
+      const clientX = getEventClientX(e, lastDragClientXRef.current);
 
       const result = calculateProgress(clientX);
 
@@ -264,10 +283,32 @@ const ProgressBar = ({
       }
 
       setIsDragging(false);
+      lastDragClientXRef.current = null;
 
       setHoverTime(null);
 
       // Thông báo cho parent component rằng đã kéo xong
+      if (onDragStateChange) {
+        onDragStateChange(false);
+      }
+    };
+
+    const handleDragCancel = (e) => {
+      if (!isDragging) return;
+
+      preventTouchScroll(e);
+
+      const result = calculateProgress(lastDragClientXRef.current);
+
+      if (result) {
+        setSeekingTime(result.time);
+        onSeek(result.time);
+      }
+
+      setIsDragging(false);
+      lastDragClientXRef.current = null;
+      setHoverTime(null);
+
       if (onDragStateChange) {
         onDragStateChange(false);
       }
@@ -280,7 +321,9 @@ const ProgressBar = ({
 
       window.addEventListener("touchmove", handleDragMove, { passive: false });
 
-      window.addEventListener("touchend", handleDragEnd);
+      window.addEventListener("touchend", handleDragEnd, { passive: false });
+
+      window.addEventListener("touchcancel", handleDragCancel, { passive: false });
     }
 
     return () => {
@@ -291,8 +334,10 @@ const ProgressBar = ({
       window.removeEventListener("touchmove", handleDragMove);
 
       window.removeEventListener("touchend", handleDragEnd);
+
+      window.removeEventListener("touchcancel", handleDragCancel);
     };
-  }, [isDragging, calculateProgress, onDragStateChange, onSeek]);
+  }, [isDragging, calculateProgress, getEventClientX, preventTouchScroll, onDragStateChange, onSeek]);
 
   // Hover Handler
 
@@ -340,12 +385,13 @@ const ProgressBar = ({
   const currentThumbnail = hoverTime !== null ? getThumbnailForTime(hoverTime) : null;
 
   return (
-    <div className="mb-2 pointer-events-auto relative select-none touch-none">
+    <div className="mb-2 pointer-events-auto relative select-none touch-none" style={{ touchAction: "none" }}>
       <div
         ref={progressBarRef}
         className={`group/seek w-full bg-white/20 rounded-full cursor-pointer transition-all duration-200 relative flex items-center
           ${isMobile ? "h-2 py-1" : "h-1 hover:h-1.5 py-1"}
         `}
+        style={{ touchAction: "none" }}
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
         onMouseMove={handleProgressHover}
