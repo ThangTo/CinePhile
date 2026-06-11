@@ -88,7 +88,9 @@ const VideoControls = ({
     <div
       className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none opacity-100 touch-auto"
       style={{
+        bottom: 0,
         paddingBottom: isFullscreen ? "calc(0.5rem + var(--safe-bottom))" : "0.5rem",
+        transform: "translate3d(0, 0, 0)",
       }}
     >
       {/* Progress Bar */}

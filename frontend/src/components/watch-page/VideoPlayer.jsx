@@ -196,6 +196,7 @@ const VideoPlayer = ({
   const isMutedRef = useRef(false);
   const preDuckVolumeRef = useRef(null);
   const duckRestoreTimeoutRef = useRef(null);
+  const fullscreenLayoutResetTimeoutRef = useRef(null);
   const audioContextRef = useRef(null);
   const audioSourceRef = useRef(null);
   const gainNodeRef = useRef(null);
@@ -335,6 +336,48 @@ const VideoPlayer = ({
   useEffect(() => {
     applyLogicalVolumeToVideo(volume, isMuted);
   }, [applyLogicalVolumeToVideo, isMuted, volume]);
+
+  const scheduleFullscreenLayoutReset = useCallback(() => {
+    if (fullscreenLayoutResetTimeoutRef.current) {
+      clearTimeout(fullscreenLayoutResetTimeoutRef.current);
+      fullscreenLayoutResetTimeoutRef.current = null;
+    }
+
+    const resetLayout = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      container.style.removeProperty("width");
+      container.style.removeProperty("height");
+      container.style.removeProperty("min-height");
+      container.style.removeProperty("max-height");
+      // Force a layout pass after native fullscreen returns control to the PWA shell.
+      void container.offsetHeight;
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    requestAnimationFrame(resetLayout);
+    fullscreenLayoutResetTimeoutRef.current = setTimeout(resetLayout, 350);
+  }, []);
+
+  const unlockScreenOrientation = useCallback(() => {
+    if (!window.screen?.orientation?.unlock) return;
+    try {
+      window.screen.orientation.unlock();
+    } catch (_error) {}
+  }, []);
+
+  const exitFullscreenUiState = useCallback(() => {
+    setIsFullscreen(false);
+    setShowControls(true);
+    setShowMoreMenu(false);
+    setShowSpeedMenu(false);
+    setShowQualityMenu(false);
+    setShowAudioMenu(false);
+    setShowSubtitleMenu(false);
+    unlockScreenOrientation();
+    scheduleFullscreenLayoutReset();
+  }, [scheduleFullscreenLayoutReset, unlockScreenOrientation]);
 
   // Hybrid Proxy: Check if source needs proxy mode
   const hlsSource = useMemo(() => {
@@ -1494,6 +1537,8 @@ const VideoPlayer = ({
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       if (singleTapTimeoutRef.current) clearTimeout(singleTapTimeoutRef.current);
       if (doubleTapDismissRef.current) clearTimeout(doubleTapDismissRef.current);
+      if (fullscreenLayoutResetTimeoutRef.current)
+        clearTimeout(fullscreenLayoutResetTimeoutRef.current);
       clearDuckRestoreTimeout();
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(() => {});
@@ -1671,6 +1716,7 @@ const VideoPlayer = ({
         try {
           video.webkitEnterFullscreen();
           setIsFullscreen(true);
+          setShowControls(true);
           return;
         } catch (err) {}
       }
@@ -1686,6 +1732,7 @@ const VideoPlayer = ({
           .call(container)
           .then(() => {
             setIsFullscreen(true);
+            setShowControls(true);
           })
           .catch((err) => console.error(err));
       }
@@ -1700,17 +1747,12 @@ const VideoPlayer = ({
         exitFullscreen
           .call(document)
           .then(() => {
-            setIsFullscreen(false);
-            if (window.screen?.orientation?.unlock) {
-              try {
-                window.screen.orientation.unlock();
-              } catch (_error) {}
-            }
+            exitFullscreenUiState();
           })
           .catch((err) => console.error(err));
       }
     }
-  }, []);
+  }, [exitFullscreenUiState]);
 
   const handleSpeedChange = (speed) => {
     const video = videoRef.current;
@@ -2607,11 +2649,10 @@ const VideoPlayer = ({
         document.webkitFullscreenElement ||
         document.mozFullScreenElement ||
         document.msFullscreenElement;
-      setIsFullscreen(!!isCurrentlyFullscreen);
-      if (!isCurrentlyFullscreen && window.screen?.orientation?.unlock) {
-        try {
-          window.screen.orientation.unlock();
-        } catch (_error) {}
+      if (isCurrentlyFullscreen) {
+        setIsFullscreen(true);
+      } else {
+        exitFullscreenUiState();
       }
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -2624,7 +2665,39 @@ const VideoPlayer = ({
       document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
       document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
     };
-  }, []);
+  }, [exitFullscreenUiState]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !hasNativePlayer) return undefined;
+
+    const handleNativeFullscreenStart = () => {
+      setIsFullscreen(true);
+      setShowControls(true);
+    };
+
+    const handleNativeFullscreenEnd = () => {
+      exitFullscreenUiState();
+    };
+
+    const handlePresentationModeChange = () => {
+      if (video.webkitPresentationMode && video.webkitPresentationMode !== "inline") {
+        handleNativeFullscreenStart();
+      } else {
+        handleNativeFullscreenEnd();
+      }
+    };
+
+    video.addEventListener("webkitbeginfullscreen", handleNativeFullscreenStart);
+    video.addEventListener("webkitendfullscreen", handleNativeFullscreenEnd);
+    video.addEventListener("webkitpresentationmodechanged", handlePresentationModeChange);
+
+    return () => {
+      video.removeEventListener("webkitbeginfullscreen", handleNativeFullscreenStart);
+      video.removeEventListener("webkitendfullscreen", handleNativeFullscreenEnd);
+      video.removeEventListener("webkitpresentationmodechanged", handlePresentationModeChange);
+    };
+  }, [exitFullscreenUiState, hasNativePlayer]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
