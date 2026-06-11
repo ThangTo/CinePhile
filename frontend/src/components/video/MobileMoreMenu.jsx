@@ -9,6 +9,7 @@ const MobileMoreMenu = ({
   showAudioMenu,
   onToggleAudioMenu,
   onAudioChange,
+  allowPictureInPicture = false,
   onPictureInPicture,
   playbackRate,
   showSpeedMenu,
@@ -271,6 +272,7 @@ const MobileMoreMenu = ({
               </div>
 
               {/* Picture in Picture */}
+              {allowPictureInPicture && (
               <button
                 onClick={() => {
                   onPictureInPicture();
@@ -281,6 +283,7 @@ const MobileMoreMenu = ({
                 <i className="fa-solid fa-images w-5 text-center text-white/70 text-base" />
                 <span className="text-[15px] font-medium">Thu nhỏ (PiP)</span>
               </button>
+              )}
 
               {/* Download */}
               {onDownload && (

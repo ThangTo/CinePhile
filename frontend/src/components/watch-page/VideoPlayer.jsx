@@ -20,6 +20,27 @@ const START_POSITION_BUDGET_MS = 1200;
 const BUFFERING_INDICATOR_DELAY_MS = 400;
 const PROGRESS_SAVE_INTERVAL_MS = 15000;
 const NEXT_EPISODE_COUNTDOWN_SEC = 5;
+const DEFAULT_VOLUME = 1.2;
+const MAX_VOLUME = 1.2;
+const NATIVE_MAX_VOLUME = 1;
+const DUCKED_VOLUME = 0.05;
+const DUCK_RESTORE_TIMEOUT_MS = 10000;
+const DISABLE_PICTURE_IN_PICTURE = true;
+
+function clampVolumeValue(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return DEFAULT_VOLUME;
+  return Math.max(0, Math.min(MAX_VOLUME, numericValue));
+}
+
+function getNativeVideoVolume(value) {
+  return Math.min(NATIVE_MAX_VOLUME, clampVolumeValue(value));
+}
+
+function getBoostGain(value) {
+  const safeVolume = clampVolumeValue(value);
+  return safeVolume > NATIVE_MAX_VOLUME ? safeVolume : 1;
+}
 
 function getProxySources() {
   try {
@@ -100,7 +121,7 @@ const VideoPlayer = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.75);
+  const [volume, setVolume] = useState(DEFAULT_VOLUME);
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
@@ -171,6 +192,14 @@ const VideoPlayer = ({
   const lastTapRef = useRef({ time: 0 });
   const singleTapTimeoutRef = useRef(null);
   const doubleTapDismissRef = useRef(null);
+  const volumeRef = useRef(DEFAULT_VOLUME);
+  const isMutedRef = useRef(false);
+  const preDuckVolumeRef = useRef(null);
+  const duckRestoreTimeoutRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const audioSourceRef = useRef(null);
+  const gainNodeRef = useRef(null);
+  const audioBoostUnavailableRef = useRef(false);
 
   const hlsRef = useRef(null);
   const blobUrlRef = useRef(null);
@@ -207,6 +236,105 @@ const VideoPlayer = ({
   useEffect(() => {
     directOnlySourceDomainsRef.current = directOnlySourceDomains;
   }, [directOnlySourceDomains]);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  const clearDuckRestoreTimeout = useCallback(() => {
+    if (duckRestoreTimeoutRef.current) {
+      clearTimeout(duckRestoreTimeoutRef.current);
+      duckRestoreTimeoutRef.current = null;
+    }
+  }, []);
+
+  const applyLogicalVolumeToVideo = useCallback((targetVolume = volumeRef.current, muted = isMutedRef.current) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const safeVolume = clampVolumeValue(targetVolume);
+    try {
+      video.volume = muted ? 0 : getNativeVideoVolume(safeVolume);
+    } catch (_error) {}
+
+    if (gainNodeRef.current) {
+      try {
+        gainNodeRef.current.gain.value = muted ? 1 : getBoostGain(safeVolume);
+      } catch (_error) {}
+    }
+  }, []);
+
+  const ensureAudioBoost = useCallback(
+    async (targetVolume = volumeRef.current, muted = isMutedRef.current) => {
+      const safeVolume = clampVolumeValue(targetVolume);
+      applyLogicalVolumeToVideo(safeVolume, muted);
+
+      if (muted || safeVolume <= NATIVE_MAX_VOLUME || audioBoostUnavailableRef.current) {
+        return false;
+      }
+
+      const video = videoRef.current;
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!video || !AudioContextCtor) return false;
+
+      try {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContextCtor();
+        }
+
+        const audioContext = audioContextRef.current;
+        if (audioContext.state === "suspended") {
+          await audioContext.resume().catch(() => {});
+        }
+
+        if (audioContext.state === "suspended") {
+          return false;
+        }
+
+        if (!audioSourceRef.current) {
+          audioSourceRef.current = audioContext.createMediaElementSource(video);
+          gainNodeRef.current = audioContext.createGain();
+          audioSourceRef.current.connect(gainNodeRef.current);
+          gainNodeRef.current.connect(audioContext.destination);
+        }
+
+        applyLogicalVolumeToVideo(safeVolume, muted);
+        return true;
+      } catch (error) {
+        audioBoostUnavailableRef.current = true;
+        console.warn("[VideoPlayer] Audio boost unavailable:", error?.message || error);
+        applyLogicalVolumeToVideo(safeVolume, muted);
+        return false;
+      }
+    },
+    [applyLogicalVolumeToVideo]
+  );
+
+  const restoreDuckedAudio = useCallback(() => {
+    clearDuckRestoreTimeout();
+
+    const restoredVolume = clampVolumeValue(
+      preDuckVolumeRef.current ?? volumeRef.current ?? DEFAULT_VOLUME
+    );
+    preDuckVolumeRef.current = null;
+    volumeRef.current = restoredVolume;
+    setVolume(restoredVolume);
+
+    if (!isMutedRef.current) {
+      applyLogicalVolumeToVideo(restoredVolume, false);
+      if (restoredVolume > NATIVE_MAX_VOLUME) {
+        ensureAudioBoost(restoredVolume, false);
+      }
+    }
+  }, [applyLogicalVolumeToVideo, clearDuckRestoreTimeout, ensureAudioBoost]);
+
+  useEffect(() => {
+    applyLogicalVolumeToVideo(volume, isMuted);
+  }, [applyLogicalVolumeToVideo, isMuted, volume]);
 
   // Hybrid Proxy: Check if source needs proxy mode
   const hlsSource = useMemo(() => {
@@ -403,6 +531,7 @@ const VideoPlayer = ({
 
     try {
       await video.play();
+      await ensureAudioBoost(volumeRef.current, isMutedRef.current);
       setIsPlaying(true);
       setHasAutoPlayed(true);
       pendingPlaybackRef.current = false;
@@ -413,7 +542,7 @@ const VideoPlayer = ({
       pendingPlaybackRef.current = false;
       return false;
     }
-  }, [canStartPlayback]);
+  }, [canStartPlayback, ensureAudioBoost]);
 
   const requestEmbedPlayback = useCallback(() => {
     authModalRequestedRef.current = false;
@@ -595,6 +724,11 @@ const VideoPlayer = ({
         containerRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     };
+    const handleEnterPiP = () => {
+      if (DISABLE_PICTURE_IN_PICTURE && document.pictureInPictureElement === video) {
+        document.exitPictureInPicture?.().catch(() => {});
+      }
+    };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("durationchange", handleDurationChange);
@@ -608,6 +742,7 @@ const VideoPlayer = ({
     video.addEventListener("loadeddata", handleCanPlay);
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("progress", handleProgress);
+    video.addEventListener("enterpictureinpicture", handleEnterPiP);
     video.addEventListener("leavepictureinpicture", handleLeavePiP);
 
     return () => {
@@ -624,6 +759,7 @@ const VideoPlayer = ({
       video.removeEventListener("loadeddata", handleCanPlay);
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("progress", handleProgress);
+      video.removeEventListener("enterpictureinpicture", handleEnterPiP);
       video.removeEventListener("leavepictureinpicture", handleLeavePiP);
     };
   }, [
@@ -1358,9 +1494,13 @@ const VideoPlayer = ({
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       if (singleTapTimeoutRef.current) clearTimeout(singleTapTimeoutRef.current);
       if (doubleTapDismissRef.current) clearTimeout(doubleTapDismissRef.current);
+      clearDuckRestoreTimeout();
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+      }
       clearPendingBuffering();
     };
-  }, [clearPendingBuffering]);
+  }, [clearDuckRestoreTimeout, clearPendingBuffering]);
 
   // Clear double tap feedback animation after 800ms of no new taps
   useEffect(() => {
@@ -1476,26 +1616,33 @@ const VideoPlayer = ({
   };
 
   const handleVolumeChange = (e) => {
-    const video = videoRef.current;
-    const newVolume = parseFloat(e.target.value);
+    const newVolume = clampVolumeValue(e.target.value);
+    clearDuckRestoreTimeout();
+    preDuckVolumeRef.current = null;
+    volumeRef.current = newVolume;
     setVolume(newVolume);
-    if (video) {
-      video.volume = newVolume;
-      setIsMuted(newVolume === 0);
+    isMutedRef.current = newVolume === 0;
+    setIsMuted(newVolume === 0);
+    applyLogicalVolumeToVideo(newVolume, newVolume === 0);
+    if (newVolume > NATIVE_MAX_VOLUME) {
+      ensureAudioBoost(newVolume, false);
     }
   };
 
   const toggleMute = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
     if (isMuted) {
-      video.volume = volume;
+      isMutedRef.current = false;
+      applyLogicalVolumeToVideo(volumeRef.current, false);
+      if (volumeRef.current > NATIVE_MAX_VOLUME) {
+        ensureAudioBoost(volumeRef.current, false);
+      }
       setIsMuted(false);
     } else {
-      video.volume = 0;
+      isMutedRef.current = true;
+      applyLogicalVolumeToVideo(volumeRef.current, true);
       setIsMuted(true);
     }
-  }, [isMuted, volume]);
+  }, [applyLogicalVolumeToVideo, ensureAudioBoost, isMuted]);
 
   const handleSkip = (seconds) => {
     const video = videoRef.current;
@@ -1539,9 +1686,6 @@ const VideoPlayer = ({
           .call(container)
           .then(() => {
             setIsFullscreen(true);
-            if (window.screen?.orientation?.lock) {
-              window.screen.orientation.lock("landscape").catch(() => {});
-            }
           })
           .catch((err) => console.error(err));
       }
@@ -1558,7 +1702,9 @@ const VideoPlayer = ({
           .then(() => {
             setIsFullscreen(false);
             if (window.screen?.orientation?.unlock) {
-              window.screen.orientation.unlock();
+              try {
+                window.screen.orientation.unlock();
+              } catch (_error) {}
             }
           })
           .catch((err) => console.error(err));
@@ -1576,6 +1722,7 @@ const VideoPlayer = ({
   };
 
   const handlePictureInPicture = async () => {
+    if (DISABLE_PICTURE_IN_PICTURE) return;
     const video = videoRef.current;
     if (!video) return;
     try {
@@ -2151,46 +2298,56 @@ const VideoPlayer = ({
     };
     const onFullscreen = () => toggleFullscreen();
     const onVolumeUp = () => {
-      const video = videoRef.current;
-      if (!video) return;
-      const newVol = Math.min(1, video.volume + 0.1);
-      video.volume = newVol;
+      clearDuckRestoreTimeout();
+      preDuckVolumeRef.current = null;
+      const newVol = clampVolumeValue(volumeRef.current + 0.1);
+      volumeRef.current = newVol;
+      isMutedRef.current = false;
+      applyLogicalVolumeToVideo(newVol, false);
+      if (newVol > NATIVE_MAX_VOLUME) {
+        ensureAudioBoost(newVol, false);
+      }
       setVolume(newVol);
       setIsMuted(false);
     };
     const onVolumeDown = () => {
-      const video = videoRef.current;
-      if (!video) return;
-      const newVol = Math.max(0, video.volume - 0.1);
-      video.volume = newVol;
+      clearDuckRestoreTimeout();
+      preDuckVolumeRef.current = null;
+      const newVol = clampVolumeValue(volumeRef.current - 0.1);
+      volumeRef.current = newVol;
+      isMutedRef.current = newVol === 0;
+      applyLogicalVolumeToVideo(newVol, newVol === 0);
       setVolume(newVol);
-      if (newVol === 0) setIsMuted(true);
+      setIsMuted(newVol === 0);
     };
     const onMute = () => {
-      const video = videoRef.current;
-      if (video) {
-        video.volume = 0;
-        setIsMuted(true);
-      }
+      isMutedRef.current = true;
+      applyLogicalVolumeToVideo(volumeRef.current, true);
+      setIsMuted(true);
     };
     const onUnmute = () => {
-      const video = videoRef.current;
-      if (video) {
-        video.volume = volume;
-        setIsMuted(false);
+      isMutedRef.current = false;
+      applyLogicalVolumeToVideo(volumeRef.current, false);
+      if (volumeRef.current > NATIVE_MAX_VOLUME) {
+        ensureAudioBoost(volumeRef.current, false);
       }
+      setIsMuted(false);
     };
     const onDuckAudio = () => {
-      const video = videoRef.current;
-      if (video && !isMuted && video.volume > 0.05) {
-        video.volume = 0.05;
+      if (isMutedRef.current || volumeRef.current <= DUCKED_VOLUME) return;
+
+      clearDuckRestoreTimeout();
+      if (preDuckVolumeRef.current === null) {
+        preDuckVolumeRef.current = volumeRef.current;
       }
+
+      volumeRef.current = DUCKED_VOLUME;
+      setVolume(DUCKED_VOLUME);
+      applyLogicalVolumeToVideo(DUCKED_VOLUME, false);
+      duckRestoreTimeoutRef.current = setTimeout(restoreDuckedAudio, DUCK_RESTORE_TIMEOUT_MS);
     };
     const onRestoreAudio = () => {
-      const video = videoRef.current;
-      if (video && !isMuted) {
-        video.volume = volume;
-      }
+      restoreDuckedAudio();
     };
 
     // === PHASE 4: Advanced Voice Commands ===
@@ -2209,12 +2366,16 @@ const VideoPlayer = ({
       }
     };
     const onMaxVolume = () => {
-      const video = videoRef.current;
-      if (video) {
-        video.volume = 1;
-        setVolume(1);
-        setIsMuted(false);
+      clearDuckRestoreTimeout();
+      preDuckVolumeRef.current = null;
+      volumeRef.current = MAX_VOLUME;
+      isMutedRef.current = false;
+      applyLogicalVolumeToVideo(MAX_VOLUME, false);
+      if (MAX_VOLUME > NATIVE_MAX_VOLUME) {
+        ensureAudioBoost(MAX_VOLUME, false);
       }
+      setVolume(MAX_VOLUME);
+      setIsMuted(false);
     };
     const onPrevEp = () => {
       const currentEpNumber = episode?.episode || episode?.episodeId || 1;
@@ -2256,7 +2417,16 @@ const VideoPlayer = ({
       window.removeEventListener("VOICE_CMD_CHANGE_AUDIO", onChangeAudio);
       window.removeEventListener("VOICE_CMD_MAX_VOLUME", onMaxVolume);
     };
-  }, [duration, requestNativePlayback, toggleFullscreen, volume]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    applyLogicalVolumeToVideo,
+    clearDuckRestoreTimeout,
+    duration,
+    ensureAudioBoost,
+    requestNativePlayback,
+    restoreDuckedAudio,
+    toggleFullscreen,
+  ]);
 
   const handleDownloadMovie = useCallback(async () => {
     if (!user) {
@@ -2438,8 +2608,11 @@ const VideoPlayer = ({
         document.mozFullScreenElement ||
         document.msFullscreenElement;
       setIsFullscreen(!!isCurrentlyFullscreen);
-      if (!isCurrentlyFullscreen && window.screen?.orientation?.unlock)
-        window.screen.orientation.unlock();
+      if (!isCurrentlyFullscreen && window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch (_error) {}
+      }
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
@@ -2516,7 +2689,7 @@ const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className="relative w-full bg-black rounded-lg aspect-[16/9] max-w-full touch-none"
+      className="relative w-full bg-black rounded-lg aspect-[16/9] max-w-full touch-pan-y"
       style={{ cursor: isFullscreen && !showControls ? "none" : "default" }}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
@@ -2540,6 +2713,9 @@ const VideoPlayer = ({
           onEnded={handleVideoEnded}
           crossOrigin="anonymous"
           playsInline
+          disablePictureInPicture={DISABLE_PICTURE_IN_PICTURE}
+          disableRemotePlayback
+          controlsList="nodownload noplaybackrate noremoteplayback"
           webkit-playsinline="true"
           x5-playsinline="true"
           style={{
@@ -2551,7 +2727,7 @@ const VideoPlayer = ({
             transition: "filter 0.3s ease-in-out",
             WebkitTouchCallout: "none",
             WebkitUserSelect: "none",
-            touchAction: "manipulation",
+            touchAction: "pan-y",
           }}
         />
       ) : playableEmbedSource ? (
@@ -2823,6 +2999,7 @@ const VideoPlayer = ({
         onPlayPause={handlePlayPause}
         onSkip={handleSkip}
         volume={volume}
+        maxVolume={MAX_VOLUME}
         isMuted={isMuted}
         onVolumeChange={handleVolumeChange}
         onToggleMute={toggleMute}
@@ -2848,6 +3025,7 @@ const VideoPlayer = ({
         isQualityPremium={isQualityPremium}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
+        allowPictureInPicture={!DISABLE_PICTURE_IN_PICTURE}
         onPictureInPicture={handlePictureInPicture}
         showMoreMenu={showMoreMenu}
         onToggleMoreMenu={() => setShowMoreMenu(!showMoreMenu)}

@@ -26,6 +26,7 @@ const VideoControls = ({
   onSkip,
   // Volume
   volume,
+  maxVolume = 1,
   isMuted,
   onVolumeChange,
   onToggleMute,
@@ -57,6 +58,7 @@ const VideoControls = ({
   isFullscreen,
   onToggleFullscreen,
   // Picture in Picture
+  allowPictureInPicture = false,
   onPictureInPicture,
   // Mobile More Menu
   showMoreMenu,
@@ -84,7 +86,7 @@ const VideoControls = ({
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none opacity-100 touch-none"
+      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-2 md:p-3 lg:p-4 pt-12 md:pt-16 lg:pt-20 transition-opacity duration-300 z-20 pointer-events-none opacity-100 touch-auto"
       style={{
         paddingBottom: isFullscreen ? "calc(0.5rem + var(--safe-bottom))" : "0.5rem",
       }}
@@ -165,12 +167,14 @@ const VideoControls = ({
               <div className="absolute inset-0 bg-white/30 rounded-lg" />
               <div
                 className="absolute inset-y-0 left-0 bg-white rounded-lg"
-                style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
+                style={{
+                  width: `${Math.min(100, ((isMuted ? 0 : volume) / maxVolume) * 100)}%`,
+                }}
               />
               <input
                 type="range"
                 min="0"
-                max="1"
+                max={maxVolume}
                 step="0.01"
                 value={isMuted ? 0 : volume}
                 onChange={onVolumeChange}
@@ -268,6 +272,7 @@ const VideoControls = ({
           </div>
 
           {/* Picture in Picture - Desktop/Tablet only */}
+          {allowPictureInPicture && (
           <div className="hidden md:block">
             <Tooltip text="Thu nhỏ">
               <button
@@ -278,6 +283,7 @@ const VideoControls = ({
               </button>
             </Tooltip>
           </div>
+          )}
 
           {/* Speed Menu - Desktop/Tablet only */}
           <div className="hidden md:flex">
@@ -339,6 +345,7 @@ const VideoControls = ({
               showAudioMenu={showAudioMenu}
               onToggleAudioMenu={onToggleAudioMenu}
               onAudioChange={onAudioChange}
+              allowPictureInPicture={allowPictureInPicture}
               onPictureInPicture={onPictureInPicture}
               playbackRate={playbackRate}
               showSpeedMenu={showSpeedMenu}
