@@ -1086,6 +1086,43 @@ const getUserQuestSummary = async (req, res) => {
   }
 };
 
+const VALID_STATUSES = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'CANCELLED'];
+
+const getPaymentTransactions = async (req, res) => {
+  try {
+    const { status, from, to, search, packageId, page: pageRaw, limit: limitRaw } = req.query;
+
+    const statusClean = VALID_STATUSES.includes(status) ? status : undefined;
+    const fromClean = from && !isNaN(new Date(from).getTime()) ? from : undefined;
+    const toClean = to && !isNaN(new Date(to).getTime()) ? to : undefined;
+    const page = Math.max(1, parseInt(pageRaw) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitRaw) || 20));
+
+    const result = await adminService.getPaymentTransactions({
+      status: statusClean,
+      from: fromClean,
+      to: toClean,
+      search,
+      packageId,
+      page,
+      limit,
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getPaymentStats = async (req, res) => {
+  try {
+    const data = await adminService.getPaymentStats();
+    res.json({ data });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
 // Movies
 getAllMovies,
@@ -1154,4 +1191,8 @@ getAllMovies,
   getColabUrl,
   updateColabUrl,
   getSubtitleRequests,
+
+  // Payments
+  getPaymentTransactions,
+  getPaymentStats,
 };

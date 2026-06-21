@@ -1408,3 +1408,17 @@ export const castAPI = {
     return response.data || response || { success: true };
   },
 };
+
+/**
+ * Payments / Transactions API
+ */
+export const paymentAPI = {
+  getTransactions: async (params = {}) => {
+    const response = await apiRequest("/admin/payments", { params, requiresAuth: true });
+    return response;
+  },
+  getStats: async () => {
+    const response = await apiRequest("/admin/payments/stats", { requiresAuth: true });
+    return response;
+  },
+};

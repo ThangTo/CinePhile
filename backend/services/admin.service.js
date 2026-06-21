@@ -1,5 +1,6 @@
 const MovieModel = require('../models/movie.model');
 const UserModel = require('../models/user.model');
+const TransactionModel = require('../models/transaction.model');
 const watchStreakService = require('./watchStreak.service');
 const EpisodeModel = require('../models/episode.model');
 const UserHistoryModel = require('../models/user_history.model');
@@ -1928,6 +1929,82 @@ const getUserAnalytics = async (userId) => {
   };
 };
 
+// ─── Payment Transactions ──────────────────────────────────────
+
+const getPaymentTransactions = async ({ status, from, to, search, packageId, page = 1, limit = 20 }) => {
+  const filter = {};
+
+  if (status) {
+    filter.status = status;
+  }
+
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(from + 'T00:00:00.000');
+    if (to) filter.createdAt.$lte = new Date(to + 'T23:59:59.999');
+  }
+
+  if (packageId) {
+    filter.packageId = packageId;
+  }
+
+  if (search) {
+    const sanitized = search.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const users = await UserModel.find({
+      $or: [
+        { username: { $regex: sanitized, $options: 'i' } },
+        { email: { $regex: sanitized, $options: 'i' } },
+      ],
+    }).select('_id').lean();
+
+    filter.user = { $in: users.map((u) => u._id) };
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [data, total] = await Promise.all([
+    TransactionModel.find(filter)
+      .populate('user', 'username name email avatar')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    TransactionModel.countDocuments(filter),
+  ]);
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+const getPaymentStats = async () => {
+  const stats = await TransactionModel.aggregate([
+    { $match: { status: 'SUCCESS' } },
+    {
+      $group: {
+        _id: null,
+        totalRevenue: { $sum: '$amount' },
+        totalCoin: { $sum: { $add: ['$coinAmount', '$bonusCoin'] } },
+        paidUserCount: { $addToSet: '$user' },
+        successCount: { $sum: 1 },
+      },
+    },
+  ]);
+
+  if (stats.length === 0) {
+    return { totalRevenue: 0, totalCoin: 0, paidUserCount: 0, successCount: 0 };
+  }
+
+  const { totalRevenue, totalCoin, paidUserCount, successCount } = stats[0];
+  return { totalRevenue, totalCoin, paidUserCount: paidUserCount.length, successCount };
+};
+
 module.exports = {
   // Movies
   getAllMovies,
@@ -1972,4 +2049,7 @@ module.exports = {
   upsertPremiumPlan,
   deletePremiumPlan,
   getPremiumPlanPrice,
+  // Payments
+  getPaymentTransactions,
+  getPaymentStats,
 };

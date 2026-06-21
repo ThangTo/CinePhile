@@ -14,6 +14,7 @@ export const ADMIN_TABS = {
   PLAYBACK: "playback",
   HLS_LAB: "hls-lab",
   PRICING: "pricing",
+  PAYMENTS: "payments",
   MAILBOX: "mailbox",
   QUESTS: "quests",
   CASTS: "casts",
@@ -35,6 +36,7 @@ export const ADMIN_MENU_ITEMS = [
   { id: ADMIN_TABS.SUBTITLES, label: "Phụ đề", icon: "fa-closed-captioning" },
   { id: ADMIN_TABS.SETTINGS, label: "Cài đặt", icon: "fa-cog" },
   { id: ADMIN_TABS.PRICING, label: "Quản lý giá", icon: "fa-dollar-sign" },
+  { id: ADMIN_TABS.PAYMENTS, label: "Người nạp tiền", icon: "fa-coins" },
   { id: ADMIN_TABS.QUESTS, label: "Nhiệm vụ", icon: "fa-list-check" },
 ];
 

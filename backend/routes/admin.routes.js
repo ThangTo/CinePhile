@@ -235,6 +235,10 @@ router.put('/casts/:id', castController.updateCast);
 // DELETE /api/v1/admin/casts/:id - Delete cast
 router.delete('/casts/:id', castController.deleteCast);
 
+// ===== ADMIN PAYMENTS =====
+router.get('/payments/stats', adminController.getPaymentStats);
+router.get('/payments', adminController.getPaymentTransactions);
+
 // function isAdmin(req, res, next) {
 //   if (req.isAuthenticated() && (req.user.role === 'admin')) {
 //     return next();

@@ -14,6 +14,7 @@ const AdminViralClipsTab = lazy(() => import("components/admin/AdminViralClipsTa
 const AdminMailboxTab = lazy(() => import("components/admin/AdminMailboxTab"));
 const AdminTikTokTab = lazy(() => import("components/admin/AdminTikTokTab"));
 const SettingsPricingTab = lazy(() => import("components/admin/SettingsPricingTab"));
+const AdminPaymentsTab = lazy(() => import("components/admin/AdminPaymentsTab"));
 const AdminQuestsTab = lazy(() => import("components/admin/AdminQuestsTab"));
 const AdminSubtitlesTab = lazy(() => import("components/admin/AdminSubtitlesTab"));
 const AdminPlaybackTab = lazy(() => import("components/admin/AdminPlaybackTab"));
@@ -137,6 +138,12 @@ const AdminDashboard = () => {
         return <AdminSettingsTab />;
       case ADMIN_TABS.PRICING:
         return <SettingsPricingTab />;
+      case ADMIN_TABS.PAYMENTS:
+        return (
+          <div className="animate-fade-in">
+            <AdminPaymentsTab />
+          </div>
+        );
       case ADMIN_TABS.QUESTS:
         return <AdminQuestsTab />;
       default:
