@@ -1,6 +1,6 @@
 /**
  * Leaderboard Service
- * Fetches top users ranked by watch-time × streak score.
+ * Fetches top users ranked by watch minutes plus weighted log streak score.
  */
 
 import apiRequest from './utils/apiRequest';

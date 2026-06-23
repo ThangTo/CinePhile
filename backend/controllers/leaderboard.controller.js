@@ -7,7 +7,7 @@ const leaderboardService = require('../services/leaderboard.service');
 
 /**
  * GET /api/v1/users/leaderboard
- * Returns top 10 users ranked by watch-time × adjusted streak score.
+ * Returns top 10 users ranked by watch minutes plus weighted log streak score.
  */
 exports.getTopUsers = async (req, res) => {
   try {

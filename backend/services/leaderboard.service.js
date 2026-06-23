@@ -2,8 +2,9 @@
  * Leaderboard Service
  * Computes and caches the public top users leaderboard.
  *
- * Cache: leaderboard:topUsers:v4:<yyyy-mm-dd> (TTL: 3600s)
- * Score formula: totalWatchTime * adjustedMaxStreak * adjustedCurrentStreak
+ * Cache: leaderboard:topUsers:v5:<yyyy-mm-dd> (TTL: 3600s)
+ * Score formula:
+ * watchMinutes + 500 * log2(currentStreak + 1) + 150 * log2(maxStreak + 1)
  */
 
 const mongoose = require('mongoose');
@@ -12,10 +13,25 @@ const watchStreakService = require('./watchStreak.service');
 const { normalizeAvatarForOutput } = require('../utils/avatarUtils');
 const premiumService = require('./premium.service');
 
-const CACHE_KEY_PREFIX = 'leaderboard:topUsers:v4';
+const CACHE_KEY_PREFIX = 'leaderboard:topUsers:v5';
 const CACHE_TTL = 3600; // 1 hour
 const LEADERBOARD_LIMIT = 10;
 const PUBLIC_USER_ROLES = ['user', 'premium'];
+const WATCH_SECONDS_PER_MINUTE = 60;
+const CURRENT_STREAK_SCORE_WEIGHT = 500;
+const MAX_STREAK_SCORE_WEIGHT = 150;
+
+const toNonNegativeNumber = (value) => Math.max(0, Number(value) || 0);
+
+const calculateScore = ({ totalWatchTime, currentStreak, maxStreak }) => {
+  const watchMinutes = toNonNegativeNumber(totalWatchTime) / WATCH_SECONDS_PER_MINUTE;
+  const currentStreakScore =
+    CURRENT_STREAK_SCORE_WEIGHT * Math.log2(toNonNegativeNumber(currentStreak) + 1);
+  const maxStreakScore =
+    MAX_STREAK_SCORE_WEIGHT * Math.log2(toNonNegativeNumber(maxStreak) + 1);
+
+  return Math.round(watchMinutes + currentStreakScore + maxStreakScore);
+};
 
 const getCacheDateSegment = (referenceDate = new Date()) => {
   const date = new Date(referenceDate);
@@ -70,9 +86,7 @@ const getTopUsers = async (referenceDate = new Date()) => {
       const totalWatchTime = watchTimeByUserId.get(user._id.toString()) || 0;
       const currentStreak = watchStreakService.getCurrentStreakValue(user, referenceDate);
       const maxStreak = Number(user.longestStreak) || 0;
-      const adjustedMaxStreak = maxStreak > 0 ? maxStreak : 1;
-      const adjustedCurrentStreak = currentStreak > 0 ? currentStreak : 1;
-      const score = totalWatchTime * adjustedMaxStreak * adjustedCurrentStreak;
+      const score = calculateScore({ totalWatchTime, currentStreak, maxStreak });
 
       const premiumUser = premiumService.normalizePremiumSnapshot(user, referenceDate);
 
