@@ -237,6 +237,8 @@ router.delete('/casts/:id', castController.deleteCast);
 
 // ===== ADMIN PAYMENTS =====
 router.get('/payments/stats', adminController.getPaymentStats);
+router.get('/payments/config', adminController.getPaymentConfig);
+router.put('/payments/config', adminController.updatePaymentConfig);
 router.get('/payments', adminController.getPaymentTransactions);
 
 // function isAdmin(req, res, next) {

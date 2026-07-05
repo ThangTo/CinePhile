@@ -265,6 +265,9 @@ app.get('/api/v1/settings/premium-plans', adminController.getPremiumPlans);
 
 // GET /api/v1/settings/features — anyone can read feature permissions
 app.get('/api/v1/settings/features', adminController.getFeaturePermissions);
+
+// GET /api/v1/settings/payment-status — anyone can read the global payment toggle
+app.get('/api/v1/settings/payment-status', adminController.getPaymentConfig);
 app.use('/api/v1/crawl', crawlerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/cast', castRoutes);

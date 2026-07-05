@@ -1042,6 +1042,16 @@ export const settingsAPI = {
     return response.data || {};
   },
 
+  /**
+   * Get global payment toggle status — public endpoint, no auth required
+   */
+  getPaymentStatus: async () => {
+    const response = await apiRequest("/settings/payment-status", {
+      requiresAuth: false,
+    });
+    return response.data || { enabled: true };
+  },
+
   // ─── Pricing ──────────────────────────────────────────────────────────────
 
   /**
@@ -1420,5 +1430,17 @@ export const paymentAPI = {
   getStats: async () => {
     const response = await apiRequest("/admin/payments/stats", { requiresAuth: true });
     return response;
+  },
+  getConfig: async () => {
+    const response = await apiRequest("/admin/payments/config", { requiresAuth: true });
+    return response.data || {};
+  },
+  updateConfig: async (enabled) => {
+    const response = await apiRequest("/admin/payments/config", {
+      method: "PUT",
+      data: { enabled },
+      requiresAuth: true,
+    });
+    return response.data || {};
   },
 };

@@ -86,6 +86,13 @@ const createPaymentLink = async ({ userId, packageId }) => {
     throw new Error('Missing userId or payment package');
   }
 
+  const paymentEnabled = await adminService.getSetting('payment_enabled');
+  if (paymentEnabled === false) {
+    const error = new Error('Chức năng nạp tiền đang tạm khóa. Vui lòng quay lại sau.');
+    error.statusCode = 403;
+    throw error;
+  }
+
   const selectedPackage = await resolveCoinPackageSelection({ packageId });
 
   // PayOS only accepts a numeric orderCode.

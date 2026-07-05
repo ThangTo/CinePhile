@@ -20,6 +20,7 @@ const RechargeCoinPage = () => {
   const [isCreatingLink, setIsCreatingLink] = useState(false);
   const [coinPackages, setCoinPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(true);
+  const [paymentEnabled, setPaymentEnabled] = useState(true);
 
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -38,6 +39,14 @@ const RechargeCoinPage = () => {
       })
       .catch(() => {})
       .finally(() => setLoadingPackages(false));
+  }, []);
+
+  // Check global payment toggle (admin can disable bank transfer)
+  useEffect(() => {
+    settingsAPI
+      .getPaymentStatus()
+      .then((res) => setPaymentEnabled(res?.enabled !== false))
+      .catch(() => {});
   }, []);
 
   // Check URL params for payment status (Redirect Mode)
@@ -61,6 +70,11 @@ const RechargeCoinPage = () => {
   const handleRecharge = async () => {
     if (!user) {
       navigate("/");
+      return;
+    }
+
+    if (!paymentEnabled) {
+      setError("Chức năng nạp tiền đang tạm khóa, vui lòng quay lại sau.");
       return;
     }
 
@@ -106,7 +120,12 @@ const RechargeCoinPage = () => {
       }
     } catch (err) {
       console.error(err);
-      setError("Có lỗi xảy ra. Vui lòng thử lại sau.");
+      if (err.status === 403) {
+        setPaymentEnabled(false);
+        setError(err.message || "Chức năng nạp tiền đang tạm khóa, vui lòng quay lại sau.");
+      } else {
+        setError("Có lỗi xảy ra. Vui lòng thử lại sau.");
+      }
     } finally {
       setIsCreatingLink(false);
     }
@@ -263,20 +282,32 @@ const RechargeCoinPage = () => {
             <div className="grid md:grid-cols-2 gap-4">
               {/* Method 1: Bank Transfer (PayOS) */}
               <div
-                className={`p-6 rounded-2xl border transition-all cursor-pointer relative border-primaryColor bg-primaryColor/5`}
+                className={`p-6 rounded-2xl border transition-all relative ${
+                  paymentEnabled
+                    ? "cursor-pointer border-primaryColor bg-primaryColor/5"
+                    : "cursor-not-allowed border-white/5 bg-white/[0.01] opacity-60"
+                }`}
               >
-                <div className="absolute top-3 right-3 shadow-sm rounded-full">
-                  <div className="w-5 h-5 bg-primaryColor rounded-full flex items-center justify-center">
-                    <FiCheck className="text-black w-3 h-3 stroke-[3px]" />
+                {paymentEnabled ? (
+                  <div className="absolute top-3 right-3 shadow-sm rounded-full">
+                    <div className="w-5 h-5 bg-primaryColor rounded-full flex items-center justify-center">
+                      <FiCheck className="text-black w-3 h-3 stroke-[3px]" />
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs font-semibold">
+                    Tạm khóa
+                  </div>
+                )}
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-blue-600/20 flex items-center justify-center text-blue-400">
                     <FiCreditCard size={24} />
                   </div>
                   <div>
                     <h3 className="text-white font-bold text-lg">Chuyển khoản / VietQR</h3>
-                    <p className="text-gray-500 text-sm">Quét mã QR, tự động xử lý 24/7</p>
+                    <p className="text-gray-500 text-sm">
+                      {paymentEnabled ? "Quét mã QR, tự động xử lý 24/7" : "Đang tạm khóa, vui lòng quay lại sau"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -337,12 +368,12 @@ const RechargeCoinPage = () => {
                 <div className="w-full md:w-auto min-w-[300px]">
                   <button
                     onClick={handleRecharge}
-                    disabled={!finalAmount || finalAmount < 10 || loading || isCreatingLink}
+                    disabled={!finalAmount || finalAmount < 10 || loading || isCreatingLink || !paymentEnabled}
                     className={`
                             w-full py-4 rounded-xl font-bold text-lg tracking-wide transition-all duration-300
                             flex items-center justify-center gap-3 shadow-lg
                             ${
-                              finalAmount >= 10 && !loading && !isCreatingLink
+                              finalAmount >= 10 && !loading && !isCreatingLink && paymentEnabled
                                 ? "bg-primaryColor hover:bg-hoverPrimaryColor text-black shadow-primaryColor/25 hover:shadow-primaryColor/40 hover:-translate-y-1"
                                 : "bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5"
                             }
@@ -356,6 +387,11 @@ const RechargeCoinPage = () => {
                       <>Xác nhận và thanh toán</>
                     )}
                   </button>
+                  {!paymentEnabled && (
+                    <p className="text-center text-sm text-red-400 mt-2">
+                      Chức năng nạp tiền đang tạm khóa, vui lòng quay lại sau.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

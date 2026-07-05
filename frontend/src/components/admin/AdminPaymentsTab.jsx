@@ -62,6 +62,11 @@ const AdminPaymentsTab = () => {
 
   const [packages, setPackages] = useState([]);
 
+  const [paymentEnabled, setPaymentEnabled] = useState(true);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [togglingConfig, setTogglingConfig] = useState(false);
+  const [configMessage, setConfigMessage] = useState({ type: "", text: "" });
+
   useEffect(() => {
     setStatsLoading(true);
     paymentAPI
@@ -70,6 +75,34 @@ const AdminPaymentsTab = () => {
       .catch(() => {})
       .finally(() => setStatsLoading(false));
   }, []);
+
+  useEffect(() => {
+    setConfigLoading(true);
+    paymentAPI
+      .getConfig()
+      .then((res) => setPaymentEnabled(res?.enabled !== false))
+      .catch(() => {})
+      .finally(() => setConfigLoading(false));
+  }, []);
+
+  const handleTogglePayment = async () => {
+    const nextEnabled = !paymentEnabled;
+    setTogglingConfig(true);
+    setConfigMessage({ type: "", text: "" });
+    try {
+      const res = await paymentAPI.updateConfig(nextEnabled);
+      setPaymentEnabled(res?.enabled !== false ? res.enabled : nextEnabled);
+      setConfigMessage({
+        type: "success",
+        text: nextEnabled ? "Đã mở chuyển khoản." : "Đã khóa chuyển khoản.",
+      });
+      setTimeout(() => setConfigMessage({ type: "", text: "" }), 3000);
+    } catch (err) {
+      setConfigMessage({ type: "error", text: err?.message || "Không thể cập nhật trạng thái." });
+    } finally {
+      setTogglingConfig(false);
+    }
+  };
 
   useEffect(() => {
     settingsAPI
@@ -160,6 +193,43 @@ const AdminPaymentsTab = () => {
           <FiRefreshCw className="w-4 h-4" />
           Tải lại
         </button>
+      </div>
+
+      {/* Payment Toggle */}
+      <div className="bg-bgColor3 rounded-xl p-4 border border-white/10 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="text-white font-medium">Chuyển khoản ngân hàng</h3>
+          <p className="text-gray-500 text-xs mt-1">
+            Tắt để tạm khóa nạp tiền qua chuyển khoản trên toàn hệ thống.
+          </p>
+          {!paymentEnabled && !configLoading && (
+            <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium border bg-red-500/20 text-red-400 border-red-500/30">
+              Đang khóa nạp tiền
+            </span>
+          )}
+          {configMessage.text && (
+            <p
+              className={`text-xs mt-2 ${
+                configMessage.type === "error" ? "text-red-400" : "text-green-400"
+              }`}
+            >
+              {configMessage.text}
+            </p>
+          )}
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={paymentEnabled}
+            disabled={configLoading || togglingConfig}
+            onChange={handleTogglePayment}
+          />
+          <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+          <span className="ml-3 text-sm font-medium text-gray-300 w-20">
+            {paymentEnabled ? "Đang mở" : "Đang khóa"}
+          </span>
+        </label>
       </div>
 
       {/* Stat Cards */}

@@ -23,6 +23,9 @@ const createPaymentLink = async (req, res) => {
     if (error.message === "User not found") {
       return res.status(404).json({ message: error.message });
     }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
     res.status(500).json({ message: "Something went error" });
   }
 };

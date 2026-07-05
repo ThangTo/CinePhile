@@ -1123,6 +1123,28 @@ const getPaymentStats = async (req, res) => {
   }
 };
 
+const getPaymentConfig = async (req, res) => {
+  try {
+    const enabled = await adminService.getSetting('payment_enabled');
+    res.json({ success: true, data: { enabled: enabled !== false } });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const updatePaymentConfig = async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled must be a boolean' });
+    }
+    await adminService.setSetting('payment_enabled', enabled, 'Global payment toggle');
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
 // Movies
 getAllMovies,
@@ -1195,4 +1217,6 @@ getAllMovies,
   // Payments
   getPaymentTransactions,
   getPaymentStats,
+  getPaymentConfig,
+  updatePaymentConfig,
 };
