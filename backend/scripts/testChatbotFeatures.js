@@ -19,7 +19,7 @@ async function measureRequest(label, fn) {
   const status = duration <= PERF_THRESHOLD_MS ? '✅' : '⚠️';
 
   console.log(
-    `${status} ${label} - Thời gian phản hồi: ${duration} ms (ngưỡng ${PERF_THRESHOLD_MS} ms)`
+    `${status} ${label} - Thời gian phản hồi: ${duration} ms (ngưỡng ${PERF_THRESHOLD_MS} ms)`,
   );
 
   return { result, duration };
@@ -31,100 +31,97 @@ async function testSecurityConfig() {
 
   if (!GEMINI_API_KEY) {
     console.log(
-      '⚠️ GEMINI_API_KEY chưa được cấu hình (env). Một số test chatbot sẽ sử dụng fallback keyword.'
+      '⚠️ GEMINI_API_KEY chưa được cấu hình (env). Một số test chatbot sẽ sử dụng fallback keyword.',
     );
   } else {
     const masked =
       GEMINI_API_KEY.length > 6
         ? GEMINI_API_KEY.slice(0, 3) + '***' + GEMINI_API_KEY.slice(-3)
         : '***';
-    console.log(
-      '✅ GEMINI_API_KEY đã được cấu hình (đã mask, không log full):',
-      masked
-    );
+    console.log('✅ GEMINI_API_KEY đã được cấu hình (đã mask, không log full):', masked);
   }
 
-  console.log(
-    '✅ API key đang được lấy từ biến môi trường (.env), không hard-code trong source.'
-  );
+  console.log('✅ API key đang được lấy từ biến môi trường (.env), không hard-code trong source.');
 }
 
 // TEST 2: Performance - Tìm phim mới
 async function testNewMoviesQuery() {
   console.log('\n=== TEST 2: Performance - Tìm phim mới ===');
-  
+
   const testSessionId = 'test-session-new-movies-' + Date.now();
-  
+
   const { result } = await measureRequest('Chatbot: query phim mới', () =>
     handleChat({
       userId: null,
       message: 'Cho mình xem phim mới cập nhật gần đây',
       sessionId: testSessionId,
       history: [],
-      metadata: {}
-    }));
-  
+      metadata: {},
+    }),
+  );
+
   console.log('✅ Kết quả (rút gọn):', (result || '').substring(0, 200) + '...');
-  
+
   return testSessionId;
 }
 
 // TEST 3: Reliability - Kiểm tra lưu lịch sử chat
 async function testChatHistory(sessionId) {
   console.log('\n=== TEST 3: Reliability - Kiểm tra lịch sử chat ===');
-  
+
   const chatSession = await Chat.findOne({ sessionId }).lean();
-  
+
   if (!chatSession) {
     console.log('❌ Không tìm thấy chat session');
     return;
   }
-  
+
   console.log('✅ Chat session tìm thấy:');
   console.log('  - Session ID:', chatSession.sessionId);
   console.log('  - Số tin nhắn:', chatSession.messages.length);
-  console.log('  - Tin nhắn gần nhất:', chatSession.messages[chatSession.messages.length - 1].content.substring(0, 100) + '...');
+  console.log(
+    '  - Tin nhắn gần nhất:',
+    chatSession.messages[chatSession.messages.length - 1].content.substring(0, 100) + '...',
+  );
 }
 
 // TEST 4: Performance + Context - Hội thoại đa lượt
 async function testConversationContext(sessionId) {
   console.log('\n=== TEST 4: Performance + Context - Hội thoại đa lượt ===');
-  
+
   // Tin nhắn đầu tiên
-  const { result: result1 } = await measureRequest(
-    'Chatbot: lượt 1 (phim hành động)',
-    () => handleChat({
+  const { result: result1 } = await measureRequest('Chatbot: lượt 1 (phim hành động)', () =>
+    handleChat({
       userId: null,
       message: 'Cho mình xem phim hành động',
       sessionId,
       history: [],
-      metadata: {}
-    })
+      metadata: {},
+    }),
   );
-  
+
   console.log('✅ Tin nhắn 1:', (result1 || '').substring(0, 150) + '...');
-  
+
   // Tin nhắn thứ 2 (dựa vào context của tin nhắn 1)
-  const { result: result2 } = await measureRequest(
-    'Chatbot: lượt 2 (phim hay nhất)',
-    () => handleChat({
+  const { result: result2 } = await measureRequest('Chatbot: lượt 2 (phim hay nhất)', () =>
+    handleChat({
       userId: null,
       message: 'Phim nào hay nhất?',
       sessionId,
       history: [], // Service sẽ tự load từ database
-      metadata: {}
-    })
+      metadata: {},
+    }),
   );
-  
+
   console.log('✅ Tin nhắn 2 (với context):', (result2 || '').substring(0, 150) + '...');
 }
 
 // TEST 5: Reliability - Xóa lịch sử chat
 async function testClearHistory(sessionId) {
   console.log('\n=== TEST 5: Reliability - Xóa lịch sử chat ===');
-  
+
   await Chat.updateMany({ sessionId }, { isActive: false });
-  
+
   const inactiveSessions = await Chat.find({ sessionId, isActive: false }).countDocuments();
   console.log('✅ Đã đánh dấu inactive:', inactiveSessions, 'sessions');
 }
@@ -132,15 +129,15 @@ async function testClearHistory(sessionId) {
 // TEST 6: Data readiness - Kiểm tra phim mới trong DB
 async function checkNewMovies() {
   console.log('\n=== TEST 6: Data readiness - Kiểm tra phim mới trong database ===');
-  
+
   const newMoviesCount = await Movie.countDocuments({ isNewRelease: true });
   console.log('  - Phim có isNewRelease=true:', newMoviesCount);
-  
+
   const recentMoviesCount = await Movie.countDocuments({
-    updatedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+    updatedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
   });
   console.log('  - Phim update trong 30 ngày:', recentMoviesCount);
-  
+
   if (newMoviesCount === 0 && recentMoviesCount === 0) {
     console.log('\n⚠️  Cảnh báo: Không có phim mới trong database!');
     console.log('   Để test tính năng này, hãy:');
@@ -161,8 +158,8 @@ async function testGenreQueryPerformance() {
       message: 'Gợi ý giúp mình vài phim kinh dị hay',
       sessionId,
       history: [],
-      metadata: {}
-    })
+      metadata: {},
+    }),
   );
 }
 
@@ -178,8 +175,8 @@ async function testActorQueryPerformance() {
       message: 'Có phim nào của diễn viên Tom Cruise không?',
       sessionId,
       history: [],
-      metadata: {}
-    })
+      metadata: {},
+    }),
   );
 }
 
@@ -198,7 +195,7 @@ async function testConcurrentChats() {
     'Làm sao để xem lại lịch sử phim đã xem?',
     'Gợi ý vài phim gia đình cho trẻ em',
     'Có phim kinh dị nào đang hot không?',
-    'Phim nào được đánh giá cao nhất trên CinePhile?'
+    'Phim nào được đánh giá cao nhất trên CinePhine?',
   ];
 
   const start = Date.now();
@@ -211,7 +208,7 @@ async function testConcurrentChats() {
       message,
       sessionId,
       history: [],
-      metadata: {}
+      metadata: {},
     });
   });
 
@@ -222,11 +219,11 @@ async function testConcurrentChats() {
   const failCount = results.length - successCount;
 
   console.log(
-    `✅ Hoàn thành ${results.length} request đồng thời trong ${duration} ms. Thành công: ${successCount}, Lỗi: ${failCount}`
+    `✅ Hoàn thành ${results.length} request đồng thời trong ${duration} ms. Thành công: ${successCount}, Lỗi: ${failCount}`,
   );
   if (duration > PERF_THRESHOLD_MS) {
     console.log(
-      '⚠️ Tổng thời gian xử lý đồng thời vượt quá ngưỡng 5 giây. Cần tối ưu thêm nếu đây là case phổ biến.'
+      '⚠️ Tổng thời gian xử lý đồng thời vượt quá ngưỡng 5 giây. Cần tối ưu thêm nếu đây là case phổ biến.',
     );
   }
 }
@@ -242,16 +239,14 @@ async function testReliabilityOverMultipleRequests() {
   for (let i = 0; i < totalRequests; i++) {
     const sessionId = `test-reliability-${Date.now()}-${i}`;
     try {
-      const { duration } = await measureRequest(
-        `Chatbot: request #${i + 1}`,
-        () =>
-          handleChat({
-            userId: null,
-            message: 'Cho mình vài gợi ý phim hay bất kỳ',
-            sessionId,
-            history: [],
-            metadata: {}
-          })
+      const { duration } = await measureRequest(`Chatbot: request #${i + 1}`, () =>
+        handleChat({
+          userId: null,
+          message: 'Cho mình vài gợi ý phim hay bất kỳ',
+          sessionId,
+          history: [],
+          metadata: {},
+        }),
       );
       successCount += 1;
       if (duration > PERF_THRESHOLD_MS) slowCount += 1;
@@ -265,17 +260,17 @@ async function testReliabilityOverMultipleRequests() {
 
   console.log(
     `✅ Tổng kết reliability: ${successCount}/${totalRequests} request thành công (${successRate.toFixed(
-      1
-    )}%).`
+      1,
+    )}%).`,
   );
   console.log(
     `✅ Tỉ lệ request dưới ${PERF_THRESHOLD_MS} ms: ${totalRequests - slowCount}/${
       totalRequests
-    } (${fastRate.toFixed(1)}%).`
+    } (${fastRate.toFixed(1)}%).`,
   );
   if (fastRate < 95) {
     console.log(
-      '⚠️ Tỉ lệ request dưới 5 giây < 95%. Cần theo dõi thêm trong môi trường thực tế (production) để đảm bảo yêu cầu phi chức năng.'
+      '⚠️ Tỉ lệ request dưới 5 giây < 95%. Cần theo dõi thêm trong môi trường thực tế (production) để đảm bảo yêu cầu phi chức năng.',
     );
   }
 }
@@ -283,27 +278,27 @@ async function testReliabilityOverMultipleRequests() {
 async function main() {
   try {
     console.log('🚀 Bắt đầu test các tính năng mới của chatbot...\n');
-    
+
     // Kết nối database
-    const dbUrl = process.env.MONGO_URI || 'mongodb://localhost:27017/cinephile';
+    const dbUrl = process.env.MONGO_URI || 'mongodb://localhost:27017/CinePhine';
     await mongoose.connect(dbUrl);
     console.log('✅ Đã kết nối MongoDB');
-    
+
     // Test 1: Security - cấu hình GEMINI_API_KEY
     await testSecurityConfig();
 
     // Test 6: Kiểm tra dữ liệu phim mới trong DB (hỗ trợ hiệu năng query)
     await checkNewMovies();
-    
+
     // Test 2: Tìm phim mới + performance
     const sessionId = await testNewMoviesQuery();
-    
+
     // Test 3: Kiểm tra lịch sử
     await testChatHistory(sessionId);
-    
+
     // Test 4: Hội thoại đa lượt + performance
     // await testConversationContext(sessionId);
-    
+
     // Test 5: Xóa lịch sử
     await testClearHistory(sessionId);
 
@@ -318,9 +313,8 @@ async function main() {
 
     // Test 10: Reliability - nhiều request liên tiếp
     await testReliabilityOverMultipleRequests();
-    
+
     console.log('\n✅ Tất cả 10 test case đã hoàn thành!');
-    
   } catch (error) {
     console.error('\n❌ Lỗi:', error.message);
     console.error(error);

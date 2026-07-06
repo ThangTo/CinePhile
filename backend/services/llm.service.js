@@ -1,9 +1,4 @@
-const {
-  createChatCompletion,
-  extractChatMessageContent,
-} = require('./llmProvider.service');
-
-const VIRAL_LLM_DEFAULT_MODEL = 'google/gemini-2.0-flash-001';
+const { complete } = require('./llm');
 
 /**
  * Analyze subtitle content with scene boundaries using LLM to identify viral moments.
@@ -11,7 +6,6 @@ const VIRAL_LLM_DEFAULT_MODEL = 'google/gemini-2.0-flash-001';
 async function analyzeScenes(vttContent, sceneBoundaries = [], options = {}) {
   console.log(`[LLM] Analyzing scenes from VTT content (${vttContent.length} chars)`);
 
-  // Keep timestamps so the LLM can return exact clip boundaries.
   const cleanVtt = vttContent
     .split('\n')
     .filter(line => line.trim() !== '' && line.trim() !== 'WEBVTT')
@@ -47,31 +41,24 @@ Rules:
   const userPrompt = `Subtitles (VTT format):\n${cleanVtt}${sceneInfo}`;
 
   try {
-    const chatCompletion = options.chatCompletion || createChatCompletion;
-    const response = await chatCompletion(
-      {
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 1500,
-        response_format: { type: 'json_object' },
-      },
-      {
-        scope: 'VIRAL',
-        defaultModel: VIRAL_LLM_DEFAULT_MODEL,
-        title: 'CinePhine Viral Clip Generator',
-        timeoutMs: 60000,
-        ...(options.providerOptions || {}),
-      },
-    );
+    const llmComplete = options.llm || complete;
+    const response = await llmComplete({
+      scope: 'VIRAL',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 1500,
+      response_format: { type: 'json_object' },
+      ...(options.llmOptions || {}),
+    });
 
     console.log(
       `[LLM] Provider ${response.provider} model ${response.model} responded in ${response.durationMs}ms`
     );
 
-    const content = extractChatMessageContent(response.data);
+    const content = response.content;
     if (!content) {
       throw new Error('LLM returned empty response');
     }

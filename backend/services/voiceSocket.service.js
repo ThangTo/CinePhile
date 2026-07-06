@@ -1,16 +1,13 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const { createClient, LiveTranscriptionEvents } = require('@deepgram/sdk');
-const { callLlmWithFallback } = require('../utils/llmUtils');
+const { complete } = require('./llm');
 const { generateTtsAudio } = require('../utils/ttsUtils');
 const {
   executeToolCalls,
   executeDeterministicVoiceFallback,
   getSystemPrompt,
   TOOLS,
-  LLM_PROVIDER,
-  LLM_MODELS,
-  REQUEST_TIMEOUT,
 } = require('../controllers/ai.controller');
 
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
@@ -235,11 +232,8 @@ function initVoiceSocket(httpServer) {
         }
         messages.push({ role: 'user', content: transcript });
 
-        const data = await callLlmWithFallback({
+        const result = await complete({
           scope: 'TIMI',
-          provider: LLM_PROVIDER,
-          models: LLM_MODELS,
-          timeoutMs: REQUEST_TIMEOUT,
           messages,
           tools: TOOLS,
           tool_choice: 'auto',
@@ -247,14 +241,7 @@ function initVoiceSocket(httpServer) {
           temperature: 0.3,
         });
 
-        const choice = data.choices?.[0];
-        if (!choice) {
-          sock.emit('timi_response', { success: false, commands: [], reply: 'Timi không kết nối được AI.' });
-          sock.emit('timi_thinking', false);
-          return;
-        }
-
-        const toolCalls = choice.message?.tool_calls || [];
+        const toolCalls = result.toolCalls || [];
         let { commands, directReply } = await executeToolCalls(toolCalls, sock.user, context);
         if (commands.length === 0 && !directReply) {
           const fallbackResult = await executeDeterministicVoiceFallback(transcript, sock.user, context);
@@ -263,7 +250,7 @@ function initVoiceSocket(httpServer) {
             directReply = fallbackResult.directReply;
           }
         }
-        const reply = directReply || choice.message?.content || (commands.length > 0 ? 'Dạ xong rồi ạ!' : 'Mình không hiểu ý bạn!');
+        const reply = directReply || result.content || (commands.length > 0 ? 'Dạ xong rồi ạ!' : 'Mình không hiểu ý bạn!');
 
         const audioUrl = await generateTtsAudio(reply);
 

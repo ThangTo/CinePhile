@@ -1,39 +1,10 @@
-const {
-  callLlmWithFallback,
-  DEFAULT_FREE_FALLBACK_MODELS,
-  resolveModelsToTry,
-} = require('../utils/llmUtils');
+const { complete } = require('../services/llm');
 const Movie = require('../models/movie.model');
 const UserFavorite = require('../models/user_favorite.model');
 const Comment = require('../models/comment.model');
 const mongoose = require('mongoose');
 const { generateTtsAudio } = require('../utils/ttsUtils');
 const movieService = require('../services/movie.service');
-
-function parsePositiveInt(value, fallback) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function resolveProviderName(...values) {
-  return String(values.find((value) => value !== undefined && value !== null && String(value).trim() !== '') || 'openrouter')
-    .trim()
-    .toLowerCase();
-}
-
-function getDefaultTimiModel(provider) {
-  if (provider === 'gemini') return 'gemini-2.5-flash';
-  if (provider === 'openai') return 'gpt-4o-mini';
-  return 'google/gemini-2.5-flash';
-}
-
-const LLM_PROVIDER = resolveProviderName(process.env.TIMI_LLM_PROVIDER, process.env.LLM_PROVIDER, 'openrouter');
-const LLM_MODEL = process.env.TIMI_LLM_MODEL || getDefaultTimiModel(LLM_PROVIDER);
-const LLM_MODELS = resolveModelsToTry({
-  model: LLM_MODEL,
-  models: process.env.TIMI_LLM_FALLBACK_MODELS || (LLM_PROVIDER === 'openrouter' ? DEFAULT_FREE_FALLBACK_MODELS : []),
-});
-const REQUEST_TIMEOUT = parsePositiveInt(process.env.TIMI_LLM_TIMEOUT_MS, 10000); // Tăng lên 10s vì có thể gọi DB
 
 // ====================================================================
 // TOOLS DEFINITION
@@ -814,11 +785,8 @@ const processVoiceCommand = async (req, res) => {
     }
     messages.push({ role: 'user', content: transcript.trim() });
 
-    const data = await callLlmWithFallback({
+    const result = await complete({
       scope: 'TIMI',
-      provider: LLM_PROVIDER,
-      models: LLM_MODELS,
-      timeoutMs: REQUEST_TIMEOUT,
       messages,
       tools: TOOLS,
       tool_choice: 'auto',
@@ -826,21 +794,19 @@ const processVoiceCommand = async (req, res) => {
       temperature: 0.3,
     });
     
-    const choice = data.choices?.[0];
-    if (!choice) return res.json({ success: false, commands: [], reply: 'Timi không kết nối được AI.' });
+    const toolCalls = result.toolCalls || [];
+    let commandResult = await executeToolCalls(toolCalls, user, context);
 
-    const toolCalls = choice.message?.tool_calls || [];
-    let { commands, directReply } = await executeToolCalls(toolCalls, user, context);
-
-    if (commands.length === 0 && !directReply) {
+    if (commandResult.commands.length === 0 && !commandResult.directReply) {
       const fallbackResult = await executeDeterministicVoiceFallback(transcript.trim(), user, context);
       if (fallbackResult) {
-        commands = fallbackResult.commands;
-        directReply = fallbackResult.directReply;
+        commandResult.commands = fallbackResult.commands;
+        commandResult.directReply = fallbackResult.directReply;
       }
     }
 
-    const reply = directReply || choice.message?.content || (commands.length > 0 ? 'Dạ xong rồi ạ!' : 'Mình không hiểu ý bạn!');
+    const { commands, directReply } = commandResult;
+    const reply = directReply || result.content || (commands.length > 0 ? 'Dạ xong rồi ạ!' : 'Mình không hiểu ý bạn!');
 
     // Generate Audio URL with ElevenLabs (TTS Cache)
     const audioUrl = await generateTtsAudio(reply);
@@ -879,8 +845,4 @@ module.exports = {
   buildDeterministicVoiceToolCalls,
   getSystemPrompt,
   TOOLS,
-  LLM_PROVIDER,
-  LLM_MODEL,
-  LLM_MODELS,
-  REQUEST_TIMEOUT,
 };

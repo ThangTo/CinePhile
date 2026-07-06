@@ -20,7 +20,7 @@ const VoiceIndicator = () => {
 
   const [showTooltip, setShowTooltip] = useState(true);
   const safeFloatingStyle = {
-    bottom: "calc(var(--safe-bottom) + 5.75rem)",
+    bottom: "calc(var(--safe-bottom) + 2rem)",
     left: "calc(var(--safe-left) + 1.25rem)",
   };
 

@@ -195,8 +195,8 @@ CinePhine/
 
    ```env
    # Database
-   MONGO_URI=mongodb://localhost:27017/cinephile
-   # hoặc MongoDB Atlas: mongodb+srv://username:password@cluster.mongodb.net/cinephile
+   MONGO_URI=mongodb://localhost:27017/CinePhine
+   # hoặc MongoDB Atlas: mongodb+srv://username:password@cluster.mongodb.net/CinePhine
 
    # Server
    PORT=5000
@@ -282,7 +282,7 @@ Có thể sử dụng MongoDB local hoặc MongoDB Atlas:
 
 - Cài đặt MongoDB trên máy
 - Chạy MongoDB service
-- Cập nhật `MONGO_URI` trong `.env`: `mongodb://localhost:27017/cinephile`
+- Cập nhật `MONGO_URI` trong `.env`: `mongodb://localhost:27017/CinePhine`
 
 **MongoDB Atlas (Cloud):**
 

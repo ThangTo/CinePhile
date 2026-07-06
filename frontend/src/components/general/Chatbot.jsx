@@ -4,6 +4,8 @@ import { getSystemInstruction } from "constants/chatbotKnowledge";
 
 const EMOJI_MART_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/emoji-mart@latest/dist/browser.js";
 let emojiMartLoadPromise = null;
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
+const STREAM_PAINT_DELAY_MS = 16;
 
 function loadEmojiMart() {
   if (typeof window === "undefined") return Promise.resolve();
@@ -28,6 +30,150 @@ function loadEmojiMart() {
   });
 
   return emojiMartLoadPromise;
+}
+
+function appendTokenToMessage(setMessages, messageId, content) {
+  setMessages((prev) =>
+    prev.map((msg) =>
+      msg.id === messageId
+        ? { ...msg, content, isThinking: false, isStreaming: true }
+        : msg
+    )
+  );
+}
+
+function finalizeBotMessage(setMessages, messageId, content) {
+  setMessages((prev) =>
+    prev.map((msg) =>
+      msg.id === messageId
+        ? { ...msg, content, isThinking: false, isStreaming: false }
+        : msg
+    )
+  );
+}
+
+function extractPlainText(html) {
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = html;
+  return tempDiv.textContent || tempDiv.innerText || "";
+}
+
+function waitForStreamPaint() {
+  return new Promise((resolve) => {
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, STREAM_PAINT_DELAY_MS);
+  });
+}
+
+async function sendChatMessageFallback(payload) {
+  const res = await fetch(`${API_BASE_URL}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Chat request failed");
+
+  const answerHTML = (data.answer || "").trim();
+  return {
+    answerHTML,
+    plainText: extractPlainText(answerHTML),
+  };
+}
+
+async function sendChatMessageWithStream(payload, messageId, setMessages) {
+  let streamedContent = "";
+  let receivedToken = false;
+  let finalResult = null;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok || !res.body) {
+      throw new Error(`Stream request failed (${res.status})`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() || "";
+
+      for (const frame of frames) {
+        const event = parseStreamEvent(frame);
+        if (!event) continue;
+        if (event.type === "token") {
+          receivedToken = true;
+          streamedContent += event.content || "";
+          appendTokenToMessage(setMessages, messageId, streamedContent);
+          await waitForStreamPaint();
+          continue;
+        }
+
+        if (event.type === "done") {
+          finalResult = {
+            answerHTML: (event.answer || "").trim(),
+            plainText: event.plainText || extractPlainText(event.answer || ""),
+          };
+          continue;
+        }
+
+        if (event.type === "error") {
+          throw new Error(event.message || "Chat stream failed");
+        }
+      }
+    }
+
+    if (buffer.trim()) {
+      const event = parseStreamEvent(buffer);
+      if (event?.type === "done") {
+        finalResult = {
+          answerHTML: (event.answer || "").trim(),
+          plainText: event.plainText || extractPlainText(event.answer || ""),
+        };
+      }
+    }
+
+    if (!finalResult) {
+      throw new Error("Chat stream ended before completion");
+    }
+
+    return finalResult;
+  } catch (error) {
+    if (receivedToken) throw error;
+    return sendChatMessageFallback(payload);
+  }
+}
+
+function parseStreamEvent(frame) {
+  const data = String(frame || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trim())
+    .join("");
+
+  if (!data) return null;
+  return JSON.parse(data);
 }
 
 const Chatbot = () => {
@@ -176,33 +322,15 @@ const Chatbot = () => {
         sessionId: sessionIdRef.current,
       };
 
-      const res = await fetch(
-        `${process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1"}/chat`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        }
+      const { answerHTML, plainText } = await sendChatMessageWithStream(
+        payload,
+        newBotMessageId,
+        setMessages
       );
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-
-      const answerHTML = (data.answer || "").trim();
-
-      // Cập nhật text cho history (bỏ HTML tags đi)
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = answerHTML;
-      const plainText = tempDiv.textContent || tempDiv.innerText || "";
       chatHistoryRef.current.push({ role: "model", parts: [{ text: plainText }] });
 
       // Cập nhật lại UI tin nhắn của bot
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === newBotMessageId ? { ...msg, content: answerHTML, isThinking: false } : msg
-        )
-      );
+      finalizeBotMessage(setMessages, newBotMessageId, answerHTML);
     } catch (error) {
       setMessages((prev) =>
         prev.map((msg) =>
@@ -408,7 +536,7 @@ const Chatbot = () => {
 
       {/* ====== CHATBOT POPUP ====== */}
       <div
-        className={`chatbot-popup-container fixed right-[35px] bottom-[95px] w-[380px] h-[600px] max-h-[80vh] bg-bgColor2/90 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl shadow-black/80 z-[100005] flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right max-sm:w-full max-sm:h-full max-sm:bottom-0 max-sm:right-0 max-sm:rounded-none
+        className={`chatbot-popup-container fixed right-[35px] bottom-[95px] w-[460px] h-[600px] max-h-[80vh] bg-bgColor2/90 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl shadow-black/80 z-[100005] flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right max-sm:w-full max-sm:h-full max-sm:bottom-0 max-sm:right-0 max-sm:rounded-none
         ${showChatbot ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-90 pointer-events-none"}
         [&_em-emoji-picker]:absolute [&_em-emoji-picker]:bottom-[80px] [&_em-emoji-picker]:left-[15px] [&_em-emoji-picker]:w-[calc(100%-30px)] [&_em-emoji-picker]:max-h-[350px] [&_em-emoji-picker]:z-[10005] [&_em-emoji-picker]:shadow-2xl [&_em-emoji-picker]:rounded-2xl [&_em-emoji-picker]:border [&_em-emoji-picker]:border-white/10 ${
           !showEmojiPicker ? "[&_em-emoji-picker]:hidden" : ""
@@ -502,7 +630,11 @@ const Chatbot = () => {
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                   </div>
                 ) : (
-                  <div dangerouslySetInnerHTML={{ __html: msg.content }} />
+                  msg.isStreaming ? (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                  ) : (
+                    <div dangerouslySetInnerHTML={{ __html: msg.content }} />
+                  )
                 )}
 
                 {msg.file && (

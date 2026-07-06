@@ -26,6 +26,7 @@ app.use(
     filter: (req, res) => {
       // Don't compress SSE responses
       if (req.headers.accept === 'text/event-stream') return false;
+      if (req.path.includes('/chat/stream')) return false;
       if (req.path.includes('/thumbnails/process')) return false;
       if (req.path.includes('/update-episodes')) return false;
       if (req.path.includes('/update-quality')) return false;

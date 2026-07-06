@@ -23,6 +23,42 @@ const handleChat = async (req, res) => {
     }
 };
 
+const writeStreamEvent = (res, event) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+    if (typeof res.flush === 'function') res.flush();
+};
+
+const handleChatStream = async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (res.socket && typeof res.socket.setNoDelay === 'function') res.socket.setNoDelay(true);
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+    writeStreamEvent(res, { type: 'ready' });
+
+    try {
+        const userId = req.user?._id || null;
+        const {message, history, metadata, sessionId} = req.body;
+
+        const result = await chatService.handleChatStream({
+            userId,
+            message,
+            history,
+            metadata,
+            sessionId,
+            onToken: (content) => writeStreamEvent(res, { type: 'token', content }),
+        });
+
+        writeStreamEvent(res, { type: 'done', answer: result.answer, plainText: result.plainText });
+        res.end();
+    } catch (error) {
+        console.error('Chat stream error: ', error);
+        writeStreamEvent(res, { type: 'error', message: error.message || 'Chat stream error' });
+        res.end();
+    }
+};
+
 // Lấy lịch sử chat của user
 const getChatHistory = async (req, res) => {
     try {
@@ -83,4 +119,4 @@ const clearChatHistory = async (req, res) => {
     }
 };
 
-module.exports = {handleChat, getChatHistory, clearChatHistory};
+module.exports = {handleChat, handleChatStream, getChatHistory, clearChatHistory};

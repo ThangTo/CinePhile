@@ -10,10 +10,7 @@ const MovieModel = require('../models/movie.model');
 const TrendingMovieModel = require('../models/trending_movie.model');
 const crawlerService = require('./crawler.service');
 const { slugify } = require('../utils/movieAdminUtils');
-const {
-  createChatCompletion,
-  extractChatMessageContent,
-} = require('./llmProvider.service');
+const { complete } = require('./llm');
 
 const execAsync = promisify(exec);
 
@@ -36,18 +33,6 @@ const TIKTOK_FETCH_RETRIES = Math.max(1, Number(process.env.TIKTOK_FETCH_RETRIES
 const TIKTOK_TRENDING_COUNT = Math.max(1, Number(process.env.TIKTOK_TRENDING_COUNT || 30));
 const TIKTOK_TMDB_SEARCH_LIMIT = Math.max(1, Number(process.env.TIKTOK_TMDB_SEARCH_LIMIT || 10));
 const AUTO_CRAWL_LIMIT = Math.max(0, Number(process.env.TRENDING_AUTO_CRAWL_LIMIT || 6));
-
-function resolveProviderName(...values) {
-  return String(values.find((value) => value !== undefined && value !== null && String(value).trim() !== '') || 'openrouter')
-    .trim()
-    .toLowerCase();
-}
-
-function getDefaultTrendingModel(provider) {
-  if (provider === 'gemini') return 'gemini-2.5-flash';
-  if (provider === 'openai') return 'gpt-4o-mini';
-  return 'google/gemini-2.0-flash-001';
-}
 
 const GENERIC_TRENDING_TERMS = new Set([
   'phim',
@@ -1135,32 +1120,18 @@ Yeu cau ai_quote:
   const userPrompt = `Danh sach ung vien phim:\n${JSON.stringify(movieListForAI, null, 2)}`;
 
   try {
-    const provider = resolveProviderName(
-      process.env.TRENDING_LLM_PROVIDER,
-      process.env.LLM_PROVIDER,
-      'openrouter',
-    );
-    const response = await createChatCompletion(
-      {
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
-        response_format: { type: 'json_object' },
-      },
-      {
-        scope: 'TRENDING',
-        provider,
-        defaultModel: getDefaultTrendingModel(provider),
-        referer: 'https://cinephine.io.vn',
-        title: 'CinePhine Trending Pipeline',
-        timeoutMs: 30000,
-      },
-    );
+    const response = await complete({
+      scope: 'TRENDING',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 2000,
+      response_format: { type: 'json_object' },
+    });
 
-    const content = extractChatMessageContent(response.data) || '';
+    const content = response.content || '';
     let parsed;
 
     try {
