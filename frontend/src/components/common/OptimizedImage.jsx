@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { preloadImage } from "utils/imagePreloader";
 import { useSectionVisible } from "components/common/LazySection";
 import imageCache from "utils/imageCache";
@@ -34,11 +34,14 @@ const OptimizedImage = ({
 
   const allSrcs = useMemo(() => [src, ...(fallbackSrcs || [])].filter(Boolean), [src, fallbackSrcs]);
   const [currentSrcIndex, setCurrentSrcIndex] = useState(0);
+  const [useOriginalSrc, setUseOriginalSrc] = useState(false);
   const activeSrc = allSrcs[currentSrcIndex] || null;
 
   // Reset index when root src changes
   useEffect(() => {
     setCurrentSrcIndex(0);
+    setUseOriginalSrc(false);
+    setHasError(false);
   }, [src]);
 
   // Generate optimized URL once using useMemo
@@ -56,6 +59,7 @@ const OptimizedImage = ({
       return `https://images.weserv.nl/?url=${activeSrc}&w=${finalSize}&q=${finalQuality}&output=webp`;
     }
   }, [activeSrc, sizeKey, size, quality]);
+  const resolvedSrc = useOriginalSrc ? activeSrc : optimizedUrl;
 
   // If lazy is false or priority is true, or section is visible, load immediately
   const shouldLoadImmediately = !lazy || priority || sectionVisible;
@@ -66,9 +70,25 @@ const OptimizedImage = ({
   const imgRef = useRef(null);
   const observerRef = useRef(null);
 
+  const advanceImageSource = useCallback(() => {
+    if (!useOriginalSrc && activeSrc) {
+      setUseOriginalSrc(true);
+      return;
+    }
+
+    if (currentSrcIndex < allSrcs.length - 1) {
+      setCurrentSrcIndex((prev) => prev + 1);
+      setUseOriginalSrc(false);
+      return;
+    }
+
+    setHasError(true);
+    if (onError) onError();
+  }, [activeSrc, allSrcs.length, currentSrcIndex, onError, useOriginalSrc]);
+
   // Intersection Observer for lazy loading
   useEffect(() => {
-    if (!lazy || priority || sectionVisible || isInView || !optimizedUrl) return;
+    if (!lazy || priority || sectionVisible || isInView || !resolvedSrc) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -76,10 +96,10 @@ const OptimizedImage = ({
           if (entry.isIntersecting) {
             setIsInView(true);
             // Check cache before setting src
-            if (imageCache.isCached(optimizedUrl)) {
+            if (imageCache.isCached(resolvedSrc)) {
               setIsLoaded(true);
             }
-            setImageSrc(optimizedUrl);
+            setImageSrc(resolvedSrc);
             if (observerRef.current) {
               observerRef.current.disconnect();
             }
@@ -102,7 +122,7 @@ const OptimizedImage = ({
         observerRef.current.disconnect();
       }
     };
-  }, [lazy, priority, sectionVisible, optimizedUrl, isInView]);
+  }, [lazy, priority, sectionVisible, resolvedSrc, isInView]);
 
   // Preload on hover
   useEffect(() => {
@@ -121,7 +141,7 @@ const OptimizedImage = ({
     return () => {
       element.removeEventListener("mouseenter", handleMouseEnter);
     };
-  }, [preloadOnHover, imageSrc, isLoaded, optimizedUrl]);
+  }, [preloadOnHover, imageSrc, isLoaded]);
 
   // Load image when src changes
   // For priority images, use native img onload instead of creating new Image object
@@ -141,33 +161,29 @@ const OptimizedImage = ({
       if (onLoad) onLoad();
     };
     img.onerror = () => {
-      if (currentSrcIndex < allSrcs.length - 1) {
-        setCurrentSrcIndex((prev) => prev + 1);
-      } else {
-        setHasError(true);
-        if (onError) onError();
-      }
+      // The rendered img element owns fallback and error state. This preload
+      // probe must not race it and mark a successfully rendered fallback as failed.
     };
     img.src = imageSrc;
-  }, [allSrcs.length, currentSrcIndex, imageSrc, onLoad, onError, priority]);
+  }, [advanceImageSource, imageSrc, onLoad, priority]);
 
   // If lazy is false or priority is true, or section is visible, load immediately when src changes
   useEffect(() => {
-    if (shouldLoadImmediately && optimizedUrl) {
+    if ((shouldLoadImmediately || isInView) && resolvedSrc) {
       // Reset states when URL changes
       setIsLoaded(false);
       setHasError(false);
 
       // Check cache first - if cached, mark as loaded immediately
-      const cached = imageCache.isCached(optimizedUrl);
+      const cached = imageCache.isCached(resolvedSrc);
       if (cached) {
         setIsLoaded(true);
       }
 
-      setImageSrc(optimizedUrl);
+      setImageSrc(resolvedSrc);
       setIsInView(true);
     }
-  }, [shouldLoadImmediately, optimizedUrl, sectionVisible]);
+  }, [isInView, resolvedSrc, shouldLoadImmediately]);
 
   // Re-check cache when imageSrc changes (in case image was preloaded after component mount)
   useEffect(() => {
@@ -194,11 +210,9 @@ const OptimizedImage = ({
     };
 
     testImg.onerror = () => {
-      // Image failed to load, don't mark as loaded
+      // Image failed to load, don't mark as loaded. The rendered img element
+      // handles source fallback so this cache probe cannot override its state.
       isHandled = true;
-      if (currentSrcIndex < allSrcs.length - 1) {
-        setCurrentSrcIndex((prev) => prev + 1);
-      }
     };
 
     testImg.src = imageSrc;
@@ -212,7 +226,7 @@ const OptimizedImage = ({
         imageCache.markAsLoaded(imageSrc);
       }
     });
-  }, [allSrcs.length, currentSrcIndex, imageSrc, hasError]);
+  }, [imageSrc, hasError]);
 
   // Separate container props from image props
   const { containerClassName, ...restProps } = props;
@@ -274,16 +288,10 @@ const OptimizedImage = ({
             }
           }}
           onError={() => {
-            if (currentSrcIndex < allSrcs.length - 1) {
-              setCurrentSrcIndex((prev) => prev + 1);
-              return;
-            }
-            setHasError(true);
-            // Mark as failed to avoid retrying
             if (imageSrc) {
               imageCache.markAsFailed(imageSrc);
             }
-            if (onError) onError();
+            advanceImageSource();
           }}
         />
       )}
