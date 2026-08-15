@@ -13,16 +13,27 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Ket noi SSH vao VPS va Deploy
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Deploy backend to VPS
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 15m
           script: |
-            cd ~/CinePhine/backend
-            git reset --hard HEAD
-            git pull origin dev
-            npm install
-            pm2 restart cinephine-api --update-env
-            pm2 restart cinephine-scheduler --update-env || pm2 start ecosystem.config.js --only cinephine-scheduler --env production
+            set -eu
+
+            APP_DIR=/opt/cinephine
+            test -d "$APP_DIR/.git"
+
+            cd "$APP_DIR"
+            git fetch --prune origin dev
+            git checkout -B dev origin/dev
+            git reset --hard origin/dev
+
+            cd backend
+            npm ci --omit=dev
+            pm2 startOrReload ecosystem.config.js --env production --update-env
+            pm2 save
+
+            curl --fail --retry 5 --retry-delay 2 http://127.0.0.1:5000/health
