@@ -6,7 +6,6 @@ const GenreModel = require('../models/genre.model');
 const CountryModel = require('../models/country.model');
 const { ensureCastForNames } = require('../integrations/cast.service');
 const { slugify } = require('../utils/movieAdminUtils');
-const { createNotification } = require('../controllers/notification.controller');
 const { invalidateMovieCache } = require('../middleware/cache.middleware');
 const { extractEpisodeNumber } = require('../utils/episodeNumber.util');
 const redisService = require('./redis.service');
@@ -233,19 +232,6 @@ const crawlMovies = async (page = 1, onProgress = null, skipExisting = false) =>
           await upsertTaxonomies(categories, countries);
         } catch (taxError) {
           console.error('⚠️  Lỗi khi upsert taxonomies:', taxError.message);
-        }
-
-        // --- [THÊM MỚI] GỬI THÔNG BÁO ---
-        // Logic: Gửi thông báo khi phim được cập nhật/thêm mới
-        try {
-          await createNotification({
-            title: 'Cập nhật phim',
-            message: `Phim ${moviePayload.name} (${moviePayload.currentEpisode}) vừa được cập nhật.`,
-            type: 'movie_update',
-            movieId: savedMovie._id,
-          });
-        } catch (notiError) {
-          console.error(`⚠️ Lỗi gửi thông báo phim ${slug}:`, notiError.message);
         }
 
         // 5. ĐẢM BẢO CAST (diễn viên/đạo diễn) ĐƯỢC LƯU TRONG COLLECTION CAST (TMDb)
@@ -720,7 +706,6 @@ const crawlMovieBySlug = async (slug) => {
     const axios = require('axios');
     const he = require('he');
     const { ensureCastForNames, ensureCastFromTmdbId } = require('../integrations/cast.service');
-    const { createNotification } = require('../controllers/notification.controller');
     const API_BASE_URL = 'https://phimapi.com';
 
     // Kiểm tra phim đã tồn tại chưa
@@ -808,18 +793,6 @@ const crawlMovieBySlug = async (slug) => {
       await upsertTaxonomies(categories, countries);
     } catch (taxError) {
       console.error('⚠️  Lỗi khi upsert taxonomies:', taxError.message);
-    }
-
-    // Gửi thông báo
-    try {
-      await createNotification({
-        title: 'Cập nhật phim',
-        message: `Phim ${moviePayload.name} (${moviePayload.currentEpisode}) vừa được cập nhật.`,
-        type: 'movie_update',
-        movieId: savedMovie._id,
-      });
-    } catch (notiError) {
-      console.error(`⚠️ Lỗi gửi thông báo phim ${slug}:`, notiError.message);
     }
 
     // Đồng bộ Cast
