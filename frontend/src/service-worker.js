@@ -7,6 +7,11 @@ import { CacheFirst, NetworkOnly, StaleWhileRevalidate } from "workbox-strategie
 
 clientsClaim();
 
+// Activate a newly installed worker so clients on the previous bundle also update.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
 precacheAndRoute(self.__WB_MANIFEST);
 
 const publicUrl = process.env.PUBLIC_URL || "";

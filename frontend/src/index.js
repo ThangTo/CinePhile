@@ -18,12 +18,14 @@ root.render(
 );
 
 serviceWorkerRegistration.register({
+  // Auto-update: activate the waiting service worker immediately,
+  // the "controlling" handler below reloads the page with the new bundle.
   onUpdate: (workbox) => {
-    window.dispatchEvent(
-      new CustomEvent("cinephine:pwa-update", {
-        detail: { workbox },
-      }),
-    );
+    if (typeof workbox.messageSkipWaiting === "function") {
+      workbox.messageSkipWaiting();
+      return;
+    }
+    workbox.messageSW?.({ type: "SKIP_WAITING" });
   },
   onControlling: () => {
     window.location.reload();

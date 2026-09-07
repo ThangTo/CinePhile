@@ -5,7 +5,6 @@ import { NotificationProvider } from "contexts/NotificationContext";
 import { ThemeProvider } from "contexts/ThemeContext";
 import { VoiceProvider, useVoice } from "contexts/VoiceContext";
 import ErrorBoundary from "components/common/ErrorBoundary";
-import PwaUpdateToast from "components/pwa/PwaUpdateToast";
 import { initUserInteractionListener } from "utils/userInteraction";
 import "styles/themes.css";
 import ProtectedRoute from "./components/general/ProtectedRoute";
@@ -27,9 +26,7 @@ const CastDetailPage = lazy(() => import("./pages/CastDetailPage"));
 const MainLayout = lazy(() => import("layouts/MainLayout"));
 const NotFoundPage = lazy(() => import("./pages/NotFound"));
 const GoogleAuthHandler = lazy(() => import("pages/GoogleAuthHandler"));
-const GoogleAuthHandlerWrapper = lazy(() =>
-  import("components/common/GoogleAuthHandlerWrapper")
-);
+const GoogleAuthHandlerWrapper = lazy(() => import("components/common/GoogleAuthHandlerWrapper"));
 const CursorEffects = lazy(() => import("components/common/CursorEffects"));
 const VoiceIndicator = lazy(() => import("components/common/VoiceIndicator"));
 const TimiOnboarding = lazy(() => import("components/common/TimiOnboarding"));
@@ -120,7 +117,6 @@ function AppInner() {
         </Suspense>
       </Router>
       <VoiceWidgets />
-      <PwaUpdateToast />
     </>
   );
 }
